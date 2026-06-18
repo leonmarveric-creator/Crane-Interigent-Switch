@@ -1,0 +1,13 @@
+# Netlify 設定。Next.js (App Router) は Netlify の Next Runtime が自動対応。
+[build]
+  command = "npm run build"
+
+# Next.js ランタイムプラグイン (Netlifyが自動で入れるが明示しておく)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# 注意: Vercel Cron (vercel.json) は Netlify では動かない。
+# iCal同期と光目覚ましの定期実行は別途設定する (下記いずれか):
+#   A) 外部Cronサービス (cron-job.org 等) で各APIを叩く ← 簡単・推奨
+#   B) Netlify Scheduled Functions を使う
+# 詳細は README の「Netlifyでの定期実行」を参照。
