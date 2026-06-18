@@ -1,4 +1,4 @@
-import { aesCmac } from "aes-cmac";
+import { AesCmac } from "aes-cmac";
 
 /**
  * Sesame 5 / candyhouse Web API クライアント。
@@ -26,7 +26,8 @@ async function generateSign(secretKeyHex: string): Promise<string> {
   ts.writeUInt32LE(epochSec, 0);
   const message = ts.subarray(1, 4); // index0(LSB)を捨て、続く3byte
 
-  const mac = await aesCmac(key, message); // Uint8Array (16byte)
+  const cmac = new AesCmac(key);
+  const mac = await cmac.calculate(message); // Promise<Uint8Array> (16byte)
   return Buffer.from(mac).toString("hex");
 }
 
