@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { fetchIcalEvents, applyStayTimes, extractPhoneLast4, randomPin } from "@/lib/ical";
+import { fetchIcalEvents, applyStayTimes, extractPhoneLast4, randomPin, extractReservationUrl } from "@/lib/ical";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -54,6 +54,8 @@ export async function GET(req: NextRequest) {
         .eq("airbnb_uid", ev.uid)
         .maybeSingle();
 
+      const reservationUrl = extractReservationUrl(ev.description);
+
       if (existing) {
         await supabaseAdmin
           .from("reservations")
@@ -61,6 +63,7 @@ export async function GET(req: NextRequest) {
             check_in: checkIn.toISOString(),
             check_out: checkOut.toISOString(),
             status: "active", // 再出現したら復活
+            airbnb_reservation_url: reservationUrl, // 既存ぶんも埋める
           })
           .eq("id", existing.id);
         stat.updated++;
@@ -76,6 +79,7 @@ export async function GET(req: NextRequest) {
           check_out: checkOut.toISOString(),
           status: "active",
           unlock_pin: pin,
+          airbnb_reservation_url: reservationUrl,
         });
         stat.added++;
       }

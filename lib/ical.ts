@@ -23,6 +23,12 @@ export function randomPin(): string {
   return String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 }
 
+/** Airbnb iCal 説明文から予約ページURLを抽出。 */
+export function extractReservationUrl(description: string): string | null {
+  const m = description.match(/https?:\/\/\S*reservations\/details\/\w+/i);
+  return m ? m[0].replace(/\\+$/, "") : null;
+}
+
 /**
  * Airbnb の iCal URL から予約VEVENTを取得。
  * Airbnbは DATE値(終日)で来るため、チェックイン/アウトの時刻を後段で補正する。

@@ -19,7 +19,7 @@ export default async function AdminPage() {
 
   const { data: reservations } = await supabaseAdmin
     .from("reservations")
-    .select("id, room_id, source, check_in, check_out, status, guest_name, guest_lang, unlock_pin")
+    .select("id, room_id, source, check_in, check_out, status, guest_name, guest_lang, unlock_pin, airbnb_reservation_url")
     .order("check_in", { ascending: false })
     .limit(100);
 
@@ -55,6 +55,7 @@ export default async function AdminPage() {
       check_in: r.check_in,
       check_out: r.check_out,
       unlock_pin: r.unlock_pin,
+      airbnb_reservation_url: r.airbnb_reservation_url ?? null,
     };
   });
 

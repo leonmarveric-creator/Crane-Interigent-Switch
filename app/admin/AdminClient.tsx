@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound, QrCode,
+  Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
+  QrCode, Globe, ExternalLink,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
+import {
+  AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
+} from "@/lib/adminI18n";
 import { addReservation, cancelReservation, regeneratePin, assignDevices } from "./actions";
 
 export interface Room {
@@ -19,6 +23,7 @@ export interface Reservation {
   guest_name: string | null; guest_lang: string;
   check_in: string; check_out: string;
   unlock_pin: string | null;
+  airbnb_reservation_url: string | null;
 }
 export interface SwitchBotInfo {
   error: string | null;
@@ -26,8 +31,9 @@ export interface SwitchBotInfo {
   infraredRemoteList: { deviceId: string; deviceName: string; remoteType: string }[];
 }
 
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString("ja-JP", {
+const LOCALE: Record<AdminLang, string> = { ja: "ja-JP", en: "en-US", zh: "zh-CN" };
+const fmt = (iso: string, lang: AdminLang) =>
+  new Date(iso).toLocaleString(LOCALE[lang], {
     month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
     timeZone: "Asia/Tokyo",
   });
@@ -35,7 +41,15 @@ const fmt = (iso: string) =>
 export default function AdminClient({
   rooms, reservations, switchbot,
 }: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo }) {
+  const [lang, setLang] = useState<AdminLang>("ja");
   const [filter, setFilter] = useState<string>("all");
+  const t = AT[lang];
+
+  useEffect(() => {
+    const saved = localStorage.getItem("adminLang");
+    if (isAdminLang(saved)) setLang(saved);
+  }, []);
+  const changeLang = (l: AdminLang) => { setLang(l); localStorage.setItem("adminLang", l); };
 
   const shown = useMemo(
     () => reservations.filter((r) => filter === "all" || r.room_slug === filter),
@@ -57,36 +71,39 @@ export default function AdminClient({
       <div className="relative z-10 mx-auto max-w-5xl px-5 py-8">
         <header className="mb-8 flex items-center justify-between">
           <div>
-            <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">HOST DASHBOARD</p>
-            <h1 className="mt-1 text-2xl font-semibold">部屋QR ＆ 予約管理</h1>
+            <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">{t.dashboard}</p>
+            <h1 className="mt-1 text-2xl font-semibold">{t.title}</h1>
           </div>
-          <button onClick={logout}
-            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs active:scale-95">
-            <LogOut className="h-4 w-4" /> ログアウト
-          </button>
+          <div className="flex items-center gap-2">
+            <LangSwitch lang={lang} onChange={changeLang} />
+            <button onClick={logout}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs active:scale-95">
+              <LogOut className="h-4 w-4" /> {t.logout}
+            </button>
+          </div>
         </header>
 
-        {/* 印刷用 固定QR (ドアに貼る) */}
+        {/* 印刷用 固定QR */}
         <section className="mb-8">
           <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
-            <QrCode className="h-4 w-4" /> ドア用 固定QR（印刷して各部屋の入口に貼る）
+            <QrCode className="h-4 w-4" /> {t.doorQrTitle}
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {rooms.map((r) => <RoomQrCard key={r.id} r={r} />)}
           </div>
         </section>
 
-        {/* 部屋ごとのデバイス割り当て */}
-        <DeviceAssignSection rooms={rooms} info={switchbot} />
+        {/* デバイス割り当て */}
+        <DeviceAssignSection rooms={rooms} info={switchbot} t={t} />
 
         {/* 予約追加フォーム */}
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
           <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
-            <Plus className="h-4 w-4" /> 手動で予約を追加（PIN自動発行）
+            <Plus className="h-4 w-4" /> {t.addTitle}
           </div>
           <form action={addReservation} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-xs text-white/60">
-              部屋
+              {t.room}
               <select name="room_id" required
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]">
                 {rooms.map((r) => (
@@ -95,43 +112,43 @@ export default function AdminClient({
               </select>
             </label>
             <label className="text-xs text-white/60">
-              言語
+              {t.language}
               <select name="guest_lang" defaultValue="en"
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]">
                 {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
               </select>
             </label>
             <label className="text-xs text-white/60">
-              チェックイン（日本時間）
+              {t.checkIn}
               <input type="datetime-local" name="check_in" required
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]" />
             </label>
             <label className="text-xs text-white/60">
-              チェックアウト（日本時間）
+              {t.checkOut}
               <input type="datetime-local" name="check_out" required
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]" />
             </label>
             <label className="text-xs text-white/60">
-              ゲスト名（任意）
+              {t.guestName}（{t.optional}）
               <input type="text" name="guest_name" placeholder="—"
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white" />
             </label>
             <label className="text-xs text-white/60">
-              PIN（任意・空なら自動4桁）
-              <input type="text" name="unlock_pin" inputMode="numeric" placeholder="自動" maxLength={6}
+              {t.pinField}
+              <input type="text" name="unlock_pin" inputMode="numeric" placeholder={t.autoPlaceholder} maxLength={6}
                 className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white font-mono" />
             </label>
             <button type="submit"
               className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50
                 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
-              <Plus className="h-4 w-4" /> 予約を追加してPINを発行
+              <Plus className="h-4 w-4" /> {t.addButton}
             </button>
           </form>
         </section>
 
         {/* フィルタ */}
         <div className="mb-4 flex flex-wrap gap-2">
-          <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label="すべて" />
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
           {rooms.map((r) => (
             <FilterChip key={r.id} active={filter === r.slug}
               onClick={() => setFilter(r.slug)} label={r.display_name} />
@@ -140,9 +157,9 @@ export default function AdminClient({
 
         {/* 予約カード */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {shown.map((r) => <ReservationCard key={r.id} r={r} />)}
+          {shown.map((r) => <ReservationCard key={r.id} r={r} t={t} lang={lang} />)}
           {shown.length === 0 && (
-            <p className="col-span-full py-12 text-center text-sm text-white/40">予約がありません</p>
+            <p className="col-span-full py-12 text-center text-sm text-white/40">{t.noReservations}</p>
           )}
         </div>
       </div>
@@ -150,7 +167,37 @@ export default function AdminClient({
   );
 }
 
-function DeviceAssignSection({ rooms, info }: { rooms: Room[]; info: SwitchBotInfo }) {
+function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLang) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs active:scale-95">
+        <Globe className="h-4 w-4 text-cyan-300" /> {ADMIN_LANG_LABEL[lang]}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            className="absolute right-0 z-20 mt-2 w-32 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0c14]/90 backdrop-blur-xl">
+            {ADMIN_LANGS.map((l) => (
+              <li key={l}>
+                <button onClick={() => { onChange(l); setOpen(false); }}
+                  className={`w-full px-4 py-2.5 text-left text-sm ${l === lang ? "text-cyan-300 bg-cyan-500/10" : "text-white/70 hover:bg-white/5"}`}>
+                  {ADMIN_LANG_LABEL[l]}
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+type T = (typeof AT)["ja"];
+
+function DeviceAssignSection({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
   const ir = info.infraredRemoteList ?? [];
   const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
   const lights = ir.filter((d) => /light/i.test(d.remoteType));
@@ -158,20 +205,18 @@ function DeviceAssignSection({ rooms, info }: { rooms: Room[]; info: SwitchBotIn
   return (
     <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
       <div className="mb-1 flex items-center gap-2 text-sm text-cyan-200">
-        <KeyRound className="h-4 w-4" /> 部屋ごとのデバイス割り当て
+        <KeyRound className="h-4 w-4" /> {t.assignTitle}
       </div>
-      <p className="mb-4 text-xs text-white/40">
-        各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。
-      </p>
+      <p className="mb-4 text-xs text-white/40">{t.assignDesc}</p>
 
       {info.error ? (
         <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-          {info.error}（Netlifyに SWITCHBOT_TOKEN / SWITCHBOT_SECRET を追加して再デプロイすると選べます）
+          {info.error}{t.switchbotEnvNote}
         </p>
       ) : (
         <div className="space-y-3">
           {rooms.map((room) => (
-            <RoomAssignRow key={room.id} room={room} acs={acs} lights={lights} />
+            <RoomAssignRow key={room.id} room={room} acs={acs} lights={lights} t={t} />
           ))}
         </div>
       )}
@@ -180,16 +225,15 @@ function DeviceAssignSection({ rooms, info }: { rooms: Room[]; info: SwitchBotIn
 }
 
 function RoomAssignRow({
-  room, acs, lights,
+  room, acs, lights, t,
 }: {
   room: Room;
   acs: { deviceId: string; deviceName: string }[];
   lights: { deviceId: string; deviceName: string }[];
+  t: T;
 }) {
   const opt = (d: { deviceId: string; deviceName: string }) => (
-    <option key={d.deviceId} value={d.deviceId}>
-      {d.deviceName || d.deviceId}
-    </option>
+    <option key={d.deviceId} value={d.deviceId}>{d.deviceName || d.deviceId}</option>
   );
   return (
     <form action={assignDevices}
@@ -197,24 +241,24 @@ function RoomAssignRow({
       <input type="hidden" name="room_id" value={room.id} />
       <div className="text-sm font-medium text-white/80">{room.display_name}</div>
       <label className="text-[11px] text-white/50">
-        エアコン
+        {t.ac}
         <select name="ac" defaultValue={room.ac_device_id ?? ""}
           className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
-          <option value="">（なし）</option>
+          <option value="">{t.none}</option>
           {acs.map(opt)}
         </select>
       </label>
       <label className="text-[11px] text-white/50">
-        照明
+        {t.light}
         <select name="light" defaultValue={room.light_device_id ?? ""}
           className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
-          <option value="">（なし）</option>
+          <option value="">{t.none}</option>
           {lights.map(opt)}
         </select>
       </label>
       <button type="submit"
         className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-4 py-2 text-xs text-emerald-200 active:bg-emerald-500/30">
-        保存
+        {t.save}
       </button>
     </form>
   );
@@ -241,10 +285,10 @@ function RoomQrCard({ r }: { r: Room }) {
       <img src={r.qr} alt={`QR ${r.slug}`} className="mx-auto w-full max-w-[140px] rounded-xl bg-white p-1.5" />
       <p className="mt-2 truncate text-xs text-white/70">{r.display_name}</p>
       <div className="mt-2 flex justify-center gap-2">
-        <button onClick={copy} className="text-white/50 hover:text-cyan-300" title="URLコピー">
+        <button onClick={copy} className="text-white/50 hover:text-cyan-300" title="URL">
           {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
         </button>
-        <a href={r.qr} download={`qr-${r.slug}.png`} className="text-white/50 hover:text-white" title="QR保存">
+        <a href={r.qr} download={`qr-${r.slug}.png`} className="text-white/50 hover:text-white" title="QR">
           <Download className="h-4 w-4" />
         </a>
       </div>
@@ -252,7 +296,7 @@ function RoomQrCard({ r }: { r: Room }) {
   );
 }
 
-function ReservationCard({ r }: { r: Reservation }) {
+function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang }) {
   const [copied, setCopied] = useState(false);
   const active = r.status === "active";
 
@@ -279,29 +323,34 @@ function ReservationCard({ r }: { r: Reservation }) {
               {r.status}
             </span>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">
-              {r.source === "ical" ? "Airbnb" : "手動"}
+              {r.source === "ical" ? "Airbnb" : t.manual}
             </span>
           </div>
-          <p className="mt-1.5 text-xs text-white/50">{fmt(r.check_in)} → {fmt(r.check_out)}</p>
+          <p className="mt-1.5 text-xs text-white/50">{fmt(r.check_in, lang)} → {fmt(r.check_out, lang)}</p>
           {r.guest_name && <p className="text-xs text-white/40">{r.guest_name}・{r.guest_lang}</p>}
         </div>
 
-        {/* PIN (ゲストに送る数字) */}
         <button onClick={copyPin}
           className="shrink-0 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-center">
           <div className="flex items-center gap-1 text-[10px] text-cyan-300/70">
-            <KeyRound className="h-3 w-3" /> PIN {copied ? "✓" : ""}
+            <KeyRound className="h-3 w-3" /> {t.pin} {copied ? "✓" : ""}
           </div>
           <div className="font-mono text-2xl tracking-[0.3em] text-cyan-200">{r.unlock_pin ?? "----"}</div>
         </button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {r.airbnb_reservation_url && (
+          <a href={r.airbnb_reservation_url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
+            <ExternalLink className="h-3.5 w-3.5" /> {t.openAirbnb}
+          </a>
+        )}
         <form action={regeneratePin}>
           <input type="hidden" name="id" value={r.id} />
           <button type="submit"
             className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
-            <RefreshCw className="h-3.5 w-3.5" /> PIN再発行
+            <RefreshCw className="h-3.5 w-3.5" /> {t.regenPin}
           </button>
         </form>
         {active && (
@@ -309,7 +358,7 @@ function ReservationCard({ r }: { r: Reservation }) {
             <input type="hidden" name="id" value={r.id} />
             <button type="submit"
               className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
-              <Ban className="h-3.5 w-3.5" /> キャンセル
+              <Ban className="h-3.5 w-3.5" /> {t.cancel}
             </button>
           </form>
         )}
