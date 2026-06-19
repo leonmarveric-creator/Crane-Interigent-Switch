@@ -13,7 +13,10 @@ export const maxDuration = 60;
  * Vercel Cron は Authorization: Bearer ${CRON_SECRET} を付与。
  */
 export async function GET(req: NextRequest) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  const key = new URL(req.url).searchParams.get("key");
+  if (!secret || (auth !== `Bearer ${secret}` && key !== secret)) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 

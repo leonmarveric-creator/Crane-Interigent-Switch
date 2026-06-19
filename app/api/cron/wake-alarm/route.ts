@@ -10,7 +10,10 @@ export const runtime = "nodejs";
  *  該当部屋の照明をONして triggered_at を記録 (二重点灯防止)。
  */
 export async function GET(req: NextRequest) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  const key = new URL(req.url).searchParams.get("key");
+  if (!secret || (auth !== `Bearer ${secret}` && key !== secret)) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
