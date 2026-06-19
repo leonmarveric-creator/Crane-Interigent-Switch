@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import AdminClient, { type Room, type Reservation } from "./AdminClient";
+import { listDevices } from "@/lib/switchbot";
+import AdminClient, { type Room, type Reservation, type SwitchBotInfo } from "./AdminClient";
 
 export const dynamic = "force-dynamic";
 
@@ -52,5 +53,17 @@ export default async function AdminPage() {
     };
   });
 
-  return <AdminClient rooms={rooms} reservations={enriched} />;
+  // SwitchBotデバイス一覧 (ID確認用)。env未設定なら error メッセージ。
+  let switchbot: SwitchBotInfo;
+  if (process.env.SWITCHBOT_TOKEN && process.env.SWITCHBOT_SECRET) {
+    const r = await listDevices({
+      token: process.env.SWITCHBOT_TOKEN,
+      secret: process.env.SWITCHBOT_SECRET,
+    });
+    switchbot = r;
+  } else {
+    switchbot = { error: "SWITCHBOT_TOKEN / SECRET が未設定です", deviceList: [], infraredRemoteList: [] };
+  }
+
+  return <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} />;
 }

@@ -46,6 +46,31 @@ async function sendCommand(
   return { ok, status: res.status, payload };
 }
 
+/** デバイス一覧を取得 (管理画面でID確認用)。 */
+export async function listDevices(creds: SwitchBotCreds): Promise<{
+  error: string | null;
+  deviceList: { deviceId: string; deviceName: string; deviceType: string }[];
+  infraredRemoteList: { deviceId: string; deviceName: string; remoteType: string }[];
+}> {
+  try {
+    const res = await fetch(`${BASE}/devices`, {
+      headers: authHeaders(creds),
+      cache: "no-store",
+    });
+    const json = await res.json();
+    if (json?.statusCode !== 100) {
+      return { error: json?.message || `status ${json?.statusCode}`, deviceList: [], infraredRemoteList: [] };
+    }
+    return {
+      error: null,
+      deviceList: json.body?.deviceList ?? [],
+      infraredRemoteList: json.body?.infraredRemoteList ?? [],
+    };
+  } catch (e: any) {
+    return { error: e?.message || "fetch failed", deviceList: [], infraredRemoteList: [] };
+  }
+}
+
 /** 仮想IRエアコン: ON / OFF。setAllで温度等の細かい指定も可能。 */
 export function acTurnOn(creds: SwitchBotCreds, deviceId: string) {
   return sendCommand(creds, deviceId, { command: "turnOn" });
