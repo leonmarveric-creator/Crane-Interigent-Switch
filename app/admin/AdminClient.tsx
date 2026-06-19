@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
-  QrCode, Globe, ExternalLink,
+  QrCode, Globe, ExternalLink, LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb,
+  Loader2, X,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
@@ -95,6 +96,9 @@ export default function AdminClient({
 
         {/* デバイス割り当て */}
         <DeviceAssignSection rooms={rooms} info={switchbot} t={t} />
+
+        {/* デバイステスト */}
+        <DeviceTestSection rooms={rooms} t={t} />
 
         {/* 予約追加フォーム */}
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
@@ -261,6 +265,72 @@ function RoomAssignRow({
         {t.save}
       </button>
     </form>
+  );
+}
+
+function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
+  return (
+    <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+      <div className="mb-1 flex items-center gap-2 text-sm text-violet-200">
+        <Snowflake className="h-4 w-4" /> {t.testTitle}
+      </div>
+      <p className="mb-4 text-xs text-white/40">{t.testDesc}</p>
+      <div className="space-y-3">
+        {rooms.map((room) => <DeviceTestRow key={room.id} room={room} t={t} />)}
+      </div>
+    </section>
+  );
+}
+
+type TestAction = "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
+
+function DeviceTestRow({ room, t }: { room: Room; t: T }) {
+  const [busy, setBusy] = useState<TestAction | null>(null);
+  const [result, setResult] = useState<{ action: TestAction; ok: boolean } | null>(null);
+
+  const run = async (action: TestAction) => {
+    setBusy(action); setResult(null);
+    try {
+      const res = await fetch("/api/admin/test-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomSlug: room.slug, action }),
+      });
+      setResult({ action, ok: res.ok });
+    } catch {
+      setResult({ action, ok: false });
+    }
+    setBusy(null);
+  };
+
+  const Btn = ({ action, label, Icon, color }: {
+    action: TestAction; label: string; Icon: any; color: string;
+  }) => {
+    const isBusy = busy === action;
+    const r = result?.action === action ? result : null;
+    return (
+      <button onClick={() => run(action)} disabled={!!busy}
+        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${color} disabled:opacity-50`}>
+        {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : r ? (r.ok ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <X className="h-3.5 w-3.5 text-rose-300" />)
+          : <Icon className="h-3.5 w-3.5" />}
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="mb-2 text-sm font-medium text-white/80">{room.display_name}</div>
+      <div className="flex flex-wrap gap-2">
+        <Btn action="unlock" label={t.unlock} Icon={LockKeyholeOpen} color="border-emerald-400/30 bg-emerald-500/10 text-emerald-200" />
+        <Btn action="lock" label={t.lock} Icon={LockKeyhole} color="border-cyan-400/30 bg-cyan-500/10 text-cyan-200" />
+        <Btn action="ac_on" label={t.acOn} Icon={Snowflake} color="border-cyan-400/30 bg-cyan-500/10 text-cyan-200" />
+        <Btn action="ac_off" label={t.acOff} Icon={Snowflake} color="border-white/15 bg-white/5 text-white/60" />
+        <Btn action="light_on" label={t.lightOn} Icon={Lightbulb} color="border-amber-400/30 bg-amber-500/10 text-amber-200" />
+        <Btn action="light_off" label={t.lightOff} Icon={Lightbulb} color="border-white/15 bg-white/5 text-white/60" />
+      </div>
+    </div>
   );
 }
 

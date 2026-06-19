@@ -37,6 +37,14 @@ type Dict = {
   manual: string;
   openAirbnb: string;
   switchbotEnvNote: string;
+  testTitle: string;
+  testDesc: string;
+  unlock: string;
+  lock: string;
+  acOn: string;
+  acOff: string;
+  lightOn: string;
+  lightOff: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -57,6 +65,10 @@ export const AT: Record<AdminLang, Dict> = {
     pin: "PIN", regenPin: "PIN再発行", cancel: "キャンセル", manual: "手動",
     openAirbnb: "Airbnbで開く",
     switchbotEnvNote: "（Netlifyに SWITCHBOT_TOKEN / SWITCHBOT_SECRET を追加して再デプロイすると選べます）",
+    testTitle: "デバイステスト（その場で動作確認）",
+    testDesc: "各部屋の機器をホストとして直接操作します（ゲストのPINは不要）。",
+    unlock: "解錠", lock: "施錠",
+    acOn: "エアコンON", acOff: "エアコンOFF", lightOn: "照明ON", lightOff: "照明OFF",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -75,6 +87,10 @@ export const AT: Record<AdminLang, Dict> = {
     pin: "PIN", regenPin: "Reissue PIN", cancel: "Cancel", manual: "Manual",
     openAirbnb: "Open in Airbnb",
     switchbotEnvNote: "(Add SWITCHBOT_TOKEN / SWITCHBOT_SECRET on Netlify and redeploy to choose devices)",
+    testTitle: "Device test (check on the spot)",
+    testDesc: "Control each room's devices directly as the host (no guest PIN needed).",
+    unlock: "Unlock", lock: "Lock",
+    acOn: "AC On", acOff: "AC Off", lightOn: "Light On", lightOff: "Light Off",
   },
   zh: {
     dashboard: "房东控制台",
@@ -93,5 +109,9 @@ export const AT: Record<AdminLang, Dict> = {
     pin: "PIN", regenPin: "重新生成PIN", cancel: "取消", manual: "手动",
     openAirbnb: "在 Airbnb 打开",
     switchbotEnvNote: "（在 Netlify 添加 SWITCHBOT_TOKEN / SWITCHBOT_SECRET 并重新部署后即可选择）",
+    testTitle: "设备测试（当场确认）",
+    testDesc: "以房东身份直接操作各房间设备（无需房客PIN）。",
+    unlock: "开锁", lock: "上锁",
+    acOn: "空调开", acOff: "空调关", lightOn: "灯光开", lightOff: "灯光关",
   },
 };

@@ -1,4 +1,6 @@
-import { getActiveStay, hasValidSession } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { getActiveStays } from "@/lib/auth";
+import { verifySession, roomCookieName } from "@/lib/roomSession";
 import { isLang, type Lang } from "@/lib/i18n";
 import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
@@ -9,11 +11,9 @@ export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 /**
  * ゲスト操作画面のエントリ (固定QR方式)。
  *  /room/[room_id]?lang=en   ← トークンはURLに無い
- *  1. 現在アクティブな滞在があるか (時刻判定)
- *  2. PIN認証済みのセッションCookieがあるか
- *     - 無ければ PinGate (PIN入力画面)
- *     - 有れば ControlPanel
- *  3. アクティブな滞在が無ければ AccessDenied
+ *  1. 現在アクティブな滞在(複数可)があるか (時刻判定)
+ *  2. PIN認証済みのセッションCookieが、その滞在のいずれかと一致するか
+ *  3. 無ければ PinGate、無効ならアクティブ滞在なしで AccessDenied
  */
 export default async function RoomPage({
   params,
@@ -22,24 +22,29 @@ export default async function RoomPage({
   params: { room_id: string };
   searchParams: { lang?: string };
 }) {
-  const stay = await getActiveStay(params.room_id);
+  const stays = await getActiveStays(params.room_id);
+  const primary = stays?.reservations[0];
 
   const lang: Lang = isLang(searchParams.lang)
     ? searchParams.lang
-    : isLang(stay?.reservation.guest_lang)
-    ? (stay!.reservation.guest_lang as Lang)
+    : isLang(primary?.guest_lang)
+    ? (primary!.guest_lang as Lang)
     : "en";
 
-  if (!stay) {
+  if (!stays || !primary) {
     return <AccessDenied lang={lang} />;
   }
 
-  const authed = hasValidSession(params.room_id, stay.reservation.id);
-  if (!authed) {
+  // セッションが有効滞在のいずれかと一致するか
+  const token = cookies().get(roomCookieName(params.room_id))?.value;
+  const v = verifySession(token);
+  const matched = v ? stays.reservations.find((r) => r.id === v.reservationId) : undefined;
+
+  if (!matched) {
     return (
       <PinGate
         roomSlug={params.room_id}
-        roomName={stay.room.display_name}
+        roomName={stays.room.display_name}
         initialLang={lang}
       />
     );
@@ -48,8 +53,8 @@ export default async function RoomPage({
   return (
     <ControlPanel
       roomSlug={params.room_id}
-      roomName={stay.room.display_name}
-      checkOut={stay.reservation.check_out}
+      roomName={stays.room.display_name}
+      checkOut={matched.check_out}
       initialLang={lang}
     />
   );
