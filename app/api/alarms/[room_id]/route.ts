@@ -1,25 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateStay } from "@/lib/auth";
+import { authorizeRoomRequest } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
 /**
  * ゲストが光目覚ましを設定/解除。
- * POST /api/alarms/[room_id]  body: { token, fireAtIso } または { token, clear:true }
+ * 認証はPIN認証で発行された署名付きセッションCookie。
+ * POST /api/alarms/[room_id]  body: { fireAtIso } または { clear:true }
  * 1滞在につき1アラーム (upsert)。
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { room_id: string } }
 ) {
-  const { token, fireAtIso, clear } = (await req.json().catch(() => ({}))) as {
-    token?: string;
+  const { fireAtIso, clear } = (await req.json().catch(() => ({}))) as {
     fireAtIso?: string;
     clear?: boolean;
   };
 
-  const stay = await validateStay(params.room_id, token);
+  const stay = await authorizeRoomRequest(params.room_id);
   if (!stay) return NextResponse.json({ ok: false, error: "ACCESS_DENIED" }, { status: 403 });
 
   const { reservation } = stay;

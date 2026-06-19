@@ -5,6 +5,22 @@ export interface IcalEvent {
   start: Date; // 日付(all-day)の場合あり
   end: Date;
   summary: string;
+  description: string;
+}
+
+/**
+ * Airbnb の iCal 説明文から電話番号の下4桁を抽出 (あれば)。
+ * 例: "Phone Number (Last 4 Digits): 1234"
+ * 取れた場合はそれをPINに使える (ゲストは自分の番号下4桁を入力するだけ)。
+ */
+export function extractPhoneLast4(description: string): string | null {
+  const m = description.match(/Last\s*4\s*Digits\D*(\d{4})/i);
+  return m ? m[1] : null;
+}
+
+/** 4桁ランダムPIN */
+export function randomPin(): string {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 }
 
 /**
@@ -23,6 +39,7 @@ export async function fetchIcalEvents(url: string): Promise<IcalEvent[]> {
       start: v.start as Date,
       end: v.end as Date,
       summary: String(v.summary ?? ""),
+      description: String(v.description ?? ""),
     });
   }
   return events;

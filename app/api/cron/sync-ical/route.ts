@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { fetchIcalEvents, applyStayTimes } from "@/lib/ical";
+import { fetchIcalEvents, applyStayTimes, extractPhoneLast4, randomPin } from "@/lib/ical";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,6 +62,8 @@ export async function GET(req: NextRequest) {
           .eq("id", existing.id);
         stat.updated++;
       } else {
+        // PIN: iCalに電話下4桁があればそれを、無ければランダム4桁
+        const pin = extractPhoneLast4(ev.description) ?? randomPin();
         // guest_token はDBデフォルト(gen_random_bytes)で自動発行
         await supabaseAdmin.from("reservations").insert({
           room_id: room.id,
@@ -70,6 +72,7 @@ export async function GET(req: NextRequest) {
           check_in: checkIn.toISOString(),
           check_out: checkOut.toISOString(),
           status: "active",
+          unlock_pin: pin,
         });
         stat.added++;
       }

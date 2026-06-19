@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateStay } from "@/lib/auth";
+import { authorizeRoomRequest } from "@/lib/auth";
 import { sendSesameCommand, SESAME_CMD } from "@/lib/sesame";
 import {
   acTurnOn, acTurnOff, lightTurnOn, lightTurnOff,
@@ -12,19 +12,19 @@ type Action = "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
 
 /**
  * デバイス操作プロキシ。秘密鍵はここ(サーバ)から出ない。
- * POST /api/devices/[room_id]   body: { action, token }
+ * 認証は PIN認証で発行された署名付きセッションCookie。
+ * POST /api/devices/[room_id]   body: { action }
  *  room_id は rooms.slug を想定。
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { room_id: string } }
 ) {
-  const { action, token } = (await req.json().catch(() => ({}))) as {
+  const { action } = (await req.json().catch(() => ({}))) as {
     action?: Action;
-    token?: string;
   };
 
-  const stay = await validateStay(params.room_id, token);
+  const stay = await authorizeRoomRequest(params.room_id);
   if (!stay) {
     return NextResponse.json({ ok: false, error: "ACCESS_DENIED" }, { status: 403 });
   }

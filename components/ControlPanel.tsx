@@ -13,23 +13,23 @@ type DeviceAction =
 
 interface Props {
   roomSlug: string;
-  token: string;
   roomName: string;
   checkOut: string;
   initialLang: Lang;
 }
 
-async function callDevice(roomSlug: string, action: DeviceAction, token: string) {
+// 認証は PIN認証で発行されたセッションCookie (same-origin fetch で自動送信)
+async function callDevice(roomSlug: string, action: DeviceAction) {
   const res = await fetch(`/api/devices/${roomSlug}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, token }),
+    body: JSON.stringify({ action }),
   });
   return res.ok;
 }
 
 export default function ControlPanel({
-  roomSlug, token, roomName, checkOut, initialLang,
+  roomSlug, roomName, checkOut, initialLang,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
@@ -65,24 +65,24 @@ export default function ControlPanel({
         </header>
 
         {/* スマートロック (主役) */}
-        <LockCard roomSlug={roomSlug} token={token} t={t} />
+        <LockCard roomSlug={roomSlug} t={t} />
 
         {/* デバイスグリッド */}
         <div className="mt-5 grid grid-cols-2 gap-4">
           <ToggleCard
-            roomSlug={roomSlug} token={token}
+            roomSlug={roomSlug}
             icon={Snowflake} label={t.ac} accent="cyan"
             onAction={"ac_on"} offAction={"ac_off"} t={t}
           />
           <ToggleCard
-            roomSlug={roomSlug} token={token}
+            roomSlug={roomSlug}
             icon={Lightbulb} label={t.light} accent="amber"
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
         </div>
 
         {/* 光目覚まし */}
-        <WakeCard roomSlug={roomSlug} token={token} checkOut={checkOut} t={t} lang={lang} />
+        <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} />
       </div>
     </main>
   );
@@ -132,7 +132,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
 /* ------------------------------------------------------------------ */
 /* スマートロック カード (波紋 + サイバー解錠エフェクト)                */
 /* ------------------------------------------------------------------ */
-function LockCard({ roomSlug, token, t }: { roomSlug: string; token: string; t: typeof T["en"] }) {
+function LockCard({ roomSlug, t }: { roomSlug: string; t: typeof T["en"] }) {
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ripple, setRipple] = useState(0);
@@ -142,11 +142,11 @@ function LockCard({ roomSlug, token, t }: { roomSlug: string; token: string; t: 
     setBusy(true);
     setRipple((r) => r + 1);
     const next = !unlocked;
-    const ok = await callDevice(roomSlug, next ? "unlock" : "lock", token);
+    const ok = await callDevice(roomSlug, next ? "unlock" : "lock");
     if (ok) setUnlocked(next);
     setBusy(false);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);
-  }, [busy, unlocked, roomSlug, token]);
+  }, [busy, unlocked, roomSlug]);
 
   const Icon = unlocked ? LockKeyholeOpen : LockKeyhole;
 
@@ -199,9 +199,9 @@ function LockCard({ roomSlug, token, t }: { roomSlug: string; token: string; t: 
 /* ON/OFF トグルカード (エアコン / 照明)                                */
 /* ------------------------------------------------------------------ */
 function ToggleCard({
-  roomSlug, token, icon: Icon, label, accent, onAction, offAction, t,
+  roomSlug, icon: Icon, label, accent, onAction, offAction, t,
 }: {
-  roomSlug: string; token: string;
+  roomSlug: string;
   icon: typeof Snowflake; label: string; accent: "cyan" | "amber";
   onAction: DeviceAction; offAction: DeviceAction; t: typeof T["en"];
 }) {
@@ -216,7 +216,7 @@ function ToggleCard({
     if (busy) return;
     setBusy(true);
     const next = !on;
-    const ok = await callDevice(roomSlug, next ? onAction : offAction, token);
+    const ok = await callDevice(roomSlug, next ? onAction : offAction);
     if (ok) setOn(next);
     setBusy(false);
     if (navigator.vibrate) navigator.vibrate(20);
@@ -252,9 +252,9 @@ function ToggleCard({
 /* 光目覚まし カード (タイムピッカー)                                   */
 /* ------------------------------------------------------------------ */
 function WakeCard({
-  roomSlug, token, checkOut, t, lang,
+  roomSlug, checkOut, t, lang,
 }: {
-  roomSlug: string; token: string; checkOut: string; t: typeof T["en"]; lang: Lang;
+  roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang;
 }) {
   const [time, setTime] = useState("07:00");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
@@ -271,7 +271,7 @@ function WakeCard({
     const res = await fetch(`/api/alarms/${roomSlug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, fireAtIso: fire.toISOString() }),
+      body: JSON.stringify({ fireAtIso: fire.toISOString() }),
     });
     setState(res.ok ? "set" : "idle");
   };

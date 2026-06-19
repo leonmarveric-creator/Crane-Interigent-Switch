@@ -28,6 +28,10 @@ type Dict = {
   failed: string;
   accessDenied: string;
   accessDeniedDesc: string;
+  enterPin: string;
+  pinPrompt: string;
+  wrongPin: string;
+  verify: string;
 };
 
 export const T: Record<Lang, Dict> = {
@@ -38,6 +42,8 @@ export const T: Record<Lang, Dict> = {
     welcome: "ようこそ", checkout: "チェックアウト",
     sending: "送信中…", success: "完了", failed: "失敗しました",
     accessDenied: "アクセス拒否", accessDeniedDesc: "このリンクは無効か、滞在期間外です。",
+    enterPin: "PINを入力", pinPrompt: "お預かりの暗証番号を入力してください",
+    wrongPin: "PINが違います", verify: "認証",
   },
   en: {
     unlock: "Unlock", lock: "Lock", locked: "Locked", unlocked: "Unlocked",
@@ -46,6 +52,8 @@ export const T: Record<Lang, Dict> = {
     welcome: "Welcome", checkout: "Check-out",
     sending: "Sending…", success: "Done", failed: "Failed",
     accessDenied: "Access Denied", accessDeniedDesc: "This link is invalid or outside your stay period.",
+    enterPin: "Enter PIN", pinPrompt: "Please enter the PIN provided for your stay",
+    wrongPin: "Incorrect PIN", verify: "Verify",
   },
   zh: {
     unlock: "开锁", lock: "上锁", locked: "已上锁", unlocked: "已开锁",
@@ -54,6 +62,8 @@ export const T: Record<Lang, Dict> = {
     welcome: "欢迎", checkout: "退房",
     sending: "发送中…", success: "完成", failed: "失败",
     accessDenied: "拒绝访问", accessDeniedDesc: "此链接无效或不在入住期间内。",
+    enterPin: "输入PIN", pinPrompt: "请输入入住时提供的密码",
+    wrongPin: "PIN码错误", verify: "验证",
   },
   ko: {
     unlock: "잠금 해제", lock: "잠금", locked: "잠김", unlocked: "열림",
@@ -62,6 +72,8 @@ export const T: Record<Lang, Dict> = {
     welcome: "환영합니다", checkout: "체크아웃",
     sending: "전송 중…", success: "완료", failed: "실패",
     accessDenied: "접근 거부", accessDeniedDesc: "이 링크는 유효하지 않거나 숙박 기간이 아닙니다.",
+    enterPin: "PIN 입력", pinPrompt: "숙박 시 안내받은 PIN을 입력하세요",
+    wrongPin: "PIN이 올바르지 않습니다", verify: "확인",
   },
 };
 
