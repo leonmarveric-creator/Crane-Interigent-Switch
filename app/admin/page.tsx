@@ -14,7 +14,7 @@ export default async function AdminPage() {
 
   const { data: roomRows } = await supabaseAdmin
     .from("rooms")
-    .select("id, slug, display_name, is_active")
+    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id")
     .order("slug");
 
   const { data: reservations } = await supabaseAdmin
@@ -31,7 +31,12 @@ export default async function AdminPage() {
         width: 480, margin: 1,
         color: { dark: "#0b0f1a", light: "#ffffff" },
       });
-      return { ...r, url, qr };
+      return {
+        id: r.id, slug: r.slug, display_name: r.display_name, is_active: r.is_active,
+        ac_device_id: r.switchbot_ac_device_id ?? null,
+        light_device_id: r.switchbot_light_device_id ?? null,
+        url, qr,
+      };
     })
   );
 

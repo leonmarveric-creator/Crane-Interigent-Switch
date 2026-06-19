@@ -49,6 +49,20 @@ export async function cancelReservation(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** 部屋にSwitchBotデバイス(エアコン/照明)を割り当て。 */
+export async function assignDevices(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  if (!room_id) return;
+  const ac = String(formData.get("ac") || "") || null;
+  const light = String(formData.get("light") || "") || null;
+  await supabaseAdmin
+    .from("rooms")
+    .update({ switchbot_ac_device_id: ac, switchbot_light_device_id: light })
+    .eq("id", room_id);
+  revalidatePath("/admin");
+}
+
 /** PINを再発行 (現在のPINを無効化して4桁を作り直す)。 */
 export async function regeneratePin(formData: FormData) {
   requireAdmin();

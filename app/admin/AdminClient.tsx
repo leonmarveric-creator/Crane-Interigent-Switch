@@ -6,10 +6,11 @@ import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound, QrCode,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
-import { addReservation, cancelReservation, regeneratePin } from "./actions";
+import { addReservation, cancelReservation, regeneratePin, assignDevices } from "./actions";
 
 export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
+  ac_device_id: string | null; light_device_id: string | null;
   url: string; qr: string;
 }
 export interface Reservation {
@@ -75,8 +76,8 @@ export default function AdminClient({
           </div>
         </section>
 
-        {/* SwitchBot デバイスID一覧 */}
-        <SwitchBotSection info={switchbot} />
+        {/* 部屋ごとのデバイス割り当て */}
+        <DeviceAssignSection rooms={rooms} info={switchbot} />
 
         {/* 予約追加フォーム */}
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
@@ -149,68 +150,73 @@ export default function AdminClient({
   );
 }
 
-function SwitchBotSection({ info }: { info: SwitchBotInfo }) {
+function DeviceAssignSection({ rooms, info }: { rooms: Room[]; info: SwitchBotInfo }) {
   const ir = info.infraredRemoteList ?? [];
-  const phys = info.deviceList ?? [];
+  const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
+  const lights = ir.filter((d) => /light/i.test(d.remoteType));
+
   return (
     <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
       <div className="mb-1 flex items-center gap-2 text-sm text-cyan-200">
-        <KeyRound className="h-4 w-4" /> SwitchBot デバイスID（rooms に登録する値）
+        <KeyRound className="h-4 w-4" /> 部屋ごとのデバイス割り当て
       </div>
       <p className="mb-4 text-xs text-white/40">
-        エアコン・照明は「赤外線リモコン」に出ます。IDをコピーして下の手順でSupabaseに登録します。
+        各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。
       </p>
 
       {info.error ? (
         <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-          {info.error}（Netlifyに SWITCHBOT_TOKEN / SWITCHBOT_SECRET を追加して再デプロイすると一覧が出ます）
+          {info.error}（Netlifyに SWITCHBOT_TOKEN / SWITCHBOT_SECRET を追加して再デプロイすると選べます）
         </p>
       ) : (
-        <div className="space-y-4">
-          {ir.length > 0 && (
-            <div>
-              <p className="mb-2 text-[11px] tracking-wide text-cyan-300/70">赤外線リモコン（エアコン・照明）</p>
-              <div className="space-y-2">
-                {ir.map((d) => (
-                  <DeviceRow key={d.deviceId} name={d.deviceName} type={d.remoteType} id={d.deviceId} />
-                ))}
-              </div>
-            </div>
-          )}
-          {phys.length > 0 && (
-            <div>
-              <p className="mb-2 text-[11px] tracking-wide text-white/40">物理デバイス（Hub等）</p>
-              <div className="space-y-2">
-                {phys.map((d) => (
-                  <DeviceRow key={d.deviceId} name={d.deviceName} type={d.deviceType} id={d.deviceId} />
-                ))}
-              </div>
-            </div>
-          )}
-          {ir.length === 0 && phys.length === 0 && (
-            <p className="text-xs text-white/40">デバイスが見つかりません（アプリで仮想リモコンを作成済みか確認）。</p>
-          )}
+        <div className="space-y-3">
+          {rooms.map((room) => (
+            <RoomAssignRow key={room.id} room={room} acs={acs} lights={lights} />
+          ))}
         </div>
       )}
     </section>
   );
 }
 
-function DeviceRow({ name, type, id }: { name: string; type: string; id: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(id);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
-  };
+function RoomAssignRow({
+  room, acs, lights,
+}: {
+  room: Room;
+  acs: { deviceId: string; deviceName: string }[];
+  lights: { deviceId: string; deviceName: string }[];
+}) {
+  const opt = (d: { deviceId: string; deviceName: string }) => (
+    <option key={d.deviceId} value={d.deviceId}>
+      {d.deviceName || d.deviceId}
+    </option>
+  );
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
-      <span className="min-w-0 flex-1 truncate text-sm">{name || "—"}</span>
-      <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">{type}</span>
-      <span className="shrink-0 font-mono text-[11px] text-white/60">{id}</span>
-      <button onClick={copy} className="shrink-0 text-white/60 hover:text-cyan-300">
-        {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+    <form action={assignDevices}
+      className="grid grid-cols-1 items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+      <input type="hidden" name="room_id" value={room.id} />
+      <div className="text-sm font-medium text-white/80">{room.display_name}</div>
+      <label className="text-[11px] text-white/50">
+        エアコン
+        <select name="ac" defaultValue={room.ac_device_id ?? ""}
+          className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
+          <option value="">（なし）</option>
+          {acs.map(opt)}
+        </select>
+      </label>
+      <label className="text-[11px] text-white/50">
+        照明
+        <select name="light" defaultValue={room.light_device_id ?? ""}
+          className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
+          <option value="">（なし）</option>
+          {lights.map(opt)}
+        </select>
+      </label>
+      <button type="submit"
+        className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-4 py-2 text-xs text-emerald-200 active:bg-emerald-500/30">
+        保存
       </button>
-    </div>
+    </form>
   );
 }
 
