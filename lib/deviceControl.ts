@@ -2,6 +2,15 @@ import { sendSesameCommand, SESAME_CMD } from "./sesame";
 import {
   acTurnOn, acTurnOff, lightTurnOn, lightTurnOff, type SwitchBotCreds,
 } from "./switchbot";
+import { supabaseAdmin } from "./supabaseAdmin";
+
+/** 操作ログを記録 (失敗しても本処理は止めない)。 */
+export async function logDevice(entry: {
+  room_id: string; reservation_id?: string | null;
+  action: string; source: "guest" | "admin" | "cron"; success: boolean;
+}) {
+  try { await supabaseAdmin.from("device_logs").insert(entry); } catch { /* ignore */ }
+}
 
 export type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";

@@ -63,6 +63,16 @@ type Dict = {
   empty: string;
   arriving: string;
   period: string;
+  geofenceTitle: string;
+  geofenceHint: string;
+  radiusM: string;
+  tabHistory: string;
+  historyTitle: string;
+  noLogs: string;
+  srcGuest: string;
+  srcAdmin: string;
+  srcCron: string;
+  when: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -93,6 +103,9 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "ゲスト", status: "状態",
     imageTitle: "部屋アート画像", imageUrlLabel: "画像URL（/rooms/room-xxx.jpg など）",
     staying: "滞在中", empty: "空室", arriving: "到着予定", period: "期間",
+    geofenceTitle: "位置制限（GPS）", geofenceHint: "建物の緯度・経度（空欄で制限OFF）", radiusM: "半径(m)",
+    tabHistory: "履歴", historyTitle: "操作履歴", noLogs: "履歴がありません",
+    srcGuest: "ゲスト", srcAdmin: "管理者", srcCron: "自動", when: "日時",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -121,6 +134,9 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "Guest", status: "Status",
     imageTitle: "Room art image", imageUrlLabel: "Image URL (e.g. /rooms/room-xxx.jpg)",
     staying: "Staying", empty: "Empty", arriving: "Arriving", period: "Stay",
+    geofenceTitle: "Location lock (GPS)", geofenceHint: "Building latitude / longitude (blank = off)", radiusM: "Radius (m)",
+    tabHistory: "Log", historyTitle: "Operation log", noLogs: "No history",
+    srcGuest: "Guest", srcAdmin: "Host", srcCron: "Auto", when: "Time",
   },
   zh: {
     dashboard: "房东控制台",
@@ -149,5 +165,8 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "房客", status: "状态",
     imageTitle: "房间图片", imageUrlLabel: "图片URL（如 /rooms/room-xxx.jpg）",
     staying: "入住中", empty: "空房", arriving: "即将入住", period: "时间段",
+    geofenceTitle: "位置限制（GPS）", geofenceHint: "建筑纬度 / 经度（留空=关闭）", radiusM: "半径(m)",
+    tabHistory: "记录", historyTitle: "操作记录", noLogs: "暂无记录",
+    srcGuest: "房客", srcAdmin: "房东", srcCron: "自动", when: "时间",
   },
 };

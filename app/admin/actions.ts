@@ -63,6 +63,28 @@ export async function assignDevices(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** 部屋のジオフェンス(座標・半径)を更新。空欄で解除。 */
+export async function updateGeofence(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  if (!room_id) return;
+  const latRaw = String(formData.get("lat") || "").trim();
+  const lngRaw = String(formData.get("lng") || "").trim();
+  const radRaw = String(formData.get("radius") || "").trim();
+  const lat = latRaw ? Number(latRaw) : null;
+  const lng = lngRaw ? Number(lngRaw) : null;
+  const geofence_radius_m = radRaw ? Math.max(20, Math.round(Number(radRaw))) : 150;
+  await supabaseAdmin
+    .from("rooms")
+    .update({
+      lat: Number.isFinite(lat as number) ? lat : null,
+      lng: Number.isFinite(lng as number) ? lng : null,
+      geofence_radius_m,
+    })
+    .eq("id", room_id);
+  revalidatePath("/admin");
+}
+
 /** 部屋のアート画像URLを更新。 */
 export async function updateRoomImage(formData: FormData) {
   requireAdmin();

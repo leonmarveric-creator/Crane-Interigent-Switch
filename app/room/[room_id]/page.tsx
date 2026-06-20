@@ -57,6 +57,9 @@ export default async function RoomPage({
       checkOut={matched.check_out}
       initialLang={lang}
       imageUrl={stays.room.image_url}
+      lat={stays.room.lat}
+      lng={stays.room.lng}
+      radiusM={stays.room.geofence_radius_m}
     />
   );
 }

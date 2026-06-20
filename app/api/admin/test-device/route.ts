@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { executeDeviceAction, type DeviceAction } from "@/lib/deviceControl";
+import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
 import { ADMIN_COOKIE } from "@/lib/adminAuth";
 
 export const runtime = "nodejs";
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const r = await executeDeviceAction(room, action as DeviceAction, "Admin Test");
+    await logDevice({ room_id: room.id, action: String(action), source: "admin", success: r.ok });
     return NextResponse.json(r, { status: r.ok ? 200 : 502 });
   } catch (e) {
     console.error("admin test error", e);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { lightTurnOn, type SwitchBotCreds } from "@/lib/switchbot";
+import { logDevice } from "@/lib/deviceControl";
 
 export const runtime = "nodejs";
 
@@ -50,9 +51,11 @@ export async function GET(req: NextRequest) {
     };
     try {
       await lightTurnOn(creds, room.switchbot_light_device_id);
+      await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: true });
       fired++;
     } catch (e) {
       console.error("alarm light failed", alarm.id, e);
+      await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: false });
     }
   }
 

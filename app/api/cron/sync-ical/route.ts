@@ -106,5 +106,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary, ranAt: new Date().toISOString() });
+  // 古い操作ログを自動削除 (既定90日、LOG_RETENTION_DAYS で変更可)
+  let purged: number | null = null;
+  const retentionDays = Number(process.env.LOG_RETENTION_DAYS || "90");
+  if (retentionDays > 0) {
+    const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
+    const { count } = await supabaseAdmin
+      .from("device_logs")
+      .delete({ count: "exact" })
+      .lt("created_at", cutoff);
+    purged = count ?? null;
+  }
+
+  return NextResponse.json({ ok: true, summary, purgedLogs: purged, ranAt: new Date().toISOString() });
 }

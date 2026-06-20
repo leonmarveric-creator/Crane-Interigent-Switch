@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { listDevices } from "@/lib/switchbot";
-import AdminClient, { type Room, type Reservation, type SwitchBotInfo } from "./AdminClient";
+import AdminClient, { type Room, type Reservation, type SwitchBotInfo, type LogEntry } from "./AdminClient";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export default async function AdminPage() {
 
   const { data: roomRows } = await supabaseAdmin
     .from("rooms")
-    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id, image_url")
+    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id, image_url, lat, lng, geofence_radius_m")
     .order("slug");
 
   const { data: reservations } = await supabaseAdmin
@@ -36,6 +36,7 @@ export default async function AdminPage() {
         ac_device_id: r.switchbot_ac_device_id ?? null,
         light_device_id: r.switchbot_light_device_id ?? null,
         image_url: r.image_url ?? null,
+        lat: r.lat ?? null, lng: r.lng ?? null, radius: r.geofence_radius_m ?? 150,
         url, qr,
       };
     })
@@ -72,5 +73,21 @@ export default async function AdminPage() {
     switchbot = { error: "SWITCHBOT_TOKEN / SECRET が未設定です", deviceList: [], infraredRemoteList: [] };
   }
 
-  return <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} />;
+  // 操作ログ (直近200件)
+  const { data: logRows } = await supabaseAdmin
+    .from("device_logs")
+    .select("id, room_id, action, source, success, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const logs: LogEntry[] = (logRows ?? []).map((l) => ({
+    id: l.id,
+    room_name: roomMap.get(l.room_id)?.display_name ?? "—",
+    room_slug: roomMap.get(l.room_id)?.slug ?? "",
+    action: l.action,
+    source: l.source,
+    success: l.success,
+    created_at: l.created_at,
+  }));
+
+  return <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} />;
 }

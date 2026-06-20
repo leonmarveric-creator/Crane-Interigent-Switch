@@ -5,20 +5,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
   QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
-  Image as ImageIcon,
+  Image as ImageIcon, History,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, assignDevices, updateRoomImage,
+  addReservation, cancelReservation, regeneratePin, assignDevices, updateRoomImage, updateGeofence,
 } from "./actions";
 
 export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
   image_url: string | null;
+  lat: number | null; lng: number | null; radius: number;
   url: string; qr: string;
 }
 export interface Reservation {
@@ -34,8 +35,12 @@ export interface SwitchBotInfo {
   deviceList: { deviceId: string; deviceName: string; deviceType: string }[];
   infraredRemoteList: { deviceId: string; deviceName: string; remoteType: string }[];
 }
+export interface LogEntry {
+  id: string; room_name: string; room_slug: string;
+  action: string; source: string; success: boolean; created_at: string;
+}
 type T = (typeof AT)["ja"];
-type Tab = "today" | "reservations" | "rooms" | "test";
+type Tab = "today" | "reservations" | "rooms" | "history" | "test";
 
 const LOCALE: Record<AdminLang, string> = { ja: "ja-JP", en: "en-US", zh: "zh-CN" };
 const fmt = (iso: string, lang: AdminLang) =>
@@ -44,8 +49,8 @@ const fmt = (iso: string, lang: AdminLang) =>
   });
 
 export default function AdminClient({
-  rooms, reservations, switchbot,
-}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo }) {
+  rooms, reservations, switchbot, logs,
+}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[] }) {
   const [lang, setLang] = useState<AdminLang>("ja");
   const [tab, setTab] = useState<Tab>("today");
   const t = AT[lang];
@@ -86,6 +91,7 @@ export default function AdminClient({
         {tab === "today" && <TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "reservations" && <ReservationsTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} />}
+        {tab === "history" && <HistoryTab logs={logs} rooms={rooms} t={t} lang={lang} />}
         {tab === "test" && <DeviceTestSection rooms={rooms} t={t} />}
       </div>
 
@@ -100,6 +106,7 @@ function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: 
     { key: "today", label: t.tabToday, Icon: CalendarDays },
     { key: "reservations", label: t.tabReservations, Icon: ClipboardList },
     { key: "rooms", label: t.tabRooms, Icon: DoorOpen },
+    { key: "history", label: t.tabHistory, Icon: History },
     { key: "test", label: t.tabTest, Icon: Wrench },
   ];
   return (
@@ -262,6 +269,58 @@ function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; rese
   );
 }
 
+/* ---------------- History tab ---------------- */
+function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[]; t: T; lang: AdminLang }) {
+  const [filter, setFilter] = useState<string>("all");
+  const actionLabel: Record<string, string> = {
+    unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
+  };
+  const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
+  const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
+        <History className="h-4 w-4" /> {t.historyTitle}
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
+        {rooms.map((r) => <FilterChip key={r.id} active={filter === r.slug} onClick={() => setFilter(r.slug)} label={r.display_name} />)}
+      </div>
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+        <table className="w-full text-sm">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-white/40">
+            <tr className="border-b border-white/10">
+              <th className="px-3 py-3">{t.when}</th>
+              <th className="px-2 py-3">{t.tabRooms}</th>
+              <th className="px-2 py-3">{t.unlock}/{t.acOn}</th>
+              <th className="px-2 py-3">{t.status}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((l) => (
+              <tr key={l.id} className="border-b border-white/5 last:border-0">
+                <td className="px-3 py-2.5 text-[11px] text-white/60">{fmt(l.created_at, lang)}</td>
+                <td className="px-2 py-2.5 text-xs">{l.room_name}</td>
+                <td className="px-2 py-2.5 text-xs">
+                  <span className="text-white/80">{actionLabel[l.action] ?? l.action}</span>
+                  <span className="ml-1 text-[10px] text-white/35">· {srcLabel[l.source] ?? l.source}</span>
+                </td>
+                <td className="px-2 py-2.5">
+                  {l.success
+                    ? <Check className="h-4 w-4 text-emerald-300" />
+                    : <span className="text-rose-300">×</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {shown.length === 0 && <p className="mt-3 text-center text-xs text-white/40">{t.noLogs}</p>}
+    </section>
+  );
+}
+
 /* ---------------- Rooms tab ---------------- */
 function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
   const ir = info.infraredRemoteList ?? [];
@@ -340,6 +399,18 @@ function RoomManageCard({
           <input type="text" name="image_url" defaultValue={room.image_url ?? ""} placeholder="/rooms/room-xxx.jpg" className={`${selCls} mt-1 py-2 text-xs`} />
         </label>
         <button type="submit" className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.save}</button>
+      </form>
+
+      {/* ジオフェンス (位置制限) */}
+      <form action={updateGeofence} className="border-t border-white/10 p-4">
+        <input type="hidden" name="room_id" value={room.id} />
+        <p className="mb-2 text-[11px] text-white/50">📍 {t.geofenceTitle} — {t.geofenceHint}</p>
+        <div className="flex items-end gap-2">
+          <input type="text" name="lat" inputMode="decimal" defaultValue={room.lat ?? ""} placeholder="lat 35.0000" className={`${selCls} py-2 text-xs`} />
+          <input type="text" name="lng" inputMode="decimal" defaultValue={room.lng ?? ""} placeholder="lng 135.0000" className={`${selCls} py-2 text-xs`} />
+          <input type="text" name="radius" inputMode="numeric" defaultValue={room.radius} placeholder="150" className="w-20 rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-center text-xs text-white" />
+          <button type="submit" className="rounded-lg border border-cyan-400/50 bg-cyan-500/15 px-3 py-2 text-xs text-cyan-200">{t.save}</button>
+        </div>
       </form>
     </div>
   );

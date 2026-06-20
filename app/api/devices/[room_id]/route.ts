@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeRoomRequest } from "@/lib/auth";
-import { executeDeviceAction, type DeviceAction } from "@/lib/deviceControl";
+import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
 
 export const runtime = "nodejs"; // crypto / aes-cmac のため Edge不可
 
@@ -26,6 +26,10 @@ export async function POST(
       action as DeviceAction,
       `Guest:${stay.reservation.id.slice(0, 8)}`
     );
+    await logDevice({
+      room_id: stay.room.id, reservation_id: stay.reservation.id,
+      action: String(action), source: "guest", success: r.ok,
+    });
     return NextResponse.json({ ok: r.ok, error: r.error }, { status: r.ok ? 200 : 502 });
   } catch (e) {
     console.error("device cmd error", e);

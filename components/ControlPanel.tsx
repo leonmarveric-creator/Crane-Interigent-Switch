@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
@@ -19,6 +19,17 @@ interface Props {
   initialLang: Lang;
   admin?: boolean; // 管理画面テストモード (PIN不要・admin認証で操作)
   imageUrl?: string | null; // 部屋アート
+  lat?: number | null; // ジオフェンス: 建物の緯度
+  lng?: number | null; // ジオフェンス: 建物の経度
+  radiusM?: number | null; // 許可半径(m)
+}
+
+function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
 }
 
 // guest: PIN認証セッションCookie / admin: 管理者Cookieでテスト操作
@@ -32,12 +43,40 @@ async function callDevice(roomSlug: string, action: DeviceAction, admin?: boolea
 }
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
   const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
+  const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
   const t = T[lang];
+
+  const geoEnabled = !admin && typeof lat === "number" && typeof lng === "number";
+
+  // 操作ガード: 範囲外/未許可ならブロック
+  const guardCommand = useCallback(async (): Promise<boolean> => {
+    if (!geoEnabled) return true;
+    let p = geoCache.current;
+    if (!p || Date.now() - p.t > 180000) { // 3分キャッシュ
+      try {
+        const pos = await new Promise<GeolocationPosition>((res, rej) =>
+          navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 9000, maximumAge: 60000 }));
+        p = { lat: pos.coords.latitude, lng: pos.coords.longitude, t: Date.now() };
+        geoCache.current = p;
+      } catch (e: any) {
+        const msg = e?.code === 1 ? t.locPermission : t.locUnavailable;
+        setGeoMsg(msg); sfxError(); setTimeout(() => setGeoMsg(null), 4500);
+        return false;
+      }
+    }
+    const d = haversine(p.lat, p.lng, lat as number, lng as number);
+    if (d > (radiusM ?? 150)) {
+      setGeoMsg(t.locTooFar); sfxError(); setTimeout(() => setGeoMsg(null), 4500);
+      return false;
+    }
+    return true;
+  }, [geoEnabled, lat, lng, radiusM, t]);
 
   useEffect(() => {
     const saved = localStorage.getItem("guestMuted");
@@ -87,6 +126,18 @@ export default function ControlPanel({
         <SideTelemetry side="left" />
         <SideTelemetry side="right" />
       </div>
+
+      {/* ジオフェンス警告バナー */}
+      <AnimatePresence>
+        {geoMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="fixed inset-x-4 top-4 z-40 mx-auto max-w-sm rounded-2xl border border-rose-400/50
+              bg-rose-500/20 px-4 py-3 text-center text-sm text-rose-100 backdrop-blur-xl">
+            📍 {geoMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
         {/* HUDステータスバー */}
@@ -143,7 +194,7 @@ export default function ControlPanel({
 
         {/* スマートロック (主役) */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
-          <LockCard roomSlug={roomSlug} t={t} admin={admin} />
+          <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
         </motion.div>
 
         {/* デバイスグリッド */}
@@ -151,12 +202,12 @@ export default function ControlPanel({
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
           className="mt-5 grid grid-cols-2 gap-4">
           <ToggleCard
-            roomSlug={roomSlug} admin={admin}
+            roomSlug={roomSlug} admin={admin} guard={guardCommand}
             icon={Snowflake} label={t.ac} accent="cyan"
             onAction={"ac_on"} offAction={"ac_off"} t={t}
           />
           <ToggleCard
-            roomSlug={roomSlug} admin={admin}
+            roomSlug={roomSlug} admin={admin} guard={guardCommand}
             icon={Lightbulb} label={t.light} accent="amber"
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
@@ -436,7 +487,7 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 /* ------------------------------------------------------------------ */
 /* スマートロック カード (波紋 + サイバー解錠エフェクト)                */
 /* ------------------------------------------------------------------ */
-function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"]; admin?: boolean }) {
+function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T["en"]; admin?: boolean; guard?: () => Promise<boolean> }) {
   // 状態取得はしない (API節約)。押したコマンドをそのまま送る明示式。
   const [last, setLast] = useState<"unlock" | "lock" | null>(null);
   const [busy, setBusy] = useState<"unlock" | "lock" | null>(null);
@@ -445,6 +496,7 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
 
   const run = useCallback(async (action: "unlock" | "lock") => {
     if (busy) return;
+    if (guard && !(await guard())) return;
     blip();
     setBusy(action); setResult(null); setRipple((r) => r + 1);
     const ok = await callDevice(roomSlug, action, admin);
@@ -454,7 +506,7 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);
     setTimeout(() => setResult(null), 1900);
-  }, [busy, roomSlug, admin]);
+  }, [busy, roomSlug, admin, guard]);
 
   const unlocked = last === "unlock";
   const Icon = unlocked ? LockKeyholeOpen : LockKeyhole;
@@ -529,9 +581,9 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
 /* ON/OFF トグルカード (エアコン / 照明)                                */
 /* ------------------------------------------------------------------ */
 function ToggleCard({
-  roomSlug, icon: Icon, label, accent, onAction, offAction, t, admin,
+  roomSlug, icon: Icon, label, accent, onAction, offAction, t, admin, guard,
 }: {
-  roomSlug: string; admin?: boolean;
+  roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
   icon: typeof Snowflake; label: string; accent: "cyan" | "amber";
   onAction: DeviceAction; offAction: DeviceAction; t: typeof T["en"];
 }) {
@@ -546,6 +598,7 @@ function ToggleCard({
 
   const send = async (which: "on" | "off") => {
     if (busy) return;
+    if (guard && !(await guard())) return;
     blip();
     setBusy(which);
     const ok = await callDevice(roomSlug, which === "on" ? onAction : offAction, admin);
