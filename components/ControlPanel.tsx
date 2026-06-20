@@ -16,20 +16,22 @@ interface Props {
   roomName: string;
   checkOut: string;
   initialLang: Lang;
+  admin?: boolean; // 管理画面テストモード (PIN不要・admin認証で操作)
+  imageUrl?: string | null; // 部屋アート
 }
 
-// 認証は PIN認証で発行されたセッションCookie (same-origin fetch で自動送信)
-async function callDevice(roomSlug: string, action: DeviceAction) {
-  const res = await fetch(`/api/devices/${roomSlug}`, {
+// guest: PIN認証セッションCookie / admin: 管理者Cookieでテスト操作
+async function callDevice(roomSlug: string, action: DeviceAction, admin?: boolean) {
+  const res = await fetch(admin ? "/api/admin/test-device" : `/api/devices/${roomSlug}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify(admin ? { roomSlug, action } : { action }),
   });
   return res.ok;
 }
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
@@ -47,6 +49,17 @@ export default function ControlPanel({
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
+        {/* 部屋アート (ヒーロー) */}
+        {imageUrl && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+            className="mb-5 overflow-hidden rounded-3xl border border-white/10 shadow-[0_0_60px_-25px_rgba(34,211,238,0.7)]">
+            <img src={imageUrl} alt={roomName}
+              className="aspect-square w-full object-cover"
+              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+          </motion.div>
+        )}
+
         {/* ヘッダー: 部屋名 + 言語切替 */}
         <header className="mb-8 flex items-start justify-between">
           <div>
@@ -54,35 +67,41 @@ export default function ControlPanel({
               {t.welcome.toUpperCase()}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-wide">{roomName}</h1>
-            <p className="mt-1 text-xs text-white/40">
-              {t.checkout}: {new Date(checkOut).toLocaleString(lang, {
-                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                timeZone: "Asia/Tokyo",
-              })}
-            </p>
+            {admin ? (
+              <a href="/admin" className="mt-1 inline-block text-xs text-violet-300/80">
+                ⓘ TEST MODE · ← 管理画面へ戻る
+              </a>
+            ) : (
+              <p className="mt-1 text-xs text-white/40">
+                {t.checkout}: {new Date(checkOut).toLocaleString(lang, {
+                  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                  timeZone: "Asia/Tokyo",
+                })}
+              </p>
+            )}
           </div>
           <LangSwitch lang={lang} setLang={setLang} />
         </header>
 
         {/* スマートロック (主役) */}
-        <LockCard roomSlug={roomSlug} t={t} />
+        <LockCard roomSlug={roomSlug} t={t} admin={admin} />
 
         {/* デバイスグリッド */}
         <div className="mt-5 grid grid-cols-2 gap-4">
           <ToggleCard
-            roomSlug={roomSlug}
+            roomSlug={roomSlug} admin={admin}
             icon={Snowflake} label={t.ac} accent="cyan"
             onAction={"ac_on"} offAction={"ac_off"} t={t}
           />
           <ToggleCard
-            roomSlug={roomSlug}
+            roomSlug={roomSlug} admin={admin}
             icon={Lightbulb} label={t.light} accent="amber"
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
         </div>
 
-        {/* 光目覚まし */}
-        <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} />
+        {/* 光目覚まし (テストモードでは非表示: アラームはゲストセッション前提) */}
+        {!admin && <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} />}
       </div>
     </main>
   );
@@ -132,7 +151,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
 /* ------------------------------------------------------------------ */
 /* スマートロック カード (波紋 + サイバー解錠エフェクト)                */
 /* ------------------------------------------------------------------ */
-function LockCard({ roomSlug, t }: { roomSlug: string; t: typeof T["en"] }) {
+function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"]; admin?: boolean }) {
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ripple, setRipple] = useState(0);
@@ -142,11 +161,11 @@ function LockCard({ roomSlug, t }: { roomSlug: string; t: typeof T["en"] }) {
     setBusy(true);
     setRipple((r) => r + 1);
     const next = !unlocked;
-    const ok = await callDevice(roomSlug, next ? "unlock" : "lock");
+    const ok = await callDevice(roomSlug, next ? "unlock" : "lock", admin);
     if (ok) setUnlocked(next);
     setBusy(false);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);
-  }, [busy, unlocked, roomSlug]);
+  }, [busy, unlocked, roomSlug, admin]);
 
   const Icon = unlocked ? LockKeyholeOpen : LockKeyhole;
 
@@ -199,9 +218,9 @@ function LockCard({ roomSlug, t }: { roomSlug: string; t: typeof T["en"] }) {
 /* ON/OFF トグルカード (エアコン / 照明)                                */
 /* ------------------------------------------------------------------ */
 function ToggleCard({
-  roomSlug, icon: Icon, label, accent, onAction, offAction, t,
+  roomSlug, icon: Icon, label, accent, onAction, offAction, t, admin,
 }: {
-  roomSlug: string;
+  roomSlug: string; admin?: boolean;
   icon: typeof Snowflake; label: string; accent: "cyan" | "amber";
   onAction: DeviceAction; offAction: DeviceAction; t: typeof T["en"];
 }) {
@@ -216,7 +235,7 @@ function ToggleCard({
     if (busy) return;
     setBusy(true);
     const next = !on;
-    const ok = await callDevice(roomSlug, next ? onAction : offAction);
+    const ok = await callDevice(roomSlug, next ? onAction : offAction, admin);
     if (ok) setOn(next);
     setBusy(false);
     if (navigator.vibrate) navigator.vibrate(20);

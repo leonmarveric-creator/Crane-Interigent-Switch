@@ -56,6 +56,7 @@ export default async function RoomPage({
       roomName={stays.room.display_name}
       checkOut={matched.check_out}
       initialLang={lang}
+      imageUrl={stays.room.image_url}
     />
   );
 }

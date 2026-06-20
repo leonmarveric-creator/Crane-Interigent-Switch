@@ -39,12 +39,28 @@ type Dict = {
   switchbotEnvNote: string;
   testTitle: string;
   testDesc: string;
+  openTest: string;
   unlock: string;
   lock: string;
   acOn: string;
   acOff: string;
   lightOn: string;
   lightOff: string;
+  // tabs
+  tabToday: string;
+  tabReservations: string;
+  tabRooms: string;
+  tabTest: string;
+  // today table
+  todayTitle: string;
+  todayNone: string;
+  guest: string;
+  status: string;
+  // room image
+  imageTitle: string;
+  imageUrlLabel: string;
+  staying: string;
+  empty: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -66,9 +82,15 @@ export const AT: Record<AdminLang, Dict> = {
     openAirbnb: "Airbnbで開く",
     switchbotEnvNote: "（Netlifyに SWITCHBOT_TOKEN / SWITCHBOT_SECRET を追加して再デプロイすると選べます）",
     testTitle: "デバイステスト（その場で動作確認）",
-    testDesc: "各部屋の機器をホストとして直接操作します（ゲストのPINは不要）。",
+    testDesc: "各部屋のゲスト操作画面をPIN不要で開いて、実機を動かせます。",
+    openTest: "テスト画面を開く",
     unlock: "解錠", lock: "施錠",
     acOn: "エアコンON", acOff: "エアコンOFF", lightOn: "照明ON", lightOff: "照明OFF",
+    tabToday: "今日", tabReservations: "予約", tabRooms: "部屋", tabTest: "テスト",
+    todayTitle: "今日のゲスト", todayNone: "本日の滞在はありません",
+    guest: "ゲスト", status: "状態",
+    imageTitle: "部屋アート画像", imageUrlLabel: "画像URL（/rooms/room-xxx.jpg など）",
+    staying: "滞在中", empty: "空室",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -88,9 +110,15 @@ export const AT: Record<AdminLang, Dict> = {
     openAirbnb: "Open in Airbnb",
     switchbotEnvNote: "(Add SWITCHBOT_TOKEN / SWITCHBOT_SECRET on Netlify and redeploy to choose devices)",
     testTitle: "Device test (check on the spot)",
-    testDesc: "Control each room's devices directly as the host (no guest PIN needed).",
+    testDesc: "Open each room's guest screen without a PIN and operate the real devices.",
+    openTest: "Open test screen",
     unlock: "Unlock", lock: "Lock",
     acOn: "AC On", acOff: "AC Off", lightOn: "Light On", lightOff: "Light Off",
+    tabToday: "Today", tabReservations: "Bookings", tabRooms: "Rooms", tabTest: "Test",
+    todayTitle: "Today's guests", todayNone: "No stays today",
+    guest: "Guest", status: "Status",
+    imageTitle: "Room art image", imageUrlLabel: "Image URL (e.g. /rooms/room-xxx.jpg)",
+    staying: "Staying", empty: "Empty",
   },
   zh: {
     dashboard: "房东控制台",
@@ -110,8 +138,14 @@ export const AT: Record<AdminLang, Dict> = {
     openAirbnb: "在 Airbnb 打开",
     switchbotEnvNote: "（在 Netlify 添加 SWITCHBOT_TOKEN / SWITCHBOT_SECRET 并重新部署后即可选择）",
     testTitle: "设备测试（当场确认）",
-    testDesc: "以房东身份直接操作各房间设备（无需房客PIN）。",
+    testDesc: "无需PIN即可打开各房间的房客界面，直接操作真实设备。",
+    openTest: "打开测试界面",
     unlock: "开锁", lock: "上锁",
     acOn: "空调开", acOff: "空调关", lightOn: "灯光开", lightOff: "灯光关",
+    tabToday: "今日", tabReservations: "预订", tabRooms: "房间", tabTest: "测试",
+    todayTitle: "今日房客", todayNone: "今天没有入住",
+    guest: "房客", status: "状态",
+    imageTitle: "房间图片", imageUrlLabel: "图片URL（如 /rooms/room-xxx.jpg）",
+    staying: "入住中", empty: "空房",
   },
 };

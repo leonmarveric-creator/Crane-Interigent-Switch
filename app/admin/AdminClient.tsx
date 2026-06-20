@@ -4,18 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
-  QrCode, Globe, ExternalLink, LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb,
-  Loader2, X,
+  QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
+  Image as ImageIcon,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
-import { addReservation, cancelReservation, regeneratePin, assignDevices } from "./actions";
+import {
+  addReservation, cancelReservation, regeneratePin, assignDevices, updateRoomImage,
+} from "./actions";
 
 export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
+  image_url: string | null;
   url: string; qr: string;
 }
 export interface Reservation {
@@ -31,19 +34,20 @@ export interface SwitchBotInfo {
   deviceList: { deviceId: string; deviceName: string; deviceType: string }[];
   infraredRemoteList: { deviceId: string; deviceName: string; remoteType: string }[];
 }
+type T = (typeof AT)["ja"];
+type Tab = "today" | "reservations" | "rooms" | "test";
 
 const LOCALE: Record<AdminLang, string> = { ja: "ja-JP", en: "en-US", zh: "zh-CN" };
 const fmt = (iso: string, lang: AdminLang) =>
   new Date(iso).toLocaleString(LOCALE[lang], {
-    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-    timeZone: "Asia/Tokyo",
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo",
   });
 
 export default function AdminClient({
   rooms, reservations, switchbot,
 }: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo }) {
   const [lang, setLang] = useState<AdminLang>("ja");
-  const [filter, setFilter] = useState<string>("all");
+  const [tab, setTab] = useState<Tab>("today");
   const t = AT[lang];
 
   useEffect(() => {
@@ -51,11 +55,6 @@ export default function AdminClient({
     if (isAdminLang(saved)) setLang(saved);
   }, []);
   const changeLang = (l: AdminLang) => { setLang(l); localStorage.setItem("adminLang", l); };
-
-  const shown = useMemo(
-    () => reservations.filter((r) => filter === "all" || r.room_slug === filter),
-    [reservations, filter]
-  );
 
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -69,106 +68,308 @@ export default function AdminClient({
         <div className="absolute top-1/2 -right-24 h-96 w-96 rounded-full bg-violet-600/15 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-5xl px-5 py-8">
-        <header className="mb-8 flex items-center justify-between">
+      <div className="relative z-10 mx-auto max-w-5xl px-5 pb-28 pt-8">
+        <header className="mb-6 flex items-center justify-between">
           <div>
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">{t.dashboard}</p>
-            <h1 className="mt-1 text-2xl font-semibold">{t.title}</h1>
+            <h1 className="mt-1 text-xl font-semibold">{t.title}</h1>
           </div>
           <div className="flex items-center gap-2">
             <LangSwitch lang={lang} onChange={changeLang} />
             <button onClick={logout}
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs active:scale-95">
-              <LogOut className="h-4 w-4" /> {t.logout}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs active:scale-95">
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </header>
 
-        {/* 印刷用 固定QR */}
-        <section className="mb-8">
-          <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
-            <QrCode className="h-4 w-4" /> {t.doorQrTitle}
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-            {rooms.map((r) => <RoomQrCard key={r.id} r={r} />)}
-          </div>
-        </section>
-
-        {/* デバイス割り当て */}
-        <DeviceAssignSection rooms={rooms} info={switchbot} t={t} />
-
-        {/* デバイステスト */}
-        <DeviceTestSection rooms={rooms} t={t} />
-
-        {/* 予約追加フォーム */}
-        <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-          <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
-            <Plus className="h-4 w-4" /> {t.addTitle}
-          </div>
-          <form action={addReservation} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="text-xs text-white/60">
-              {t.room}
-              <select name="room_id" required
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]">
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>{r.display_name}（{r.slug}）</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs text-white/60">
-              {t.language}
-              <select name="guest_lang" defaultValue="en"
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]">
-                {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-white/60">
-              {t.checkIn}
-              <input type="datetime-local" name="check_in" required
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]" />
-            </label>
-            <label className="text-xs text-white/60">
-              {t.checkOut}
-              <input type="datetime-local" name="check_out" required
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]" />
-            </label>
-            <label className="text-xs text-white/60">
-              {t.guestName}（{t.optional}）
-              <input type="text" name="guest_name" placeholder="—"
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white" />
-            </label>
-            <label className="text-xs text-white/60">
-              {t.pinField}
-              <input type="text" name="unlock_pin" inputMode="numeric" placeholder={t.autoPlaceholder} maxLength={6}
-                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white font-mono" />
-            </label>
-            <button type="submit"
-              className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50
-                bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
-              <Plus className="h-4 w-4" /> {t.addButton}
-            </button>
-          </form>
-        </section>
-
-        {/* フィルタ */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
-          {rooms.map((r) => (
-            <FilterChip key={r.id} active={filter === r.slug}
-              onClick={() => setFilter(r.slug)} label={r.display_name} />
-          ))}
-        </div>
-
-        {/* 予約カード */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {shown.map((r) => <ReservationCard key={r.id} r={r} t={t} lang={lang} />)}
-          {shown.length === 0 && (
-            <p className="col-span-full py-12 text-center text-sm text-white/40">{t.noReservations}</p>
-          )}
-        </div>
+        {tab === "today" && <TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
+        {tab === "reservations" && <ReservationsTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
+        {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} />}
+        {tab === "test" && <DeviceTestSection rooms={rooms} t={t} />}
       </div>
+
+      <BottomNav tab={tab} setTab={setTab} t={t} />
     </main>
   );
+}
+
+/* ---------------- Bottom nav ---------------- */
+function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: T }) {
+  const items: { key: Tab; label: string; Icon: any }[] = [
+    { key: "today", label: t.tabToday, Icon: CalendarDays },
+    { key: "reservations", label: t.tabReservations, Icon: ClipboardList },
+    { key: "rooms", label: t.tabRooms, Icon: DoorOpen },
+    { key: "test", label: t.tabTest, Icon: Wrench },
+  ];
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#0a0c14]/85 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-5xl">
+        {items.map(({ key, label, Icon }) => {
+          const active = tab === key;
+          return (
+            <button key={key} onClick={() => setTab(key)}
+              className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-[11px] transition
+                ${active ? "text-cyan-300" : "text-white/45"}`}>
+              <Icon className="h-5 w-5" />
+              {label}
+              {active && <span className="absolute bottom-0 h-0.5 w-10 rounded-full bg-cyan-400" />}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/* ---------------- Today tab ---------------- */
+function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservations: Reservation[]; t: T; lang: AdminLang }) {
+  const now = Date.now();
+  const stayingByRoom = useMemo(() => {
+    const m = new Map<string, Reservation>();
+    for (const r of reservations) {
+      if (r.status !== "active") continue;
+      if (new Date(r.check_in).getTime() <= now && now < new Date(r.check_out).getTime()) {
+        if (!m.has(r.room_slug)) m.set(r.room_slug, r);
+      }
+    }
+    return m;
+  }, [reservations, now]);
+
+  const anyStaying = rooms.some((r) => stayingByRoom.has(r.slug));
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
+        <CalendarDays className="h-4 w-4" /> {t.todayTitle}
+      </div>
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+        <table className="w-full text-sm">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-white/40">
+            <tr className="border-b border-white/10">
+              <th className="px-4 py-3">{t.tabRooms}</th>
+              <th className="px-2 py-3">{t.status}</th>
+              <th className="px-2 py-3">{t.checkOut}</th>
+              <th className="px-2 py-3">{t.pin}</th>
+              <th className="px-2 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rooms.map((room) => {
+              const r = stayingByRoom.get(room.slug);
+              return (
+                <tr key={room.id} className="border-b border-white/5 last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <RoomThumb room={room} size={32} />
+                      <span className="font-medium">{room.display_name}</span>
+                    </div>
+                  </td>
+                  <td className="px-2 py-3">
+                    {r
+                      ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{t.staying}</span>
+                      : <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/40">{t.empty}</span>}
+                  </td>
+                  <td className="px-2 py-3 text-xs text-white/60">{r ? fmt(r.check_out, lang) : "—"}</td>
+                  <td className="px-2 py-3 font-mono text-cyan-200">{r?.unlock_pin ?? "—"}</td>
+                  <td className="px-2 py-3">
+                    {r?.airbnb_reservation_url && (
+                      <a href={r.airbnb_reservation_url} target="_blank" rel="noopener noreferrer"
+                        className="text-rose-300/80 hover:text-rose-300"><ExternalLink className="h-4 w-4" /></a>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!anyStaying && <p className="mt-3 text-center text-xs text-white/40">{t.todayNone}</p>}
+    </section>
+  );
+}
+
+/* ---------------- Reservations tab ---------------- */
+function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservations: Reservation[]; t: T; lang: AdminLang }) {
+  const [filter, setFilter] = useState<string>("all");
+  const shown = useMemo(
+    () => reservations.filter((r) => filter === "all" || r.room_slug === filter),
+    [reservations, filter]
+  );
+  return (
+    <section>
+      <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+        <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
+          <Plus className="h-4 w-4" /> {t.addTitle}
+        </div>
+        <form action={addReservation} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t.room}>
+            <select name="room_id" required className={selCls}>
+              {rooms.map((r) => <option key={r.id} value={r.id}>{r.display_name}（{r.slug}）</option>)}
+            </select>
+          </Field>
+          <Field label={t.language}>
+            <select name="guest_lang" defaultValue="en" className={selCls}>
+              {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
+            </select>
+          </Field>
+          <Field label={t.checkIn}>
+            <input type="datetime-local" name="check_in" required className={selCls} />
+          </Field>
+          <Field label={t.checkOut}>
+            <input type="datetime-local" name="check_out" required className={selCls} />
+          </Field>
+          <Field label={`${t.guestName}（${t.optional}）`}>
+            <input type="text" name="guest_name" placeholder="—" className={selCls} />
+          </Field>
+          <Field label={t.pinField}>
+            <input type="text" name="unlock_pin" inputMode="numeric" placeholder={t.autoPlaceholder} maxLength={6} className={`${selCls} font-mono`} />
+          </Field>
+          <button type="submit"
+            className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
+            <Plus className="h-4 w-4" /> {t.addButton}
+          </button>
+        </form>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
+        {rooms.map((r) => <FilterChip key={r.id} active={filter === r.slug} onClick={() => setFilter(r.slug)} label={r.display_name} />)}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {shown.map((r) => <ReservationCard key={r.id} r={r} t={t} lang={lang} />)}
+        {shown.length === 0 && <p className="col-span-full py-12 text-center text-sm text-white/40">{t.noReservations}</p>}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- Rooms tab ---------------- */
+function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
+  const ir = info.infraredRemoteList ?? [];
+  const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
+  const lights = ir.filter((d) => /light/i.test(d.remoteType));
+  return (
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {rooms.map((room) => (
+        <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} sbError={info.error} t={t} />
+      ))}
+    </section>
+  );
+}
+
+function RoomManageCard({
+  room, acs, lights, sbError, t,
+}: {
+  room: Room;
+  acs: { deviceId: string; deviceName: string }[];
+  lights: { deviceId: string; deviceName: string }[];
+  sbError: string | null;
+  t: T;
+}) {
+  const [copied, setCopied] = useState(false);
+  const opt = (d: { deviceId: string; deviceName: string }) => (
+    <option key={d.deviceId} value={d.deviceId}>{d.deviceName || d.deviceId}</option>
+  );
+  return (
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+      <div className="flex gap-3 p-4">
+        <RoomThumb room={room} size={72} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{room.display_name}</p>
+          <p className="font-mono text-[11px] text-white/40">{room.slug}</p>
+          <div className="mt-2 flex gap-2">
+            <button onClick={async () => { await navigator.clipboard.writeText(room.url); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+              className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />} URL
+            </button>
+            <a href={room.qr} download={`qr-${room.slug}.png`}
+              className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
+              <Download className="h-3.5 w-3.5" /> QR
+            </a>
+          </div>
+        </div>
+        <img src={room.qr} alt="QR" className="h-16 w-16 rounded-lg bg-white p-1" />
+      </div>
+
+      {/* デバイス割り当て */}
+      <div className="border-t border-white/10 p-4">
+        {sbError ? (
+          <p className="text-[11px] text-amber-300/80">{sbError}</p>
+        ) : (
+          <form action={assignDevices} className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="room_id" value={room.id} />
+            <label className="flex-1 text-[11px] text-white/50">{t.ac}
+              <select name="ac" defaultValue={room.ac_device_id ?? ""} className={`${selCls} mt-1 py-2 text-xs`}>
+                <option value="">{t.none}</option>{acs.map(opt)}
+              </select>
+            </label>
+            <label className="flex-1 text-[11px] text-white/50">{t.light}
+              <select name="light" defaultValue={room.light_device_id ?? ""} className={`${selCls} mt-1 py-2 text-xs`}>
+                <option value="">{t.none}</option>{lights.map(opt)}
+              </select>
+            </label>
+            <button type="submit" className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</button>
+          </form>
+        )}
+      </div>
+
+      {/* 画像URL */}
+      <form action={updateRoomImage} className="flex items-end gap-2 border-t border-white/10 p-4">
+        <input type="hidden" name="room_id" value={room.id} />
+        <label className="flex-1 text-[11px] text-white/50">
+          <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {t.imageUrlLabel}</span>
+          <input type="text" name="image_url" defaultValue={room.image_url ?? ""} placeholder="/rooms/room-xxx.jpg" className={`${selCls} mt-1 py-2 text-xs`} />
+        </label>
+        <button type="submit" className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.save}</button>
+      </form>
+    </div>
+  );
+}
+
+function RoomThumb({ room, size }: { room: Room; size: number }) {
+  if (room.image_url) {
+    return (
+      <img src={room.image_url} alt={room.display_name} width={size} height={size}
+        style={{ width: size, height: size }}
+        className="shrink-0 rounded-xl object-cover"
+        onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+    );
+  }
+  return (
+    <div style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/30">
+      <DoorOpen className="h-1/2 w-1/2" />
+    </div>
+  );
+}
+
+/* ---------------- Device test tab ---------------- */
+function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
+  return (
+    <section>
+      <div className="mb-1 flex items-center gap-2 text-sm text-violet-200">
+        <Wrench className="h-4 w-4" /> {t.testTitle}
+      </div>
+      <p className="mb-4 text-xs text-white/40">{t.testDesc}</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {rooms.map((room) => (
+          <a key={room.id} href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-100 active:bg-violet-500/20">
+            <span className="flex items-center gap-2"><RoomThumb room={room} size={32} />{room.display_name}</span>
+            <span className="flex items-center gap-1 text-xs text-violet-300/80">{t.openTest}<ExternalLink className="h-3.5 w-3.5" /></span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- shared ---------------- */
+const selCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]";
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="text-xs text-white/60">{label}<div className="mt-1">{children}</div></label>;
 }
 
 function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLang) => void }) {
@@ -181,8 +382,7 @@ function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLa
       </button>
       <AnimatePresence>
         {open && (
-          <motion.ul
-            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+          <motion.ul initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
             className="absolute right-0 z-20 mt-2 w-32 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0c14]/90 backdrop-blur-xl">
             {ADMIN_LANGS.map((l) => (
               <li key={l}>
@@ -199,216 +399,45 @@ function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLa
   );
 }
 
-type T = (typeof AT)["ja"];
-
-function DeviceAssignSection({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
-  const ir = info.infraredRemoteList ?? [];
-  const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
-  const lights = ir.filter((d) => /light/i.test(d.remoteType));
-
-  return (
-    <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-      <div className="mb-1 flex items-center gap-2 text-sm text-cyan-200">
-        <KeyRound className="h-4 w-4" /> {t.assignTitle}
-      </div>
-      <p className="mb-4 text-xs text-white/40">{t.assignDesc}</p>
-
-      {info.error ? (
-        <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-          {info.error}{t.switchbotEnvNote}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {rooms.map((room) => (
-            <RoomAssignRow key={room.id} room={room} acs={acs} lights={lights} t={t} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RoomAssignRow({
-  room, acs, lights, t,
-}: {
-  room: Room;
-  acs: { deviceId: string; deviceName: string }[];
-  lights: { deviceId: string; deviceName: string }[];
-  t: T;
-}) {
-  const opt = (d: { deviceId: string; deviceName: string }) => (
-    <option key={d.deviceId} value={d.deviceId}>{d.deviceName || d.deviceId}</option>
-  );
-  return (
-    <form action={assignDevices}
-      className="grid grid-cols-1 items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-      <input type="hidden" name="room_id" value={room.id} />
-      <div className="text-sm font-medium text-white/80">{room.display_name}</div>
-      <label className="text-[11px] text-white/50">
-        {t.ac}
-        <select name="ac" defaultValue={room.ac_device_id ?? ""}
-          className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
-          <option value="">{t.none}</option>
-          {acs.map(opt)}
-        </select>
-      </label>
-      <label className="text-[11px] text-white/50">
-        {t.light}
-        <select name="light" defaultValue={room.light_device_id ?? ""}
-          className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs text-white [color-scheme:dark]">
-          <option value="">{t.none}</option>
-          {lights.map(opt)}
-        </select>
-      </label>
-      <button type="submit"
-        className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-4 py-2 text-xs text-emerald-200 active:bg-emerald-500/30">
-        {t.save}
-      </button>
-    </form>
-  );
-}
-
-function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
-  return (
-    <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-      <div className="mb-1 flex items-center gap-2 text-sm text-violet-200">
-        <Snowflake className="h-4 w-4" /> {t.testTitle}
-      </div>
-      <p className="mb-4 text-xs text-white/40">{t.testDesc}</p>
-      <div className="space-y-3">
-        {rooms.map((room) => <DeviceTestRow key={room.id} room={room} t={t} />)}
-      </div>
-    </section>
-  );
-}
-
-type TestAction = "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
-
-function DeviceTestRow({ room, t }: { room: Room; t: T }) {
-  const [busy, setBusy] = useState<TestAction | null>(null);
-  const [result, setResult] = useState<{ action: TestAction; ok: boolean } | null>(null);
-
-  const run = async (action: TestAction) => {
-    setBusy(action); setResult(null);
-    try {
-      const res = await fetch("/api/admin/test-device", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomSlug: room.slug, action }),
-      });
-      setResult({ action, ok: res.ok });
-    } catch {
-      setResult({ action, ok: false });
-    }
-    setBusy(null);
-  };
-
-  const Btn = ({ action, label, Icon, color }: {
-    action: TestAction; label: string; Icon: any; color: string;
-  }) => {
-    const isBusy = busy === action;
-    const r = result?.action === action ? result : null;
-    return (
-      <button onClick={() => run(action)} disabled={!!busy}
-        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${color} disabled:opacity-50`}>
-        {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          : r ? (r.ok ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <X className="h-3.5 w-3.5 text-rose-300" />)
-          : <Icon className="h-3.5 w-3.5" />}
-        {label}
-      </button>
-    );
-  };
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-      <div className="mb-2 text-sm font-medium text-white/80">{room.display_name}</div>
-      <div className="flex flex-wrap gap-2">
-        <Btn action="unlock" label={t.unlock} Icon={LockKeyholeOpen} color="border-emerald-400/30 bg-emerald-500/10 text-emerald-200" />
-        <Btn action="lock" label={t.lock} Icon={LockKeyhole} color="border-cyan-400/30 bg-cyan-500/10 text-cyan-200" />
-        <Btn action="ac_on" label={t.acOn} Icon={Snowflake} color="border-cyan-400/30 bg-cyan-500/10 text-cyan-200" />
-        <Btn action="ac_off" label={t.acOff} Icon={Snowflake} color="border-white/15 bg-white/5 text-white/60" />
-        <Btn action="light_on" label={t.lightOn} Icon={Lightbulb} color="border-amber-400/30 bg-amber-500/10 text-amber-200" />
-        <Btn action="light_off" label={t.lightOff} Icon={Lightbulb} color="border-white/15 bg-white/5 text-white/60" />
-      </div>
-    </div>
-  );
-}
-
 function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs transition
-        ${active ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-white/10 bg-white/5 text-white/60"}`}>
+      className={`rounded-full border px-3 py-1.5 text-xs transition ${active ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-white/10 bg-white/5 text-white/60"}`}>
       {label}
     </button>
-  );
-}
-
-function RoomQrCard({ r }: { r: Room }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(r.url);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-center backdrop-blur-xl">
-      <img src={r.qr} alt={`QR ${r.slug}`} className="mx-auto w-full max-w-[140px] rounded-xl bg-white p-1.5" />
-      <p className="mt-2 truncate text-xs text-white/70">{r.display_name}</p>
-      <div className="mt-2 flex justify-center gap-2">
-        <button onClick={copy} className="text-white/50 hover:text-cyan-300" title="URL">
-          {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
-        </button>
-        <a href={r.qr} download={`qr-${r.slug}.png`} className="text-white/50 hover:text-white" title="QR">
-          <Download className="h-4 w-4" />
-        </a>
-      </div>
-    </div>
   );
 }
 
 function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang }) {
   const [copied, setCopied] = useState(false);
   const active = r.status === "active";
-
   const copyPin = async () => {
     if (!r.unlock_pin) return;
     await navigator.clipboard.writeText(r.unlock_pin);
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={`rounded-3xl border bg-white/[0.04] p-5 backdrop-blur-xl
-        ${active ? "border-white/10" : "border-rose-500/20 opacity-60"}`}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={`rounded-3xl border bg-white/[0.04] p-5 backdrop-blur-xl ${active ? "border-white/10" : "border-rose-500/20 opacity-60"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <DoorOpen className="h-4 w-4 text-cyan-300" />
             <span className="font-medium">{r.room_name}</span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] tracking-wide
-              ${active ? "bg-emerald-500/15 text-emerald-300"
-                : r.status === "cancelled" ? "bg-rose-500/15 text-rose-300"
-                : "bg-white/10 text-white/50"}`}>
+              ${active ? "bg-emerald-500/15 text-emerald-300" : r.status === "cancelled" ? "bg-rose-500/15 text-rose-300" : "bg-white/10 text-white/50"}`}>
               {r.status}
             </span>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">
-              {r.source === "ical" ? "Airbnb" : t.manual}
-            </span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">{r.source === "ical" ? "Airbnb" : t.manual}</span>
           </div>
           <p className="mt-1.5 text-xs text-white/50">{fmt(r.check_in, lang)} → {fmt(r.check_out, lang)}</p>
           {r.guest_name && <p className="text-xs text-white/40">{r.guest_name}・{r.guest_lang}</p>}
         </div>
-
-        <button onClick={copyPin}
-          className="shrink-0 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-center">
-          <div className="flex items-center gap-1 text-[10px] text-cyan-300/70">
-            <KeyRound className="h-3 w-3" /> {t.pin} {copied ? "✓" : ""}
-          </div>
+        <button onClick={copyPin} className="shrink-0 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-center">
+          <div className="flex items-center gap-1 text-[10px] text-cyan-300/70"><KeyRound className="h-3 w-3" /> {t.pin} {copied ? "✓" : ""}</div>
           <div className="font-mono text-2xl tracking-[0.3em] text-cyan-200">{r.unlock_pin ?? "----"}</div>
         </button>
       </div>
-
       <div className="mt-4 flex flex-wrap gap-2">
         {r.airbnb_reservation_url && (
           <a href={r.airbnb_reservation_url} target="_blank" rel="noopener noreferrer"
@@ -418,16 +447,14 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
         )}
         <form action={regeneratePin}>
           <input type="hidden" name="id" value={r.id} />
-          <button type="submit"
-            className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
+          <button type="submit" className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
             <RefreshCw className="h-3.5 w-3.5" /> {t.regenPin}
           </button>
         </form>
         {active && (
           <form action={cancelReservation}>
             <input type="hidden" name="id" value={r.id} />
-            <button type="submit"
-              className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
+            <button type="submit" className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
               <Ban className="h-3.5 w-3.5" /> {t.cancel}
             </button>
           </form>

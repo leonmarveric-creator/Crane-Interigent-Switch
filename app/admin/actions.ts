@@ -63,6 +63,16 @@ export async function assignDevices(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** 部屋のアート画像URLを更新。 */
+export async function updateRoomImage(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  if (!room_id) return;
+  const image_url = String(formData.get("image_url") || "").trim() || null;
+  await supabaseAdmin.from("rooms").update({ image_url }).eq("id", room_id);
+  revalidatePath("/admin");
+}
+
 /** PINを再発行 (現在のPINを無効化して4桁を作り直す)。 */
 export async function regeneratePin(formData: FormData) {
   requireAdmin();
