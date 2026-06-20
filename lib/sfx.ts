@@ -114,8 +114,9 @@ export function primeVoice() {
     if (ss) {
       ss.resume?.();
       const u = new SpeechSynthesisUtterance(".");
-      u.volume = 0; u.rate = 2;
-      ss.speak(u); // 無音の起動用発話
+      u.volume = 0.01; u.rate = 10; // ほぼ無音だが「発話した」状態にして以後を解放
+      if (chosenVoice) u.voice = chosenVoice;
+      ss.speak(u);
     }
   } catch { /* ignore */ }
 }

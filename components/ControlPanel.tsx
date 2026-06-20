@@ -8,7 +8,7 @@ import {
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { blip, powerUp, powerDown, error as sfxError, speak, setMuted as sfxSetMuted } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speak, primeVoice, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
@@ -673,6 +673,7 @@ function SceneButtons({
 
   const run = async (a: "welcome" | "away") => {
     if (busy) return;
+    primeVoice(); // タップ内で音声を解放
     if (guard && !(await guard())) return;
     blip(); setBusy(a);
     const ok = await callDevice(roomSlug, a, admin);
@@ -716,6 +717,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
 
   const run = useCallback(async (action: "unlock" | "lock") => {
     if (busy) return;
+    primeVoice(); // タップの瞬間に音声を解放 (iOSで後続のspeakを鳴らす)
     if (guard && !(await guard())) return;
     blip();
     setBusy(action); setResult(null); setRipple((r) => r + 1);
@@ -880,9 +882,10 @@ function WakeCard({
 }) {
   const [time, setTime] = useState("07:00");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
+  const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    setState("busy");
+    setState("busy"); setErr(null);
     // 次に来る該当時刻(JST)を計算
     const [h, m] = time.split(":").map(Number);
     const now = new Date();
@@ -890,12 +893,22 @@ function WakeCard({
     fire.setHours(h, m, 0, 0);
     if (fire <= now) fire.setDate(fire.getDate() + 1);
 
-    const res = await fetch(`/api/alarms/${roomSlug}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fireAtIso: fire.toISOString() }),
-    });
-    setState(res.ok ? "set" : "idle");
+    try {
+      const res = await fetch(`/api/alarms/${roomSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fireAtIso: fire.toISOString() }),
+      });
+      if (res.ok) { setState("set"); }
+      else {
+        const j = await res.json().catch(() => ({} as any));
+        setErr(j?.error === "OUT_OF_STAY" ? "チェックアウト前の時刻にしてください / Set a time before check-out"
+          : j?.error || `ERR ${res.status}`);
+        setState("idle");
+      }
+    } catch (e: any) {
+      setErr(e?.message || "network error"); setState("idle");
+    }
   };
 
   return (
@@ -928,6 +941,7 @@ function WakeCard({
             {state === "set" ? t.alarmSet : t.setAlarm}
           </motion.button>
         </div>
+        {err && <p className="mt-2 text-center text-[11px] text-rose-300">{err}</p>}
       </HudPanel>
     </motion.div>
   );
