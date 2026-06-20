@@ -36,12 +36,14 @@ async function processRoom(room: { id: string; slug: string; airbnb_ical_url: st
       .maybeSingle();
 
     if (existing) {
-      await supabaseAdmin.from("reservations").update({
+      const upd: Record<string, any> = {
         check_in: checkIn.toISOString(),
         check_out: checkOut.toISOString(),
-        status: "active",
         airbnb_reservation_url: reservationUrl,
-      }).eq("id", existing.id);
+      };
+      // 未来の予約のみ active に復活。過去(終了済み)はステータスを触らない → ピンポン防止
+      if (checkOut.getTime() > Date.now()) upd.status = "active";
+      await supabaseAdmin.from("reservations").update(upd).eq("id", existing.id);
       stat.updated++;
     } else {
       const pin = extractPhoneLast4(ev.description) ?? randomPin();
@@ -85,7 +87,20 @@ async function checkoutCleanup(): Promise<number> {
   if (!ended || !ended.length) return 0;
 
   const roomIds = [...new Set(ended.map((r) => r.room_id))];
+  let offCount = 0;
   await Promise.all(roomIds.map(async (roomId) => {
+    // 現在その部屋に滞在中の客がいれば消灯しない (次のゲストを邪魔しない)
+    const { data: occ } = await supabaseAdmin
+      .from("reservations")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("status", "active")
+      .lte("check_in", endNow)
+      .gt("check_out", endNow)
+      .limit(1)
+      .maybeSingle();
+    if (occ) return; // 在室中 → スキップ
+
     const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("id", roomId).maybeSingle();
     if (!room) return;
     if (room.switchbot_ac_device_id) {
@@ -96,10 +111,12 @@ async function checkoutCleanup(): Promise<number> {
       const x = await executeDeviceAction(room, "light_off", "Checkout");
       await logDevice({ room_id: roomId, action: "light_off", source: "cron", success: x.ok });
     }
+    offCount++;
   }));
 
+  // 終了した予約は completed にして再処理を防止 (在室有無に関わらず)
   await supabaseAdmin.from("reservations").update({ status: "completed" }).in("id", ended.map((r) => r.id));
-  return roomIds.length;
+  return offCount;
 }
 
 /**
