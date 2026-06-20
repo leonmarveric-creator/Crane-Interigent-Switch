@@ -44,7 +44,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .anim-scan   { animation: scanline 7s linear infinite; }
 .anim-grid   { animation: grid-pulse 6s ease-in-out infinite; }
 .anim-breathe{ animation: breathe 3.5s ease-in-out infinite; }
+@keyframes flicker {
+  0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.82; }
+  94% { opacity: 1; } 96% { opacity: 0.9; } 97% { opacity: 1; }
+}
+.anim-flicker{ animation: flicker 7s linear infinite; }
+@keyframes boot-bar {
+  0% { transform: scaleX(0); } 100% { transform: scaleX(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   .anim-drift, .anim-drift2, .anim-spin-slow, .anim-spin-rev,
-  .anim-scan, .anim-grid, .anim-breathe { animation: none; }
+  .anim-scan, .anim-grid, .anim-breathe, .anim-flicker { animation: none; }
 }

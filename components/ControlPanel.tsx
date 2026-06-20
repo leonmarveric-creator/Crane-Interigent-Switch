@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
-  AlarmClock, Check, Loader2, Globe,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import { blip, powerUp, powerDown, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
@@ -34,10 +35,24 @@ export default function ControlPanel({
   roomSlug, roomName, checkOut, initialLang, admin, imageUrl,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
+  const [muted, setMuted] = useState(false);
+  const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
   const t = T[lang];
+
+  useEffect(() => {
+    const saved = localStorage.getItem("guestMuted");
+    if (saved === "1") setMuted(true);
+  }, []);
+  useEffect(() => { sfxSetMuted(muted); }, [muted]);
+  const toggleMute = () => setMuted((m) => { const n = !m; localStorage.setItem("guestMuted", n ? "1" : "0"); return n; });
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
+      {/* 起動シーケンス */}
+      <AnimatePresence>
+        {booting && <BootSequence onDone={() => setBooting(false)} roomName={roomName} />}
+      </AnimatePresence>
+
       {/* 背景: 動くオーロラ + 走査線 + グリッド */}
       <div className="pointer-events-none absolute inset-0">
         <div className="anim-drift absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-400/30 blur-[110px]" />
@@ -63,6 +78,9 @@ export default function ControlPanel({
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
+        {/* HUDステータスバー */}
+        <HudStatusBar />
+
         {/* 部屋アート (ヒーロー・小さめ正方形・中央) */}
         {imageUrl && (
           <motion.div
@@ -102,7 +120,14 @@ export default function ControlPanel({
               </p>
             )}
           </div>
-          <LangSwitch lang={lang} setLang={setLang} />
+          <div className="flex items-center gap-2">
+            <button onClick={toggleMute}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-cyan-300 backdrop-blur-md active:scale-95"
+              aria-label="sound">
+              {muted ? <VolumeX className="h-4 w-4 text-white/40" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+            <LangSwitch lang={lang} setLang={setLang} />
+          </div>
         </motion.header>
 
         {/* スマートロック (主役) */}
@@ -175,6 +200,100 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
 }
 
 /* ------------------------------------------------------------------ */
+/* 起動シーケンス (JARVIS ブート)                                       */
+/* ------------------------------------------------------------------ */
+function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
+  useEffect(() => {
+    const id = setTimeout(onDone, 2600);
+    return () => clearTimeout(id);
+  }, [onDone]);
+
+  const lines = [
+    "INITIALIZING SYSTEM",
+    "ARC REACTOR ·········· ONLINE",
+    "SECURE LINK ·········· ESTABLISHED",
+    `ROOM · ${roomName.toUpperCase()}`,
+    "J.A.R.V.I.S ·········· READY",
+  ];
+
+  return (
+    <motion.div
+      exit={{ opacity: 0, filter: "blur(6px)" }} transition={{ duration: 0.5 }}
+      onClick={onDone}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#04060c] px-8">
+      {/* アークリアクター */}
+      <div className="relative mb-9 h-40 w-40">
+        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full">
+          <g className="anim-spin-slow" style={SPIN}>
+            <circle cx="100" cy="100" r="92" fill="none" stroke="#22d3ee" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 7" />
+          </g>
+          <g className="anim-spin-rev" style={SPIN}>
+            <circle cx="100" cy="100" r="74" fill="none" stroke="#22d3ee" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="50 250" strokeLinecap="round" />
+            <circle cx="100" cy="100" r="74" fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="20 300" strokeDashoffset="-150" strokeLinecap="round" />
+          </g>
+        </svg>
+        <motion.div
+          animate={{ scale: [1, 1.18, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.3 }}
+          className="absolute inset-0 m-auto h-16 w-16 rounded-full bg-cyan-400/40 blur-md" />
+        <div className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300/60 bg-cyan-400/10">
+          <span className="h-3 w-3 rounded-full bg-cyan-100 shadow-[0_0_22px_5px_rgba(34,211,238,0.85)]" />
+        </div>
+      </div>
+
+      {/* ターミナル行 */}
+      <div className="min-h-[110px] font-mono text-[11px] tracking-[0.22em] text-cyan-300/85">
+        {lines.map((l, i) => (
+          <motion.p key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.25 + i * 0.4 }} className="my-1 flex items-center gap-2">
+            <span className="text-emerald-400">›</span> {l}
+          </motion.p>
+        ))}
+      </div>
+
+      {/* プログレスバー */}
+      <div className="mt-7 h-0.5 w-56 overflow-hidden rounded-full bg-white/10">
+        <motion.div initial={{ width: 0 }} animate={{ width: "100%" }}
+          transition={{ duration: 2.4, ease: "easeInOut" }}
+          className="h-full bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400" />
+      </div>
+      <p className="mt-3 font-mono text-[9px] tracking-[0.3em] text-white/30">TAP TO SKIP</p>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* HUDステータスバー (テレメトリ風)                                     */
+/* ------------------------------------------------------------------ */
+function HudStatusBar() {
+  const [hex, setHex] = useState("0x0000");
+  useEffect(() => {
+    const id = setInterval(
+      () => setHex("0x" + Math.floor(Math.random() * 65536).toString(16).padStart(4, "0").toUpperCase()),
+      650
+    );
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="anim-flicker mb-4 flex items-center justify-between rounded-full border border-cyan-400/20 bg-cyan-400/[0.04] px-4 py-1.5 font-mono text-[9px] tracking-[0.25em] text-cyan-300/70">
+      <span className="flex items-center gap-1.5">
+        <span className="anim-breathe inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" /> SYS ONLINE
+      </span>
+      <span className="hidden tracking-[0.3em] text-cyan-300/50 sm:inline">J.A.R.V.I.S</span>
+      <span className="flex items-center gap-2">
+        <span className="flex items-end gap-0.5">
+          {[3, 5, 4, 6, 5].map((h, i) => (
+            <span key={i} className="anim-breathe inline-block w-0.5 bg-cyan-400/70"
+              style={{ height: h, animationDelay: `${i * 0.18}s` }} />
+          ))}
+        </span>
+        <span className="text-cyan-300/60">{hex}</span>
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* HUD部品: ターゲットブラケット / 同心円ダイヤル                        */
 /* ------------------------------------------------------------------ */
 function Corners({ tone = "cyan" }: { tone?: "cyan" | "amber" | "emerald" }) {
@@ -226,11 +345,12 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
 
   const toggle = useCallback(async () => {
     if (busy) return;
+    blip();
     setBusy(true);
     setRipple((r) => r + 1);
     const next = !unlocked;
     const ok = await callDevice(roomSlug, next ? "unlock" : "lock", admin);
-    if (ok) setUnlocked(next);
+    if (ok) { setUnlocked(next); (next ? powerUp : powerDown)(); }
     setBusy(false);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);
   }, [busy, unlocked, roomSlug, admin]);
@@ -263,6 +383,20 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
             ${unlocked ? "bg-emerald-400/30" : "bg-cyan-400/30"}`}
         />
       </AnimatePresence>
+
+      {/* スパーク放射 */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2">
+        {ripple > 0 && [...Array(12)].map((_, i) => {
+          const a = (i / 12) * Math.PI * 2;
+          return (
+            <motion.span key={`${ripple}-${i}`}
+              initial={{ opacity: 0.9, x: 0, y: 0, scale: 1 }}
+              animate={{ opacity: 0, x: Math.cos(a) * 80, y: Math.sin(a) * 80, scale: 0 }}
+              transition={{ duration: 0.55, ease: "easeOut" }}
+              className={`absolute h-1 w-1 rounded-full ${unlocked ? "bg-emerald-300" : "bg-cyan-300"}`} />
+          );
+        })}
+      </div>
 
       <div className="relative mb-4 flex h-24 w-24 items-center justify-center">
         <motion.div
@@ -309,6 +443,7 @@ function ToggleCard({
 
   const toggle = async () => {
     if (busy) return;
+    blip();
     setBusy(true);
     const next = !on;
     const ok = await callDevice(roomSlug, next ? onAction : offAction, admin);
