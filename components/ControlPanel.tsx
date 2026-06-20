@@ -50,6 +50,16 @@ export default function ControlPanel({
           [background-size:42px_42px]" />
         {/* 走査線 */}
         <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/15 to-transparent" />
+        {/* 巨大HUDレティクル (薄め) */}
+        <svg viewBox="0 0 400 400" className="absolute left-1/2 top-1/2 h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 opacity-[0.06]">
+          <g className="anim-spin-slow" style={SPIN}>
+            <circle cx="200" cy="200" r="190" fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="2 10" />
+            <circle cx="200" cy="200" r="150" fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="40 30" />
+          </g>
+          <g className="anim-spin-rev" style={SPIN}>
+            <circle cx="200" cy="200" r="120" fill="none" stroke="#fbbf24" strokeWidth="0.5" strokeDasharray="60 200" />
+          </g>
+        </svg>
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
@@ -165,6 +175,48 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
 }
 
 /* ------------------------------------------------------------------ */
+/* HUD部品: ターゲットブラケット / 同心円ダイヤル                        */
+/* ------------------------------------------------------------------ */
+function Corners({ tone = "cyan" }: { tone?: "cyan" | "amber" | "emerald" }) {
+  const c = tone === "amber" ? "border-amber-300/60" : tone === "emerald" ? "border-emerald-300/60" : "border-cyan-300/55";
+  const base = "pointer-events-none absolute h-3.5 w-3.5";
+  return (
+    <>
+      <span className={`${base} left-2.5 top-2.5 border-l border-t ${c}`} />
+      <span className={`${base} right-2.5 top-2.5 border-r border-t ${c}`} />
+      <span className={`${base} bottom-2.5 left-2.5 border-b border-l ${c}`} />
+      <span className={`${base} bottom-2.5 right-2.5 border-b border-r ${c}`} />
+    </>
+  );
+}
+
+const SPIN: React.CSSProperties = { transformBox: "fill-box", transformOrigin: "center" };
+
+function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
+  const s = unlocked ? "#34d399" : "#22d3ee";
+  return (
+    <svg viewBox="0 0 200 200" className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2">
+      {/* 外周: 目盛り (低速回転) */}
+      <g className="anim-spin-slow" style={SPIN}>
+        <circle cx="100" cy="100" r="94" fill="none" stroke={s} strokeOpacity="0.22" strokeWidth="1" strokeDasharray="1.5 7" />
+        <circle cx="100" cy="100" r="86" fill="none" stroke={s} strokeOpacity="0.12" strokeWidth="0.6" />
+      </g>
+      {/* 中周: 分割アーク (逆回転) + ゴールド差し色 */}
+      <g className={busy ? "anim-spin-rev" : "anim-spin-slow"} style={SPIN}>
+        <circle cx="100" cy="100" r="76" fill="none" stroke={s} strokeOpacity="0.55" strokeWidth="2" strokeDasharray="58 250" strokeLinecap="round" />
+        <circle cx="100" cy="100" r="76" fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="22 308" strokeDashoffset="-150" strokeLinecap="round" />
+      </g>
+      {/* レーダースイープ (扇形・回転) */}
+      <g className="anim-spin-rev" style={SPIN}>
+        <path d="M100 100 L100 36 A64 64 0 0 1 150 64 Z" fill={s} fillOpacity="0.06" />
+      </g>
+      {/* 内周 */}
+      <circle cx="100" cy="100" r="62" fill="none" stroke={s} strokeOpacity="0.2" strokeWidth="1" />
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* スマートロック カード (波紋 + サイバー解錠エフェクト)                */
 /* ------------------------------------------------------------------ */
 function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"]; admin?: boolean }) {
@@ -190,11 +242,16 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
       onClick={toggle}
       whileTap={{ scale: 0.97 }}
       className={`relative flex flex-col items-center overflow-hidden rounded-[2rem]
-        border bg-white/[0.04] px-6 py-10 backdrop-blur-2xl transition-colors
+        border bg-white/[0.03] px-6 py-12 backdrop-blur-2xl transition-colors
         ${unlocked
-          ? "border-emerald-400/40 shadow-[0_0_70px_-20px_rgba(16,185,129,0.8)]"
-          : "border-cyan-400/30 shadow-[0_0_60px_-22px_rgba(34,211,238,0.7)]"}`}
+          ? "border-emerald-400/40 shadow-[0_0_80px_-18px_rgba(16,185,129,0.85)]"
+          : "border-cyan-400/30 shadow-[0_0_70px_-20px_rgba(34,211,238,0.8)]"}`}
     >
+      <Corners tone={unlocked ? "emerald" : "cyan"} />
+
+      {/* JARVIS風 HUDダイヤル */}
+      <HudRings unlocked={unlocked} busy={busy} />
+
       {/* 解錠時の波紋 */}
       <AnimatePresence>
         <motion.span
@@ -208,32 +265,26 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
       </AnimatePresence>
 
       <div className="relative mb-4 flex h-24 w-24 items-center justify-center">
-        {/* 回転するエネルギーリング */}
-        <span className={`anim-spin-slow pointer-events-none absolute inset-[-10px] rounded-full
-          ${unlocked
-            ? "[background:conic-gradient(from_0deg,transparent,rgba(16,185,129,0.7),transparent_45%)]"
-            : "[background:conic-gradient(from_0deg,transparent,rgba(34,211,238,0.7),transparent_45%)]"} blur-[2px]`} />
-        <span className={`anim-spin-rev pointer-events-none absolute inset-[-2px] rounded-full border
-          ${unlocked ? "border-emerald-400/30" : "border-cyan-400/30"} [border-style:dashed]`} />
         <motion.div
           animate={busy ? { rotate: [0, -8, 8, 0] } : {}}
           transition={{ duration: 0.5 }}
-          className={`relative flex h-24 w-24 items-center justify-center rounded-full
-            border ${unlocked ? "border-emerald-400/50 bg-emerald-400/10" : "border-cyan-400/40 bg-cyan-400/10"}`}
+          className={`anim-breathe relative flex h-24 w-24 items-center justify-center rounded-full border
+            ${unlocked ? "border-emerald-400/60 bg-emerald-400/10" : "border-cyan-400/50 bg-cyan-400/10"}`}
         >
-        {busy ? (
-          <Loader2 className={`h-10 w-10 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
-        ) : (
-          <Icon className={`h-11 w-11 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />
-        )}
+          {busy ? (
+            <Loader2 className={`h-10 w-10 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
+          ) : (
+            <Icon className={`h-11 w-11 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />
+          )}
         </motion.div>
       </div>
 
-      <span className={`text-lg font-medium tracking-wide ${unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
+      <span className={`relative text-lg font-medium tracking-wide ${unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
         {busy ? t.sending : unlocked ? t.unlocked : t.locked}
       </span>
-      <span className="mt-1 font-mono text-[10px] tracking-[0.3em] text-white/30">
-        {unlocked ? "TAP TO LOCK" : "TAP TO UNLOCK"}
+      <span className="relative mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.3em] text-white/40">
+        <span className={`anim-breathe inline-block h-1.5 w-1.5 rounded-full ${unlocked ? "bg-emerald-400" : "bg-cyan-400"}`} />
+        {unlocked ? "SECURE · TAP TO LOCK" : "STANDBY · TAP TO UNLOCK"}
       </span>
     </motion.button>
   );
@@ -275,11 +326,14 @@ function ToggleCard({
         ${on ? `${palette.border}` : "border-white/8"}`}
       style={on ? { boxShadow: `0 0 50px -18px ${palette.glow}` } : undefined}
     >
+      <Corners tone={accent} />
       <motion.div
         animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.5 }}
-        className={`flex h-14 w-14 items-center justify-center rounded-2xl
+        className={`relative flex h-14 w-14 items-center justify-center rounded-2xl
           ${on ? `${palette.border} bg-white/5` : "border border-white/10"}`}
       >
+        {on && <span className="anim-spin-slow pointer-events-none absolute inset-[-6px] rounded-full"
+          style={{ background: `conic-gradient(from 0deg, transparent, ${palette.glow}, transparent 50%)` }} />}
         {busy
           ? <Loader2 className={`h-6 w-6 animate-spin ${palette.text}`} />
           : <Icon className={`h-7 w-7 ${on ? palette.text : "text-white/40"}`} strokeWidth={1.6} />}
