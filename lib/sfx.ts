@@ -105,6 +105,33 @@ export function confirm() {
   osc(c, "sine", 1320, 1320, t + 0.07, 0.1, 0.04);
 }
 
+/** 音声をユーザー操作内で先行起動 (iOSで後続のspeakを鳴らせるようにする)。 */
+export function primeVoice() {
+  if (typeof window === "undefined") return;
+  try { ac(); } catch { /* audio */ }
+  try {
+    const ss = window.speechSynthesis;
+    if (ss) {
+      ss.resume?.();
+      const u = new SpeechSynthesisUtterance(".");
+      u.volume = 0; u.rate = 2;
+      ss.speak(u); // 無音の起動用発話
+    }
+  } catch { /* ignore */ }
+}
+
+/** JARVIS音声 (Web Speech API・無料)。ミュート連動。英語フレーズ。 */
+export function speak(text: string) {
+  if (muted) return;
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US"; u.rate = 0.98; u.pitch = 0.8; u.volume = 0.9;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  } catch { /* ignore */ }
+}
+
 /** エラー音 */
 export function error() {
   const c = ac(); if (!c || muted) return;

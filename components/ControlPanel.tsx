@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut,
+  Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { blip, powerUp, powerDown, error as sfxError, setMuted as sfxSetMuted } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speak, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
@@ -52,6 +53,7 @@ export default function ControlPanel({
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
   const [taps, setTaps] = useState<{ id: number; x: number; y: number }[]>([]);
+  const weather = useWeather(lat, lng);
   const t = T[lang];
 
   // タップ位置に照準リング
@@ -162,9 +164,18 @@ export default function ControlPanel({
         )}
       </AnimatePresence>
 
+      {/* 天気連動の背景 */}
+      {weather && <WeatherFX code={weather.code} />}
+
+      {/* 全画面HUDフレーム (ヘルメットHUD風) */}
+      <HudFrame />
+
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
         {/* HUDステータスバー */}
         <HudStatusBar />
+
+        {/* 天気 */}
+        {weather && <Weather data={weather} />}
 
         {/* 部屋アート (ヒーロー・小さめ正方形・中央) */}
         {imageUrl && (
@@ -357,6 +368,7 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* ------------------------------------------------------------------ */
 function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
   useEffect(() => {
+    speak("System online"); // iOSではジェスチャー外のため鳴らない場合あり (ベストエフォート)
     const id = setTimeout(onDone, 2600);
     return () => clearTimeout(id);
   }, [onDone]);
@@ -412,6 +424,124 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
       </div>
       <p className="mt-3 font-mono text-[9px] tracking-[0.3em] text-white/30">TAP TO SKIP</p>
     </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 天気 (Open-Meteo・キー不要)                                          */
+/* ------------------------------------------------------------------ */
+function wIcon(code: number) {
+  if (code === 0) return Sun;
+  if (code <= 2) return CloudSun;
+  if (code === 3) return Cloud;
+  if (code === 45 || code === 48) return CloudFog;
+  if (code >= 51 && code <= 57) return CloudDrizzle;
+  if (code >= 61 && code <= 67) return CloudRain;
+  if (code >= 71 && code <= 77) return CloudSnow;
+  if (code >= 80 && code <= 82) return CloudRain;
+  if (code >= 95) return CloudLightning;
+  return Cloud;
+}
+type WeatherData = { temp: number; code: number };
+function useWeather(lat?: number | null, lng?: number | null): WeatherData | null {
+  const [w, setW] = useState<WeatherData | null>(null);
+  useEffect(() => {
+    if (typeof lat !== "number" || typeof lng !== "number") return;
+    let on = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&timezone=auto`);
+        const j = await r.json();
+        if (on && j?.current) setW({ temp: Math.round(j.current.temperature_2m), code: j.current.weather_code });
+      } catch { /* ignore */ }
+    };
+    load();
+    const id = setInterval(load, 15 * 60 * 1000);
+    return () => { on = false; clearInterval(id); };
+  }, [lat, lng]);
+  return w;
+}
+function Weather({ data }: { data: WeatherData }) {
+  const Icon = wIcon(data.code);
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="mb-4 flex items-center justify-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/[0.04] px-4 py-1.5 text-xs text-cyan-200/80">
+      <Icon className="anim-breathe h-4 w-4 text-cyan-300" />
+      <span className="font-mono text-sm">{data.temp}°C</span>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 天気連動の背景 (雨・雪・晴れ)                                        */
+/* ------------------------------------------------------------------ */
+function WeatherFX({ code }: { code: number }) {
+  const kind = code === 0 || code === 1 ? "clear"
+    : code >= 71 && code <= 77 ? "snow"
+    : (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95 ? "rain"
+    : "cloud";
+
+  const drops = useMemo(
+    () => [...Array(kind === "rain" ? 60 : kind === "snow" ? 40 : 0)].map(() => ({
+      left: Math.random() * 100,
+      dur: kind === "rain" ? 0.6 + Math.random() * 0.6 : 4 + Math.random() * 5,
+      delay: Math.random() * 3,
+      size: kind === "snow" ? 2 + Math.random() * 3 : 0,
+    })),
+    [kind]
+  );
+
+  if (kind === "clear") {
+    return (
+      <div className="pointer-events-none absolute inset-0">
+        <div className="anim-breathe absolute left-1/2 top-1/4 h-72 w-72 -translate-x-1/2 rounded-full bg-amber-300/15 blur-[100px]" />
+      </div>
+    );
+  }
+  if (kind === "cloud") return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {drops.map((d, i) =>
+        kind === "rain" ? (
+          <span key={i} className="absolute top-0 w-px bg-gradient-to-b from-cyan-200/50 to-transparent"
+            style={{ left: `${d.left}%`, height: 14, animation: `rainfall ${d.dur}s linear ${d.delay}s infinite` }} />
+        ) : (
+          <span key={i} className="absolute top-0 rounded-full bg-white/70"
+            style={{ left: `${d.left}%`, width: d.size, height: d.size, animation: `snowfall ${d.dur}s linear ${d.delay}s infinite` }} />
+        )
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 全画面HUDフレーム (ヘルメットHUD)                                    */
+/* ------------------------------------------------------------------ */
+function HudFrame() {
+  const corner = "pointer-events-none absolute h-7 w-7 border-cyan-300/40";
+  return (
+    <div className="pointer-events-none fixed inset-0 z-20">
+      {/* コーナーブラケット */}
+      <span className={`${corner} left-3 top-3 border-l-2 border-t-2`} />
+      <span className={`${corner} right-3 top-3 border-r-2 border-t-2`} />
+      <span className={`${corner} bottom-3 left-3 border-b-2 border-l-2`} />
+      <span className={`${corner} bottom-3 right-3 border-b-2 border-r-2`} />
+      {/* 上下のティックライン */}
+      <div className="absolute inset-x-14 top-3.5 h-[3px] opacity-30
+        [background:repeating-linear-gradient(90deg,#22d3ee_0,#22d3ee_1px,transparent_1px,transparent_9px)]" />
+      <div className="absolute inset-x-14 bottom-3.5 h-[3px] opacity-30
+        [background:repeating-linear-gradient(90deg,#22d3ee_0,#22d3ee_1px,transparent_1px,transparent_9px)]" />
+      {/* 隅の小ゲージ */}
+      <svg viewBox="0 0 60 60" className="absolute bottom-6 right-6 h-10 w-10 opacity-40">
+        <g className="anim-spin-slow" style={SPIN}>
+          <circle cx="30" cy="30" r="26" fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="3 5" />
+        </g>
+        <g className="anim-spin-rev" style={SPIN}>
+          <circle cx="30" cy="30" r="18" fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="20 60" />
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -546,7 +676,8 @@ function SceneButtons({
     if (guard && !(await guard())) return;
     blip(); setBusy(a);
     const ok = await callDevice(roomSlug, a, admin);
-    if (ok) (a === "welcome" ? powerUp : powerDown)(); else sfxError();
+    if (ok) { (a === "welcome" ? powerUp : powerDown)(); speak(a === "welcome" ? "Welcome home" : "Goodbye"); }
+    else sfxError();
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 25 : [20, 40, 20]);
   };
@@ -589,8 +720,11 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
     blip();
     setBusy(action); setResult(null); setRipple((r) => r + 1);
     const ok = await callDevice(roomSlug, action, admin);
-    if (ok) { setLast(action); (action === "unlock" ? powerUp : powerDown)(); }
-    else sfxError();
+    if (ok) {
+      setLast(action);
+      (action === "unlock" ? powerUp : powerDown)();
+      speak(action === "unlock" ? "Door unlocked" : "Door locked");
+    } else sfxError();
     setResult(ok);
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);

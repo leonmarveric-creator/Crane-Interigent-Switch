@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Lock, Loader2, Globe } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import { primeVoice } from "@/lib/sfx";
 
 const PIN_LEN = 4;
 
@@ -35,6 +36,7 @@ export default function PinGate({
   };
 
   const submit = async (pin: string) => {
+    primeVoice(); // タップ操作内で音声を先行起動 (iOSで起動音声を鳴らすため)
     setBusy(true); setErr(false);
     const res = await fetch(`/api/room/${roomSlug}/auth`, {
       method: "POST",

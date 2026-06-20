@@ -55,7 +55,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 /* ホログラム投影スキャン */
 @keyframes holoscan { 0% { transform: translateY(-120%); } 100% { transform: translateY(360%); } }
 .anim-holoscan { animation: holoscan 3.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .anim-holoscan { animation: none; } }
+/* 天気連動: 雨・雪 */
+@keyframes rainfall { 0% { transform: translateY(-10vh); } 100% { transform: translateY(110vh); } }
+@keyframes snowfall { 0% { transform: translateY(-5vh) translateX(0); } 100% { transform: translateY(110vh) translateX(14px); } }
+@media (prefers-reduced-motion: reduce) {
+  .anim-holoscan { animation: none; }
+}
 /* アイアンマンHUD: 角をカットした多角形パネル / 六角形 */
 .clip-bevel {
   clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
