@@ -368,7 +368,7 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* ------------------------------------------------------------------ */
 function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
   useEffect(() => {
-    speak("System online"); // iOSではジェスチャー外のため鳴らない場合あり (ベストエフォート)
+    speak("All systems online"); // iOSではジェスチャー外のため鳴らない場合あり (ベストエフォート)
     const id = setTimeout(onDone, 2600);
     return () => clearTimeout(id);
   }, [onDone]);
@@ -723,7 +723,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
     if (ok) {
       setLast(action);
       (action === "unlock" ? powerUp : powerDown)();
-      speak(action === "unlock" ? "Door unlocked" : "Door locked");
+      speak(action === "unlock" ? "Door unlocked" : "Door secured");
     } else sfxError();
     setResult(ok);
     setBusy(null);

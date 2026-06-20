@@ -120,13 +120,42 @@ export function primeVoice() {
   } catch { /* ignore */ }
 }
 
-/** JARVIS音声 (Web Speech API・無料)。ミュート連動。英語フレーズ。 */
+// JARVIS風の英国男性ボイスを選択 (端末にあるものから優先順に)
+let chosenVoice: SpeechSynthesisVoice | null = null;
+function pickVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const byName = (n: string) => voices.find((v) => v.name === n);
+  return (
+    byName("Daniel") ||                          // Apple en-GB 男性 (JARVISに近い)
+    byName("Arthur") ||                          // Apple 新しめ en-GB
+    byName("Google UK English Male") ||          // Chrome
+    byName("Microsoft Ryan Online (Natural) - English (United Kingdom)") ||
+    voices.find((v) => v.lang === "en-GB" && /male|daniel|arthur|ryan|george|oliver/i.test(v.name)) ||
+    voices.find((v) => v.lang === "en-GB") ||
+    voices.find((v) => v.lang?.startsWith("en-GB")) ||
+    voices.find((v) => v.lang?.startsWith("en")) ||
+    null
+  );
+}
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  chosenVoice = pickVoice();
+  window.speechSynthesis.onvoiceschanged = () => { chosenVoice = pickVoice(); };
+}
+
+/** JARVIS音声 (Web Speech API・無料)。英国紳士ボイス・落ち着いた話速。 */
 export function speak(text: string) {
   if (muted) return;
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   try {
+    const v = chosenVoice || pickVoice();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US"; u.rate = 0.98; u.pitch = 0.8; u.volume = 0.9;
+    if (v) u.voice = v;
+    u.lang = v?.lang || "en-GB";
+    u.rate = 0.9;    // 落ち着いた抑揚
+    u.pitch = 0.95;  // やや低めの男性トーン
+    u.volume = 1;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   } catch { /* ignore */ }
