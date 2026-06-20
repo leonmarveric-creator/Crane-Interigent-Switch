@@ -9,6 +9,7 @@ export interface StayReservation {
   check_in: string;
   check_out: string;
   unlock_pin: string | null;
+  welcomed_at: string | null;
 }
 
 export interface ActiveStay {
@@ -37,7 +38,7 @@ export async function getActiveStays(roomSlug: string): Promise<ActiveStays | nu
   const nowIso = new Date().toISOString();
   const { data: reservations } = await supabaseAdmin
     .from("reservations")
-    .select("id, room_id, guest_lang, check_in, check_out, unlock_pin")
+    .select("id, room_id, guest_lang, check_in, check_out, unlock_pin, welcomed_at")
     .eq("room_id", room.id)
     .eq("status", "active")
     .lte("check_in", nowIso)

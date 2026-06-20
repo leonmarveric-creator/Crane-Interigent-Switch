@@ -31,6 +31,23 @@ export async function POST(req: NextRequest) {
   try {
     const r = await executeDeviceAction(room, action as DeviceAction, "Admin Test");
     await logDevice({ room_id: room.id, action: String(action), source: "admin", success: r.ok });
+
+    // ホストがウェルカム実行 → 直近の有効/今後の予約を welcomed にして自動側を抑止
+    if (action === "welcome") {
+      const nowIso = new Date().toISOString();
+      const { data: res } = await supabaseAdmin
+        .from("reservations")
+        .select("id")
+        .eq("room_id", room.id)
+        .eq("status", "active")
+        .is("welcomed_at", null)
+        .gt("check_out", nowIso)
+        .order("check_in", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (res) await supabaseAdmin.from("reservations").update({ welcomed_at: nowIso }).eq("id", res.id);
+    }
+
     return NextResponse.json(r, { status: r.ok ? 200 : 502 });
   } catch (e) {
     console.error("admin test error", e);

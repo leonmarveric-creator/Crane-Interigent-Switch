@@ -1,6 +1,6 @@
 import { sendSesameCommand, SESAME_CMD } from "./sesame";
 import {
-  acTurnOn, acTurnOff, lightTurnOn, lightTurnOff, type SwitchBotCreds,
+  acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, type SwitchBotCreds,
 } from "./switchbot";
 import { supabaseAdmin } from "./supabaseAdmin";
 
@@ -13,7 +13,8 @@ export async function logDevice(entry: {
 }
 
 export type DeviceAction =
-  | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
+  | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
+  | "welcome" | "away"; // シーン: 快適モード / 外出全OFF
 
 /**
  * 部屋(秘密鍵込み)に対してデバイス操作を実行する共通ロジック。
@@ -60,6 +61,34 @@ export async function executeDeviceAction(
         ? await lightTurnOn(sbCreds, room.switchbot_light_device_id)
         : await lightTurnOff(sbCreds, room.switchbot_light_device_id);
       return { ok: r.ok };
+    }
+    case "welcome": {
+      // 快適モード: エアコン適温ON(季節判定) + 照明ON
+      let ok = true;
+      if (room.switchbot_ac_device_id) {
+        const m = Number(new Date().toLocaleString("en-US", { month: "numeric", timeZone: "Asia/Tokyo" }));
+        const cool = m >= 5 && m <= 10; // 5〜10月は冷房
+        let r = await acSetAll(sbCreds, room.switchbot_ac_device_id,
+          { temp: cool ? 26 : 24, mode: cool ? 2 : 5, fan: 1, power: "on" });
+        if (!r.ok) r = await acTurnOn(sbCreds, room.switchbot_ac_device_id); // DIY等フォールバック
+        ok = ok && r.ok;
+      }
+      if (room.switchbot_light_device_id) {
+        const r = await lightTurnOn(sbCreds, room.switchbot_light_device_id);
+        ok = ok && r.ok;
+      }
+      return { ok };
+    }
+    case "away": {
+      // 外出: エアコン + 照明 OFF
+      let ok = true;
+      if (room.switchbot_ac_device_id) {
+        const r = await acTurnOff(sbCreds, room.switchbot_ac_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_light_device_id) {
+        const r = await lightTurnOff(sbCreds, room.switchbot_light_device_id); ok = ok && r.ok;
+      }
+      return { ok };
     }
     default:
       return { ok: false, error: "BAD_ACTION" };

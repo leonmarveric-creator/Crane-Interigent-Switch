@@ -103,3 +103,13 @@ export async function regeneratePin(formData: FormData) {
   await supabaseAdmin.from("reservations").update({ unlock_pin: randomPin() }).eq("id", id);
   revalidatePath("/admin");
 }
+
+/** 任意のPINを手動設定 (Airbnbのおすすめコード等に合わせる)。 */
+export async function setPin(formData: FormData) {
+  requireAdmin();
+  const id = String(formData.get("id") || "");
+  const pin = String(formData.get("pin") || "").replace(/\D/g, "").slice(0, 6);
+  if (!id || pin.length < 4) return;
+  await supabaseAdmin.from("reservations").update({ unlock_pin: pin }).eq("id", id);
+  revalidatePath("/admin");
+}

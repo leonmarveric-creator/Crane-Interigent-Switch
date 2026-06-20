@@ -35,6 +35,8 @@ type Dict = {
   locTooFar: string;
   locPermission: string;
   locUnavailable: string;
+  comfortMode: string;
+  awayMode: string;
 };
 
 export const T: Record<Lang, Dict> = {
@@ -48,6 +50,7 @@ export const T: Record<Lang, Dict> = {
     enterPin: "PINを入力", pinPrompt: "お預かりの暗証番号を入力してください",
     wrongPin: "PINが違います", verify: "認証",
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
+    comfortMode: "快適モード", awayMode: "外出（全部OFF）",
   },
   en: {
     unlock: "Unlock", lock: "Lock", locked: "Locked", unlocked: "Unlocked",
@@ -59,6 +62,7 @@ export const T: Record<Lang, Dict> = {
     enterPin: "Enter PIN", pinPrompt: "Please enter the PIN provided for your stay",
     wrongPin: "Incorrect PIN", verify: "Verify",
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
+    comfortMode: "Comfort", awayMode: "Away (all off)",
   },
   zh: {
     unlock: "开锁", lock: "上锁", locked: "已上锁", unlocked: "已开锁",
@@ -70,6 +74,7 @@ export const T: Record<Lang, Dict> = {
     enterPin: "输入PIN", pinPrompt: "请输入入住时提供的密码",
     wrongPin: "PIN码错误", verify: "验证",
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
+    comfortMode: "舒适模式", awayMode: "外出（全关）",
   },
   ko: {
     unlock: "잠금 해제", lock: "잠금", locked: "잠김", unlocked: "열림",
@@ -81,6 +86,7 @@ export const T: Record<Lang, Dict> = {
     enterPin: "PIN 입력", pinPrompt: "숙박 시 안내받은 PIN을 입력하세요",
     wrongPin: "PIN이 올바르지 않습니다", verify: "확인",
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
+    comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)",
   },
 };
 

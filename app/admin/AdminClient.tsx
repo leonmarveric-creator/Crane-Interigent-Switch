@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
   QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
-  Image as ImageIcon, History,
+  Image as ImageIcon, History, PowerOff, Loader2, Home,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, assignDevices, updateRoomImage, updateGeofence,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, updateGeofence,
 } from "./actions";
 
 export interface Room {
@@ -401,6 +401,12 @@ function RoomManageCard({
         <button type="submit" className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.save}</button>
       </form>
 
+      {/* ウェルカム / 退室クリーンアップ */}
+      <div className="grid grid-cols-2 gap-2 border-t border-white/10 p-4">
+        <SceneButton slug={room.slug} action="welcome" label={t.welcomeScene} tone="emerald" />
+        <SceneButton slug={room.slug} action="away" label={t.checkoutOff} tone="amber" />
+      </div>
+
       {/* ジオフェンス (位置制限) */}
       <form action={updateGeofence} className="border-t border-white/10 p-4">
         <input type="hidden" name="room_id" value={room.id} />
@@ -413,6 +419,35 @@ function RoomManageCard({
         </div>
       </form>
     </div>
+  );
+}
+
+function SceneButton({ slug, action, label, tone }: {
+  slug: string; action: "welcome" | "away"; label: string; tone: "emerald" | "amber";
+}) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const run = async () => {
+    setBusy(true); setDone(false);
+    try {
+      await fetch("/api/admin/test-device", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomSlug: slug, action }),
+      });
+      setDone(true); setTimeout(() => setDone(false), 2000);
+    } catch { /* ignore */ }
+    setBusy(false);
+  };
+  const cls = tone === "emerald"
+    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200 active:bg-emerald-500/20"
+    : "border-amber-400/40 bg-amber-500/10 text-amber-200 active:bg-amber-500/20";
+  const Icon = action === "welcome" ? Home : PowerOff;
+  return (
+    <button onClick={run} disabled={busy}
+      className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs disabled:opacity-50 ${cls}`}>
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : done ? <Check className="h-4 w-4 text-emerald-300" /> : <Icon className="h-4 w-4" />}
+      {label}
+    </button>
   );
 }
 
@@ -533,6 +568,13 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
             <ExternalLink className="h-3.5 w-3.5" /> {t.openAirbnb}
           </a>
         )}
+        {/* PINを手動設定 (Airbnb推奨コード等) */}
+        <form action={setPin} className="flex items-center gap-1">
+          <input type="hidden" name="id" value={r.id} />
+          <input name="pin" defaultValue={r.unlock_pin ?? ""} inputMode="numeric" maxLength={6}
+            className="w-16 rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-center font-mono text-xs text-cyan-200" />
+          <button type="submit" className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-200">{t.save}</button>
+        </form>
         <form action={regeneratePin}>
           <input type="hidden" name="id" value={r.id} />
           <button type="submit" className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">

@@ -4,13 +4,14 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import { blip, powerUp, powerDown, error as sfxError, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
-  | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
+  | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
+  | "welcome" | "away";
 
 interface Props {
   roomSlug: string;
@@ -192,8 +193,23 @@ export default function ControlPanel({
           </div>
         </motion.header>
 
+        {/* 位置制限の常設案内 (有効な部屋のみ) */}
+        {geoEnabled && (
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.14 }}
+            className="mb-4 flex items-center justify-center gap-1.5 rounded-full border border-cyan-400/20
+              bg-cyan-400/[0.06] px-3 py-1.5 text-center text-[11px] text-cyan-200/70">
+            📍 {t.locTooFar}
+          </motion.p>
+        )}
+
+        {/* シーン: 快適モード / 外出 */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
+          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
+        </motion.div>
+
         {/* スマートロック (主役) */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
+        <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
           <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
         </motion.div>
 
@@ -481,6 +497,46 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
       <circle cx="100" cy="100" r="62" fill="none" stroke={s} strokeOpacity="0.22" strokeWidth="1" />
       <circle cx="100" cy="100" r="26" fill={s} fillOpacity="0.07" className="anim-core" style={SPIN} />
     </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* シーンボタン: 快適モード / 外出全OFF                                 */
+/* ------------------------------------------------------------------ */
+function SceneButtons({
+  roomSlug, admin, guard, t,
+}: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"] }) {
+  const [busy, setBusy] = useState<"welcome" | "away" | null>(null);
+
+  const run = async (a: "welcome" | "away") => {
+    if (busy) return;
+    if (guard && !(await guard())) return;
+    blip(); setBusy(a);
+    const ok = await callDevice(roomSlug, a, admin);
+    if (ok) (a === "welcome" ? powerUp : powerDown)(); else sfxError();
+    setBusy(null);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 25 : [20, 40, 20]);
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <HudPanel tone="emerald" active onClick={() => run("welcome")} small
+        contentClassName="flex-col items-center gap-2 px-4 py-5">
+        <Corners tone="emerald" />
+        {busy === "welcome"
+          ? <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
+          : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
+        <span className="text-sm text-emerald-200">{t.comfortMode}</span>
+      </HudPanel>
+      <HudPanel tone="violet" onClick={() => run("away")} small
+        contentClassName="flex-col items-center gap-2 px-4 py-5">
+        <Corners tone="emerald" />
+        {busy === "away"
+          ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
+          : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
+        <span className="text-sm text-violet-200">{t.awayMode}</span>
+      </HudPanel>
+    </div>
   );
 }
 

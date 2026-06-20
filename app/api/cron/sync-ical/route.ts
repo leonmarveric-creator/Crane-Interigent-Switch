@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { fetchIcalEvents, applyStayTimes, extractPhoneLast4, randomPin, extractReservationUrl } from "@/lib/ical";
+import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -106,6 +107,36 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ===== チェックアウト後の自動OFF (エアコン・照明) + completed化 =====
+  // 施錠はドアの開閉が分からないため対象外。
+  const endNow = new Date().toISOString();
+  const { data: ended } = await supabaseAdmin
+    .from("reservations")
+    .select("id, room_id")
+    .eq("status", "active")
+    .lt("check_out", endNow);
+
+  let cleanedRooms = 0;
+  if (ended && ended.length) {
+    const roomIds = [...new Set(ended.map((r) => r.room_id))];
+    for (const roomId of roomIds) {
+      const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("id", roomId).maybeSingle();
+      if (!room) continue;
+      if (room.switchbot_ac_device_id) {
+        const x = await executeDeviceAction(room, "ac_off", "Checkout");
+        await logDevice({ room_id: roomId, action: "ac_off", source: "cron", success: x.ok });
+      }
+      if (room.switchbot_light_device_id) {
+        const x = await executeDeviceAction(room, "light_off", "Checkout");
+        await logDevice({ room_id: roomId, action: "light_off", source: "cron", success: x.ok });
+      }
+      cleanedRooms++;
+    }
+    // 過去予約を completed にして再処理を防止
+    await supabaseAdmin.from("reservations").update({ status: "completed" })
+      .in("id", ended.map((r) => r.id));
+  }
+
   // 古い操作ログを自動削除 (既定90日、LOG_RETENTION_DAYS で変更可)
   let purged: number | null = null;
   const retentionDays = Number(process.env.LOG_RETENTION_DAYS || "90");
@@ -118,5 +149,5 @@ export async function GET(req: NextRequest) {
     purged = count ?? null;
   }
 
-  return NextResponse.json({ ok: true, summary, purgedLogs: purged, ranAt: new Date().toISOString() });
+  return NextResponse.json({ ok: true, summary, cleanedRooms, purgedLogs: purged, ranAt: new Date().toISOString() });
 }

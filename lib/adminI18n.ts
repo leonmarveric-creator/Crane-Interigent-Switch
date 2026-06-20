@@ -73,6 +73,8 @@ type Dict = {
   srcAdmin: string;
   srcCron: string;
   when: string;
+  checkoutOff: string;
+  welcomeScene: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -106,6 +108,8 @@ export const AT: Record<AdminLang, Dict> = {
     geofenceTitle: "位置制限（GPS）", geofenceHint: "建物の緯度・経度（空欄で制限OFF）", radiusM: "半径(m)",
     tabHistory: "履歴", historyTitle: "操作履歴", noLogs: "履歴がありません",
     srcGuest: "ゲスト", srcAdmin: "管理者", srcCron: "自動", when: "日時",
+    checkoutOff: "退室OFF（エアコン・照明）",
+    welcomeScene: "ウェルカム（エアコン＋照明ON）",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -137,6 +141,8 @@ export const AT: Record<AdminLang, Dict> = {
     geofenceTitle: "Location lock (GPS)", geofenceHint: "Building latitude / longitude (blank = off)", radiusM: "Radius (m)",
     tabHistory: "Log", historyTitle: "Operation log", noLogs: "No history",
     srcGuest: "Guest", srcAdmin: "Host", srcCron: "Auto", when: "Time",
+    checkoutOff: "Turn off (AC & Light)",
+    welcomeScene: "Welcome (AC + Light on)",
   },
   zh: {
     dashboard: "房东控制台",
@@ -168,5 +174,7 @@ export const AT: Record<AdminLang, Dict> = {
     geofenceTitle: "位置限制（GPS）", geofenceHint: "建筑纬度 / 经度（留空=关闭）", radiusM: "半径(m)",
     tabHistory: "记录", historyTitle: "操作记录", noLogs: "暂无记录",
     srcGuest: "房客", srcAdmin: "房东", srcCron: "自动", when: "时间",
+    checkoutOff: "关闭（空调·灯光）",
+    welcomeScene: "欢迎（空调＋灯光开）",
   },
 };
