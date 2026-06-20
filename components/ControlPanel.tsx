@@ -37,32 +37,43 @@ export default function ControlPanel({
   const t = T[lang];
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[#05060a] text-white">
-      {/* 背景: ダークネイビーのオーロラ */}
+    <main className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
+      {/* 背景: 動くオーロラ + 走査線 + グリッド */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-500/20 blur-[120px]" />
-        <div className="absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-violet-600/20 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-emerald-500/15 blur-[120px]" />
-        <div className="absolute inset-0 opacity-[0.04]
-          [background-image:linear-gradient(#22d3ee_1px,transparent_1px),linear-gradient(90deg,#22d3ee_1px,transparent_1px)]
-          [background-size:44px_44px]" />
+        <div className="anim-drift absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-400/30 blur-[110px]" />
+        <div className="anim-drift2 absolute top-1/4 -right-24 h-96 w-96 rounded-full bg-fuchsia-500/30 blur-[110px]" />
+        <div className="anim-drift absolute bottom-0 left-1/4 h-80 w-80 rounded-full bg-emerald-400/25 blur-[110px]" />
+        <div className="anim-drift2 absolute top-1/2 left-1/2 h-72 w-72 rounded-full bg-sky-400/20 blur-[120px]" />
+        {/* グリッド (脈動) */}
+        <div className="anim-grid absolute inset-0
+          [background-image:linear-gradient(#38bdf8_1px,transparent_1px),linear-gradient(90deg,#38bdf8_1px,transparent_1px)]
+          [background-size:42px_42px]" />
+        {/* 走査線 */}
+        <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/15 to-transparent" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
         {/* 部屋アート (ヒーロー・小さめ正方形・中央) */}
         {imageUrl && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="mb-5 flex justify-center">
+            initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 180, damping: 18 }}
+            className="relative mb-5 flex justify-center">
+            {/* 回転リング */}
+            <div className="anim-spin-slow pointer-events-none absolute h-52 w-52 rounded-full
+              [background:conic-gradient(from_0deg,transparent,rgba(34,211,238,0.5),transparent_40%)] blur-md sm:h-60 sm:w-60" />
             <img src={imageUrl} alt={roomName}
-              className="aspect-square w-40 rounded-3xl border border-white/10 object-cover
-                shadow-[0_0_50px_-18px_rgba(34,211,238,0.7)] sm:w-48"
+              className="relative aspect-square w-40 rounded-3xl border border-cyan-300/30 object-cover
+                shadow-[0_0_60px_-12px_rgba(34,211,238,0.8)] sm:w-48"
               onError={(e) => { e.currentTarget.style.display = "none"; }} />
           </motion.div>
         )}
 
         {/* ヘッダー: 部屋名 + 言語切替 */}
-        <header className="mb-5 flex items-start justify-between">
+        <motion.header
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-5 flex items-start justify-between">
           <div>
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">
               {t.welcome.toUpperCase()}
@@ -82,13 +93,17 @@ export default function ControlPanel({
             )}
           </div>
           <LangSwitch lang={lang} setLang={setLang} />
-        </header>
+        </motion.header>
 
         {/* スマートロック (主役) */}
-        <LockCard roomSlug={roomSlug} t={t} admin={admin} />
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
+          <LockCard roomSlug={roomSlug} t={t} admin={admin} />
+        </motion.div>
 
         {/* デバイスグリッド */}
-        <div className="mt-5 grid grid-cols-2 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
+          className="mt-5 grid grid-cols-2 gap-4">
           <ToggleCard
             roomSlug={roomSlug} admin={admin}
             icon={Snowflake} label={t.ac} accent="cyan"
@@ -99,7 +114,7 @@ export default function ControlPanel({
             icon={Lightbulb} label={t.light} accent="amber"
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
-        </div>
+        </motion.div>
 
         {/* 光目覚まし (テストモードでは非表示: アラームはゲストセッション前提) */}
         {!admin && <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} />}
@@ -192,18 +207,27 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
         />
       </AnimatePresence>
 
-      <motion.div
-        animate={busy ? { rotate: [0, -8, 8, 0] } : {}}
-        transition={{ duration: 0.5 }}
-        className={`relative mb-4 flex h-24 w-24 items-center justify-center rounded-full
-          border ${unlocked ? "border-emerald-400/50 bg-emerald-400/10" : "border-cyan-400/40 bg-cyan-400/10"}`}
-      >
+      <div className="relative mb-4 flex h-24 w-24 items-center justify-center">
+        {/* 回転するエネルギーリング */}
+        <span className={`anim-spin-slow pointer-events-none absolute inset-[-10px] rounded-full
+          ${unlocked
+            ? "[background:conic-gradient(from_0deg,transparent,rgba(16,185,129,0.7),transparent_45%)]"
+            : "[background:conic-gradient(from_0deg,transparent,rgba(34,211,238,0.7),transparent_45%)]"} blur-[2px]`} />
+        <span className={`anim-spin-rev pointer-events-none absolute inset-[-2px] rounded-full border
+          ${unlocked ? "border-emerald-400/30" : "border-cyan-400/30"} [border-style:dashed]`} />
+        <motion.div
+          animate={busy ? { rotate: [0, -8, 8, 0] } : {}}
+          transition={{ duration: 0.5 }}
+          className={`relative flex h-24 w-24 items-center justify-center rounded-full
+            border ${unlocked ? "border-emerald-400/50 bg-emerald-400/10" : "border-cyan-400/40 bg-cyan-400/10"}`}
+        >
         {busy ? (
           <Loader2 className={`h-10 w-10 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
         ) : (
           <Icon className={`h-11 w-11 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />
         )}
-      </motion.div>
+        </motion.div>
+      </div>
 
       <span className={`text-lg font-medium tracking-wide ${unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
         {busy ? t.sending : unlocked ? t.unlocked : t.locked}

@@ -14,3 +14,37 @@ html, body {
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8) sepia(1) saturate(5) hue-rotate(220deg);
 }
+
+/* ===== 近未来アニメーション ===== */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(28px, -22px) scale(1.12); }
+  66%      { transform: translate(-22px, 16px) scale(0.92); }
+}
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes spin-rev  { to { transform: rotate(-360deg); } }
+@keyframes scanline {
+  0%   { transform: translateY(-120%); opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+@keyframes grid-pulse {
+  0%, 100% { opacity: 0.05; }
+  50%      { opacity: 0.12; }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.anim-drift  { animation: drift 14s ease-in-out infinite; }
+.anim-drift2 { animation: drift 18s ease-in-out infinite reverse; }
+.anim-spin-slow { animation: spin-slow 18s linear infinite; }
+.anim-spin-rev  { animation: spin-rev 24s linear infinite; }
+.anim-scan   { animation: scanline 7s linear infinite; }
+.anim-grid   { animation: grid-pulse 6s ease-in-out infinite; }
+.anim-breathe{ animation: breathe 3.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-drift, .anim-drift2, .anim-spin-slow, .anim-spin-rev,
+  .anim-scan, .anim-grid, .anim-breathe { animation: none; }
+}
