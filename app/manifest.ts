@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Crane Switch",
     short_name: "Crane",
-    start_url: "/",
+    start_url: "/admin",
     display: "standalone",
     background_color: "#05060a",
     theme_color: "#05060a",
