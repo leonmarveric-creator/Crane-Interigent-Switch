@@ -76,7 +76,11 @@ async function processRoom(room: { id: string; slug: string; airbnb_ical_url: st
   return stat;
 }
 
-/** チェックアウト後の自動OFF (エアコン・照明) + completed化。 */
+/**
+ * チェックアウト後処理。退室済み(誰もいない)の部屋だけエアコン・照明をOFFし、
+ * 終了した予約を completed 化する。
+ * 滞在中(チェックイン済み&チェックアウト前の客がいる)の部屋は絶対に触らない。
+ */
 async function checkoutCleanup(): Promise<number> {
   const endNow = new Date().toISOString();
   const { data: ended } = await supabaseAdmin
@@ -89,7 +93,7 @@ async function checkoutCleanup(): Promise<number> {
   const roomIds = [...new Set(ended.map((r) => r.room_id))];
   let offCount = 0;
   await Promise.all(roomIds.map(async (roomId) => {
-    // 現在その部屋に滞在中の客がいれば消灯しない (次のゲストを邪魔しない)
+    // 現在その部屋に滞在中の客がいれば絶対にOFFしない (退室後のみOFF)
     const { data: occ } = await supabaseAdmin
       .from("reservations")
       .select("id")
