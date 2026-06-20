@@ -51,7 +51,15 @@ export default function ControlPanel({
   const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
+  const [taps, setTaps] = useState<{ id: number; x: number; y: number }[]>([]);
   const t = T[lang];
+
+  // タップ位置に照準リング
+  const onTap = (e: React.PointerEvent) => {
+    const id = Date.now() + Math.random();
+    setTaps((r) => [...r.slice(-5), { id, x: e.clientX, y: e.clientY }]);
+    setTimeout(() => setTaps((r) => r.filter((p) => p.id !== id)), 700);
+  };
 
   const geoEnabled = !admin && typeof lat === "number" && typeof lng === "number";
 
@@ -87,7 +95,21 @@ export default function ControlPanel({
   const toggleMute = () => setMuted((m) => { const n = !m; localStorage.setItem("guestMuted", n ? "1" : "0"); return n; });
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
+    <main onPointerDown={onTap} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
+      {/* タップ照準リング */}
+      <div className="pointer-events-none fixed inset-0 z-40">
+        <AnimatePresence>
+          {taps.map((p) => (
+            <motion.span key={p.id}
+              initial={{ opacity: 0.7, scale: 0 }} animate={{ opacity: 0, scale: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              style={{ left: p.x, top: p.y }}
+              className="absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/70
+                [box-shadow:0_0_14px_rgba(34,211,238,0.6)]" />
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* 起動シーケンス */}
       <AnimatePresence>
         {booting && <BootSequence onDone={() => setBooting(false)} roomName={roomName} />}
@@ -149,14 +171,22 @@ export default function ControlPanel({
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 180, damping: 18 }}
-            className="relative mb-5 flex justify-center">
+            className="hero-wrap relative mb-5 flex justify-center">
             {/* 回転リング */}
             <div className="anim-spin-slow pointer-events-none absolute h-52 w-52 rounded-full
               [background:conic-gradient(from_0deg,transparent,rgba(34,211,238,0.5),transparent_40%)] blur-md sm:h-60 sm:w-60" />
-            <img src={imageUrl} alt={roomName}
-              className="relative aspect-square w-40 rounded-3xl border border-cyan-300/30 object-cover
-                shadow-[0_0_60px_-12px_rgba(34,211,238,0.8)] sm:w-48"
-              onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            {/* ホログラム投影フレーム */}
+            <div className="relative aspect-square w-40 overflow-hidden rounded-3xl border border-cyan-300/30
+              shadow-[0_0_60px_-12px_rgba(34,211,238,0.8)] sm:w-48">
+              <img src={imageUrl} alt={roomName} className="h-full w-full object-cover"
+                onError={(e) => { const w = e.currentTarget.closest(".hero-wrap") as HTMLElement | null; if (w) w.style.display = "none"; }} />
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-0 opacity-25 [background:repeating-linear-gradient(0deg,transparent_0,transparent_2px,rgba(0,0,0,0.35)_3px)]" />
+                <div className="anim-holoscan absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-transparent via-cyan-200/30 to-transparent" />
+                <div className="anim-flicker absolute inset-0 bg-cyan-400/[0.06] mix-blend-screen" />
+                <Corners tone="cyan" />
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -390,11 +420,14 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
 /* ------------------------------------------------------------------ */
 function HudStatusBar() {
   const [hex, setHex] = useState("0x0000");
+  const [clock, setClock] = useState("--:--:--");
   useEffect(() => {
-    const id = setInterval(
-      () => setHex("0x" + Math.floor(Math.random() * 65536).toString(16).padStart(4, "0").toUpperCase()),
-      650
-    );
+    const tick = () => {
+      setHex("0x" + Math.floor(Math.random() * 65536).toString(16).padStart(4, "0").toUpperCase());
+      setClock(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo" }));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
   return (
@@ -402,7 +435,7 @@ function HudStatusBar() {
       <span className="flex items-center gap-1.5">
         <span className="anim-breathe inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" /> SYS ONLINE
       </span>
-      <span className="hidden tracking-[0.3em] text-cyan-300/50 sm:inline">J.A.R.V.I.S</span>
+      <span className="tracking-[0.2em] text-cyan-200/80">{clock}</span>
       <span className="flex items-center gap-2">
         <span className="flex items-end gap-0.5">
           {[3, 5, 4, 6, 5].map((h, i) => (
@@ -410,7 +443,7 @@ function HudStatusBar() {
               style={{ height: h, animationDelay: `${i * 0.18}s` }} />
           ))}
         </span>
-        <span className="text-cyan-300/60">{hex}</span>
+        <span className="hidden text-cyan-300/60 sm:inline">{hex}</span>
       </span>
     </div>
   );
