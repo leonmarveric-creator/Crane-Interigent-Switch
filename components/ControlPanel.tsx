@@ -55,13 +55,13 @@ export default function ControlPanel({
             initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
             className="mb-5 overflow-hidden rounded-3xl border border-white/10 shadow-[0_0_60px_-25px_rgba(34,211,238,0.7)]">
             <img src={imageUrl} alt={roomName}
-              className="aspect-square w-full object-cover"
+              className="h-36 w-full object-cover object-center sm:h-44"
               onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
           </motion.div>
         )}
 
         {/* ヘッダー: 部屋名 + 言語切替 */}
-        <header className="mb-8 flex items-start justify-between">
+        <header className="mb-5 flex items-start justify-between">
           <div>
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">
               {t.welcome.toUpperCase()}
