@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { blip, powerUp, powerDown, setMuted as sfxSetMuted } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off";
@@ -75,6 +75,17 @@ export default function ControlPanel({
             <circle cx="200" cy="200" r="120" fill="none" stroke="#fbbf24" strokeWidth="0.5" strokeDasharray="60 200" />
           </g>
         </svg>
+        {/* 回路トレース (光が流れる) */}
+        <svg viewBox="0 0 400 800" preserveAspectRatio="none" className="absolute inset-0 h-full w-full opacity-[0.18]">
+          <path d="M-5 90 H90 L120 120 V250 H40" fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="4 9" className="anim-dash" />
+          <path d="M405 200 H320 L290 230 V420 H360" fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="4 9" className="anim-dash" style={{ animationDelay: "1.5s" }} />
+          <path d="M-5 620 H110 L140 590 V470" fill="none" stroke="#a78bfa" strokeWidth="1" strokeDasharray="4 9" className="anim-dash" style={{ animationDelay: "0.8s" }} />
+        </svg>
+        {/* 浮遊する光の粒子 */}
+        <Particles />
+        {/* サイドのデータストリーム */}
+        <SideTelemetry side="left" />
+        <SideTelemetry side="right" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
@@ -195,6 +206,51 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
           </motion.ul>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* アンビエント演出: 粒子 / サイドデータ                                */
+/* ------------------------------------------------------------------ */
+function Particles() {
+  const motes = useMemo(
+    () => [...Array(18)].map(() => ({
+      left: Math.random() * 100,
+      dur: 6 + Math.random() * 9,
+      delay: Math.random() * 9,
+      size: 1 + Math.random() * 2,
+      amber: Math.random() > 0.8,
+    })),
+    []
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {motes.map((m, i) => (
+        <span key={i} className="absolute rounded-full"
+          style={{
+            left: `${m.left}%`, bottom: -12, width: m.size, height: m.size,
+            background: m.amber ? "rgba(251,191,36,0.8)" : "rgba(34,211,238,0.75)",
+            boxShadow: m.amber ? "0 0 6px rgba(251,191,36,0.9)" : "0 0 6px rgba(34,211,238,0.9)",
+            animation: `rise ${m.dur}s linear ${m.delay}s infinite`,
+          }} />
+      ))}
+    </div>
+  );
+}
+
+function SideTelemetry({ side }: { side: "left" | "right" }) {
+  const rows = useMemo(
+    () => [...Array(48)].map(() => Math.floor(Math.random() * 65536).toString(16).padStart(4, "0").toUpperCase()),
+    []
+  );
+  return (
+    <div className={`pointer-events-none absolute top-0 ${side === "left" ? "left-0.5" : "right-0.5"} hidden h-full w-9 overflow-hidden opacity-25 sm:block`}>
+      <div className="anim-stream font-mono text-[7px] leading-[1.7] tracking-wider text-cyan-300/70">
+        {rows.concat(rows).map((r, i) => (
+          <div key={i} className={i % 7 === 0 ? "text-emerald-300/70" : ""}>{r}</div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -348,23 +404,31 @@ function HudPanel({
 function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
   const s = unlocked ? "#34d399" : "#22d3ee";
   return (
-    <svg viewBox="0 0 200 200" className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2">
-      {/* 外周: 目盛り (低速回転) */}
+    <svg viewBox="0 0 200 200" className="pointer-events-none absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2">
+      {/* 放射スポーク (低速回転) */}
       <g className="anim-spin-slow" style={SPIN}>
-        <circle cx="100" cy="100" r="94" fill="none" stroke={s} strokeOpacity="0.22" strokeWidth="1" strokeDasharray="1.5 7" />
-        <circle cx="100" cy="100" r="86" fill="none" stroke={s} strokeOpacity="0.12" strokeWidth="0.6" />
+        {[...Array(48)].map((_, i) => {
+          const long = i % 4 === 0;
+          return (
+            <line key={i} x1="100" y1={long ? 8 : 11} x2="100" y2={long ? 17 : 15}
+              stroke={s} strokeOpacity={long ? 0.45 : 0.22} strokeWidth="1"
+              transform={`rotate(${(i / 48) * 360} 100 100)`} />
+          );
+        })}
+        <circle cx="100" cy="100" r="94" fill="none" stroke={s} strokeOpacity="0.18" strokeWidth="0.6" />
       </g>
       {/* 中周: 分割アーク (逆回転) + ゴールド差し色 */}
       <g className={busy ? "anim-spin-rev" : "anim-spin-slow"} style={SPIN}>
-        <circle cx="100" cy="100" r="76" fill="none" stroke={s} strokeOpacity="0.55" strokeWidth="2" strokeDasharray="58 250" strokeLinecap="round" />
-        <circle cx="100" cy="100" r="76" fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="22 308" strokeDashoffset="-150" strokeLinecap="round" />
+        <circle cx="100" cy="100" r="78" fill="none" stroke={s} strokeOpacity="0.55" strokeWidth="2" strokeDasharray="58 250" strokeLinecap="round" />
+        <circle cx="100" cy="100" r="78" fill="none" stroke="#fbbf24" strokeOpacity="0.65" strokeWidth="2" strokeDasharray="22 312" strokeDashoffset="-150" strokeLinecap="round" />
       </g>
       {/* レーダースイープ (扇形・回転) */}
       <g className="anim-spin-rev" style={SPIN}>
-        <path d="M100 100 L100 36 A64 64 0 0 1 150 64 Z" fill={s} fillOpacity="0.06" />
+        <path d="M100 100 L100 34 A66 66 0 0 1 153 62 Z" fill={s} fillOpacity="0.07" />
       </g>
-      {/* 内周 */}
-      <circle cx="100" cy="100" r="62" fill="none" stroke={s} strokeOpacity="0.2" strokeWidth="1" />
+      {/* 内周 + 鼓動コア */}
+      <circle cx="100" cy="100" r="62" fill="none" stroke={s} strokeOpacity="0.22" strokeWidth="1" />
+      <circle cx="100" cy="100" r="26" fill={s} fillOpacity="0.07" className="anim-core" style={SPIN} />
     </svg>
   );
 }
@@ -373,46 +437,45 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 /* スマートロック カード (波紋 + サイバー解錠エフェクト)                */
 /* ------------------------------------------------------------------ */
 function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"]; admin?: boolean }) {
-  const [unlocked, setUnlocked] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // 状態取得はしない (API節約)。押したコマンドをそのまま送る明示式。
+  const [last, setLast] = useState<"unlock" | "lock" | null>(null);
+  const [busy, setBusy] = useState<"unlock" | "lock" | null>(null);
+  const [result, setResult] = useState<boolean | null>(null);
   const [ripple, setRipple] = useState(0);
 
-  const toggle = useCallback(async () => {
+  const run = useCallback(async (action: "unlock" | "lock") => {
     if (busy) return;
     blip();
-    setBusy(true);
-    setRipple((r) => r + 1);
-    const next = !unlocked;
-    const ok = await callDevice(roomSlug, next ? "unlock" : "lock", admin);
-    if (ok) { setUnlocked(next); (next ? powerUp : powerDown)(); }
-    setBusy(false);
+    setBusy(action); setResult(null); setRipple((r) => r + 1);
+    const ok = await callDevice(roomSlug, action, admin);
+    if (ok) { setLast(action); (action === "unlock" ? powerUp : powerDown)(); }
+    else sfxError();
+    setResult(ok);
+    setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 30 : [20, 40, 20]);
-  }, [busy, unlocked, roomSlug, admin]);
+    setTimeout(() => setResult(null), 1900);
+  }, [busy, roomSlug, admin]);
 
+  const unlocked = last === "unlock";
   const Icon = unlocked ? LockKeyholeOpen : LockKeyhole;
+  const statusText = busy ? t.sending
+    : result === true ? (last === "unlock" ? t.unlocked : t.locked)
+    : result === false ? t.failed : "";
 
   return (
-    <HudPanel tone={unlocked ? "emerald" : "cyan"} active onClick={toggle}
-      contentClassName="flex-col items-center overflow-hidden px-6 py-12">
+    <HudPanel tone={unlocked ? "emerald" : "cyan"} active
+      contentClassName="flex-col items-center overflow-hidden px-6 py-10">
       <Corners tone={unlocked ? "emerald" : "cyan"} />
+      <HudRings unlocked={unlocked} busy={!!busy} />
 
-      {/* JARVIS風 HUDダイヤル */}
-      <HudRings unlocked={unlocked} busy={busy} />
-
-      {/* 解錠時の波紋 */}
+      {/* 波紋 + スパーク (操作時) */}
       <AnimatePresence>
-        <motion.span
-          key={ripple}
-          initial={{ scale: 0, opacity: 0.5 }}
-          animate={{ scale: 4, opacity: 0 }}
+        <motion.span key={ripple}
+          initial={{ scale: 0, opacity: 0.5 }} animate={{ scale: 4, opacity: 0 }}
           transition={{ duration: 0.9, ease: "easeOut" }}
-          className={`pointer-events-none absolute h-32 w-32 rounded-full
-            ${unlocked ? "bg-emerald-400/30" : "bg-cyan-400/30"}`}
-        />
+          className={`pointer-events-none absolute h-32 w-32 rounded-full ${unlocked ? "bg-emerald-400/30" : "bg-cyan-400/30"}`} />
       </AnimatePresence>
-
-      {/* スパーク放射 */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2">
+      <div className="pointer-events-none absolute left-1/2 top-[38%]">
         {ripple > 0 && [...Array(12)].map((_, i) => {
           const a = (i / 12) * Math.PI * 2;
           return (
@@ -425,28 +488,39 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
         })}
       </div>
 
-      <div className="relative mb-4 flex h-24 w-24 items-center justify-center">
+      {/* 中央アイコン (最後の操作を反映する目安) */}
+      <div className="relative mb-3 flex h-20 w-20 items-center justify-center">
         <motion.div
-          animate={busy ? { rotate: [0, -8, 8, 0] } : {}}
-          transition={{ duration: 0.5 }}
-          className={`anim-breathe relative flex h-24 w-24 items-center justify-center rounded-full border
-            ${unlocked ? "border-emerald-400/60 bg-emerald-400/10" : "border-cyan-400/50 bg-cyan-400/10"}`}
-        >
-          {busy ? (
-            <Loader2 className={`h-10 w-10 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
-          ) : (
-            <Icon className={`h-11 w-11 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />
-          )}
+          animate={busy ? { rotate: [0, -8, 8, 0] } : {}} transition={{ duration: 0.5 }}
+          className={`anim-breathe relative flex h-20 w-20 items-center justify-center rounded-full border
+            ${unlocked ? "border-emerald-400/60 bg-emerald-400/10" : "border-cyan-400/50 bg-cyan-400/10"}`}>
+          {busy
+            ? <Loader2 className={`h-9 w-9 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
+            : <Icon className={`h-10 w-10 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />}
         </motion.div>
       </div>
 
-      <span className={`relative text-lg font-medium tracking-wide ${unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
-        {busy ? t.sending : unlocked ? t.unlocked : t.locked}
+      {/* ステータス (操作結果を一時表示) */}
+      <span className={`relative h-5 text-sm font-medium tracking-wide
+        ${result === false ? "text-rose-300" : unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
+        {statusText}
       </span>
-      <span className="relative mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.3em] text-white/40">
-        <span className={`anim-breathe inline-block h-1.5 w-1.5 rounded-full ${unlocked ? "bg-emerald-400" : "bg-cyan-400"}`} />
-        {unlocked ? "SECURE · TAP TO LOCK" : "STANDBY · TAP TO UNLOCK"}
-      </span>
+
+      {/* 解錠 / 施錠 ボタン */}
+      <div className="relative mt-4 grid w-full grid-cols-2 gap-3">
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => run("unlock")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-emerald-400/50
+            bg-emerald-500/15 py-3.5 text-sm text-emerald-200 active:bg-emerald-500/30 disabled:opacity-50">
+          {busy === "unlock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyholeOpen className="h-4 w-4" />}
+          {t.unlock}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => run("lock")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-cyan-400/50
+            bg-cyan-500/15 py-3.5 text-sm text-cyan-200 active:bg-cyan-500/30 disabled:opacity-50">
+          {busy === "lock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
+          {t.lock}
+        </motion.button>
+      </div>
     </HudPanel>
   );
 }
@@ -461,46 +535,61 @@ function ToggleCard({
   icon: typeof Snowflake; label: string; accent: "cyan" | "amber";
   onAction: DeviceAction; offAction: DeviceAction; t: typeof T["en"];
 }) {
-  const [on, setOn] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // 明示式: 押したON/OFFをそのまま送る (状態のズレなし)
+  const [last, setLast] = useState<"on" | "off" | null>(null);
+  const [busy, setBusy] = useState<"on" | "off" | null>(null);
+  const on = last === "on";
 
   const palette = accent === "cyan"
-    ? { text: "text-cyan-300", border: "border-cyan-400/40", glow: "rgba(34,211,238,0.6)" }
-    : { text: "text-amber-300", border: "border-amber-400/40", glow: "rgba(251,191,36,0.6)" };
+    ? { text: "text-cyan-300", glow: "rgba(34,211,238,0.6)", dot: "bg-cyan-400", hx: "bg-cyan-400/30" }
+    : { text: "text-amber-300", glow: "rgba(251,191,36,0.6)", dot: "bg-amber-400", hx: "bg-amber-400/30" };
 
-  const toggle = async () => {
+  const send = async (which: "on" | "off") => {
     if (busy) return;
     blip();
-    setBusy(true);
-    const next = !on;
-    const ok = await callDevice(roomSlug, next ? onAction : offAction, admin);
-    if (ok) setOn(next);
-    setBusy(false);
+    setBusy(which);
+    const ok = await callDevice(roomSlug, which === "on" ? onAction : offAction, admin);
+    if (ok) setLast(which);
+    setBusy(null);
     if (navigator.vibrate) navigator.vibrate(20);
   };
 
   return (
-    <HudPanel tone={accent} active={on} onClick={toggle} small
-      contentClassName="flex-col items-center gap-3 px-4 py-7">
+    <HudPanel tone={accent} active={on} small
+      contentClassName="flex-col items-center gap-3 px-4 py-6">
       <Corners tone={accent} />
       {/* 六角形アイコンフレーム */}
       <motion.div
-        animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.55 }}
-        className="relative flex h-16 w-16 items-center justify-center">
+        animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.6 }}
+        className="relative flex h-14 w-14 items-center justify-center">
+        <svg viewBox="0 0 100 100" className="anim-spin-rev pointer-events-none absolute inset-[-9px]" style={SPIN}>
+          {[...Array(24)].map((_, i) => (
+            <line key={i} x1="50" y1="4" x2="50" y2={i % 3 === 0 ? "10" : "8"}
+              stroke={accent === "cyan" ? "#22d3ee" : "#fbbf24"} strokeOpacity={on ? 0.55 : 0.25}
+              strokeWidth="1" transform={`rotate(${(i / 24) * 360} 50 50)`} />
+          ))}
+        </svg>
         {on && <span className="anim-spin-slow pointer-events-none absolute inset-0"
           style={{ background: `conic-gradient(from 0deg, transparent, ${palette.glow}, transparent 55%)`, clipPath: "polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)" }} />}
-        <span className={`clip-hex absolute inset-[2px] ${on ? "bg-[#0b1018]" : "bg-[#0b1018]/80"}`} />
-        <span className={`clip-hex absolute inset-0 ${on ? (accent === "cyan" ? "bg-cyan-400/30" : "bg-amber-400/30") : "bg-white/10"}`} />
+        <span className={`clip-hex absolute inset-0 ${on ? palette.hx : "bg-white/10"}`} />
         <span className="clip-hex absolute inset-[1.5px] bg-[#0b1018]" />
-        {busy
-          ? <Loader2 className={`relative h-6 w-6 animate-spin ${palette.text}`} />
-          : <Icon className={`relative h-7 w-7 ${on ? palette.text : "text-white/40"}`} strokeWidth={1.6} />}
+        <Icon className={`relative h-6 w-6 ${on ? palette.text : "text-white/40"}`} strokeWidth={1.6} />
       </motion.div>
-      <span className={`text-sm ${on ? palette.text : "text-white/50"}`}>{label}</span>
-      <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.25em] text-white/40">
-        <span className={`inline-block h-1 w-1 rounded-full ${on ? (accent === "cyan" ? "bg-cyan-400" : "bg-amber-400") : "bg-white/20"} ${on ? "anim-breathe" : ""}`} />
-        {on ? t.on.toUpperCase() : t.off.toUpperCase()}
-      </span>
+
+      <span className={`text-sm ${on ? palette.text : "text-white/60"}`}>{label}</span>
+
+      {/* ON / OFF ボタン */}
+      <div className="grid w-full grid-cols-2 gap-2">
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("on")} disabled={!!busy}
+          className={`clip-bevel-sm flex items-center justify-center gap-1 border py-2.5 text-xs disabled:opacity-50
+            ${accent === "cyan" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-amber-400/50 bg-amber-500/15 text-amber-200"}`}>
+          {busy === "on" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.on.toUpperCase()}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("off")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-1 border border-white/15 bg-white/5 py-2.5 text-xs text-white/60 disabled:opacity-50">
+          {busy === "off" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.off.toUpperCase()}
+        </motion.button>
+      </div>
     </HudPanel>
   );
 }
