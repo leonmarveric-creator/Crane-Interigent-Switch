@@ -49,13 +49,23 @@ export async function GET(req: NextRequest) {
       token: room.switchbot_token ?? process.env.SWITCHBOT_TOKEN!,
       secret: room.switchbot_secret ?? process.env.SWITCHBOT_SECRET!,
     };
+
+    let ok = false;
     try {
-      await lightTurnOn(creds, room.switchbot_light_device_id);
-      await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: true });
-      fired++;
+      const r = await lightTurnOn(creds, room.switchbot_light_device_id);
+      ok = r.ok; // SwitchBotの論理失敗(ok:false)も検知
     } catch (e) {
       console.error("alarm light failed", alarm.id, e);
-      await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: false });
+      ok = false;
+    }
+
+    await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: ok });
+
+    if (ok) {
+      fired++;
+    } else {
+      // 失敗時は triggered_at を戻して次回(数分後)に再試行できるようにする
+      await supabaseAdmin.from("alarms").update({ triggered_at: null }).eq("id", alarm.id);
     }
   }
 

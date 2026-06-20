@@ -18,10 +18,12 @@ export default function PinGate({
   const [digits, setDigits] = useState<string[]>(Array(PIN_LEN).fill(""));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const onChange = (i: number, v: string) => {
+    if (locked) return;
     const d = v.replace(/\D/g, "").slice(-1);
     const next = [...digits];
     next[i] = d;
@@ -47,7 +49,8 @@ export default function PinGate({
     if (res.ok) {
       router.refresh(); // セッション発行後、パネル表示へ
     } else {
-      setErr(true);
+      if (res.status === 429) setLocked(true); // ロックアウト
+      else setErr(true);
       setDigits(Array(PIN_LEN).fill(""));
       refs.current[0]?.focus();
       if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
@@ -104,15 +107,18 @@ export default function PinGate({
               inputMode="numeric"
               maxLength={1}
               autoFocus={i === 0}
+              disabled={locked}
               className={`h-16 w-12 rounded-2xl border bg-black/40 text-center text-2xl font-mono
-                focus:outline-none ${err ? "border-rose-500/60" : "border-white/15 focus:border-cyan-400/60"}`}
+                focus:outline-none disabled:opacity-40
+                ${locked ? "border-amber-500/60" : err ? "border-rose-500/60" : "border-white/15 focus:border-cyan-400/60"}`}
             />
           ))}
         </div>
 
         <div className="mt-4 h-5">
           {busy && <Loader2 className="mx-auto h-4 w-4 animate-spin text-cyan-300" />}
-          {err && <p className="text-xs text-rose-400">{t.wrongPin}</p>}
+          {locked && <p className="text-xs text-amber-400">{t.pinLocked}</p>}
+          {err && !locked && <p className="text-xs text-rose-400">{t.wrongPin}</p>}
         </div>
       </motion.div>
     </main>

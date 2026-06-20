@@ -145,11 +145,14 @@ export async function GET(req: NextRequest) {
   // チェックアウト自動OFF + ログ削除 (並列)
   const retentionDays = Number(process.env.LOG_RETENTION_DAYS || "90");
   const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
+  // PIN失敗記録は1日より古いものを削除 (ロック判定は直近のみ参照のため)
+  const pinCutoff = new Date(Date.now() - 86400000).toISOString();
   const [cleanedRooms, purgeRes] = await Promise.all([
     checkoutCleanup(),
     retentionDays > 0
       ? supabaseAdmin.from("device_logs").delete({ count: "exact" }).lt("created_at", cutoff)
       : Promise.resolve({ count: null }),
+    supabaseAdmin.from("pin_attempts").delete().lt("created_at", pinCutoff),
   ]);
 
   return NextResponse.json({

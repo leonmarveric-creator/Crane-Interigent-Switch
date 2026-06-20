@@ -886,12 +886,18 @@ function WakeCard({
 
   const submit = async () => {
     setState("busy"); setErr(null);
-    // 次に来る該当時刻(JST)を計算
+    // 次に来る該当時刻(JST固定)を計算。端末のタイムゾーンに依存しない。
     const [h, m] = time.split(":").map(Number);
-    const now = new Date();
-    const fire = new Date(now);
-    fire.setHours(h, m, 0, 0);
-    if (fire <= now) fire.setDate(fire.getDate() + 1);
+    const nowMs = Date.now();
+    // 現在のJST壁時計の年月日を取得 (JST = UTC+9, サマータイム無し)
+    const jstNow = new Date(nowMs + 9 * 3600 * 1000);
+    const jY = jstNow.getUTCFullYear();
+    const jM = jstNow.getUTCMonth();
+    const jD = jstNow.getUTCDate();
+    // 「そのJST日の h:m」をUTCの瞬間として算出 (UTC = JST - 9h)
+    let fireMs = Date.UTC(jY, jM, jD, h - 9, m, 0, 0);
+    if (fireMs <= nowMs) fireMs += 24 * 3600 * 1000; // 過ぎていれば翌日
+    const fire = new Date(fireMs);
 
     try {
       const res = await fetch(`/api/alarms/${roomSlug}`, {
