@@ -49,14 +49,15 @@ export default function ControlPanel({
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
-        {/* 部屋アート (ヒーロー) */}
+        {/* 部屋アート (ヒーロー・小さめ正方形・中央) */}
         {imageUrl && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
-            className="mb-5 overflow-hidden rounded-3xl border border-white/10 shadow-[0_0_60px_-25px_rgba(34,211,238,0.7)]">
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="mb-5 flex justify-center">
             <img src={imageUrl} alt={roomName}
-              className="h-36 w-full object-cover object-center sm:h-44"
-              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+              className="aspect-square w-40 rounded-3xl border border-white/10 object-cover
+                shadow-[0_0_50px_-18px_rgba(34,211,238,0.7)] sm:w-48"
+              onError={(e) => { e.currentTarget.style.display = "none"; }} />
           </motion.div>
         )}
 

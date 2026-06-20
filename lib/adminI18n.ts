@@ -61,6 +61,8 @@ type Dict = {
   imageUrlLabel: string;
   staying: string;
   empty: string;
+  arriving: string;
+  period: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -90,7 +92,7 @@ export const AT: Record<AdminLang, Dict> = {
     todayTitle: "今日のゲスト", todayNone: "本日の滞在はありません",
     guest: "ゲスト", status: "状態",
     imageTitle: "部屋アート画像", imageUrlLabel: "画像URL（/rooms/room-xxx.jpg など）",
-    staying: "滞在中", empty: "空室",
+    staying: "滞在中", empty: "空室", arriving: "到着予定", period: "期間",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -118,7 +120,7 @@ export const AT: Record<AdminLang, Dict> = {
     todayTitle: "Today's guests", todayNone: "No stays today",
     guest: "Guest", status: "Status",
     imageTitle: "Room art image", imageUrlLabel: "Image URL (e.g. /rooms/room-xxx.jpg)",
-    staying: "Staying", empty: "Empty",
+    staying: "Staying", empty: "Empty", arriving: "Arriving", period: "Stay",
   },
   zh: {
     dashboard: "房东控制台",
@@ -146,6 +148,6 @@ export const AT: Record<AdminLang, Dict> = {
     todayTitle: "今日房客", todayNone: "今天没有入住",
     guest: "房客", status: "状态",
     imageTitle: "房间图片", imageUrlLabel: "图片URL（如 /rooms/room-xxx.jpg）",
-    staying: "入住中", empty: "空房",
+    staying: "入住中", empty: "空房", arriving: "即将入住", period: "时间段",
   },
 };

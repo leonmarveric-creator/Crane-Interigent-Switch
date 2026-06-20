@@ -123,20 +123,32 @@ function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: 
 }
 
 /* ---------------- Today tab ---------------- */
+const jstDay = (iso: number | string) =>
+  new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }); // YYYY-MM-DD
+
 function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservations: Reservation[]; t: T; lang: AdminLang }) {
   const now = Date.now();
-  const stayingByRoom = useMemo(() => {
-    const m = new Map<string, Reservation>();
-    for (const r of reservations) {
-      if (r.status !== "active") continue;
-      if (new Date(r.check_in).getTime() <= now && now < new Date(r.check_out).getTime()) {
-        if (!m.has(r.room_slug)) m.set(r.room_slug, r);
-      }
+  const today = jstDay(now);
+
+  // 各部屋: 今滞在中 > 今日これから到着 の順で「今日のゲスト」を選ぶ
+  const todayByRoom = useMemo(() => {
+    const m = new Map<string, { r: Reservation; state: "staying" | "arriving" }>();
+    for (const room of rooms) {
+      const active = reservations.find((r) =>
+        r.room_slug === room.slug && r.status === "active" &&
+        new Date(r.check_in).getTime() <= now && now < new Date(r.check_out).getTime()
+      );
+      if (active) { m.set(room.slug, { r: active, state: "staying" }); continue; }
+      const arriving = reservations
+        .filter((r) => r.room_slug === room.slug && r.status === "active"
+          && new Date(r.check_in).getTime() > now && jstDay(r.check_in) === today)
+        .sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime())[0];
+      if (arriving) m.set(room.slug, { r: arriving, state: "arriving" });
     }
     return m;
-  }, [reservations, now]);
+  }, [reservations, rooms, now, today]);
 
-  const anyStaying = rooms.some((r) => stayingByRoom.has(r.slug));
+  const anyToday = rooms.some((r) => todayByRoom.has(r.slug));
 
   return (
     <section>
@@ -149,14 +161,15 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
             <tr className="border-b border-white/10">
               <th className="px-4 py-3">{t.tabRooms}</th>
               <th className="px-2 py-3">{t.status}</th>
-              <th className="px-2 py-3">{t.checkOut}</th>
+              <th className="px-2 py-3">{t.period}</th>
               <th className="px-2 py-3">{t.pin}</th>
               <th className="px-2 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {rooms.map((room) => {
-              const r = stayingByRoom.get(room.slug);
+              const hit = todayByRoom.get(room.slug);
+              const r = hit?.r;
               return (
                 <tr key={room.id} className="border-b border-white/5 last:border-0">
                   <td className="px-4 py-3">
@@ -166,11 +179,15 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
                     </div>
                   </td>
                   <td className="px-2 py-3">
-                    {r
-                      ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{t.staying}</span>
-                      : <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/40">{t.empty}</span>}
+                    {!hit
+                      ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/40">{t.empty}</span>
+                      : hit.state === "staying"
+                        ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{t.staying}</span>
+                        : <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">{t.arriving}</span>}
                   </td>
-                  <td className="px-2 py-3 text-xs text-white/60">{r ? fmt(r.check_out, lang) : "—"}</td>
+                  <td className="px-2 py-3 text-[11px] text-white/60">
+                    {r ? `${fmt(r.check_in, lang)} → ${fmt(r.check_out, lang)}` : "—"}
+                  </td>
                   <td className="px-2 py-3 font-mono text-cyan-200">{r?.unlock_pin ?? "—"}</td>
                   <td className="px-2 py-3">
                     {r?.airbnb_reservation_url && (
@@ -184,7 +201,7 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
           </tbody>
         </table>
       </div>
-      {!anyStaying && <p className="mt-3 text-center text-xs text-white/40">{t.todayNone}</p>}
+      {!anyToday && <p className="mt-3 text-center text-xs text-white/40">{t.todayNone}</p>}
     </section>
   );
 }
