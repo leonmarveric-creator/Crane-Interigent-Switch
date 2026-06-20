@@ -52,6 +52,16 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @keyframes boot-bar {
   0% { transform: scaleX(0); } 100% { transform: scaleX(1); }
 }
+/* アイアンマンHUD: 角をカットした多角形パネル / 六角形 */
+.clip-bevel {
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+}
+.clip-bevel-sm {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+.clip-hex {
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
 @media (prefers-reduced-motion: reduce) {
   .anim-drift, .anim-drift2, .anim-spin-slow, .anim-spin-rev,
   .anim-scan, .anim-grid, .anim-breathe, .anim-flicker { animation: none; }

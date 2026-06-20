@@ -311,6 +311,40 @@ function Corners({ tone = "cyan" }: { tone?: "cyan" | "amber" | "emerald" }) {
 
 const SPIN: React.CSSProperties = { transformBox: "fill-box", transformOrigin: "center" };
 
+const TONES = {
+  cyan: { edge: "rgba(34,211,238,0.25)", light: "rgba(34,211,238,0.95)" },
+  amber: { edge: "rgba(251,191,36,0.25)", light: "rgba(251,191,36,0.95)" },
+  emerald: { edge: "rgba(16,185,129,0.25)", light: "rgba(16,185,129,0.95)" },
+  violet: { edge: "rgba(167,139,250,0.25)", light: "rgba(167,139,250,0.95)" },
+} as const;
+
+/** アイアンマン風 角カットパネル (エッジを光が周回)。 */
+function HudPanel({
+  tone = "cyan", active = false, onClick, contentClassName = "", small = false, children,
+}: {
+  tone?: keyof typeof TONES; active?: boolean; onClick?: () => void;
+  contentClassName?: string; small?: boolean; children: React.ReactNode;
+}) {
+  const c = TONES[tone];
+  const clip = small ? "clip-bevel-sm" : "clip-bevel";
+  return (
+    <motion.div
+      onClick={onClick} whileTap={onClick ? { scale: 0.97 } : undefined}
+      role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
+      className={`${clip} relative ${onClick ? "cursor-pointer" : ""}`}
+      style={active ? { filter: `drop-shadow(0 0 22px ${c.light})` } : undefined}>
+      {/* 静的エッジ */}
+      <span className={`${clip} pointer-events-none absolute inset-0`} style={{ background: c.edge }} />
+      {/* 周回する光 */}
+      <span className={`${clip} anim-spin-slow pointer-events-none absolute inset-0`}
+        style={{ background: `conic-gradient(from 0deg, transparent 0deg, ${active ? c.light : "rgba(160,180,230,0.5)"} 16deg, transparent 72deg)` }} />
+      {/* 内側パネル */}
+      <span className={`${clip} pointer-events-none absolute inset-[1.5px] bg-[#070a12]/95 backdrop-blur-2xl`} />
+      <span className={`relative flex ${contentClassName}`}>{children}</span>
+    </motion.div>
+  );
+}
+
 function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
   const s = unlocked ? "#34d399" : "#22d3ee";
   return (
@@ -358,15 +392,8 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
   const Icon = unlocked ? LockKeyholeOpen : LockKeyhole;
 
   return (
-    <motion.button
-      onClick={toggle}
-      whileTap={{ scale: 0.97 }}
-      className={`relative flex flex-col items-center overflow-hidden rounded-[2rem]
-        border bg-white/[0.03] px-6 py-12 backdrop-blur-2xl transition-colors
-        ${unlocked
-          ? "border-emerald-400/40 shadow-[0_0_80px_-18px_rgba(16,185,129,0.85)]"
-          : "border-cyan-400/30 shadow-[0_0_70px_-20px_rgba(34,211,238,0.8)]"}`}
-    >
+    <HudPanel tone={unlocked ? "emerald" : "cyan"} active onClick={toggle}
+      contentClassName="flex-col items-center overflow-hidden px-6 py-12">
       <Corners tone={unlocked ? "emerald" : "cyan"} />
 
       {/* JARVIS風 HUDダイヤル */}
@@ -420,7 +447,7 @@ function LockCard({ roomSlug, t, admin }: { roomSlug: string; t: typeof T["en"];
         <span className={`anim-breathe inline-block h-1.5 w-1.5 rounded-full ${unlocked ? "bg-emerald-400" : "bg-cyan-400"}`} />
         {unlocked ? "SECURE · TAP TO LOCK" : "STANDBY · TAP TO UNLOCK"}
       </span>
-    </motion.button>
+    </HudPanel>
   );
 }
 
@@ -453,31 +480,28 @@ function ToggleCard({
   };
 
   return (
-    <motion.button
-      onClick={toggle}
-      whileTap={{ scale: 0.95 }}
-      className={`relative flex flex-col items-center gap-3 rounded-[1.75rem] border
-        bg-white/[0.04] px-4 py-7 backdrop-blur-2xl transition-all
-        ${on ? `${palette.border}` : "border-white/8"}`}
-      style={on ? { boxShadow: `0 0 50px -18px ${palette.glow}` } : undefined}
-    >
+    <HudPanel tone={accent} active={on} onClick={toggle} small
+      contentClassName="flex-col items-center gap-3 px-4 py-7">
       <Corners tone={accent} />
+      {/* 六角形アイコンフレーム */}
       <motion.div
-        animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.5 }}
-        className={`relative flex h-14 w-14 items-center justify-center rounded-2xl
-          ${on ? `${palette.border} bg-white/5` : "border border-white/10"}`}
-      >
-        {on && <span className="anim-spin-slow pointer-events-none absolute inset-[-6px] rounded-full"
-          style={{ background: `conic-gradient(from 0deg, transparent, ${palette.glow}, transparent 50%)` }} />}
+        animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.55 }}
+        className="relative flex h-16 w-16 items-center justify-center">
+        {on && <span className="anim-spin-slow pointer-events-none absolute inset-0"
+          style={{ background: `conic-gradient(from 0deg, transparent, ${palette.glow}, transparent 55%)`, clipPath: "polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)" }} />}
+        <span className={`clip-hex absolute inset-[2px] ${on ? "bg-[#0b1018]" : "bg-[#0b1018]/80"}`} />
+        <span className={`clip-hex absolute inset-0 ${on ? (accent === "cyan" ? "bg-cyan-400/30" : "bg-amber-400/30") : "bg-white/10"}`} />
+        <span className="clip-hex absolute inset-[1.5px] bg-[#0b1018]" />
         {busy
-          ? <Loader2 className={`h-6 w-6 animate-spin ${palette.text}`} />
-          : <Icon className={`h-7 w-7 ${on ? palette.text : "text-white/40"}`} strokeWidth={1.6} />}
+          ? <Loader2 className={`relative h-6 w-6 animate-spin ${palette.text}`} />
+          : <Icon className={`relative h-7 w-7 ${on ? palette.text : "text-white/40"}`} strokeWidth={1.6} />}
       </motion.div>
       <span className={`text-sm ${on ? palette.text : "text-white/50"}`}>{label}</span>
-      <span className="font-mono text-[10px] tracking-[0.25em] text-white/30">
+      <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.25em] text-white/40">
+        <span className={`inline-block h-1 w-1 rounded-full ${on ? (accent === "cyan" ? "bg-cyan-400" : "bg-amber-400") : "bg-white/20"} ${on ? "anim-breathe" : ""}`} />
         {on ? t.on.toUpperCase() : t.off.toUpperCase()}
       </span>
-    </motion.button>
+    </HudPanel>
   );
 }
 
@@ -510,37 +534,36 @@ function WakeCard({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      className="mt-5 rounded-[1.75rem] border border-violet-400/25 bg-white/[0.04] p-5
-        backdrop-blur-2xl shadow-[0_0_50px_-22px_rgba(167,139,250,0.7)]"
-    >
-      <div className="flex items-center gap-2.5">
-        <AlarmClock className="h-5 w-5 text-violet-300" strokeWidth={1.6} />
-        <span className="text-sm text-violet-200">{t.wakeLight}</span>
-      </div>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-5">
+      <HudPanel tone="violet" contentClassName="flex-col p-5">
+        <div className="flex items-center gap-2.5">
+          <AlarmClock className="h-5 w-5 text-violet-300" strokeWidth={1.6} />
+          <span className="text-sm text-violet-200">{t.wakeLight}</span>
+          <span className="anim-breathe ml-auto inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />
+        </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => { setTime(e.target.value); setState("idle"); }}
-          className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-3
-            text-center font-mono text-3xl tracking-widest text-violet-100
-            [color-scheme:dark] focus:border-violet-400/60 focus:outline-none"
-        />
-        <motion.button
-          whileTap={{ scale: 0.94 }}
-          onClick={submit}
-          disabled={state === "busy"}
-          className="flex h-[58px] items-center gap-1.5 rounded-2xl border border-violet-400/50
-            bg-violet-500/15 px-5 text-sm text-violet-200 active:bg-violet-500/30"
-        >
-          {state === "busy" && <Loader2 className="h-4 w-4 animate-spin" />}
-          {state === "set" && <Check className="h-4 w-4 text-emerald-300" />}
-          {state === "set" ? t.alarmSet : t.setAlarm}
-        </motion.button>
-      </div>
+        <div className="mt-4 flex items-center gap-3">
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => { setTime(e.target.value); setState("idle"); }}
+            className="clip-bevel-sm flex-1 border border-white/10 bg-black/50 px-4 py-3
+              text-center font-mono text-3xl tracking-widest text-violet-100
+              [color-scheme:dark] focus:border-violet-400/60 focus:outline-none"
+          />
+          <motion.button
+            whileTap={{ scale: 0.94 }}
+            onClick={submit}
+            disabled={state === "busy"}
+            className="clip-bevel-sm flex h-[58px] items-center gap-1.5 border border-violet-400/50
+              bg-violet-500/15 px-5 text-sm text-violet-200 active:bg-violet-500/30"
+          >
+            {state === "busy" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {state === "set" && <Check className="h-4 w-4 text-emerald-300" />}
+            {state === "set" ? t.alarmSet : t.setAlarm}
+          </motion.button>
+        </div>
+      </HudPanel>
     </motion.div>
   );
 }
