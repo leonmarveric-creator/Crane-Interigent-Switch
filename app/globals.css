@@ -94,3 +94,51 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .anim-drift, .anim-drift2, .anim-spin-slow, .anim-spin-rev,
   .anim-scan, .anim-grid, .anim-breathe, .anim-flicker { animation: none; }
 }
+
+/* ===== 追加: より濃いアイアンマン演出 ===== */
+/* 画面端のビネット(脈動) */
+@keyframes vignettePulse { 0%,100% { opacity: 0.5; } 50% { opacity: 0.78; } }
+.anim-vignette { animation: vignettePulse 7s ease-in-out infinite; }
+
+/* HUDレティクルが画面内を漂う */
+@keyframes roam {
+  0%   { transform: translate(0,0); }
+  25%  { transform: translate(40px,28px); }
+  50%  { transform: translate(-30px,46px); }
+  75%  { transform: translate(24px,-34px); }
+  100% { transform: translate(0,0); }
+}
+.anim-roam { animation: roam 26s ease-in-out infinite; }
+
+/* まれに走る全画面グリッチ */
+@keyframes glitchFlash {
+  0%, 100% { opacity: 0; transform: translateX(0); }
+  48% { opacity: 0; }
+  49% { opacity: 0.5; transform: translateX(-3px); }
+  50% { opacity: 0.2; transform: translateX(3px); }
+  51% { opacity: 0.55; transform: translateX(-2px); }
+  52% { opacity: 0; transform: translateX(0); }
+}
+.anim-glitch { animation: glitchFlash 9s steps(1,end) infinite; }
+
+/* 起動時の最終フラッシュ */
+@keyframes bootFlash { 0%,82% { opacity: 0; } 90% { opacity: 0.85; } 100% { opacity: 0; } }
+.anim-bootflash { animation: bootFlash 2.6s ease-out forwards; }
+
+/* リアクター充電リング */
+@keyframes charge { from { stroke-dashoffset: 471; } to { stroke-dashoffset: 0; } }
+.anim-charge { animation: charge 2.4s ease-in-out forwards; }
+
+/* テキスト・グリッチ(起動見出し用) */
+@keyframes textGlitch {
+  0%,100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  20% { clip-path: inset(20% 0 50% 0); transform: translate(-2px); }
+  40% { clip-path: inset(60% 0 10% 0); transform: translate(2px); }
+  60% { clip-path: inset(10% 0 70% 0); transform: translate(-1px); }
+  80% { clip-path: inset(40% 0 30% 0); transform: translate(1px); }
+}
+.anim-textglitch { animation: textGlitch 2.4s steps(2,end) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-vignette, .anim-roam, .anim-glitch, .anim-textglitch { animation: none; }
+}

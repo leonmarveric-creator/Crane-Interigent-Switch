@@ -105,6 +105,44 @@ export function confirm() {
   osc(c, "sine", 1320, 1320, t + 0.07, 0.1, 0.04);
 }
 
+/** 起動チャージ: ゆっくり上昇するハム + 完了チャイム (BootSequence用) */
+export function charge() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sawtooth", 70, 240, t, 2.2, 0.03);            // 低音の立ち上がり
+  osc(c, "sine", 220, 880, t + 0.1, 2.1, 0.022);        // ハーモニクス上昇
+  osc(c, "triangle", 110, 440, t + 0.2, 2.0, 0.018, 7); // 倍音うねり
+  noise(c, t, 2.2, 0.011, 300, 3200);                   // 空気感
+  osc(c, "sine", 1320, 1320, t + 2.0, 0.18, 0.05);      // 完了チャイム
+  osc(c, "sine", 1980, 1980, t + 2.12, 0.2, 0.045);
+}
+
+/** コマンド掃引: ボタン操作の瞬間に走る短いエネルギー音 */
+export function sweep() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 1400, 480, t, 0.16, 0.022);
+  noise(c, t, 0.16, 0.018, 5200, 800);
+}
+
+/** アクセス許可音 (PIN認証成功) */
+export function access() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sawtooth", 240, 900, t, 0.34, 0.045);
+  osc(c, "sine", 700, 2100, t, 0.34, 0.03);
+  noise(c, t, 0.36, 0.024, 700, 5200);
+  osc(c, "sine", 1320, 1320, t + 0.30, 0.14, 0.05);
+  osc(c, "sine", 1760, 1760, t + 0.36, 0.16, 0.045);
+  osc(c, "sine", 2640, 2640, t + 0.42, 0.18, 0.04);
+}
+
+/** 候補からランダムに1つ喋る (JARVISのセリフに変化をつける) */
+export function speakOneOf(lines: string[]) {
+  if (!lines.length) return;
+  speak(lines[Math.floor(Math.random() * lines.length)]);
+}
+
 /** 音声をユーザー操作内で先行起動 (iOSで後続のspeakを鳴らせるようにする)。 */
 export function primeVoice() {
   if (typeof window === "undefined") return;

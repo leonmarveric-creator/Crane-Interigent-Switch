@@ -8,7 +8,7 @@ import {
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { blip, powerUp, powerDown, error as sfxError, speak, primeVoice, setMuted as sfxSetMuted } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
@@ -63,7 +63,9 @@ export default function ControlPanel({
     setTimeout(() => setTaps((r) => r.filter((p) => p.id !== id)), 700);
   };
 
-  const geoEnabled = !admin && typeof lat === "number" && typeof lng === "number";
+  // 位置制限は「座標あり かつ 半径>0」のときだけ有効。
+  // 半径0でも座標は残せるので、天気(useWeather)はそのまま表示される(分離)。
+  const geoEnabled = !admin && typeof lat === "number" && typeof lng === "number" && (radiusM ?? 0) > 0;
 
   // 操作ガード: 範囲外/未許可ならブロック
   const guardCommand = useCallback(async (): Promise<boolean> => {
@@ -169,6 +171,9 @@ export default function ControlPanel({
 
       {/* 全画面HUDフレーム (ヘルメットHUD風) */}
       <HudFrame />
+
+      {/* アンビエント: ビネット・漂うレティクル・グリッチ */}
+      <AmbientFX />
 
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
         {/* HUDステータスバー */}
@@ -323,7 +328,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
 /* ------------------------------------------------------------------ */
 function Particles() {
   const motes = useMemo(
-    () => [...Array(18)].map(() => ({
+    () => [...Array(26)].map(() => ({
       left: Math.random() * 100,
       dur: 6 + Math.random() * 9,
       delay: Math.random() * 9,
@@ -368,7 +373,8 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* ------------------------------------------------------------------ */
 function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
   useEffect(() => {
-    speak("All systems online"); // iOSではジェスチャー外のため鳴らない場合あり (ベストエフォート)
+    charge(); // 起動チャージ音
+    speakOneOf(["All systems online", "Good evening. Systems online", "J.A.R.V.I.S online"]); // iOSではジェスチャー外のため鳴らない場合あり
     const id = setTimeout(onDone, 2600);
     return () => clearTimeout(id);
   }, [onDone]);
@@ -396,6 +402,9 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
             <circle cx="100" cy="100" r="74" fill="none" stroke="#22d3ee" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="50 250" strokeLinecap="round" />
             <circle cx="100" cy="100" r="74" fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="20 300" strokeDashoffset="-150" strokeLinecap="round" />
           </g>
+          {/* 充電リング: 0→全周へ満ちる */}
+          <circle cx="100" cy="100" r="75" fill="none" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round"
+            strokeDasharray="471" className="anim-charge" style={{ ...SPIN, transform: "rotate(-90deg)" }} />
         </svg>
         <motion.div
           animate={{ scale: [1, 1.18, 1], opacity: [0.5, 1, 0.5] }}
@@ -411,7 +420,8 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
         {lines.map((l, i) => (
           <motion.p key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.25 + i * 0.4 }} className="my-1 flex items-center gap-2">
-            <span className="text-emerald-400">›</span> {l}
+            <span className="text-emerald-400">›</span>
+            <span className={i === 3 ? "anim-textglitch text-cyan-100" : ""}>{l}</span>
           </motion.p>
         ))}
       </div>
@@ -423,6 +433,9 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
           className="h-full bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400" />
       </div>
       <p className="mt-3 font-mono text-[9px] tracking-[0.3em] text-white/30">TAP TO SKIP</p>
+
+      {/* 起動完了の白フラッシュ */}
+      <div className="anim-bootflash pointer-events-none absolute inset-0 bg-cyan-50" />
     </motion.div>
   );
 }
@@ -604,6 +617,69 @@ const TONES = {
   violet: { edge: "rgba(167,139,250,0.25)", light: "rgba(167,139,250,0.95)" },
 } as const;
 
+/* ------------------------------------------------------------------ */
+/* コマンド発動エフェクト (操作の瞬間に走る光の掃引 + フラッシュ + リング) */
+/* ------------------------------------------------------------------ */
+function CommandFX({ trigger, tone }: { trigger: number; tone: keyof typeof TONES }) {
+  const c = TONES[tone].light;
+  if (!trigger) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+      {/* フラッシュ */}
+      <motion.div key={`f${trigger}`}
+        initial={{ opacity: 0.55 }} animate={{ opacity: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}
+        className="absolute inset-0"
+        style={{ background: `radial-gradient(circle at 50% 45%, ${c}, transparent 62%)`, mixBlendMode: "screen" }} />
+      {/* 水平スイープ光 */}
+      <motion.div key={`s${trigger}`}
+        initial={{ x: "-130%" }} animate={{ x: "130%" }} transition={{ duration: 0.65, ease: "easeInOut" }}
+        className="absolute inset-y-0 w-1/3"
+        style={{ background: `linear-gradient(90deg, transparent, ${c}, transparent)`, opacity: 0.5 }} />
+      {/* 拡張リング */}
+      <motion.span key={`r${trigger}`}
+        initial={{ scale: 0.3, opacity: 0.85 }} animate={{ scale: 2.6, opacity: 0 }} transition={{ duration: 0.7, ease: "easeOut" }}
+        className="absolute left-1/2 top-[42%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+        style={{ borderColor: c }} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* アンビエントHUD: ビネット / 漂うレティクル / まれなグリッチ          */
+/* ------------------------------------------------------------------ */
+function AmbientFX() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[5]">
+      {/* 端を締めるビネット(脈動) */}
+      <div className="anim-vignette absolute inset-0"
+        style={{ background: "radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.55) 100%)" }} />
+      {/* 漂うターゲットレティクル */}
+      <div className="anim-roam absolute left-[14%] top-[22%] opacity-30">
+        <svg viewBox="0 0 80 80" className="h-16 w-16">
+          <g className="anim-spin-slow" style={SPIN}>
+            <circle cx="40" cy="40" r="30" fill="none" stroke="#22d3ee" strokeWidth="0.8" strokeDasharray="2 8" />
+          </g>
+          <circle cx="40" cy="40" r="3" fill="none" stroke="#fbbf24" strokeWidth="1" />
+          <line x1="40" y1="6" x2="40" y2="16" stroke="#22d3ee" strokeWidth="0.8" />
+          <line x1="40" y1="64" x2="40" y2="74" stroke="#22d3ee" strokeWidth="0.8" />
+          <line x1="6" y1="40" x2="16" y2="40" stroke="#22d3ee" strokeWidth="0.8" />
+          <line x1="64" y1="40" x2="74" y2="40" stroke="#22d3ee" strokeWidth="0.8" />
+        </svg>
+      </div>
+      <div className="anim-roam absolute right-[12%] bottom-[26%] opacity-20" style={{ animationDelay: "8s" }}>
+        <svg viewBox="0 0 60 60" className="h-12 w-12">
+          <g className="anim-spin-rev" style={SPIN}>
+            <rect x="10" y="10" width="40" height="40" fill="none" stroke="#a78bfa" strokeWidth="0.7" strokeDasharray="3 6" />
+          </g>
+        </svg>
+      </div>
+      {/* まれに走るRGBグリッチ */}
+      <div className="anim-glitch absolute inset-0 mix-blend-screen"
+        style={{ background: "repeating-linear-gradient(0deg, rgba(34,211,238,0.10) 0, rgba(34,211,238,0.10) 1px, transparent 2px, transparent 4px)" }} />
+    </div>
+  );
+}
+
 /** アイアンマン風 角カットパネル (エッジを光が周回)。 */
 function HudPanel({
   tone = "cyan", active = false, onClick, contentClassName = "", small = false, children,
@@ -670,15 +746,20 @@ function SceneButtons({
   roomSlug, admin, guard, t,
 }: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"] }) {
   const [busy, setBusy] = useState<"welcome" | "away" | null>(null);
+  const [fx, setFx] = useState<{ n: number; a: "welcome" | "away" } | null>(null);
 
   const run = async (a: "welcome" | "away") => {
     if (busy) return;
     primeVoice(); // タップ内で音声を解放
     if (guard && !(await guard())) return;
-    blip(); setBusy(a);
+    blip(); sweep(); setBusy(a); setFx((p) => ({ n: (p?.n ?? 0) + 1, a }));
     const ok = await callDevice(roomSlug, a, admin);
-    if (ok) { (a === "welcome" ? powerUp : powerDown)(); speak(a === "welcome" ? "Welcome home" : "Goodbye"); }
-    else sfxError();
+    if (ok) {
+      (a === "welcome" ? powerUp : powerDown)();
+      speakOneOf(a === "welcome"
+        ? ["Welcome home", "Comfort mode engaged", "Systems set for your return"]
+        : ["Goodbye", "Powering down", "Have a safe trip"]);
+    } else sfxError();
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 25 : [20, 40, 20]);
   };
@@ -688,6 +769,7 @@ function SceneButtons({
       <HudPanel tone="emerald" active onClick={() => run("welcome")} small
         contentClassName="flex-col items-center gap-2 px-4 py-5">
         <Corners tone="emerald" />
+        <CommandFX trigger={fx?.a === "welcome" ? fx.n : 0} tone="emerald" />
         {busy === "welcome"
           ? <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
           : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
@@ -696,6 +778,7 @@ function SceneButtons({
       <HudPanel tone="violet" onClick={() => run("away")} small
         contentClassName="flex-col items-center gap-2 px-4 py-5">
         <Corners tone="emerald" />
+        <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
         {busy === "away"
           ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
           : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
@@ -714,18 +797,21 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
   const [busy, setBusy] = useState<"unlock" | "lock" | null>(null);
   const [result, setResult] = useState<boolean | null>(null);
   const [ripple, setRipple] = useState(0);
+  const [fx, setFx] = useState(0);
 
   const run = useCallback(async (action: "unlock" | "lock") => {
     if (busy) return;
     primeVoice(); // タップの瞬間に音声を解放 (iOSで後続のspeakを鳴らす)
     if (guard && !(await guard())) return;
-    blip();
-    setBusy(action); setResult(null); setRipple((r) => r + 1);
+    blip(); sweep();
+    setBusy(action); setResult(null); setRipple((r) => r + 1); setFx((f) => f + 1);
     const ok = await callDevice(roomSlug, action, admin);
     if (ok) {
       setLast(action);
       (action === "unlock" ? powerUp : powerDown)();
-      speak(action === "unlock" ? "Door unlocked" : "Door secured");
+      speakOneOf(action === "unlock"
+        ? ["Door unlocked", "Access granted", "Welcome in"]
+        : ["Door secured", "Locked and secured", "Lockdown engaged"]);
     } else sfxError();
     setResult(ok);
     setBusy(null);
@@ -743,6 +829,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
     <HudPanel tone={unlocked ? "emerald" : "cyan"} active
       contentClassName="flex-col items-center overflow-hidden px-6 py-10">
       <Corners tone={unlocked ? "emerald" : "cyan"} />
+      <CommandFX trigger={fx} tone={unlocked ? "emerald" : "cyan"} />
       <HudRings unlocked={unlocked} busy={!!busy} />
 
       {/* 波紋 + スパーク (操作時) */}
@@ -815,6 +902,7 @@ function ToggleCard({
   // 明示式: 押したON/OFFをそのまま送る (状態のズレなし)
   const [last, setLast] = useState<"on" | "off" | null>(null);
   const [busy, setBusy] = useState<"on" | "off" | null>(null);
+  const [fx, setFx] = useState(0);
   const on = last === "on";
 
   const palette = accent === "cyan"
@@ -824,18 +912,20 @@ function ToggleCard({
   const send = async (which: "on" | "off") => {
     if (busy) return;
     if (guard && !(await guard())) return;
-    blip();
-    setBusy(which);
+    blip(); sweep();
+    setBusy(which); setFx((f) => f + 1);
     const ok = await callDevice(roomSlug, which === "on" ? onAction : offAction, admin);
-    if (ok) setLast(which);
+    if (ok) { setLast(which); (which === "on" ? powerUp : powerDown)(); }
+    else sfxError();
     setBusy(null);
-    if (navigator.vibrate) navigator.vibrate(20);
+    if (navigator.vibrate) navigator.vibrate(which === "on" ? 22 : 16);
   };
 
   return (
     <HudPanel tone={accent} active={on} small
       contentClassName="flex-col items-center gap-3 px-4 py-6">
       <Corners tone={accent} />
+      <CommandFX trigger={fx} tone={accent} />
       {/* 六角形アイコンフレーム */}
       <motion.div
         animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.6 }}

@@ -2,10 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Loader2, Globe } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { primeVoice } from "@/lib/sfx";
+import { primeVoice, access, speak } from "@/lib/sfx";
 
 const PIN_LEN = 4;
 
@@ -19,6 +19,7 @@ export default function PinGate({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [granted, setGranted] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -47,7 +48,12 @@ export default function PinGate({
     });
     setBusy(false);
     if (res.ok) {
-      router.refresh(); // セッション発行後、パネル表示へ
+      // ACCESS GRANTED 演出 → 少し見せてからパネルへ
+      setGranted(true);
+      access();
+      speak("Access granted");
+      if (navigator.vibrate) navigator.vibrate([15, 30, 15, 30, 60]);
+      setTimeout(() => router.refresh(), 1150);
     } else {
       if (res.status === 429) setLocked(true); // ロックアウト
       else setErr(true);
@@ -121,6 +127,32 @@ export default function PinGate({
           {err && !locked && <p className="text-xs text-rose-400">{t.wrongPin}</p>}
         </div>
       </motion.div>
+
+      {/* ACCESS GRANTED 遷移演出 */}
+      <AnimatePresence>
+        {granted && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#04060c]/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0.7, scale: 0 }} animate={{ opacity: 0, scale: 3.4 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+              className="absolute h-40 w-40 rounded-full border-2 border-emerald-300/70" />
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 14 }}
+              className="flex h-20 w-20 items-center justify-center rounded-full border border-emerald-400/60 bg-emerald-400/10
+                shadow-[0_0_50px_-6px_rgba(16,185,129,0.9)]">
+              <Lock className="h-8 w-8 text-emerald-300" strokeWidth={1.5} />
+            </motion.div>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+              className="mt-5 font-mono text-sm tracking-[0.35em] text-emerald-300">
+              ACCESS GRANTED
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

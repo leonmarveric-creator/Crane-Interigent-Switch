@@ -33,6 +33,20 @@ export function extractReservationUrl(description: string): string | null {
  * Airbnb の iCal URL から予約VEVENTを取得。
  * Airbnbは DATE値(終日)で来るため、チェックイン/アウトの時刻を後段で補正する。
  */
+/**
+ * Airbnbのブロック日(ホストが手動で閉じた / 他サイト連携で埋めた)を除外する。
+ * 実予約は SUMMARY が "Reserved" 等。ブロックは "Airbnb (Not available)" /
+ * "Not available" / "Blocked" 等で、説明欄に予約URLが無い。
+ */
+function isBlockedEvent(summary: string, description: string): boolean {
+  const s = summary.toLowerCase();
+  if (/not available|unavailable|blocked/.test(s)) {
+    // 念のため: 予約URLを含む稀なケースは実予約として残す
+    return !/\/reservations\/details\//i.test(description);
+  }
+  return false;
+}
+
 export async function fetchIcalEvents(url: string): Promise<IcalEvent[]> {
   const data = await ical.async.fromURL(url);
   const events: IcalEvent[] = [];
@@ -40,12 +54,15 @@ export async function fetchIcalEvents(url: string): Promise<IcalEvent[]> {
     const v: any = data[k];
     if (v.type !== "VEVENT") continue;
     if (!v.uid || !v.start || !v.end) continue;
+    const summary = String(v.summary ?? "");
+    const description = String(v.description ?? "");
+    if (isBlockedEvent(summary, description)) continue; // ブロック日はスキップ
     events.push({
       uid: String(v.uid),
       start: v.start as Date,
       end: v.end as Date,
-      summary: String(v.summary ?? ""),
-      description: String(v.description ?? ""),
+      summary,
+      description,
     });
   }
   return events;

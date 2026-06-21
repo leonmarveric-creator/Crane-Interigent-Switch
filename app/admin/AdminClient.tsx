@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useFormStatus } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
   QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
-  Image as ImageIcon, History, PowerOff, Loader2, Home,
+  Image as ImageIcon, History, PowerOff, Loader2, Home, Upload,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, updateGeofence,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence,
 } from "./actions";
 
 export interface Room {
@@ -47,6 +48,43 @@ const fmt = (iso: string, lang: AdminLang) =>
   new Date(iso).toLocaleString(LOCALE[lang], {
     month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo",
   });
+
+/**
+ * 送信ボタン (サーバーアクション用)。
+ * 送信中はスピナー、完了後は数秒「✓ 保存しました」を表示して、保存されたことを可視化する。
+ * <form action={...}> の中で submit ボタンとして使うこと。
+ */
+function SubmitButton({
+  className, children, savedText, idleIcon,
+}: {
+  className?: string; children: React.ReactNode; savedText: string; idleIcon?: React.ReactNode;
+}) {
+  const { pending } = useFormStatus();
+  const [saved, setSaved] = useState(false);
+  const was = useRef(false);
+  useEffect(() => {
+    if (was.current && !pending) {
+      setSaved(true);
+      const id = setTimeout(() => setSaved(false), 1900);
+      was.current = pending;
+      return () => clearTimeout(id);
+    }
+    was.current = pending;
+  }, [pending]);
+  return (
+    <button type="submit" disabled={pending}
+      className={`${className ?? ""} transition disabled:opacity-60`}
+      aria-busy={pending}>
+      {pending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : saved ? (
+        <span className="inline-flex items-center gap-1 text-emerald-300"><Check className="h-3.5 w-3.5" />{savedText}</span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5">{idleIcon}{children}</span>
+      )}
+    </button>
+  );
+}
 
 export default function AdminClient({
   rooms, reservations, switchbot, logs,
@@ -249,10 +287,10 @@ function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; rese
           <Field label={t.pinField}>
             <input type="text" name="unlock_pin" inputMode="numeric" placeholder={t.autoPlaceholder} maxLength={6} className={`${selCls} font-mono`} />
           </Field>
-          <button type="submit"
+          <SubmitButton savedText={t.saved} idleIcon={<Plus className="h-4 w-4" />}
             className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
-            <Plus className="h-4 w-4" /> {t.addButton}
-          </button>
+            {t.addButton}
+          </SubmitButton>
         </form>
       </div>
 
@@ -386,19 +424,32 @@ function RoomManageCard({
                 <option value="">{t.none}</option>{lights.map(opt)}
               </select>
             </label>
-            <button type="submit" className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</button>
+            <SubmitButton savedText={t.saved} className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</SubmitButton>
           </form>
         )}
       </div>
 
-      {/* 画像URL */}
-      <form action={updateRoomImage} className="flex items-end gap-2 border-t border-white/10 p-4">
+      {/* 画像: ファイルアップロード */}
+      <form action={uploadRoomImage} className="flex items-end gap-2 border-t border-white/10 p-4">
+        <input type="hidden" name="room_id" value={room.id} />
+        <label className="flex-1 text-[11px] text-white/50">
+          <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {t.uploadImage} <span className="text-white/30">(≤8MB)</span></span>
+          <input type="file" name="image" accept="image/*" required
+            className="mt-1 block w-full text-xs text-white/70 file:mr-2 file:rounded-lg file:border file:border-violet-400/50
+              file:bg-violet-500/15 file:px-3 file:py-1.5 file:text-violet-200" />
+        </label>
+        <SubmitButton savedText={t.saved} idleIcon={<Upload className="h-3.5 w-3.5" />}
+          className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.uploadImage}</SubmitButton>
+      </form>
+
+      {/* 画像URL (任意・直接指定したい場合) */}
+      <form action={updateRoomImage} className="flex items-end gap-2 border-t border-white/10 px-4 pb-4">
         <input type="hidden" name="room_id" value={room.id} />
         <label className="flex-1 text-[11px] text-white/50">
           <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {t.imageUrlLabel}</span>
-          <input type="text" name="image_url" defaultValue={room.image_url ?? ""} placeholder="/rooms/room-xxx.jpg" className={`${selCls} mt-1 py-2 text-xs`} />
+          <input type="text" name="image_url" defaultValue={room.image_url ?? ""} placeholder="https://... or /rooms/room-xxx.jpg" className={`${selCls} mt-1 py-2 text-xs`} />
         </label>
-        <button type="submit" className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.save}</button>
+        <SubmitButton savedText={t.saved} className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-2 text-xs text-violet-200">{t.save}</SubmitButton>
       </form>
 
       {/* ウェルカム / 退室クリーンアップ */}
@@ -410,12 +461,24 @@ function RoomManageCard({
       {/* ジオフェンス (位置制限) */}
       <form action={updateGeofence} className="border-t border-white/10 p-4">
         <input type="hidden" name="room_id" value={room.id} />
-        <p className="mb-2 text-[11px] text-white/50">📍 {t.geofenceTitle} — {t.geofenceHint}</p>
+        {/* タイトル + 大きめON/OFFトグル (現在状態を表示) */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] text-white/50">📍 {t.geofenceTitle}</p>
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <input type="checkbox" name="geofence_on" aria-label={t.geofenceEnable} defaultChecked={room.radius > 0} className="peer sr-only" />
+            <span className="font-mono text-[10px] tracking-widest text-white/40 peer-checked:hidden">OFF</span>
+            <span className="hidden font-mono text-[10px] tracking-widest text-emerald-300 peer-checked:inline">ON</span>
+            <span className="relative h-6 w-11 rounded-full bg-white/15 transition-colors peer-checked:bg-emerald-500/70
+              after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow
+              after:transition-transform after:content-[''] peer-checked:after:translate-x-5" />
+          </label>
+        </div>
+        <p className="mb-2 text-[10px] text-white/35">{t.geofenceHint}</p>
         <div className="flex items-end gap-2">
           <input type="text" name="lat" inputMode="decimal" defaultValue={room.lat ?? ""} placeholder="lat 35.0000" className={`${selCls} py-2 text-xs`} />
           <input type="text" name="lng" inputMode="decimal" defaultValue={room.lng ?? ""} placeholder="lng 135.0000" className={`${selCls} py-2 text-xs`} />
-          <input type="text" name="radius" inputMode="numeric" defaultValue={room.radius} placeholder="150" className="w-20 rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-center text-xs text-white" />
-          <button type="submit" className="rounded-lg border border-cyan-400/50 bg-cyan-500/15 px-3 py-2 text-xs text-cyan-200">{t.save}</button>
+          <input type="text" name="radius" inputMode="numeric" defaultValue={room.radius || 150} placeholder="150" className="w-20 rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-center text-xs text-white" />
+          <SubmitButton savedText={t.saved} className="rounded-lg border border-cyan-400/50 bg-cyan-500/15 px-3 py-2 text-xs text-cyan-200">{t.save}</SubmitButton>
         </div>
       </form>
     </div>
@@ -573,20 +636,22 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
           <input type="hidden" name="id" value={r.id} />
           <input name="pin" defaultValue={r.unlock_pin ?? ""} inputMode="numeric" maxLength={6}
             className="w-16 rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-center font-mono text-xs text-cyan-200" />
-          <button type="submit" className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-200">{t.save}</button>
+          <SubmitButton savedText={t.saved} className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-200">{t.save}</SubmitButton>
         </form>
         <form action={regeneratePin}>
           <input type="hidden" name="id" value={r.id} />
-          <button type="submit" className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
-            <RefreshCw className="h-3.5 w-3.5" /> {t.regenPin}
-          </button>
+          <SubmitButton savedText={t.saved} idleIcon={<RefreshCw className="h-3.5 w-3.5" />}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
+            {t.regenPin}
+          </SubmitButton>
         </form>
         {active && (
           <form action={cancelReservation}>
             <input type="hidden" name="id" value={r.id} />
-            <button type="submit" className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
-              <Ban className="h-3.5 w-3.5" /> {t.cancel}
-            </button>
+            <SubmitButton savedText={t.saved} idleIcon={<Ban className="h-3.5 w-3.5" />}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200">
+              {t.cancel}
+            </SubmitButton>
           </form>
         )}
       </div>

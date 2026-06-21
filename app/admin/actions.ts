@@ -73,7 +73,11 @@ export async function updateGeofence(formData: FormData) {
   const radRaw = String(formData.get("radius") || "").trim();
   const lat = latRaw ? Number(latRaw) : null;
   const lng = lngRaw ? Number(lngRaw) : null;
-  const geofence_radius_m = radRaw ? Math.max(20, Math.round(Number(radRaw))) : 150;
+  // 位置制限ON/OFF。OFFなら半径0(=制限なし)で保存し、座標は天気用に残す。
+  const on = String(formData.get("geofence_on") || "") === "on";
+  const geofence_radius_m = on
+    ? (radRaw ? Math.max(20, Math.round(Number(radRaw))) : 150)
+    : 0;
   await supabaseAdmin
     .from("rooms")
     .update({
@@ -92,6 +96,33 @@ export async function updateRoomImage(formData: FormData) {
   if (!room_id) return;
   const image_url = String(formData.get("image_url") || "").trim() || null;
   await supabaseAdmin.from("rooms").update({ image_url }).eq("id", room_id);
+  revalidatePath("/admin");
+}
+
+/**
+ * 部屋アートをファイルからアップロード。
+ * Supabase Storage の公開バケット "room-art" に保存し、公開URLを rooms.image_url に保存。
+ */
+export async function uploadRoomImage(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  const file = formData.get("image") as File | null;
+  if (!room_id || !file || file.size === 0) return;
+  if (!file.type.startsWith("image/")) throw new Error("NOT_IMAGE");
+  if (file.size > 8 * 1024 * 1024) throw new Error("FILE_TOO_LARGE"); // 8MBまで
+
+  const extRaw = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const ext = /^(jpg|jpeg|png|webp|gif|avif)$/.test(extRaw) ? extRaw : "jpg";
+  const path = `${room_id}/${Date.now()}.${ext}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  const { error } = await supabaseAdmin.storage
+    .from("room-art")
+    .upload(path, bytes, { contentType: file.type, upsert: true });
+  if (error) throw new Error("UPLOAD_FAILED: " + error.message);
+
+  const { data } = supabaseAdmin.storage.from("room-art").getPublicUrl(path);
+  await supabaseAdmin.from("rooms").update({ image_url: data.publicUrl }).eq("id", room_id);
   revalidatePath("/admin");
 }
 

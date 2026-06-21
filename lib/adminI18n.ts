@@ -19,6 +19,8 @@ type Dict = {
   light: string;
   none: string;
   save: string;
+  saved: string;
+  uploadImage: string;
   addTitle: string;
   room: string;
   language: string;
@@ -65,6 +67,7 @@ type Dict = {
   period: string;
   geofenceTitle: string;
   geofenceHint: string;
+  geofenceEnable: string;
   radiusM: string;
   tabHistory: string;
   historyTitle: string;
@@ -85,7 +88,7 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "ドア用 固定QR（印刷して各部屋の入口に貼る）",
     assignTitle: "部屋ごとのデバイス割り当て",
     assignDesc: "各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。",
-    ac: "エアコン", light: "照明", none: "（なし）", save: "保存",
+    ac: "エアコン", light: "照明", none: "（なし）", save: "保存", saved: "保存しました", uploadImage: "画像をアップロード",
     addTitle: "手動で予約を追加（PIN自動発行）",
     room: "部屋", language: "言語",
     checkIn: "チェックイン（日本時間）", checkOut: "チェックアウト（日本時間）",
@@ -105,7 +108,7 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "ゲスト", status: "状態",
     imageTitle: "部屋アート画像", imageUrlLabel: "画像URL（/rooms/room-xxx.jpg など）",
     staying: "滞在中", empty: "空室", arriving: "到着予定", period: "期間",
-    geofenceTitle: "位置制限（GPS）", geofenceHint: "建物の緯度・経度（空欄で制限OFF）", radiusM: "半径(m)",
+    geofenceTitle: "位置制限（GPS）", geofenceHint: "建物の緯度・経度（座標は天気にも使用／チェックで位置制限ON）", geofenceEnable: "位置制限を有効化", radiusM: "半径(m)",
     tabHistory: "履歴", historyTitle: "操作履歴", noLogs: "履歴がありません",
     srcGuest: "ゲスト", srcAdmin: "管理者", srcCron: "自動", when: "日時",
     checkoutOff: "退室OFF（エアコン・照明）",
@@ -118,7 +121,7 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "Door QR (print & post at each room entrance)",
     assignTitle: "Assign devices per room",
     assignDesc: "Pick an air conditioner / light for each room and save (choose by the names set in the SwitchBot app).",
-    ac: "Air Con", light: "Light", none: "(none)", save: "Save",
+    ac: "Air Con", light: "Light", none: "(none)", save: "Save", saved: "Saved", uploadImage: "Upload image",
     addTitle: "Add reservation manually (auto PIN)",
     room: "Room", language: "Language",
     checkIn: "Check-in (JST)", checkOut: "Check-out (JST)",
@@ -138,7 +141,7 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "Guest", status: "Status",
     imageTitle: "Room art image", imageUrlLabel: "Image URL (e.g. /rooms/room-xxx.jpg)",
     staying: "Staying", empty: "Empty", arriving: "Arriving", period: "Stay",
-    geofenceTitle: "Location lock (GPS)", geofenceHint: "Building latitude / longitude (blank = off)", radiusM: "Radius (m)",
+    geofenceTitle: "Location lock (GPS)", geofenceHint: "Building lat / lng (also used for weather; check to enable lock)", geofenceEnable: "Enable location lock", radiusM: "Radius (m)",
     tabHistory: "Log", historyTitle: "Operation log", noLogs: "No history",
     srcGuest: "Guest", srcAdmin: "Host", srcCron: "Auto", when: "Time",
     checkoutOff: "Turn off (AC & Light)",
@@ -151,7 +154,7 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "门口固定二维码（打印后贴在各房间入口）",
     assignTitle: "为每个房间分配设备",
     assignDesc: "为每个房间选择空调・灯光并保存（可按 SwitchBot App 中设置的名称选择）。",
-    ac: "空调", light: "灯光", none: "（无）", save: "保存",
+    ac: "空调", light: "灯光", none: "（无）", save: "保存", saved: "已保存", uploadImage: "上传图片",
     addTitle: "手动添加预订（自动生成PIN）",
     room: "房间", language: "语言",
     checkIn: "入住（日本时间）", checkOut: "退房（日本时间）",
@@ -171,7 +174,7 @@ export const AT: Record<AdminLang, Dict> = {
     guest: "房客", status: "状态",
     imageTitle: "房间图片", imageUrlLabel: "图片URL（如 /rooms/room-xxx.jpg）",
     staying: "入住中", empty: "空房", arriving: "即将入住", period: "时间段",
-    geofenceTitle: "位置限制（GPS）", geofenceHint: "建筑纬度 / 经度（留空=关闭）", radiusM: "半径(m)",
+    geofenceTitle: "位置限制（GPS）", geofenceHint: "建筑纬度 / 经度（也用于天气；勾选启用位置限制）", geofenceEnable: "启用位置限制", radiusM: "半径(m)",
     tabHistory: "记录", historyTitle: "操作记录", noLogs: "暂无记录",
     srcGuest: "房客", srcAdmin: "房东", srcCron: "自动", when: "时间",
     checkoutOff: "关闭（空调·灯光）",
