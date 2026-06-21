@@ -518,10 +518,12 @@ function RoomThumb({ room, size }: { room: Room; size: number }) {
   if (room.image_url) {
     const isVid = /\.(mp4|webm|mov|m4v|ogv)(\?.*)?$/i.test(room.image_url);
     if (isVid) {
+      // #t=0.1 で先頭フレームを静止表示 (ポスター代わり・再生しないので軽い)
+      const frame = room.image_url.includes("#") ? room.image_url : `${room.image_url}#t=0.1`;
       return (
-        <video src={room.image_url} width={size} height={size} muted playsInline preload="metadata"
+        <video src={frame} width={size} height={size} muted playsInline preload="metadata"
           style={{ width: size, height: size }}
-          className="shrink-0 rounded-xl object-cover"
+          className="shrink-0 rounded-xl bg-black/30 object-cover"
           onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
       );
     }
