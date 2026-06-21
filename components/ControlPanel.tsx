@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut,
@@ -24,6 +24,54 @@ interface Props {
   lat?: number | null; // ジオフェンス: 建物の緯度
   lng?: number | null; // ジオフェンス: 建物の経度
   radiusM?: number | null; // 許可半径(m)
+}
+
+// メディアURLが動画か判定 (拡張子ベース)
+function isVideoUrl(url?: string | null): boolean {
+  return !!url && /\.(mp4|webm|mov|m4v|ogv)(\?.*)?$/i.test(url);
+}
+
+/**
+ * 部屋アートのヒーロー表示。動画URLなら<video>でループ再生、それ以外は<img>。
+ * 軽量化のため: muted/loop/playsInline、画面非表示時は停止、reduced-motionでは静止画優先。
+ * 読み込み失敗時はヒーロー枠を隠す。
+ */
+function HeroMedia({ url, alt }: { url: string; alt: string }) {
+  const reduce = useReducedMotion();
+  const vref = useRef<HTMLVideoElement>(null);
+  const video = isVideoUrl(url) && !reduce;
+
+  useEffect(() => {
+    const v = vref.current;
+    if (!v) return;
+    const onVis = () => { if (document.hidden) v.pause(); else v.play().catch(() => {}); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [url]);
+
+  const hide = (el: HTMLElement | null) => {
+    const w = el?.closest(".hero-wrap") as HTMLElement | null;
+    if (w) w.style.display = "none";
+  };
+
+  if (video) {
+    return (
+      <video ref={vref} src={url} className="anim-kenburns h-full w-full object-cover"
+        autoPlay loop muted playsInline preload="metadata"
+        onError={(e) => hide(e.currentTarget)} />
+    );
+  }
+  // reduced-motion かつ動画URL の場合も、最初のフレームを静止表示
+  if (isVideoUrl(url)) {
+    return (
+      <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata"
+        onError={(e) => hide(e.currentTarget)} />
+    );
+  }
+  return (
+    <img src={url} alt={alt} className="anim-kenburns h-full w-full object-cover"
+      onError={(e) => hide(e.currentTarget)} />
+  );
 }
 
 function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
@@ -194,8 +242,7 @@ export default function ControlPanel({
             {/* ホログラム投影フレーム */}
             <div className="relative aspect-square w-40 overflow-hidden rounded-3xl border border-cyan-300/30
               shadow-[0_0_60px_-12px_rgba(34,211,238,0.8)] sm:w-48">
-              <img src={imageUrl} alt={roomName} className="h-full w-full object-cover"
-                onError={(e) => { const w = e.currentTarget.closest(".hero-wrap") as HTMLElement | null; if (w) w.style.display = "none"; }} />
+              <HeroMedia url={imageUrl} alt={roomName} />
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute inset-0 opacity-25 [background:repeating-linear-gradient(0deg,transparent_0,transparent_2px,rgba(0,0,0,0.35)_3px)]" />
                 <div className="anim-holoscan absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-transparent via-cyan-200/30 to-transparent" />

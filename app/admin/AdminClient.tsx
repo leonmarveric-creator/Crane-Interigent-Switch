@@ -433,8 +433,8 @@ function RoomManageCard({
       <form action={uploadRoomImage} className="flex items-end gap-2 border-t border-white/10 p-4">
         <input type="hidden" name="room_id" value={room.id} />
         <label className="flex-1 text-[11px] text-white/50">
-          <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {t.uploadImage} <span className="text-white/30">(≤8MB)</span></span>
-          <input type="file" name="image" accept="image/*" required
+          <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {t.uploadImage} <span className="text-white/30">(≤4MB)</span></span>
+          <input type="file" name="image" accept="image/*,video/*" required
             className="mt-1 block w-full text-xs text-white/70 file:mr-2 file:rounded-lg file:border file:border-violet-400/50
               file:bg-violet-500/15 file:px-3 file:py-1.5 file:text-violet-200" />
         </label>
@@ -516,6 +516,15 @@ function SceneButton({ slug, action, label, tone }: {
 
 function RoomThumb({ room, size }: { room: Room; size: number }) {
   if (room.image_url) {
+    const isVid = /\.(mp4|webm|mov|m4v|ogv)(\?.*)?$/i.test(room.image_url);
+    if (isVid) {
+      return (
+        <video src={room.image_url} width={size} height={size} muted playsInline preload="metadata"
+          style={{ width: size, height: size }}
+          className="shrink-0 rounded-xl object-cover"
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+      );
+    }
     return (
       <img src={room.image_url} alt={room.display_name} width={size} height={size}
         style={{ width: size, height: size }}

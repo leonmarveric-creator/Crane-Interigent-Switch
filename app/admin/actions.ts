@@ -108,11 +108,16 @@ export async function uploadRoomImage(formData: FormData) {
   const room_id = String(formData.get("room_id") || "");
   const file = formData.get("image") as File | null;
   if (!room_id || !file || file.size === 0) return;
-  if (!file.type.startsWith("image/")) throw new Error("NOT_IMAGE");
-  if (file.size > 8 * 1024 * 1024) throw new Error("FILE_TOO_LARGE"); // 8MBまで
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  if (!isImage && !isVideo) throw new Error("NOT_MEDIA");
+  // Vercelのリクエスト上限(4.5MB)を超えるとアップロード自体が失敗するため4MBに制限。
+  // 大きい動画は外部URLを画像URL欄に貼って使う運用とする。
+  if (file.size > 4 * 1024 * 1024) throw new Error("FILE_TOO_LARGE");
 
-  const extRaw = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const ext = /^(jpg|jpeg|png|webp|gif|avif)$/.test(extRaw) ? extRaw : "jpg";
+  const extRaw = (file.name.split(".").pop() || (isVideo ? "mp4" : "jpg")).toLowerCase();
+  const okExt = isVideo ? /^(mp4|webm|mov|m4v|ogv)$/ : /^(jpg|jpeg|png|webp|gif|avif)$/;
+  const ext = okExt.test(extRaw) ? extRaw : (isVideo ? "mp4" : "jpg");
   const path = `${room_id}/${Date.now()}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
 
