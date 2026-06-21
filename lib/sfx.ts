@@ -65,13 +65,15 @@ function noise(c: AudioContext, t0: number, dur: number, peak: number, fStart: n
   s.start(t0); s.stop(t0 + dur + 0.02);
 }
 
-/** ボタンタップ: クリスプなUI確認音 */
+/** ボタンタップ: 最先端ホログラムUI風のクリスプな確認音 */
 export function blip() {
   const c = ac(); if (!c || muted) return;
   const t = c.currentTime;
-  osc(c, "sine", 2100, 1500, t, 0.05, 0.04);
-  osc(c, "square", 1050, 1050, t, 0.025, 0.015);
-  noise(c, t, 0.03, 0.02, 4000, 2000);
+  osc(c, "sine", 1900, 2700, t, 0.06, 0.03);          // 立ち上がりスイープ
+  osc(c, "triangle", 950, 1400, t, 0.05, 0.018, 6);   // 倍音ボディ
+  osc(c, "sine", 3300, 3700, t + 0.008, 0.05, 0.015); // きらめき (高域スパークル)
+  noise(c, t, 0.035, 0.012, 6500, 3200);              // 微細なデジタルティック
+  osc(c, "sine", 2500, 2500, t + 0.05, 0.05, 0.016);  // 確定ピン
 }
 
 /** 解錠: 起動スイープ + シマー + 確認ピン */
@@ -159,21 +161,24 @@ export function primeVoice() {
   } catch { /* ignore */ }
 }
 
-// JARVIS風の英国男性ボイスを選択 (端末にあるものから優先順に)
+// 自然な女性アシスタントボイスを選択 (F.R.I.D.A.Y. 風・端末にあるものから優先順に)
 let chosenVoice: SpeechSynthesisVoice | null = null;
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
   const byName = (n: string) => voices.find((v) => v.name === n);
+  const femaleRe = /female|samantha|aria|jenny|ava|allison|susan|zoe|karen|moira|tessa|serena|kate|fiona|nicky|google us english/i;
   return (
-    byName("Daniel") ||                          // Apple en-GB 男性 (JARVISに近い)
-    byName("Arthur") ||                          // Apple 新しめ en-GB
-    byName("Google UK English Male") ||          // Chrome
-    byName("Microsoft Ryan Online (Natural) - English (United Kingdom)") ||
-    voices.find((v) => v.lang === "en-GB" && /male|daniel|arthur|ryan|george|oliver/i.test(v.name)) ||
-    voices.find((v) => v.lang === "en-GB") ||
-    voices.find((v) => v.lang?.startsWith("en-GB")) ||
+    byName("Samantha") ||                                                   // Apple US 女性 (自然)
+    byName("Ava") || byName("Ava (Premium)") || byName("Allison") ||        // Apple US 高品質女性
+    byName("Microsoft Aria Online (Natural) - English (United States)") ||  // Edge 自然女性
+    byName("Microsoft Jenny Online (Natural) - English (United States)") ||
+    byName("Google US English") ||                                          // Chrome (女性寄り)
+    byName("Moira") ||                                                      // Apple アイルランド女性 (FRIDAYの雰囲気)
+    byName("Karen") || byName("Tessa") || byName("Serena") || byName("Kate") ||
+    voices.find((v) => v.lang?.startsWith("en") && femaleRe.test(v.name)) ||
+    voices.find((v) => v.lang === "en-US") ||
     voices.find((v) => v.lang?.startsWith("en")) ||
     null
   );
@@ -183,7 +188,7 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => { chosenVoice = pickVoice(); };
 }
 
-/** JARVIS音声 (Web Speech API・無料)。英国紳士ボイス・落ち着いた話速。 */
+/** AIアシスタント音声 (Web Speech API・無料)。自然な女性ボイス・落ち着いた話速。 */
 export function speak(text: string) {
   if (muted) return;
   if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -191,9 +196,9 @@ export function speak(text: string) {
     const v = chosenVoice || pickVoice();
     const u = new SpeechSynthesisUtterance(text);
     if (v) u.voice = v;
-    u.lang = v?.lang || "en-GB";
-    u.rate = 0.9;    // 落ち着いた抑揚
-    u.pitch = 0.95;  // やや低めの男性トーン
+    u.lang = v?.lang || "en-US";
+    u.rate = 1.0;    // 自然な速さ
+    u.pitch = 1.08;  // やや高めの落ち着いた女性トーン
     u.volume = 1;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
