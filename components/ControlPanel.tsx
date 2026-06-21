@@ -669,7 +669,15 @@ const TONES = {
 /* ------------------------------------------------------------------ */
 function CommandFX({ trigger, tone }: { trigger: number; tone: keyof typeof TONES }) {
   const c = TONES[tone].light;
-  if (!trigger) return null;
+  // trigger が変わったら短時間だけ表示し、その後エフェクトごと取り外す (残像防止)
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!trigger) return;
+    setShow(true);
+    const id = setTimeout(() => setShow(false), 800);
+    return () => clearTimeout(id);
+  }, [trigger]);
+  if (!show) return null;
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
       {/* フラッシュ */}
