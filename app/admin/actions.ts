@@ -3,6 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
+import { runIcalSync } from "@/lib/syncIcal";
+
+/**
+ * Airbnb iCal を今すぐ手動同期 (Cronを待たずに新規予約を取り込む)。
+ * 追加/更新/キャンセル件数の合計を返す。
+ */
+export async function syncNow(): Promise<{ ok: boolean; added: number; updated: number; cancelled: number; error?: string }> {
+  requireAdmin();
+  try {
+    const { summary } = await runIcalSync();
+    const total = Object.values(summary).reduce(
+      (a, s) => ({ added: a.added + s.added, updated: a.updated + s.updated, cancelled: a.cancelled + s.cancelled }),
+      { added: 0, updated: 0, cancelled: 0 }
+    );
+    revalidatePath("/admin");
+    return { ok: true, ...total };
+  } catch (e: any) {
+    return { ok: false, added: 0, updated: 0, cancelled: 0, error: e?.message || "SYNC_FAILED" };
+  }
+}
 
 /** datetime-local (JST入力) を ISO(UTC) へ。例 "2026-06-20T15:00" */
 function jstLocalToIso(v: string): string {

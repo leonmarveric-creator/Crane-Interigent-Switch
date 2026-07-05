@@ -13,7 +13,7 @@ import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow,
 } from "./actions";
 
 export interface Room {
@@ -118,6 +118,7 @@ export default function AdminClient({
             <h1 className="mt-1 text-xl font-semibold">{t.title}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <SyncNowButton t={t} />
             <LangSwitch lang={lang} onChange={changeLang} />
             <button onClick={logout}
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs active:scale-95">
@@ -567,6 +568,41 @@ function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
 const selCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white [color-scheme:dark]";
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="text-xs text-white/60">{label}<div className="mt-1">{children}</div></label>;
+}
+
+/** Airbnb iCal を今すぐ手動同期するボタン (Cronを待たずに新規予約を取り込む)。 */
+function SyncNowButton({ t }: { t: T }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "err">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const run = async () => {
+    if (state === "busy") return;
+    setState("busy"); setMsg(null);
+    try {
+      const r = await syncNow();
+      if (r.ok) {
+        setState("done");
+        setMsg(`+${r.added} / ~${r.updated} / -${r.cancelled}`);
+      } else {
+        setState("err"); setMsg(r.error ?? null);
+      }
+    } catch (e: any) {
+      setState("err"); setMsg(e?.message ?? null);
+    }
+    setTimeout(() => { setState("idle"); setMsg(null); }, 5000);
+  };
+
+  return (
+    <button onClick={run} disabled={state === "busy"} title={msg ?? t.syncNow}
+      className="flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-100 active:scale-95 disabled:opacity-60">
+      {state === "busy" ? <Loader2 className="h-4 w-4 animate-spin" />
+        : state === "done" ? <Check className="h-4 w-4 text-emerald-300" />
+        : <RefreshCw className="h-4 w-4" />}
+      <span className="hidden sm:inline">
+        {state === "busy" ? t.syncing : state === "done" ? (msg ?? t.syncDone) : state === "err" ? t.syncFail : t.syncNow}
+      </span>
+    </button>
+  );
 }
 
 function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLang) => void }) {

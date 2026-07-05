@@ -322,8 +322,8 @@ export default function ControlPanel({
           />
         </motion.div>
 
-        {/* 光目覚まし (テストモードでは非表示: アラームはゲストセッション前提) */}
-        {!admin && <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} />}
+        {/* 光目覚まし (テストページでもホストが設定・動作確認できる) */}
+        <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
       </div>
     </main>
   );
@@ -1021,9 +1021,9 @@ function ToggleCard({
 /* 光目覚まし カード (タイムピッカー)                                   */
 /* ------------------------------------------------------------------ */
 function WakeCard({
-  roomSlug, checkOut, t, lang,
+  roomSlug, checkOut, t, lang, admin,
 }: {
-  roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang;
+  roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang; admin?: boolean;
 }) {
   const [time, setTime] = useState("07:00");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
@@ -1045,10 +1045,13 @@ function WakeCard({
     const fire = new Date(fireMs);
 
     try {
-      const res = await fetch(`/api/alarms/${roomSlug}`, {
+      // ゲスト: PIN認証セッション経由 / admin(テストページ): 管理者Cookie経由
+      const res = await fetch(admin ? "/api/admin/test-alarm" : `/api/alarms/${roomSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fireAtIso: fire.toISOString() }),
+        body: JSON.stringify(admin
+          ? { roomSlug, fireAtIso: fire.toISOString() }
+          : { fireAtIso: fire.toISOString() }),
       });
       if (res.ok) { setState("set"); }
       else {
