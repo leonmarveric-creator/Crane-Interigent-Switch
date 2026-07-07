@@ -15,10 +15,12 @@ import {
 import {
   addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow,
 } from "./actions";
+import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 
 export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
+  galaxy_device_id: string | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
   url: string; qr: string;
@@ -65,6 +67,7 @@ function SubmitButton({
   useEffect(() => {
     if (was.current && !pending) {
       setSaved(true);
+      sfxConfirm();
       const id = setTimeout(() => setSaved(false), 1900);
       was.current = pending;
       return () => clearTimeout(id);
@@ -100,18 +103,28 @@ export default function AdminClient({
   const changeLang = (l: AdminLang) => { setLang(l); localStorage.setItem("adminLang", l); };
 
   const logout = async () => {
+    blip();
     await fetch("/api/admin/logout", { method: "POST" });
     location.href = "/admin/login";
   };
 
   return (
-    <main className="min-h-dvh bg-[#05060a] text-white">
+    <main className="min-h-dvh bg-[#04060c] text-white">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-500/15 blur-[120px]" />
-        <div className="absolute top-1/2 -right-24 h-96 w-96 rounded-full bg-violet-600/15 blur-[120px]" />
+        <div className="anim-drift absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-500/15 blur-[120px]" />
+        <div className="anim-drift2 absolute top-1/2 -right-24 h-96 w-96 rounded-full bg-violet-600/15 blur-[120px]" />
+        <div className="anim-grid absolute inset-0
+          [background-image:linear-gradient(#22d3ee_1px,transparent_1px),linear-gradient(90deg,#22d3ee_1px,transparent_1px)]
+          [background-size:48px_48px]" />
+        <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/10 to-transparent" />
+        {/* HUDコーナー */}
+        <span className="absolute left-3 top-3 h-7 w-7 border-l-2 border-t-2 border-cyan-300/30" />
+        <span className="absolute right-3 top-3 h-7 w-7 border-r-2 border-t-2 border-cyan-300/30" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-5xl px-5 pb-28 pt-8">
+        {/* HUDステータスバー */}
+        <AdminStatusBar />
         <header className="mb-6 flex items-center justify-between">
           <div>
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">{t.dashboard}</p>
@@ -139,6 +152,31 @@ export default function AdminClient({
   );
 }
 
+/* ---------------- HUDステータスバー ---------------- */
+function AdminStatusBar() {
+  const [clock, setClock] = useState("--:--:--");
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo" }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="anim-flicker mb-4 flex items-center justify-between rounded-full border border-cyan-400/20 bg-cyan-400/[0.04] px-4 py-1.5 font-mono text-[9px] tracking-[0.25em] text-cyan-300/70">
+      <span className="flex items-center gap-1.5">
+        <span className="anim-breathe inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" /> HOST TERMINAL
+      </span>
+      <span className="tracking-[0.2em] text-cyan-200/80">{clock} JST</span>
+      <span className="hidden items-end gap-0.5 sm:flex">
+        {[3, 5, 4, 6, 5].map((h, i) => (
+          <span key={i} className="anim-breathe inline-block w-0.5 bg-cyan-400/70"
+            style={{ height: h, animationDelay: `${i * 0.18}s` }} />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 /* ---------------- Bottom nav ---------------- */
 function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: T }) {
   const items: { key: Tab; label: string; Icon: any }[] = [
@@ -149,17 +187,26 @@ function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: 
     { key: "test", label: t.tabTest, Icon: Wrench },
   ];
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[#0a0c14]/85 backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-400/20 bg-[#070a12]/90 backdrop-blur-xl">
+      {/* 上端に流れる光 */}
+      <div className="pointer-events-none absolute inset-x-0 -top-px h-px overflow-hidden">
+        <div className="h-px w-1/3 bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent"
+          style={{ animation: "streamX 4s linear infinite" }} />
+      </div>
       <div className="mx-auto flex max-w-5xl">
         {items.map(({ key, label, Icon }) => {
           const active = tab === key;
           return (
-            <button key={key} onClick={() => setTab(key)}
+            <button key={key} onClick={() => { if (!active) navTick(); setTab(key); }}
               className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-[11px] transition
                 ${active ? "text-cyan-300" : "text-white/45"}`}>
-              <Icon className="h-5 w-5" />
+              {active && (
+                <span className="pointer-events-none absolute inset-x-3 inset-y-1 rounded-xl bg-cyan-400/[0.07]
+                  shadow-[0_0_18px_-4px_rgba(34,211,238,0.6)_inset]" />
+              )}
+              <Icon className={`h-5 w-5 ${active ? "drop-shadow-[0_0_6px_rgba(34,211,238,0.9)]" : ""}`} />
               {label}
-              {active && <span className="absolute bottom-0 h-0.5 w-10 rounded-full bg-cyan-400" />}
+              {active && <span className="absolute bottom-0 h-0.5 w-10 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)]" />}
             </button>
           );
         })}
@@ -201,7 +248,7 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
       <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
         <CalendarDays className="h-4 w-4" /> {t.todayTitle}
       </div>
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+      <div className="clip-bevel overflow-hidden border border-cyan-400/15 bg-[#070a12]/80 backdrop-blur-xl">
         <table className="w-full text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wide text-white/40">
             <tr className="border-b border-white/10">
@@ -261,7 +308,7 @@ function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; rese
   );
   return (
     <section>
-      <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+      <div className="clip-bevel mb-6 border border-cyan-400/15 bg-[#070a12]/80 p-5 backdrop-blur-xl">
         <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
           <Plus className="h-4 w-4" /> {t.addTitle}
         </div>
@@ -313,6 +360,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
   const [filter, setFilter] = useState<string>("all");
   const actionLabel: Record<string, string> = {
     unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
+    galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff,
   };
   const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
   const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);
@@ -326,7 +374,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
         {rooms.map((r) => <FilterChip key={r.id} active={filter === r.slug} onClick={() => setFilter(r.slug)} label={r.display_name} />)}
       </div>
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+      <div className="clip-bevel overflow-hidden border border-cyan-400/15 bg-[#070a12]/80 backdrop-blur-xl">
         <table className="w-full text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wide text-white/40">
             <tr className="border-b border-white/10">
@@ -365,21 +413,31 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
   const ir = info.infraredRemoteList ?? [];
   const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
   const lights = ir.filter((d) => /light/i.test(d.remoteType));
+  // ギャラクシー(プラネタリウム)候補: Bot/Plug等の物理デバイス + プロジェクター系IRリモコン
+  const galaxies = [
+    ...(info.deviceList ?? [])
+      .filter((d) => /bot|plug/i.test(d.deviceType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+    ...ir
+      .filter((d) => /projector|others|diy|tv/i.test(d.remoteType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+  ];
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {rooms.map((room) => (
-        <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} sbError={info.error} t={t} />
+        <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} sbError={info.error} t={t} />
       ))}
     </section>
   );
 }
 
 function RoomManageCard({
-  room, acs, lights, sbError, t,
+  room, acs, lights, galaxies, sbError, t,
 }: {
   room: Room;
   acs: { deviceId: string; deviceName: string }[];
   lights: { deviceId: string; deviceName: string }[];
+  galaxies: { deviceId: string; deviceName: string }[];
   sbError: string | null;
   t: T;
 }) {
@@ -388,7 +446,7 @@ function RoomManageCard({
     <option key={d.deviceId} value={d.deviceId}>{d.deviceName || d.deviceId}</option>
   );
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
+    <div className="clip-bevel overflow-hidden border border-cyan-400/15 bg-[#070a12]/80 backdrop-blur-xl">
       <div className="flex gap-3 p-4">
         <RoomThumb room={room} size={72} />
         <div className="min-w-0 flex-1">
@@ -423,6 +481,15 @@ function RoomManageCard({
             <label className="flex-1 text-[11px] text-white/50">{t.light}
               <select name="light" defaultValue={room.light_device_id ?? ""} className={`${selCls} mt-1 py-2 text-xs`}>
                 <option value="">{t.none}</option>{lights.map(opt)}
+              </select>
+            </label>
+            {/* ギャラクシーモード: プラネタリウムプロジェクターのSwitchBot (割り当てるとゲスト画面に出現) */}
+            <label className="w-full text-[11px] text-violet-300/80">
+              <span className="flex items-center gap-1">{t.galaxy}
+                {room.galaxy_device_id && <span className="rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[9px] tracking-widest text-violet-200">ENABLED</span>}
+              </span>
+              <select name="galaxy" defaultValue={room.galaxy_device_id ?? ""} className={`${selCls} mt-1 border-violet-400/30 py-2 text-xs`}>
+                <option value="">{t.none}</option>{galaxies.map(opt)}
               </select>
             </label>
             <SubmitButton savedText={t.saved} className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</SubmitButton>
@@ -577,6 +644,7 @@ function SyncNowButton({ t }: { t: T }) {
 
   const run = async () => {
     if (state === "busy") return;
+    blip();
     setState("busy"); setMsg(null);
     try {
       const r = await syncNow();
@@ -634,8 +702,8 @@ function LangSwitch({ lang, onChange }: { lang: AdminLang; onChange: (l: AdminLa
 
 function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs transition ${active ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-white/10 bg-white/5 text-white/60"}`}>
+    <button onClick={() => { if (!active) navTick(); onClick(); }}
+      className={`clip-bevel-sm border px-3 py-1.5 text-xs transition ${active ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.7)]" : "border-white/10 bg-white/5 text-white/60"}`}>
       {label}
     </button>
   );
@@ -651,7 +719,7 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
   };
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={`rounded-3xl border bg-white/[0.04] p-5 backdrop-blur-xl ${active ? "border-white/10" : "border-rose-500/20 opacity-60"}`}>
+      className={`clip-bevel border bg-[#070a12]/80 p-5 backdrop-blur-xl ${active ? "border-cyan-400/15" : "border-rose-500/25 opacity-60"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

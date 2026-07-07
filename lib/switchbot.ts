@@ -91,6 +91,18 @@ export function acSetAll(
   });
 }
 
+/**
+ * 汎用デバイス: ON / OFF。
+ * SwitchBot Bot / Plug Mini などの物理デバイスも仮想IRも turnOn/turnOff で動く。
+ * ギャラクシーモード (プラネタリウムプロジェクター) はこれを使用。
+ */
+export function deviceTurnOn(creds: SwitchBotCreds, deviceId: string) {
+  return sendCommand(creds, deviceId, { command: "turnOn" });
+}
+export function deviceTurnOff(creds: SwitchBotCreds, deviceId: string) {
+  return sendCommand(creds, deviceId, { command: "turnOff" });
+}
+
 /** 仮想IR照明: ON / OFF。光目覚ましもこれを使用。 */
 export function lightTurnOn(creds: SwitchBotCreds, deviceId: string) {
   return sendCommand(creds, deviceId, { command: "turnOn" });

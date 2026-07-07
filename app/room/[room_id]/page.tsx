@@ -60,6 +60,7 @@ export default async function RoomPage({
       lat={stays.room.lat}
       lng={stays.room.lng}
       radiusM={stays.room.geofence_radius_m}
+      hasGalaxy={!!stays.room.switchbot_galaxy_device_id}
     />
   );
 }

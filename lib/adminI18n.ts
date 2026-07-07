@@ -17,6 +17,9 @@ type Dict = {
   assignDesc: string;
   ac: string;
   light: string;
+  galaxy: string;
+  galaxyOn: string;
+  galaxyOff: string;
   none: string;
   save: string;
   saved: string;
@@ -92,7 +95,9 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "ドア用 固定QR（印刷して各部屋の入口に貼る）",
     assignTitle: "部屋ごとのデバイス割り当て",
     assignDesc: "各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。",
-    ac: "エアコン", light: "照明", none: "（なし）", save: "保存", saved: "保存しました", uploadImage: "画像/動画をアップロード",
+    ac: "エアコン", light: "照明",
+    galaxy: "🌌 ギャラクシー（プラネタリウム）", galaxyOn: "ギャラクシーON", galaxyOff: "ギャラクシーOFF",
+    none: "（なし）", save: "保存", saved: "保存しました", uploadImage: "画像/動画をアップロード",
     addTitle: "手動で予約を追加（PIN自動発行）",
     room: "部屋", language: "言語",
     checkIn: "チェックイン（日本時間）", checkOut: "チェックアウト（日本時間）",
@@ -126,7 +131,9 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "Door QR (print & post at each room entrance)",
     assignTitle: "Assign devices per room",
     assignDesc: "Pick an air conditioner / light for each room and save (choose by the names set in the SwitchBot app).",
-    ac: "Air Con", light: "Light", none: "(none)", save: "Save", saved: "Saved", uploadImage: "Upload image / video",
+    ac: "Air Con", light: "Light",
+    galaxy: "🌌 Galaxy (planetarium)", galaxyOn: "Galaxy On", galaxyOff: "Galaxy Off",
+    none: "(none)", save: "Save", saved: "Saved", uploadImage: "Upload image / video",
     addTitle: "Add reservation manually (auto PIN)",
     room: "Room", language: "Language",
     checkIn: "Check-in (JST)", checkOut: "Check-out (JST)",
@@ -160,7 +167,9 @@ export const AT: Record<AdminLang, Dict> = {
     doorQrTitle: "门口固定二维码（打印后贴在各房间入口）",
     assignTitle: "为每个房间分配设备",
     assignDesc: "为每个房间选择空调・灯光并保存（可按 SwitchBot App 中设置的名称选择）。",
-    ac: "空调", light: "灯光", none: "（无）", save: "保存", saved: "已保存", uploadImage: "上传图片/视频",
+    ac: "空调", light: "灯光",
+    galaxy: "🌌 银河（星空投影仪）", galaxyOn: "银河开", galaxyOff: "银河关",
+    none: "（无）", save: "保存", saved: "已保存", uploadImage: "上传图片/视频",
     addTitle: "手动添加预订（自动生成PIN）",
     room: "房间", language: "语言",
     checkIn: "入住（日本时间）", checkOut: "退房（日本时间）",

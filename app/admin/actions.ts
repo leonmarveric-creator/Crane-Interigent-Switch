@@ -69,16 +69,21 @@ export async function cancelReservation(formData: FormData) {
   revalidatePath("/admin");
 }
 
-/** 部屋にSwitchBotデバイス(エアコン/照明)を割り当て。 */
+/** 部屋にSwitchBotデバイス(エアコン/照明/ギャラクシー)を割り当て。 */
 export async function assignDevices(formData: FormData) {
   requireAdmin();
   const room_id = String(formData.get("room_id") || "");
   if (!room_id) return;
   const ac = String(formData.get("ac") || "") || null;
   const light = String(formData.get("light") || "") || null;
+  const galaxy = String(formData.get("galaxy") || "") || null;
   await supabaseAdmin
     .from("rooms")
-    .update({ switchbot_ac_device_id: ac, switchbot_light_device_id: light })
+    .update({
+      switchbot_ac_device_id: ac,
+      switchbot_light_device_id: light,
+      switchbot_galaxy_device_id: galaxy,
+    })
     .eq("id", room_id);
   revalidatePath("/admin");
 }

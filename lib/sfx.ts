@@ -205,6 +205,86 @@ export function speak(text: string) {
   } catch { /* ignore */ }
 }
 
+/** PINキー入力: 超短いホロタイプ音 (1桁ごと) */
+export function keyTick() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 2200 + Math.random() * 500, 3100, t, 0.045, 0.028);
+  noise(c, t, 0.03, 0.012, 7000, 3500);
+}
+
+/** アクセス拒否: 二段の警告ブザー + ノイズバースト */
+export function deny() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "square", 340, 300, t, 0.14, 0.045);
+  osc(c, "square", 250, 210, t + 0.16, 0.16, 0.05);
+  osc(c, "sawtooth", 120, 80, t + 0.16, 0.22, 0.04);
+  noise(c, t, 0.1, 0.02, 2200, 500);
+}
+
+/** レッドアラート: ゆっくり上下するサイレン風 (拒否画面) */
+export function alert() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const o = c.createOscillator(); const g = c.createGain();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(300, t);
+  o.frequency.linearRampToValueAtTime(520, t + 0.55);
+  o.frequency.linearRampToValueAtTime(300, t + 1.1);
+  o.connect(g); g.connect(master!);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.035, t + 0.08);
+  g.gain.setValueAtTime(0.035, t + 0.95);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+  o.start(t); o.stop(t + 1.25);
+}
+
+/** UIナビ切替: 軽いホロスワイプ */
+export function navTick() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 900, 1600, t, 0.07, 0.025);
+  osc(c, "sine", 2400, 2400, t + 0.05, 0.06, 0.014);
+  noise(c, t, 0.06, 0.01, 4500, 1800);
+}
+
+/** ホログラム展開: パネル出現用の短い上昇シマー */
+export function holo() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 500, 1800, t, 0.22, 0.02);
+  osc(c, "triangle", 250, 900, t, 0.2, 0.014, 5);
+  noise(c, t, 0.2, 0.012, 1200, 6000);
+}
+
+/** ギャラクシーモードON: 夢のような上昇シマー和音 (星空展開) */
+export function galaxyOn() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  // ゆっくり開く和音 (A - C# - E - A)
+  [440, 554, 659, 880].forEach((f, i) => {
+    osc(c, "sine", f * 0.5, f, t + i * 0.09, 0.9, 0.02);
+  });
+  osc(c, "triangle", 220, 440, t, 1.0, 0.014, 6); // 底のうねり
+  noise(c, t, 1.1, 0.012, 800, 7000);             // 星屑の煌めき
+  // 高域スパークル (ランダムな星)
+  for (let i = 0; i < 5; i++) {
+    const f = 2000 + Math.random() * 2500;
+    osc(c, "sine", f, f, t + 0.25 + i * 0.14, 0.12, 0.012);
+  }
+}
+
+/** ギャラクシーモードOFF: 静かに閉じる下降 */
+export function galaxyOff() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  [880, 659, 554, 440].forEach((f, i) => {
+    osc(c, "sine", f, f * 0.5, t + i * 0.07, 0.5, 0.016);
+  });
+  noise(c, t, 0.5, 0.01, 5000, 600);
+}
+
 /** エラー音 */
 export function error() {
   const c = ac(); if (!c || muted) return;

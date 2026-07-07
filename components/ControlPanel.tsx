@@ -4,14 +4,15 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
-import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff } from "@/lib/sfx";
 
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
+  | "galaxy_on" | "galaxy_off"
   | "welcome" | "away";
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
   lat?: number | null; // ジオフェンス: 建物の緯度
   lng?: number | null; // ジオフェンス: 建物の経度
   radiusM?: number | null; // 許可半径(m)
+  hasGalaxy?: boolean; // ギャラクシーモード (プラネタリウム) 対応の部屋
 }
 
 // メディアURLが動画か判定 (拡張子ベース)
@@ -93,10 +95,11 @@ async function callDevice(roomSlug: string, action: DeviceAction, admin?: boolea
 }
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
+  const [galaxyActive, setGalaxyActive] = useState(false); // 星空オーバーレイ表示
   const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
@@ -144,7 +147,11 @@ export default function ControlPanel({
     if (saved === "1") setMuted(true);
   }, []);
   useEffect(() => { sfxSetMuted(muted); }, [muted]);
-  const toggleMute = () => setMuted((m) => { const n = !m; localStorage.setItem("guestMuted", n ? "1" : "0"); return n; });
+  const toggleMute = () => setMuted((m) => {
+    const n = !m; localStorage.setItem("guestMuted", n ? "1" : "0");
+    if (!n) setTimeout(navTick, 0); // ミュート解除時に確認音
+    return n;
+  });
 
   return (
     <main onPointerDown={onTap} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
@@ -217,6 +224,11 @@ export default function ControlPanel({
       {/* 天気連動の背景 */}
       {weather && <WeatherFX code={weather.code} />}
 
+      {/* ギャラクシーモード: 全画面星空オーバーレイ */}
+      <AnimatePresence>
+        {galaxyActive && <GalaxyOverlay />}
+      </AnimatePresence>
+
       {/* 全画面HUDフレーム (ヘルメットHUD風) */}
       <HudFrame />
 
@@ -262,7 +274,7 @@ export default function ControlPanel({
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">
               {t.welcome.toUpperCase()}
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-wide">{roomName}</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-wide"><DecodeText text={roomName} /></h1>
             {admin ? (
               <a href="/admin" className="mt-1 inline-block text-xs text-violet-300/80">
                 ⓘ TEST MODE · ← 管理画面へ戻る
@@ -322,11 +334,43 @@ export default function ControlPanel({
           />
         </motion.div>
 
+        {/* ギャラクシーモード (プラネタリウム対応の部屋のみ) */}
+        {hasGalaxy && (
+          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <GalaxyCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
+              onState={setGalaxyActive} />
+          </motion.div>
+        )}
+
         {/* 光目覚まし (テストページでもホストが設定・動作確認できる) */}
         <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
       </div>
     </main>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* デコードテキスト: 文字がスクランブルから確定していく (起動演出)       */
+/* ------------------------------------------------------------------ */
+const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@*+=<>/";
+function DecodeText({ text }: { text: string }) {
+  const [out, setOut] = useState(text);
+  useEffect(() => {
+    let frame = 0;
+    const total = 22; // 約0.9秒で確定
+    const id = setInterval(() => {
+      frame++;
+      const fixed = Math.floor((frame / total) * text.length);
+      setOut(
+        text.split("").map((ch, i) =>
+          i < fixed || ch === " " ? ch : GLYPHS[Math.floor(Math.random() * GLYPHS.length)]
+        ).join("")
+      );
+      if (frame >= total) { setOut(text); clearInterval(id); }
+    }, 40);
+    return () => clearInterval(id);
+  }, [text]);
+  return <span>{out}</span>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -337,7 +381,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { keyTick(); setOpen((o) => !o); }}
         className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5
           px-3 py-2 text-xs backdrop-blur-md active:scale-95 transition"
       >
@@ -355,7 +399,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
             {LANGS.map((l) => (
               <li key={l}>
                 <button
-                  onClick={() => { setLang(l); setOpen(false); }}
+                  onClick={() => { setLang(l); setOpen(false); navTick(); }}
                   className={`w-full px-4 py-2.5 text-left text-sm transition
                     ${l === lang ? "text-cyan-300 bg-cyan-500/10" : "text-white/70 hover:bg-white/5"}`}
                 >
@@ -1018,6 +1062,151 @@ function ToggleCard({
 }
 
 /* ------------------------------------------------------------------ */
+/* ギャラクシーモード: プラネタリウムプロジェクター (対応部屋のみ)       */
+/* ------------------------------------------------------------------ */
+function GalaxyCard({
+  roomSlug, admin, guard, t, onState,
+}: {
+  roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
+  t: typeof T["en"]; onState: (on: boolean) => void;
+}) {
+  const [last, setLast] = useState<"on" | "off" | null>(null);
+  const [busy, setBusy] = useState<"on" | "off" | null>(null);
+  const [fx, setFx] = useState(0);
+  const on = last === "on";
+
+  const send = async (which: "on" | "off") => {
+    if (busy) return;
+    primeVoice();
+    if (guard && !(await guard())) return;
+    blip(); sweep();
+    setBusy(which); setFx((f) => f + 1);
+    const ok = await callDevice(roomSlug, which === "on" ? "galaxy_on" : "galaxy_off", admin);
+    if (ok) {
+      setLast(which); onState(which === "on");
+      if (which === "on") {
+        galaxyOn();
+        speakOneOf(["Galaxy mode engaged", "Opening the cosmos", "Enjoy the stars"]);
+      } else {
+        galaxyOff();
+        speakOneOf(["Returning to Earth", "Galaxy mode off", "Goodnight, stargazer"]);
+      }
+    } else sfxError();
+    setBusy(null);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
+  };
+
+  return (
+    <HudPanel tone="violet" active={on} contentClassName="flex-col items-center overflow-hidden px-6 py-7">
+      <Corners tone={on ? "emerald" : "cyan"} />
+      <CommandFX trigger={fx} tone="violet" />
+
+      {/* カード内ミニ星空 (常時ゆらめく) */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="anim-nebula absolute -left-8 -top-10 h-40 w-40 rounded-full bg-fuchsia-500/15 blur-2xl" />
+        <div className="anim-nebula absolute -bottom-12 -right-6 h-40 w-40 rounded-full bg-indigo-500/20 blur-2xl" style={{ animationDelay: "4s" }} />
+        {[...Array(on ? 22 : 9)].map((_, i) => (
+          <span key={i} className="absolute rounded-full bg-white"
+            style={{
+              left: `${(i * 37 + 13) % 96}%`, top: `${(i * 53 + 9) % 92}%`,
+              width: i % 4 === 0 ? 2.5 : 1.5, height: i % 4 === 0 ? 2.5 : 1.5,
+              animation: `twinkle ${2 + (i % 5) * 0.8}s ease-in-out ${(i % 7) * 0.5}s infinite`,
+              boxShadow: "0 0 6px rgba(255,255,255,0.9)",
+            }} />
+        ))}
+      </div>
+
+      <div className="relative flex w-full items-center gap-4">
+        {/* 回転する銀河アイコン */}
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
+          <svg viewBox="0 0 100 100" className={`pointer-events-none absolute inset-[-8px] ${on ? "anim-spin-slow" : ""}`} style={SPIN}>
+            <ellipse cx="50" cy="50" rx="44" ry="16" fill="none" stroke="#a78bfa" strokeOpacity={on ? 0.6 : 0.25} strokeWidth="1" />
+            <ellipse cx="50" cy="50" rx="44" ry="16" fill="none" stroke="#f0abfc" strokeOpacity={on ? 0.4 : 0.15} strokeWidth="0.8"
+              transform="rotate(60 50 50)" />
+            <ellipse cx="50" cy="50" rx="44" ry="16" fill="none" stroke="#818cf8" strokeOpacity={on ? 0.4 : 0.15} strokeWidth="0.8"
+              transform="rotate(-60 50 50)" />
+          </svg>
+          <motion.div animate={{ scale: on ? [1, 1.12, 1] : 1, opacity: on ? 1 : 0.55 }}
+            transition={on ? { repeat: Infinity, duration: 2.4 } : {}}
+            className={`flex h-12 w-12 items-center justify-center rounded-full border
+              ${on ? "border-violet-400/70 bg-violet-500/20 shadow-[0_0_30px_-4px_rgba(167,139,250,0.9)]" : "border-violet-400/30 bg-violet-500/10"}`}>
+            <Sparkles className={`h-6 w-6 ${on ? "text-violet-200" : "text-violet-300/60"}`} strokeWidth={1.5} />
+          </motion.div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[9px] tracking-[0.3em] text-violet-300/70">GALAXY MODE</p>
+          <p className={`mt-0.5 text-sm font-medium ${on ? "text-violet-100" : "text-violet-200/90"}`}>{t.galaxy}</p>
+          <p className="mt-0.5 truncate text-[11px] text-white/40">{t.galaxyDesc}</p>
+        </div>
+      </div>
+
+      {/* ON / OFF */}
+      <div className="relative mt-4 grid w-full grid-cols-2 gap-3">
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => send("on")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-violet-400/50
+            bg-violet-500/15 py-3 text-sm text-violet-200 active:bg-violet-500/30 disabled:opacity-50">
+          {busy === "on" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {t.on.toUpperCase()}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => send("off")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-white/15
+            bg-white/5 py-3 text-sm text-white/60 active:bg-white/10 disabled:opacity-50">
+          {busy === "off" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {t.off.toUpperCase()}
+        </motion.button>
+      </div>
+    </HudPanel>
+  );
+}
+
+/** ギャラクシーON中の全画面星空 (またたく星 + 流れ星 + 星雲) */
+function GalaxyOverlay() {
+  const stars = useMemo(
+    () => [...Array(70)].map(() => ({
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      size: 1 + Math.random() * 2.2,
+      dur: 1.6 + Math.random() * 3.4,
+      delay: Math.random() * 4,
+      violet: Math.random() > 0.82,
+    })),
+    []
+  );
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 1.2 }}
+      className="pointer-events-none fixed inset-0 z-[6] overflow-hidden">
+      {/* 深宇宙トーン + 星雲 */}
+      <div className="absolute inset-0 bg-[#050214]/55" />
+      <div className="anim-nebula absolute left-[8%] top-[12%] h-72 w-72 rounded-full bg-fuchsia-600/20 blur-[90px]" />
+      <div className="anim-nebula absolute bottom-[15%] right-[5%] h-80 w-80 rounded-full bg-indigo-600/25 blur-[100px]" style={{ animationDelay: "5s" }} />
+      <div className="anim-nebula absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/15 blur-[80px]" style={{ animationDelay: "2.5s" }} />
+      {/* またたく星 */}
+      {stars.map((s, i) => (
+        <span key={i} className="absolute rounded-full"
+          style={{
+            left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size,
+            background: s.violet ? "rgba(216,180,254,0.95)" : "rgba(255,255,255,0.92)",
+            boxShadow: s.violet ? "0 0 8px rgba(216,180,254,0.9)" : "0 0 6px rgba(255,255,255,0.85)",
+            animation: `twinkle ${s.dur}s ease-in-out ${s.delay}s infinite`,
+          }} />
+      ))}
+      {/* 流れ星 */}
+      {[0, 1].map((i) => (
+        <span key={`sh${i}`} className="absolute h-px w-24"
+          style={{
+            right: i === 0 ? "6%" : "28%", top: i === 0 ? "14%" : "38%",
+            background: "linear-gradient(90deg, rgba(255,255,255,0.95), transparent)",
+            animation: `shootingStar ${9 + i * 4}s linear ${i * 5.5}s infinite`,
+          }} />
+      ))}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* 光目覚まし カード (タイムピッカー)                                   */
 /* ------------------------------------------------------------------ */
 function WakeCard({
@@ -1030,6 +1219,7 @@ function WakeCard({
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
+    blip();
     setState("busy"); setErr(null);
     // 次に来る該当時刻(JST固定)を計算。端末のタイムゾーンに依存しない。
     const [h, m] = time.split(":").map(Number);
@@ -1053,8 +1243,9 @@ function WakeCard({
           ? { roomSlug, fireAtIso: fire.toISOString() }
           : { fireAtIso: fire.toISOString() }),
       });
-      if (res.ok) { setState("set"); }
+      if (res.ok) { setState("set"); sfxConfirm(); }
       else {
+        sfxError();
         const j = await res.json().catch(() => ({} as any));
         setErr(j?.error === "OUT_OF_STAY" ? "チェックアウト前の時刻にしてください / Set a time before check-out"
           : j?.error || `ERR ${res.status}`);

@@ -1,6 +1,6 @@
 import { sendSesameCommand, SESAME_CMD } from "./sesame";
 import {
-  acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, type SwitchBotCreds,
+  acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, deviceTurnOn, deviceTurnOff, type SwitchBotCreds,
 } from "./switchbot";
 import { supabaseAdmin } from "./supabaseAdmin";
 
@@ -14,6 +14,7 @@ export async function logDevice(entry: {
 
 export type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
+  | "galaxy_on" | "galaxy_off" // ギャラクシーモード: プラネタリウムプロジェクター
   | "welcome" | "away"; // シーン: 快適モード / 外出全OFF
 
 /**
@@ -62,6 +63,14 @@ export async function executeDeviceAction(
         : await lightTurnOff(sbCreds, room.switchbot_light_device_id);
       return { ok: r.ok };
     }
+    case "galaxy_on":
+    case "galaxy_off": {
+      if (!room.switchbot_galaxy_device_id) return { ok: false, error: "NO_GALAXY" };
+      const r = action === "galaxy_on"
+        ? await deviceTurnOn(sbCreds, room.switchbot_galaxy_device_id)
+        : await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+      return { ok: r.ok };
+    }
     case "welcome": {
       // 快適モード: エアコン適温ON(季節判定) + 照明ON
       let ok = true;
@@ -80,13 +89,16 @@ export async function executeDeviceAction(
       return { ok };
     }
     case "away": {
-      // 外出: エアコン + 照明 OFF
+      // 外出: エアコン + 照明 + ギャラクシー OFF
       let ok = true;
       if (room.switchbot_ac_device_id) {
         const r = await acTurnOff(sbCreds, room.switchbot_ac_device_id); ok = ok && r.ok;
       }
       if (room.switchbot_light_device_id) {
         const r = await lightTurnOff(sbCreds, room.switchbot_light_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_galaxy_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
       }
       return { ok };
     }
