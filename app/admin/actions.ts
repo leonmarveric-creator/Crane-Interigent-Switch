@@ -69,6 +69,35 @@ export async function cancelReservation(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** 部屋の表示名を変更 (slugは固定なのでQR・URLはそのまま使える)。 */
+export async function renameRoom(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  const display_name = String(formData.get("display_name") || "").trim();
+  if (!room_id || !display_name) return;
+  await supabaseAdmin.from("rooms").update({ display_name }).eq("id", room_id);
+  revalidatePath("/admin");
+}
+
+/** 新しい部屋を追加。slugはURL/QRに使う安定キー (小文字英数とハイフンのみ)。 */
+export async function addRoom(formData: FormData) {
+  requireAdmin();
+  const display_name = String(formData.get("display_name") || "").trim();
+  const slug = String(formData.get("slug") || "")
+    .trim().toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/^-+|-+$/g, "");
+  const airbnb_ical_url = String(formData.get("airbnb_ical_url") || "").trim() || null;
+  if (!display_name || !slug) throw new Error("MISSING_FIELDS");
+
+  const { error } = await supabaseAdmin.from("rooms").insert({
+    slug, display_name, airbnb_ical_url, is_active: true,
+  });
+  if (error) throw new Error(error.code === "23505" ? "SLUG_EXISTS: 同じslugの部屋があります" : error.message);
+  revalidatePath("/admin");
+}
+
 /** 部屋にSwitchBotデバイス(エアコン/照明/ギャラクシー)を割り当て。 */
 export async function assignDevices(formData: FormData) {
   requireAdmin();

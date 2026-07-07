@@ -13,7 +13,7 @@ import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom,
 } from "./actions";
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 
@@ -423,10 +423,38 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
       .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
   ];
   return (
-    <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {rooms.map((room) => (
-        <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} sbError={info.error} t={t} />
-      ))}
+    <section>
+      {/* 部屋を追加 */}
+      <div className="clip-bevel mb-6 border border-emerald-400/20 bg-[#070a12]/80 p-5 backdrop-blur-xl">
+        <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
+          <Plus className="h-4 w-4" /> {t.addRoomTitle}
+        </div>
+        <form action={addRoom} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t.roomNameLabel}>
+            <input type="text" name="display_name" required placeholder="AKI" className={selCls} />
+          </Field>
+          <Field label={t.slugLabel}>
+            <input type="text" name="slug" required placeholder="aki" pattern="[a-zA-Z0-9\-\s]+"
+              className={`${selCls} font-mono lowercase`} />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label={t.icalLabel}>
+              <input type="text" name="airbnb_ical_url" placeholder="https://www.airbnb.com/calendar/ical/..." className={`${selCls} text-xs`} />
+            </Field>
+          </div>
+          <p className="text-[10px] text-white/35 sm:col-span-2">💡 {t.slugHint}</p>
+          <SubmitButton savedText={t.saved} idleIcon={<Plus className="h-4 w-4" />}
+            className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
+            {t.addRoomBtn}
+          </SubmitButton>
+        </form>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {rooms.map((room) => (
+          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} sbError={info.error} t={t} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -450,7 +478,16 @@ function RoomManageCard({
       <div className="flex gap-3 p-4">
         <RoomThumb room={room} size={72} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{room.display_name}</p>
+          {/* 表示名の変更 (slugとQRはそのまま) */}
+          <form action={renameRoom} className="flex items-center gap-1.5">
+            <input type="hidden" name="room_id" value={room.id} />
+            <input type="text" name="display_name" defaultValue={room.display_name} required
+              className="w-full min-w-0 rounded-lg border border-transparent bg-transparent px-1 py-0.5 font-medium
+                focus:border-cyan-400/50 focus:bg-black/40 focus:outline-none" />
+            <SubmitButton savedText="✓" className="shrink-0 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-200">
+              {t.rename}
+            </SubmitButton>
+          </form>
           <p className="font-mono text-[11px] text-white/40">{room.slug}</p>
           <div className="mt-2 flex gap-2">
             <button onClick={async () => { await navigator.clipboard.writeText(room.url); setCopied(true); setTimeout(() => setCopied(false), 1500); }}

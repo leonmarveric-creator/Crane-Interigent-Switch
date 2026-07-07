@@ -85,6 +85,13 @@ type Dict = {
   syncing: string;
   syncDone: string;
   syncFail: string;
+  addRoomTitle: string;
+  roomNameLabel: string;
+  slugLabel: string;
+  slugHint: string;
+  icalLabel: string;
+  addRoomBtn: string;
+  rename: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -123,6 +130,13 @@ export const AT: Record<AdminLang, Dict> = {
     checkoutOff: "退室OFF（エアコン・照明）",
     welcomeScene: "ウェルカム（エアコン＋照明ON）",
     syncNow: "今すぐ同期", syncing: "同期中…", syncDone: "同期完了", syncFail: "同期失敗",
+    addRoomTitle: "部屋を追加",
+    roomNameLabel: "部屋名（あとで変更可）",
+    slugLabel: "slug（URL用・半角英数とハイフン）",
+    slugHint: "例: aki / natu / room-501。QRとURLに使われるため後から変更しないでください",
+    icalLabel: "Airbnb iCal URL（任意・あとで設定可）",
+    addRoomBtn: "部屋を追加",
+    rename: "名前を変更",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -159,6 +173,13 @@ export const AT: Record<AdminLang, Dict> = {
     checkoutOff: "Turn off (AC & Light)",
     welcomeScene: "Welcome (AC + Light on)",
     syncNow: "Sync now", syncing: "Syncing…", syncDone: "Synced", syncFail: "Sync failed",
+    addRoomTitle: "Add a room",
+    roomNameLabel: "Room name (can change later)",
+    slugLabel: "slug (for URL; lowercase letters, numbers, hyphens)",
+    slugHint: "e.g. aki / natu / room-501. Used in the QR & URL — do not change afterwards",
+    icalLabel: "Airbnb iCal URL (optional)",
+    addRoomBtn: "Add room",
+    rename: "Rename",
   },
   zh: {
     dashboard: "房东控制台",
@@ -195,5 +216,12 @@ export const AT: Record<AdminLang, Dict> = {
     checkoutOff: "关闭（空调·灯光）",
     welcomeScene: "欢迎（空调＋灯光开）",
     syncNow: "立即同步", syncing: "同步中…", syncDone: "同步完成", syncFail: "同步失败",
+    addRoomTitle: "添加房间",
+    roomNameLabel: "房间名称（之后可修改）",
+    slugLabel: "slug（用于URL；小写字母、数字、连字符）",
+    slugHint: "例：aki / natu / room-501。用于二维码和URL，之后请勿更改",
+    icalLabel: "Airbnb iCal URL（选填）",
+    addRoomBtn: "添加房间",
+    rename: "重命名",
   },
 };

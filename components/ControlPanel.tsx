@@ -184,8 +184,9 @@ export default function ControlPanel({
         <div className="anim-grid absolute inset-0
           [background-image:linear-gradient(#38bdf8_1px,transparent_1px),linear-gradient(90deg,#38bdf8_1px,transparent_1px)]
           [background-size:42px_42px]" />
-        {/* 走査線 */}
+        {/* 走査線 (縦 + 横) */}
         <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/15 to-transparent" />
+        <div className="anim-scanx absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-transparent via-cyan-300/10 to-transparent" />
         {/* 巨大HUDレティクル (薄め) */}
         <svg viewBox="0 0 400 400" className="absolute left-1/2 top-1/2 h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 opacity-[0.06]">
           <g className="anim-spin-slow" style={SPIN}>
@@ -280,12 +281,15 @@ export default function ControlPanel({
                 ⓘ TEST MODE · ← 管理画面へ戻る
               </a>
             ) : (
-              <p className="mt-1 text-xs text-white/40">
-                {t.checkout}: {new Date(checkOut).toLocaleString(lang, {
-                  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                  timeZone: "Asia/Tokyo",
-                })}
-              </p>
+              <>
+                <p className="mt-1 text-xs text-white/40">
+                  {t.checkout}: {new Date(checkOut).toLocaleString(lang, {
+                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                    timeZone: "Asia/Tokyo",
+                  })}
+                </p>
+                <CheckoutCountdown checkOut={checkOut} />
+              </>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -346,6 +350,33 @@ export default function ControlPanel({
         <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
       </div>
     </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* チェックアウトまでのカウントダウン (T-hh:mm:ss)                       */
+/* ------------------------------------------------------------------ */
+function CheckoutCountdown({ checkOut }: { checkOut: string }) {
+  const [left, setLeft] = useState<string | null>(null);
+  useEffect(() => {
+    const target = new Date(checkOut).getTime();
+    const tick = () => {
+      const d = target - Date.now();
+      if (d <= 0) { setLeft("00:00:00"); return; }
+      const h = Math.floor(d / 3600000);
+      const m = Math.floor((d % 3600000) / 60000);
+      const s = Math.floor((d % 60000) / 1000);
+      setLeft(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [checkOut]);
+  if (!left) return null;
+  return (
+    <p className="mt-0.5 font-mono text-[10px] tracking-[0.2em] text-cyan-400/60">
+      T-{left}
+    </p>
   );
 }
 
@@ -671,12 +702,12 @@ function HudStatusBar() {
       </span>
       <span className="tracking-[0.2em] text-cyan-200/80">{clock}</span>
       <span className="flex items-center gap-2">
-        <span className="flex items-end gap-0.5">
-          {[3, 5, 4, 6, 5].map((h, i) => (
-            <span key={i} className="anim-breathe inline-block w-0.5 bg-cyan-400/70"
-              style={{ height: h, animationDelay: `${i * 0.18}s` }} />
-          ))}
-        </span>
+        {/* EKG心電図波形 */}
+        <svg viewBox="0 0 60 14" className="h-3.5 w-14 overflow-visible">
+          <path d="M0 7 H10 L14 7 L17 2 L20 12 L23 7 H34 L38 7 L41 3 L44 11 L47 7 H60"
+            fill="none" stroke="#34d399" strokeWidth="1.2" strokeLinecap="round"
+            strokeDasharray="90 30" className="anim-ekg" opacity="0.8" />
+        </svg>
         <span className="hidden text-cyan-300/60 sm:inline">{hex}</span>
       </span>
     </div>

@@ -194,6 +194,24 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .anim-scanbeam, .anim-digitpop { animation: none; }
 }
 
+/* ===== 追加ハイテク演出 ===== */
+/* EKG心電図波形が流れる */
+@keyframes ekgFlow { to { stroke-dashoffset: -120; } }
+.anim-ekg { animation: ekgFlow 2.2s linear infinite; }
+
+/* 横方向のスキャンビーム (縦のanim-scanと直交) */
+@keyframes scanX {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  8%   { opacity: 0.5; }
+  92%  { opacity: 0.5; }
+  100% { transform: translateX(120vw); opacity: 0; }
+}
+.anim-scanx { animation: scanX 11s linear 3s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-ekg, .anim-scanx { animation: none; }
+}
+
 /* ===== ギャラクシーモード ===== */
 /* 星のまたたき */
 @keyframes twinkle {
