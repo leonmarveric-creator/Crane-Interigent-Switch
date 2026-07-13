@@ -3,18 +3,13 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor,
+  LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff } from "@/lib/sfx";
-
-type DeviceAction =
-  | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
-  | "galaxy_on" | "galaxy_off"
-  | "wafu_on" | "wafu_off"
-  | "welcome" | "away";
 
 interface Props {
   roomSlug: string;
@@ -86,15 +81,6 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
-// guest: PIN認証セッションCookie / admin: 管理者Cookieでテスト操作
-async function callDevice(roomSlug: string, action: DeviceAction, admin?: boolean) {
-  const res = await fetch(admin ? "/api/admin/test-device" : `/api/devices/${roomSlug}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(admin ? { roomSlug, action } : { action }),
-  });
-  return res.ok;
-}
 
 export default function ControlPanel({
   roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasWafu,
@@ -316,7 +302,7 @@ export default function ControlPanel({
 
         {/* シーン: 快適モード / 外出 */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
-          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
+          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} />
         </motion.div>
 
         {/* スマートロック (主役) */}
@@ -339,11 +325,7 @@ export default function ControlPanel({
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
           {hasWafu && (
-            <ToggleCard
-              roomSlug={roomSlug} admin={admin} guard={guardCommand}
-              icon={LampFloor} label={t.wafu} accent="rose"
-              onAction={"wafu_on"} offAction={"wafu_off"} t={t}
-            />
+            <WafuCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
           )}
         </motion.div>
 
@@ -882,48 +864,64 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 /* ------------------------------------------------------------------ */
 /* シーンボタン: 快適モード / 外出全OFF                                 */
 /* ------------------------------------------------------------------ */
+type SceneAction = "welcome" | "welcome_cozy" | "away";
 function SceneButtons({
-  roomSlug, admin, guard, t,
-}: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"] }) {
-  const [busy, setBusy] = useState<"welcome" | "away" | null>(null);
-  const [fx, setFx] = useState<{ n: number; a: "welcome" | "away" } | null>(null);
+  roomSlug, admin, guard, t, hasWafu,
+}: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"]; hasWafu?: boolean }) {
+  const [busy, setBusy] = useState<SceneAction | null>(null);
+  const [fx, setFx] = useState<{ n: number; a: SceneAction } | null>(null);
 
-  const run = async (a: "welcome" | "away") => {
+  const run = async (a: SceneAction) => {
     if (busy) return;
     primeVoice(); // タップ内で音声を解放
     if (guard && !(await guard())) return;
     blip(); sweep(); setBusy(a); setFx((p) => ({ n: (p?.n ?? 0) + 1, a }));
     const ok = await callDevice(roomSlug, a, admin);
     if (ok) {
-      (a === "welcome" ? powerUp : powerDown)();
-      speakOneOf(a === "welcome"
-        ? ["Welcome home", "Comfort mode engaged", "Systems set for your return"]
-        : ["Goodbye", "Powering down", "Have a safe trip"]);
+      (a === "away" ? powerDown : powerUp)();
+      speakOneOf(a === "away"
+        ? ["Goodbye", "Powering down", "Have a safe trip"]
+        : a === "welcome_cozy"
+        ? ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"]
+        : ["Welcome home", "Comfort mode engaged", "Systems set for your return"]);
     } else sfxError();
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 25 : [20, 40, 20]);
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <HudPanel tone="emerald" active onClick={() => run("welcome")} small
-        contentClassName="flex-col items-center gap-2 px-4 py-5">
-        <Corners tone="emerald" />
-        <CommandFX trigger={fx?.a === "welcome" ? fx.n : 0} tone="emerald" />
-        {busy === "welcome"
-          ? <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
-          : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
-        <span className="text-sm text-emerald-200">{t.comfortMode}</span>
-      </HudPanel>
-      <HudPanel tone="violet" onClick={() => run("away")} small
-        contentClassName="flex-col items-center gap-2 px-4 py-5">
-        <Corners tone="emerald" />
-        <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
-        {busy === "away"
-          ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
-          : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
-        <span className="text-sm text-violet-200">{t.awayMode}</span>
-      </HudPanel>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <HudPanel tone="emerald" active onClick={() => run("welcome")} small
+          contentClassName="flex-col items-center gap-2 px-4 py-5">
+          <Corners tone="emerald" />
+          <CommandFX trigger={fx?.a === "welcome" ? fx.n : 0} tone="emerald" />
+          {busy === "welcome"
+            ? <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
+            : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
+          <span className="text-sm text-emerald-200">{t.comfortMode}</span>
+        </HudPanel>
+        <HudPanel tone="violet" onClick={() => run("away")} small
+          contentClassName="flex-col items-center gap-2 px-4 py-5">
+          <Corners tone="emerald" />
+          <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
+          {busy === "away"
+            ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
+            : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
+          <span className="text-sm text-violet-200">{t.awayMode}</span>
+        </HudPanel>
+      </div>
+      {hasWafu && (
+        <HudPanel tone="rose" onClick={() => run("welcome_cozy")} small
+          contentClassName="items-center justify-center gap-2 px-4 py-4">
+          <Corners tone="rose" />
+          <CommandFX trigger={fx?.a === "welcome_cozy" ? fx.n : 0} tone="rose" />
+          {busy === "welcome_cozy"
+            ? <Loader2 className="h-5 w-5 animate-spin text-rose-300" />
+            : <LampFloor className="h-5 w-5 text-rose-300" strokeWidth={1.7} />}
+          <span className="text-sm text-rose-200">{t.cozyMode}</span>
+        </HudPanel>
+      )}
     </div>
   );
 }
@@ -1102,6 +1100,81 @@ function ToggleCard({
           {busy === "off" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.off.toUpperCase()}
         </motion.button>
       </div>
+    </HudPanel>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 和風ライト: ON/OFF + 詳細ページへの導線 (詳細は別ページ)             */
+/* ------------------------------------------------------------------ */
+function WafuCard({
+  roomSlug, admin, guard, t,
+}: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"] }) {
+  const [last, setLast] = useState<"on" | "off" | null>(null);
+  const [busy, setBusy] = useState<"on" | "off" | "warm" | null>(null);
+  const [fx, setFx] = useState(0);
+  const on = last === "on";
+  const detailHref = admin ? `/admin/test/${roomSlug}/light` : `/room/${roomSlug}/light`;
+
+  const send = async (which: "on" | "off" | "warm") => {
+    if (busy) return;
+    if (guard && !(await guard())) return;
+    blip(); sweep();
+    setBusy(which); setFx((f) => f + 1);
+    // 管理者がONにするときは既定の暖色(2700K/100%)で点灯。
+    const action = which === "on" ? (admin ? "wafu_on_warm" : "wafu_on")
+      : which === "off" ? "wafu_off" : "wafu_warm";
+    const ok = await callDevice(roomSlug, action, admin);
+    if (ok) {
+      if (which === "on") { setLast("on"); powerUp(); }
+      else if (which === "off") { setLast("off"); powerDown(); }
+      else blip();
+    } else sfxError();
+    setBusy(null);
+    if (navigator.vibrate) navigator.vibrate(which === "off" ? 16 : 22);
+  };
+
+  return (
+    <HudPanel tone="rose" active={on} small
+      contentClassName="flex-col items-center gap-3 px-4 py-6">
+      <Corners tone="rose" />
+      <CommandFX trigger={fx} tone="rose" />
+      <motion.div
+        animate={{ scale: on ? 1.05 : 1, opacity: on ? 1 : 0.6 }}
+        className="relative flex h-14 w-14 items-center justify-center">
+        <span className={`clip-hex absolute inset-0 ${on ? "bg-rose-400/30" : "bg-white/10"}`} />
+        <span className="clip-hex absolute inset-[1.5px] bg-[#0b1018]" />
+        <LampFloor className={`relative h-6 w-6 ${on ? "text-rose-300" : "text-white/40"}`} strokeWidth={1.6} />
+      </motion.div>
+
+      <span className={`text-sm ${on ? "text-rose-300" : "text-white/60"}`}>{t.wafu}</span>
+
+      {/* ON / OFF */}
+      <div className="grid w-full grid-cols-2 gap-2">
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("on")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-1 border border-rose-400/50 bg-rose-500/15 py-2.5 text-xs text-rose-200 disabled:opacity-50">
+          {busy === "on" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.on.toUpperCase()}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("off")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-1 border border-white/15 bg-white/5 py-2.5 text-xs text-white/60 disabled:opacity-50">
+          {busy === "off" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.off.toUpperCase()}
+        </motion.button>
+      </div>
+
+      {/* 管理者のみ: ワンタップで暖色に戻す */}
+      {admin && (
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("warm")} disabled={!!busy}
+          className="clip-bevel-sm flex w-full items-center justify-center gap-1.5 border border-amber-400/40 bg-amber-500/10 py-2 text-[11px] text-amber-200 disabled:opacity-50">
+          {busy === "warm" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+          {t.wafuWarmReset}
+        </motion.button>
+      )}
+
+      {/* 詳細設定ページへ */}
+      <a href={detailHref}
+        className="flex w-full items-center justify-center gap-1.5 border-t border-white/10 pt-3 text-[11px] text-rose-200/80 hover:text-rose-100">
+        <Sliders className="h-3.5 w-3.5" /> {t.wafuDetails} <ChevronRight className="h-3.5 w-3.5" />
+      </a>
     </HudPanel>
   );
 }

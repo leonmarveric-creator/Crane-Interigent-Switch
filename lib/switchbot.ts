@@ -111,4 +111,26 @@ export function lightTurnOff(creds: SwitchBotCreds, deviceId: string) {
   return sendCommand(creds, deviceId, { command: "turnOff" });
 }
 
+/**
+ * スマート電球 (Color Bulb / テープライト / シーリングライト) の詳細制御。
+ * 和風ライトはこれを使用。ON/OFFは deviceTurnOn/Off を流用。
+ */
+/** 明るさ 1〜100 (%)。 */
+export function bulbSetBrightness(creds: SwitchBotCreds, deviceId: string, brightness: number) {
+  const v = Math.max(1, Math.min(100, Math.round(brightness)));
+  return sendCommand(creds, deviceId, { command: "setBrightness", parameter: String(v) });
+}
+/** 色温度 2700〜6500 (K)。電球色〜昼光色。 */
+export function bulbSetColorTemperature(creds: SwitchBotCreds, deviceId: string, kelvin: number) {
+  const v = Math.max(2700, Math.min(6500, Math.round(kelvin)));
+  return sendCommand(creds, deviceId, { command: "setColorTemperature", parameter: String(v) });
+}
+/** フルカラー "R:G:B" (各 0〜255)。 */
+export function bulbSetColor(creds: SwitchBotCreds, deviceId: string, rgb: string) {
+  // "255:170:90" 形式に正規化 (不正値は無視して 0〜255 にクランプ)。
+  const parts = rgb.split(":").map((n) => Math.max(0, Math.min(255, parseInt(n, 10) || 0)));
+  const [r, g, b] = [parts[0] ?? 255, parts[1] ?? 255, parts[2] ?? 255];
+  return sendCommand(creds, deviceId, { command: "setColor", parameter: `${r}:${g}:${b}` });
+}
+
 export type { SwitchBotCreds };

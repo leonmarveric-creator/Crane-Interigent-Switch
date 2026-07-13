@@ -42,6 +42,19 @@ type Dict = {
   galaxyDesc: string;
   wafu: string;
   wafuDesc: string;
+  cozyMode: string;
+  wafuDetails: string;
+  wafuWarmReset: string;
+  wafuBack: string;
+  brightness: string;
+  colorTemp: string;
+  color: string;
+  presets: string;
+  presetRelax: string;
+  presetRead: string;
+  presetSleep: string;
+  warmWhite: string;
+  coolWhite: string;
 };
 
 export const T: Record<Lang, Dict> = {
@@ -58,6 +71,10 @@ export const T: Record<Lang, Dict> = {
     comfortMode: "快適モード", awayMode: "外出（全部OFF）",
     galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影",
     wafu: "和風ライト", wafuDesc: "行灯のやわらかな間接照明",
+    cozyMode: "和みモード", wafuDetails: "詳細設定", wafuWarmReset: "暖色に戻す", wafuBack: "操作画面に戻る",
+    brightness: "明るさ", colorTemp: "色温度", color: "カラー",
+    presets: "プリセット", presetRelax: "くつろぎ", presetRead: "読書", presetSleep: "おやすみ",
+    warmWhite: "電球色", coolWhite: "昼光色",
   },
   en: {
     unlock: "Unlock", lock: "Lock", locked: "Locked", unlocked: "Unlocked",
@@ -72,6 +89,10 @@ export const T: Record<Lang, Dict> = {
     comfortMode: "Comfort", awayMode: "Away (all off)",
     galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room",
     wafu: "Japanese Lamp", wafuDesc: "Soft andon accent lighting",
+    cozyMode: "Cozy", wafuDetails: "Settings", wafuWarmReset: "Reset to warm", wafuBack: "Back to controls",
+    brightness: "Brightness", colorTemp: "Color temp", color: "Color",
+    presets: "Presets", presetRelax: "Relax", presetRead: "Reading", presetSleep: "Night",
+    warmWhite: "Warm", coolWhite: "Cool",
   },
   zh: {
     unlock: "开锁", lock: "上锁", locked: "已上锁", unlocked: "已开锁",
@@ -86,6 +107,10 @@ export const T: Record<Lang, Dict> = {
     comfortMode: "舒适模式", awayMode: "外出（全关）",
     galaxy: "银河模式", galaxyDesc: "在房间投影满天星空",
     wafu: "和风灯", wafuDesc: "行灯柔和的间接照明",
+    cozyMode: "和风模式", wafuDetails: "详细设置", wafuWarmReset: "恢复暖色", wafuBack: "返回操作画面",
+    brightness: "亮度", colorTemp: "色温", color: "颜色",
+    presets: "预设", presetRelax: "放松", presetRead: "阅读", presetSleep: "夜灯",
+    warmWhite: "暖光", coolWhite: "冷光",
   },
   ko: {
     unlock: "잠금 해제", lock: "잠금", locked: "잠김", unlocked: "열림",
@@ -100,6 +125,10 @@ export const T: Record<Lang, Dict> = {
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)",
     galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영",
     wafu: "일본풍 조명", wafuDesc: "안돈의 부드러운 간접 조명",
+    cozyMode: "포근 모드", wafuDetails: "상세 설정", wafuWarmReset: "따뜻한 색으로", wafuBack: "조작 화면으로",
+    brightness: "밝기", colorTemp: "색온도", color: "색상",
+    presets: "프리셋", presetRelax: "휴식", presetRead: "독서", presetSleep: "취침",
+    warmWhite: "전구색", coolWhite: "주광색",
   },
 };
 

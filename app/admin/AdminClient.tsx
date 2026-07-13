@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
   QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
-  Image as ImageIcon, History, PowerOff, Loader2, Home, Upload,
+  Image as ImageIcon, History, PowerOff, Loader2, Home, Upload, LampFloor,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
@@ -362,6 +362,8 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
   const actionLabel: Record<string, string> = {
     unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
     galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
+    wafu_on_warm: t.wafuOn, wafu_warm: t.wafuWarm, wafu_brightness: t.wafuBrightness,
+    wafu_temp: t.wafuTemp, wafu_color: t.wafuColor, welcome: t.welcomeScene, welcome_cozy: t.cozyScene, away: t.checkoutOff,
   };
   const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
   const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);
@@ -581,6 +583,11 @@ function RoomManageCard({
       <div className="grid grid-cols-2 gap-2 border-t border-white/10 p-4">
         <SceneButton slug={room.slug} action="welcome" label={t.welcomeScene} tone="emerald" />
         <SceneButton slug={room.slug} action="away" label={t.checkoutOff} tone="amber" />
+        {room.wafu_device_id && (
+          <div className="col-span-2">
+            <SceneButton slug={room.slug} action="welcome_cozy" label={t.cozyScene} tone="rose" />
+          </div>
+        )}
       </div>
 
       {/* ジオフェンス (位置制限) */}
@@ -611,7 +618,7 @@ function RoomManageCard({
 }
 
 function SceneButton({ slug, action, label, tone }: {
-  slug: string; action: "welcome" | "away"; label: string; tone: "emerald" | "amber";
+  slug: string; action: "welcome" | "welcome_cozy" | "away"; label: string; tone: "emerald" | "amber" | "rose";
 }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -628,8 +635,10 @@ function SceneButton({ slug, action, label, tone }: {
   };
   const cls = tone === "emerald"
     ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200 active:bg-emerald-500/20"
+    : tone === "rose"
+    ? "border-rose-400/40 bg-rose-500/10 text-rose-200 active:bg-rose-500/20"
     : "border-amber-400/40 bg-amber-500/10 text-amber-200 active:bg-amber-500/20";
-  const Icon = action === "welcome" ? Home : PowerOff;
+  const Icon = action === "welcome" ? Home : action === "welcome_cozy" ? LampFloor : PowerOff;
   return (
     <button onClick={run} disabled={busy}
       className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs disabled:opacity-50 ${cls}`}>

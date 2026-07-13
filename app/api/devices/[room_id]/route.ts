@@ -14,7 +14,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { room_id: string } }
 ) {
-  const { action } = (await req.json().catch(() => ({}))) as { action?: DeviceAction };
+  const { action, value } = (await req.json().catch(() => ({}))) as { action?: DeviceAction; value?: string };
 
   const stay = await authorizeRoomRequest(params.room_id);
   if (!stay) {
@@ -25,7 +25,8 @@ export async function POST(
     const r = await executeDeviceAction(
       stay.room,
       action as DeviceAction,
-      `Guest:${stay.reservation.id.slice(0, 8)}`
+      `Guest:${stay.reservation.id.slice(0, 8)}`,
+      value
     );
     await logDevice({
       room_id: stay.room.id, reservation_id: stay.reservation.id,

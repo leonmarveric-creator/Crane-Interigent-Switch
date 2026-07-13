@@ -16,9 +16,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const { roomSlug, action } = (await req.json().catch(() => ({}))) as {
+  const { roomSlug, action, value } = (await req.json().catch(() => ({}))) as {
     roomSlug?: string;
     action?: DeviceAction;
+    value?: string;
   };
 
   const { data: room } = await supabaseAdmin
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!room) return NextResponse.json({ ok: false, error: "NO_ROOM" }, { status: 404 });
 
   try {
-    const r = await executeDeviceAction(room, action as DeviceAction, "Admin Test");
+    const r = await executeDeviceAction(room, action as DeviceAction, "Admin Test", value);
     await logDevice({ room_id: room.id, action: String(action), source: "admin", success: r.ok });
 
     // ホストがウェルカム実行 → 直近の有効/今後の予約を welcomed にして自動側を抑止
