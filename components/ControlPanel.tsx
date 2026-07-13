@@ -4,12 +4,12 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles, Radio,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
-import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient } from "@/lib/sfx";
 
 interface Props {
   roomSlug: string;
@@ -92,8 +92,22 @@ export default function ControlPanel({
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
   const [taps, setTaps] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [ambientOn, setAmbientOn] = useState(false); // アークリアクターのハム (opt-in)
   const weather = useWeather(lat, lng);
   const t = T[lang];
+
+  // アンビエントハムのON/OFF (ミュート時は自動停止)。
+  const toggleAmbient = () => setAmbientOn((v) => {
+    const n = !v;
+    if (n) { primeVoice(); startAmbient(); } else stopAmbient();
+    return n;
+  });
+  // アンマウント時とタブ非表示時はハムを止める。
+  useEffect(() => {
+    const onVis = () => { if (document.hidden) stopAmbient(); else if (ambientOn && !muted) startAmbient(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { document.removeEventListener("visibilitychange", onVis); stopAmbient(); };
+  }, [ambientOn, muted]);
 
   // タップ位置に照準リング
   const onTap = (e: React.PointerEvent) => {
@@ -137,7 +151,8 @@ export default function ControlPanel({
   useEffect(() => { sfxSetMuted(muted); }, [muted]);
   const toggleMute = () => setMuted((m) => {
     const n = !m; localStorage.setItem("guestMuted", n ? "1" : "0");
-    if (!n) setTimeout(navTick, 0); // ミュート解除時に確認音
+    if (n) setAmbientOn(false); // ミュートしたらハムも止める
+    else setTimeout(navTick, 0); // ミュート解除時に確認音
     return n;
   });
 
@@ -259,7 +274,9 @@ export default function ControlPanel({
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="mb-5 flex items-start justify-between">
-          <div>
+          <div className="flex items-start gap-3">
+            <ArcReactor active={ambientOn} />
+            <div>
             <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">
               {t.welcome.toUpperCase()}
             </p>
@@ -279,9 +296,18 @@ export default function ControlPanel({
                 <CheckoutCountdown checkOut={checkOut} />
               </>
             )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={toggleAmbient}
+              onPointerEnter={hoverTick}
+              className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md active:scale-95
+                ${ambientOn ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-200 [box-shadow:0_0_14px_rgba(34,211,238,0.5)]" : "border-white/10 bg-white/5 text-white/40"}`}
+              aria-label="ambient reactor hum">
+              <Radio className={`h-4 w-4 ${ambientOn ? "anim-breathe" : ""}`} />
+            </button>
             <button onClick={toggleMute}
+              onPointerEnter={hoverTick}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-cyan-300 backdrop-blur-md active:scale-95"
               aria-label="sound">
               {muted ? <VolumeX className="h-4 w-4 text-white/40" /> : <Volume2 className="h-4 w-4" />}
@@ -310,6 +336,11 @@ export default function ControlPanel({
           <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
         </motion.div>
 
+        {/* 光目覚まし (スクロールせず見えるよう上部に配置) */}
+        <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+          <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
+        </motion.div>
+
         {/* デバイスグリッド */}
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
@@ -336,9 +367,6 @@ export default function ControlPanel({
               onState={setGalaxyActive} />
           </motion.div>
         )}
-
-        {/* 光目覚まし (テストページでもホストが設定・動作確認できる) */}
-        <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
       </div>
     </main>
   );
@@ -803,6 +831,36 @@ function AmbientFX() {
 }
 
 /** アイアンマン風 角カットパネル (エッジを光が周回)。 */
+/* ------------------------------------------------------------------ */
+/* アークリアクター: アイアンマン風の脈動コア (ヘッダー)               */
+/* ------------------------------------------------------------------ */
+function ArcReactor({ active = false }: { active?: boolean }) {
+  const glow = active ? "#7dd3fc" : "#22d3ee";
+  return (
+    <div className="relative h-11 w-11 shrink-0"
+      style={{ filter: `drop-shadow(0 0 ${active ? 10 : 5}px ${glow})` }}
+      aria-hidden>
+      <svg viewBox="0 0 100 100" className="absolute inset-0">
+        <circle cx="50" cy="50" r="46" fill="none" stroke={glow} strokeOpacity="0.3" strokeWidth="2" />
+        <g className="anim-spin-slow" style={SPIN}>
+          <circle cx="50" cy="50" r="38" fill="none" stroke={glow} strokeOpacity="0.7" strokeWidth="3" strokeDasharray="6 6" />
+        </g>
+        <g className="anim-spin-rev" style={SPIN}>
+          <circle cx="50" cy="50" r="30" fill="none" stroke={glow} strokeOpacity="0.5" strokeWidth="2" strokeDasharray="14 8" />
+        </g>
+        {/* 放射状コイル */}
+        {[...Array(9)].map((_, i) => (
+          <line key={i} x1="50" y1="23" x2="50" y2="33" stroke={glow} strokeOpacity="0.6" strokeWidth="2"
+            transform={`rotate(${(i / 9) * 360} 50 50)`} />
+        ))}
+        {/* 三角コア + 中心 */}
+        <polygon points="50,37 61,57 39,57" fill={glow} fillOpacity={active ? 0.9 : 0.55} />
+        <circle cx="50" cy="50" r="9" className="anim-core" style={SPIN} fill="#eaffff" fillOpacity={active ? 0.95 : 0.7} />
+      </svg>
+    </div>
+  );
+}
+
 function HudPanel({
   tone = "cyan", active = false, onClick, contentClassName = "", small = false, children,
 }: {
@@ -814,6 +872,7 @@ function HudPanel({
   return (
     <motion.div
       onClick={onClick} whileTap={onClick ? { scale: 0.97 } : undefined}
+      onPointerEnter={onClick ? hoverTick : undefined}
       role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
       className={`${clip} relative ${onClick ? "cursor-pointer" : ""}`}
       style={active ? { filter: `drop-shadow(0 0 22px ${c.light})` } : undefined}>
@@ -1051,12 +1110,17 @@ function ToggleCard({
 
   const send = async (which: "on" | "off") => {
     if (busy) return;
+    primeVoice();
     if (guard && !(await guard())) return;
     blip(); sweep();
     setBusy(which); setFx((f) => f + 1);
     const ok = await callDevice(roomSlug, which === "on" ? onAction : offAction, admin);
-    if (ok) { setLast(which); (which === "on" ? powerUp : powerDown)(); }
-    else sfxError();
+    if (ok) {
+      setLast(which); (which === "on" ? powerUp : powerDown)();
+      speakOneOf(which === "on"
+        ? [`${label} online`, `${label} engaged`, `${label} activated`]
+        : [`${label} offline`, `${label} standby`, `${label} deactivated`]);
+    } else sfxError();
     setBusy(null);
     if (navigator.vibrate) navigator.vibrate(which === "on" ? 22 : 16);
   };
@@ -1118,6 +1182,7 @@ function WafuCard({
 
   const send = async (which: "on" | "off" | "warm") => {
     if (busy) return;
+    primeVoice();
     if (guard && !(await guard())) return;
     blip(); sweep();
     setBusy(which); setFx((f) => f + 1);
@@ -1126,9 +1191,9 @@ function WafuCard({
       : which === "off" ? "wafu_off" : "wafu_warm";
     const ok = await callDevice(roomSlug, action, admin);
     if (ok) {
-      if (which === "on") { setLast("on"); powerUp(); }
-      else if (which === "off") { setLast("off"); powerDown(); }
-      else blip();
+      if (which === "on") { setLast("on"); powerUp(); speakOneOf([`${t.wafu} online`, "Ambient lighting engaged", "Warm glow activated"]); }
+      else if (which === "off") { setLast("off"); powerDown(); speakOneOf([`${t.wafu} offline`, "Ambient lighting off"]); }
+      else { blip(); speakOneOf(["Restoring warm tone", "Warm preset applied"]); }
     } else sfxError();
     setBusy(null);
     if (navigator.vibrate) navigator.vibrate(which === "off" ? 16 : 22);

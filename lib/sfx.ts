@@ -4,7 +4,7 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
 
-export function setMuted(m: boolean) { muted = m; }
+export function setMuted(m: boolean) { muted = m; if (m) stopAmbient(); }
 
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -292,3 +292,66 @@ export function error() {
   osc(c, "square", 220, 180, t, 0.12, 0.04);
   osc(c, "square", 160, 130, t + 0.1, 0.14, 0.04);
 }
+
+/** UIホバー: ごく短く上品な走査ティック (ボタンにカーソル/指が乗った時)。 */
+export function hoverTick() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 1500, 2200, t, 0.035, 0.012);
+  noise(c, t, 0.03, 0.006, 6000, 3000);
+}
+
+/* -------------------------------------------------------------------------- */
+/* アンビエント: アークリアクターの低い持続ハム (opt-in・任意ON)。            */
+/* -------------------------------------------------------------------------- */
+let ambient: {
+  nodes: (OscillatorNode | GainNode | BiquadFilterNode)[];
+  gain: GainNode;
+  lfo: OscillatorNode;
+} | null = null;
+
+/** リアクターハム開始 (二重起動しない)。ミュート中は鳴らさない。 */
+export function startAmbient() {
+  const c = ac(); if (!c || muted || ambient) return;
+
+  const bus = c.createGain(); bus.gain.value = 0.0001;
+  const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 320;
+  bus.connect(lp); lp.connect(master ?? c.destination);
+
+  // うなりを作る低音の重なり (55Hz + わずかにデチューン)。
+  const o1 = c.createOscillator(); o1.type = "sine"; o1.frequency.value = 55;
+  const o2 = c.createOscillator(); o2.type = "sine"; o2.frequency.value = 55; o2.detune.value = 6;
+  const o3 = c.createOscillator(); o3.type = "triangle"; o3.frequency.value = 110; o3.detune.value = -4;
+  const og = c.createGain(); og.gain.value = 0.5;
+  o1.connect(bus); o2.connect(bus); o3.connect(og); og.connect(bus);
+
+  // ゆっくり明滅するLFO (呼吸するリアクター)。
+  const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.18;
+  const lfoGain = c.createGain(); lfoGain.gain.value = 0.02;
+  lfo.connect(lfoGain); lfoGain.connect(bus.gain);
+
+  const t = c.currentTime;
+  bus.gain.setValueAtTime(0.0001, t);
+  bus.gain.exponentialRampToValueAtTime(0.05, t + 1.2); // フェードイン
+
+  [o1, o2, o3, lfo].forEach((o) => o.start(t));
+  ambient = { nodes: [o1, o2, o3, og, bus, lp, lfoGain], gain: bus, lfo };
+}
+
+/** リアクターハム停止 (なめらかにフェードアウト)。 */
+export function stopAmbient() {
+  const c = ctx; if (!c || !ambient) return;
+  const t = c.currentTime;
+  const a = ambient; ambient = null;
+  a.gain.gain.cancelScheduledValues(t);
+  a.gain.gain.setValueAtTime(a.gain.gain.value, t);
+  a.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  setTimeout(() => {
+    try {
+      a.lfo.stop();
+      a.nodes.forEach((n) => { if ("stop" in n) (n as OscillatorNode).stop(); });
+    } catch { /* already stopped */ }
+  }, 600);
+}
+
+export function isAmbientOn() { return ambient !== null; }
