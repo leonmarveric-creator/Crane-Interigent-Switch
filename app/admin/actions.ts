@@ -106,12 +106,14 @@ export async function assignDevices(formData: FormData) {
   const ac = String(formData.get("ac") || "") || null;
   const light = String(formData.get("light") || "") || null;
   const galaxy = String(formData.get("galaxy") || "") || null;
+  const wafu = String(formData.get("wafu") || "") || null;
   await supabaseAdmin
     .from("rooms")
     .update({
       switchbot_ac_device_id: ac,
       switchbot_light_device_id: light,
       switchbot_galaxy_device_id: galaxy,
+      switchbot_wafu_device_id: wafu,
     })
     .eq("id", room_id);
   revalidatePath("/admin");

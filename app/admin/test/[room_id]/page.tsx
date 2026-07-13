@@ -19,7 +19,7 @@ export default async function AdminTestRoomPage({
 }) {
   const { data: room } = await supabaseAdmin
     .from("rooms")
-    .select("slug, display_name, image_url, switchbot_galaxy_device_id")
+    .select("slug, display_name, image_url, switchbot_galaxy_device_id, switchbot_wafu_device_id")
     .eq("slug", params.room_id)
     .maybeSingle();
 
@@ -36,6 +36,7 @@ export default async function AdminTestRoomPage({
       admin
       imageUrl={room.image_url}
       hasGalaxy={!!room.switchbot_galaxy_device_id}
+      hasWafu={!!room.switchbot_wafu_device_id}
     />
   );
 }

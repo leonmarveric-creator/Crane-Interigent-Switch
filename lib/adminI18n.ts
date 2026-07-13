@@ -20,6 +20,9 @@ type Dict = {
   galaxy: string;
   galaxyOn: string;
   galaxyOff: string;
+  wafu: string;
+  wafuOn: string;
+  wafuOff: string;
   none: string;
   save: string;
   saved: string;
@@ -104,6 +107,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。",
     ac: "エアコン", light: "照明",
     galaxy: "🌌 ギャラクシー（プラネタリウム）", galaxyOn: "ギャラクシーON", galaxyOff: "ギャラクシーOFF",
+    wafu: "🏮 和風ライト（行灯・スマート電球）", wafuOn: "和風ライトON", wafuOff: "和風ライトOFF",
     none: "（なし）", save: "保存", saved: "保存しました", uploadImage: "画像/動画をアップロード",
     addTitle: "手動で予約を追加（PIN自動発行）",
     room: "部屋", language: "言語",
@@ -147,6 +151,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "Pick an air conditioner / light for each room and save (choose by the names set in the SwitchBot app).",
     ac: "Air Con", light: "Light",
     galaxy: "🌌 Galaxy (planetarium)", galaxyOn: "Galaxy On", galaxyOff: "Galaxy Off",
+    wafu: "🏮 Japanese Lamp (andon / smart bulb)", wafuOn: "Lamp On", wafuOff: "Lamp Off",
     none: "(none)", save: "Save", saved: "Saved", uploadImage: "Upload image / video",
     addTitle: "Add reservation manually (auto PIN)",
     room: "Room", language: "Language",
@@ -190,6 +195,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "为每个房间选择空调・灯光并保存（可按 SwitchBot App 中设置的名称选择）。",
     ac: "空调", light: "灯光",
     galaxy: "🌌 银河（星空投影仪）", galaxyOn: "银河开", galaxyOff: "银河关",
+    wafu: "🏮 和风灯（行灯・智能灯泡）", wafuOn: "和风灯开", wafuOff: "和风灯关",
     none: "（无）", save: "保存", saved: "已保存", uploadImage: "上传图片/视频",
     addTitle: "手动添加预订（自动生成PIN）",
     room: "房间", language: "语言",

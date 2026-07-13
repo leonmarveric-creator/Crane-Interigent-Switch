@@ -21,6 +21,7 @@ export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
   galaxy_device_id: string | null;
+  wafu_device_id: string | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
   url: string; qr: string;
@@ -360,7 +361,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
   const [filter, setFilter] = useState<string>("all");
   const actionLabel: Record<string, string> = {
     unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
-    galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff,
+    galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
   };
   const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
   const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);
@@ -413,6 +414,15 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
   const ir = info.infraredRemoteList ?? [];
   const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
   const lights = ir.filter((d) => /light/i.test(d.remoteType));
+  // 和風ライト候補: スマート電球/テープライト/プラグ等の物理デバイス + 照明系IRリモコン
+  const wafus = [
+    ...(info.deviceList ?? [])
+      .filter((d) => /bulb|light|strip|lamp|plug|bot|ceiling/i.test(d.deviceType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+    ...ir
+      .filter((d) => /light/i.test(d.remoteType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+  ];
   // ギャラクシー(プラネタリウム)候補: Bot/Plug等の物理デバイス + プロジェクター系IRリモコン
   const galaxies = [
     ...(info.deviceList ?? [])
@@ -452,7 +462,7 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {rooms.map((room) => (
-          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} sbError={info.error} t={t} />
+          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} wafus={wafus} sbError={info.error} t={t} />
         ))}
       </div>
     </section>
@@ -460,12 +470,13 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
 }
 
 function RoomManageCard({
-  room, acs, lights, galaxies, sbError, t,
+  room, acs, lights, galaxies, wafus, sbError, t,
 }: {
   room: Room;
   acs: { deviceId: string; deviceName: string }[];
   lights: { deviceId: string; deviceName: string }[];
   galaxies: { deviceId: string; deviceName: string }[];
+  wafus: { deviceId: string; deviceName: string }[];
   sbError: string | null;
   t: T;
 }) {
@@ -527,6 +538,15 @@ function RoomManageCard({
               </span>
               <select name="galaxy" defaultValue={room.galaxy_device_id ?? ""} className={`${selCls} mt-1 border-violet-400/30 py-2 text-xs`}>
                 <option value="">{t.none}</option>{galaxies.map(opt)}
+              </select>
+            </label>
+            {/* 和風ライト(行灯): スマート電球のSwitchBot (割り当てるとゲスト画面に出現) */}
+            <label className="w-full text-[11px] text-rose-300/80">
+              <span className="flex items-center gap-1">{t.wafu}
+                {room.wafu_device_id && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] tracking-widest text-rose-200">ENABLED</span>}
+              </span>
+              <select name="wafu" defaultValue={room.wafu_device_id ?? ""} className={`${selCls} mt-1 border-rose-400/30 py-2 text-xs`}>
+                <option value="">{t.none}</option>{wafus.map(opt)}
               </select>
             </label>
             <SubmitButton savedText={t.saved} className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</SubmitButton>

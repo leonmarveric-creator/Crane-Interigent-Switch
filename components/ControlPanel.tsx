@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb,
+  LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
@@ -13,6 +13,7 @@ import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, ch
 type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
   | "galaxy_on" | "galaxy_off"
+  | "wafu_on" | "wafu_off"
   | "welcome" | "away";
 
 interface Props {
@@ -26,6 +27,7 @@ interface Props {
   lng?: number | null; // ジオフェンス: 建物の経度
   radiusM?: number | null; // 許可半径(m)
   hasGalaxy?: boolean; // ギャラクシーモード (プラネタリウム) 対応の部屋
+  hasWafu?: boolean; // 和風ライト(行灯) 対応の部屋
 }
 
 // メディアURLが動画か判定 (拡張子ベース)
@@ -95,7 +97,7 @@ async function callDevice(roomSlug: string, action: DeviceAction, admin?: boolea
 }
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasWafu,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -336,6 +338,13 @@ export default function ControlPanel({
             icon={Lightbulb} label={t.light} accent="amber"
             onAction={"light_on"} offAction={"light_off"} t={t}
           />
+          {hasWafu && (
+            <ToggleCard
+              roomSlug={roomSlug} admin={admin} guard={guardCommand}
+              icon={LampFloor} label={t.wafu} accent="rose"
+              onAction={"wafu_on"} offAction={"wafu_off"} t={t}
+            />
+          )}
         </motion.div>
 
         {/* ギャラクシーモード (プラネタリウム対応の部屋のみ) */}
@@ -717,8 +726,8 @@ function HudStatusBar() {
 /* ------------------------------------------------------------------ */
 /* HUD部品: ターゲットブラケット / 同心円ダイヤル                        */
 /* ------------------------------------------------------------------ */
-function Corners({ tone = "cyan" }: { tone?: "cyan" | "amber" | "emerald" }) {
-  const c = tone === "amber" ? "border-amber-300/60" : tone === "emerald" ? "border-emerald-300/60" : "border-cyan-300/55";
+function Corners({ tone = "cyan" }: { tone?: "cyan" | "amber" | "emerald" | "rose" }) {
+  const c = tone === "amber" ? "border-amber-300/60" : tone === "emerald" ? "border-emerald-300/60" : tone === "rose" ? "border-rose-300/60" : "border-cyan-300/55";
   const base = "pointer-events-none absolute h-3.5 w-3.5";
   return (
     <>
@@ -737,6 +746,7 @@ const TONES = {
   amber: { edge: "rgba(251,191,36,0.25)", light: "rgba(251,191,36,0.95)" },
   emerald: { edge: "rgba(16,185,129,0.25)", light: "rgba(16,185,129,0.95)" },
   violet: { edge: "rgba(167,139,250,0.25)", light: "rgba(167,139,250,0.95)" },
+  rose: { edge: "rgba(251,113,133,0.25)", light: "rgba(251,113,133,0.95)" },
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -1026,7 +1036,7 @@ function ToggleCard({
   roomSlug, icon: Icon, label, accent, onAction, offAction, t, admin, guard,
 }: {
   roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
-  icon: typeof Snowflake; label: string; accent: "cyan" | "amber";
+  icon: typeof Snowflake; label: string; accent: "cyan" | "amber" | "rose";
   onAction: DeviceAction; offAction: DeviceAction; t: typeof T["en"];
 }) {
   // 明示式: 押したON/OFFをそのまま送る (状態のズレなし)
@@ -1036,8 +1046,10 @@ function ToggleCard({
   const on = last === "on";
 
   const palette = accent === "cyan"
-    ? { text: "text-cyan-300", glow: "rgba(34,211,238,0.6)", dot: "bg-cyan-400", hx: "bg-cyan-400/30" }
-    : { text: "text-amber-300", glow: "rgba(251,191,36,0.6)", dot: "bg-amber-400", hx: "bg-amber-400/30" };
+    ? { text: "text-cyan-300", glow: "rgba(34,211,238,0.6)", dot: "bg-cyan-400", hx: "bg-cyan-400/30", stroke: "#22d3ee" }
+    : accent === "rose"
+    ? { text: "text-rose-300", glow: "rgba(251,113,133,0.6)", dot: "bg-rose-400", hx: "bg-rose-400/30", stroke: "#fb7185" }
+    : { text: "text-amber-300", glow: "rgba(251,191,36,0.6)", dot: "bg-amber-400", hx: "bg-amber-400/30", stroke: "#fbbf24" };
 
   const send = async (which: "on" | "off") => {
     if (busy) return;
@@ -1063,7 +1075,7 @@ function ToggleCard({
         <svg viewBox="0 0 100 100" className="anim-spin-rev pointer-events-none absolute inset-[-9px]" style={SPIN}>
           {[...Array(24)].map((_, i) => (
             <line key={i} x1="50" y1="4" x2="50" y2={i % 3 === 0 ? "10" : "8"}
-              stroke={accent === "cyan" ? "#22d3ee" : "#fbbf24"} strokeOpacity={on ? 0.55 : 0.25}
+              stroke={palette.stroke} strokeOpacity={on ? 0.55 : 0.25}
               strokeWidth="1" transform={`rotate(${(i / 24) * 360} 50 50)`} />
           ))}
         </svg>
@@ -1080,7 +1092,9 @@ function ToggleCard({
       <div className="grid w-full grid-cols-2 gap-2">
         <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("on")} disabled={!!busy}
           className={`clip-bevel-sm flex items-center justify-center gap-1 border py-2.5 text-xs disabled:opacity-50
-            ${accent === "cyan" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-amber-400/50 bg-amber-500/15 text-amber-200"}`}>
+            ${accent === "cyan" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200"
+              : accent === "rose" ? "border-rose-400/50 bg-rose-500/15 text-rose-200"
+              : "border-amber-400/50 bg-amber-500/15 text-amber-200"}`}>
           {busy === "on" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.on.toUpperCase()}
         </motion.button>
         <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("off")} disabled={!!busy}

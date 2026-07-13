@@ -14,7 +14,7 @@ export default async function AdminPage() {
 
   const { data: roomRows } = await supabaseAdmin
     .from("rooms")
-    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, image_url, lat, lng, geofence_radius_m")
+    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, switchbot_wafu_device_id, image_url, lat, lng, geofence_radius_m")
     .order("slug");
 
   const { data: reservations } = await supabaseAdmin
@@ -36,6 +36,7 @@ export default async function AdminPage() {
         ac_device_id: r.switchbot_ac_device_id ?? null,
         light_device_id: r.switchbot_light_device_id ?? null,
         galaxy_device_id: r.switchbot_galaxy_device_id ?? null,
+        wafu_device_id: r.switchbot_wafu_device_id ?? null,
         image_url: r.image_url ?? null,
         lat: r.lat ?? null, lng: r.lng ?? null, radius: r.geofence_radius_m ?? 150,
         url, qr,

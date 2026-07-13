@@ -40,6 +40,8 @@ type Dict = {
   awayMode: string;
   galaxy: string;
   galaxyDesc: string;
+  wafu: string;
+  wafuDesc: string;
 };
 
 export const T: Record<Lang, Dict> = {
@@ -55,6 +57,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
     comfortMode: "快適モード", awayMode: "外出（全部OFF）",
     galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影",
+    wafu: "和風ライト", wafuDesc: "行灯のやわらかな間接照明",
   },
   en: {
     unlock: "Unlock", lock: "Lock", locked: "Locked", unlocked: "Unlocked",
@@ -68,6 +71,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
     comfortMode: "Comfort", awayMode: "Away (all off)",
     galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room",
+    wafu: "Japanese Lamp", wafuDesc: "Soft andon accent lighting",
   },
   zh: {
     unlock: "开锁", lock: "上锁", locked: "已上锁", unlocked: "已开锁",
@@ -81,6 +85,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
     comfortMode: "舒适模式", awayMode: "外出（全关）",
     galaxy: "银河模式", galaxyDesc: "在房间投影满天星空",
+    wafu: "和风灯", wafuDesc: "行灯柔和的间接照明",
   },
   ko: {
     unlock: "잠금 해제", lock: "잠금", locked: "잠김", unlocked: "열림",
@@ -94,6 +99,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)",
     galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영",
+    wafu: "일본풍 조명", wafuDesc: "안돈의 부드러운 간접 조명",
   },
 };
 

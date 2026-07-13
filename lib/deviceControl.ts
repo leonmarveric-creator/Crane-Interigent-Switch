@@ -15,6 +15,7 @@ export async function logDevice(entry: {
 export type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
   | "galaxy_on" | "galaxy_off" // ギャラクシーモード: プラネタリウムプロジェクター
+  | "wafu_on" | "wafu_off" // 和風ライト(行灯): スマート電球
   | "welcome" | "away"; // シーン: 快適モード / 外出全OFF
 
 /**
@@ -71,6 +72,14 @@ export async function executeDeviceAction(
         : await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
       return { ok: r.ok };
     }
+    case "wafu_on":
+    case "wafu_off": {
+      if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
+      const r = action === "wafu_on"
+        ? await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id)
+        : await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
+      return { ok: r.ok };
+    }
     case "welcome": {
       // 快適モード: エアコン適温ON(季節判定) + 照明ON
       let ok = true;
@@ -86,6 +95,10 @@ export async function executeDeviceAction(
         const r = await lightTurnOn(sbCreds, room.switchbot_light_device_id);
         ok = ok && r.ok;
       }
+      if (room.switchbot_wafu_device_id) {
+        const r = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
+        ok = ok && r.ok;
+      }
       return { ok };
     }
     case "away": {
@@ -99,6 +112,9 @@ export async function executeDeviceAction(
       }
       if (room.switchbot_galaxy_device_id) {
         const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_wafu_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id); ok = ok && r.ok;
       }
       return { ok };
     }

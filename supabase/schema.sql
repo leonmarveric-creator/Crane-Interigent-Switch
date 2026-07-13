@@ -39,6 +39,8 @@ create table if not exists public.rooms (
   -- SwitchBot (赤外線ハブミニ経由の仮想リモコン)
   switchbot_ac_device_id     text,                  -- エアコン (Virtual IR)
   switchbot_light_device_id  text,                  -- 照明 (Virtual IR)
+  switchbot_galaxy_device_id text,                  -- ギャラクシー (プラネタリウム / 物理デバイス)
+  switchbot_wafu_device_id   text,                  -- 和風ライト/行灯 (スマート電球)
   -- SwitchBotのトークン/シークレットは全部屋共通になりがちなので環境変数で持つ想定。
   -- 部屋ごとに別アカウントなら下記を使用:
   switchbot_token   text,
