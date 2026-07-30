@@ -106,6 +106,7 @@ export async function assignDevices(formData: FormData) {
   const ac = String(formData.get("ac") || "") || null;
   const light = String(formData.get("light") || "") || null;
   const galaxy = String(formData.get("galaxy") || "") || null;
+  const nest = String(formData.get("nest") || "") || null;
   const wafu = String(formData.get("wafu") || "") || null;
   await supabaseAdmin
     .from("rooms")
@@ -113,6 +114,7 @@ export async function assignDevices(formData: FormData) {
       switchbot_ac_device_id: ac,
       switchbot_light_device_id: light,
       switchbot_galaxy_device_id: galaxy,
+      switchbot_nest_device_id: nest,
       switchbot_wafu_device_id: wafu,
     })
     .eq("id", room_id);

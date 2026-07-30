@@ -1,4 +1,14 @@
 -- =============================================================================
+--  IoT Guest Control — Supabase 初回セットアップ (これ1本を SQL Editor で実行)
+--  内容: 基本スキーマ + 全migration(PIN/URL/ウェルカム/ジオフェンス/画像/
+--        ログ/PIN試行/テストアラーム/ギャラクシー/和風ライト)
+--  すべて idempotent。再実行してもエラーになりません。
+--  ※ 部屋データ(seed_rooms.sql)は秘密鍵を含むため含めていません。
+--    部屋は管理画面から追加してください。
+-- =============================================================================
+
+-- ##### 1. 基本スキーマ (rooms / reservations / alarms / RLS / view) #####
+-- =============================================================================
 --  IoT Guest Control  /  Supabase (PostgreSQL) Schema
 --  Tables: rooms, reservations (iCal + manual hybrid), alarms
 --  Run order matters (FK / enum dependencies).
@@ -153,3 +163,124 @@ create or replace view public.active_stays as
   where r.status = 'active'
     and now() >= r.check_in
     and now() <  r.check_out;
+
+-- ##### migration: pin #####
+-- =============================================================================
+--  PIN方式への移行: reservations に unlock_pin を追加
+--  Supabase SQL Editor で1回実行。
+-- =============================================================================
+
+alter table public.reservations
+  add column if not exists unlock_pin text;
+
+-- 既存予約でPIN未設定のものに4桁PINを付与
+update public.reservations
+  set unlock_pin = lpad((floor(random() * 10000))::int::text, 4, '0')
+  where unlock_pin is null;
+
+-- 今後の INSERT 用デフォルト (アプリ側が明示指定しなければ自動で4桁発行)
+alter table public.reservations
+  alter column unlock_pin set default lpad((floor(random() * 10000))::int::text, 4, '0');
+
+-- ##### migration: resurl #####
+-- 予約に Airbnb 予約ページURL を追加 (管理画面の「Airbnbで開く」用)
+alter table public.reservations
+  add column if not exists airbnb_reservation_url text;
+
+-- ##### migration: welcome #####
+-- ウェルカムシーン実行済みフラグ (初回解錠の自動実行を1滞在1回に抑える)
+alter table public.reservations
+  add column if not exists welcomed_at timestamptz;
+
+-- ##### migration: geofence #####
+-- ジオフェンス: 部屋(建物)の座標と許可半径
+alter table public.rooms
+  add column if not exists lat double precision,
+  add column if not exists lng double precision,
+  add column if not exists geofence_radius_m integer default 150;
+
+-- lat/lng が NULL の部屋は位置制限OFF (どこでも操作可) = 既存の挙動。
+-- 建物の座標を入れると、その部屋は範囲内のみ操作可能になる。
+-- 例: 建物A(4部屋)
+-- update public.rooms set lat=35.0000, lng=135.0000, geofence_radius_m=150
+--   where slug in ('room-spring','room-summer','room-autumn','room-winter');
+
+-- ##### migration: image #####
+-- 部屋アート画像のURL/パスを追加
+alter table public.rooms
+  add column if not exists image_url text;
+
+-- 既定値: /rooms/<slug>.jpg (public/rooms に画像を置く想定)
+update public.rooms
+  set image_url = '/rooms/' || slug || '.jpg'
+  where image_url is null;
+
+-- ##### migration: logs #####
+-- デバイス操作ログ
+create table if not exists public.device_logs (
+  id             uuid primary key default gen_random_uuid(),
+  room_id        uuid references public.rooms(id) on delete cascade,
+  reservation_id uuid,
+  action         text not null,            -- unlock/lock/ac_on/ac_off/light_on/light_off
+  source         text not null default 'guest', -- guest / admin / cron
+  success        boolean not null default true,
+  created_at     timestamptz not null default now()
+);
+create index if not exists idx_device_logs_created on public.device_logs (created_at desc);
+create index if not exists idx_device_logs_room on public.device_logs (room_id, created_at desc);
+
+-- service_role 経由のみ
+alter table public.device_logs enable row level security;
+
+-- ##### migration: pin_attempts #####
+-- PINブルートフォース対策: 失敗試行の記録テーブル
+-- 一定時間内の失敗回数が閾値を超えたら、その部屋のPIN認証を一時ロックする。
+-- RLS有効・ポリシー無し → service_role(サーバ)のみアクセス可能。
+
+create table if not exists pin_attempts (
+  id         uuid primary key default gen_random_uuid(),
+  room_slug  text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_pin_attempts_room_time
+  on pin_attempts (room_slug, created_at);
+
+alter table pin_attempts enable row level security;
+
+-- ##### migration: test_alarm #####
+-- =============================================================================
+--  テスト用 光目覚まし対応
+--  管理画面テストページから予約(滞在)なしでアラームを設定できるように
+--  reservation_id を NULL 許可にする。
+--  実ゲストのアラームは従来どおり reservation_id 付きで動作する。
+--  wake-alarm Cron は room_id のみ参照するため挙動は変わらない。
+-- =============================================================================
+alter table public.alarms
+  alter column reservation_id drop not null;
+
+-- ##### migration: galaxy #####
+-- ギャラクシーモード: 部屋ごとのプラネタリウムプロジェクター用 SwitchBot デバイス
+-- (SwitchBot Bot / Plug Mini 等の物理デバイスでプロジェクターの電源をON/OFF)
+alter table rooms
+  add column if not exists switchbot_galaxy_device_id text;
+
+comment on column rooms.switchbot_galaxy_device_id is
+  'プラネタリウムプロジェクターを操作する SwitchBot デバイスID (null = ギャラクシーモード非対応の部屋)';
+
+-- ##### migration: nest #####
+-- NESTモード: 部屋ごとの藤編みボールランプ(間接照明)用 SwitchBot デバイス
+alter table rooms
+  add column if not exists switchbot_nest_device_id text;
+
+comment on column rooms.switchbot_nest_device_id is
+  '藤編みボールランプ(NESTモード)を操作する SwitchBot デバイスID (null = NESTモード非対応の部屋)';
+
+-- ##### migration: wafu #####
+-- 和風ライト(行灯): 部屋ごとの SwitchBot スマート電球 (turnOn/turnOff で点灯・消灯)
+-- 既存のメイン照明(switchbot_light_device_id, 仮想IR)とは別枠の間接照明。
+alter table rooms
+  add column if not exists switchbot_wafu_device_id text;
+
+comment on column rooms.switchbot_wafu_device_id is
+  '和風ライト(行灯)を操作する SwitchBot デバイスID / スマート電球 (null = 和風ライト非対応の部屋)';

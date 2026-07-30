@@ -20,6 +20,9 @@ type Dict = {
   galaxy: string;
   galaxyOn: string;
   galaxyOff: string;
+  nest: string;
+  nestOn: string;
+  nestOff: string;
   wafu: string;
   wafuOn: string;
   wafuOff: string;
@@ -112,6 +115,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "各部屋にエアコン・照明を選んで保存します（SwitchBotアプリで付けた名前で選べます）。",
     ac: "エアコン", light: "照明",
     galaxy: "🌌 ギャラクシー（プラネタリウム）", galaxyOn: "ギャラクシーON", galaxyOff: "ギャラクシーOFF",
+    nest: "🪵 NEST（藤編みランプ）", nestOn: "NEST ON", nestOff: "NEST OFF",
     wafu: "🏮 和風ライト（行灯・スマート電球）", wafuOn: "和風ライトON", wafuOff: "和風ライトOFF",
     wafuWarm: "和風ライト暖色", wafuBrightness: "和風ライト明るさ", wafuTemp: "和風ライト色温度", wafuColor: "和風ライト色",
     cozyScene: "和みモード（エアコン＋和風ライト）",
@@ -158,6 +162,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "Pick an air conditioner / light for each room and save (choose by the names set in the SwitchBot app).",
     ac: "Air Con", light: "Light",
     galaxy: "🌌 Galaxy (planetarium)", galaxyOn: "Galaxy On", galaxyOff: "Galaxy Off",
+    nest: "🪵 Nest (rattan lamp)", nestOn: "Nest On", nestOff: "Nest Off",
     wafu: "🏮 Japanese Lamp (andon / smart bulb)", wafuOn: "Lamp On", wafuOff: "Lamp Off",
     wafuWarm: "Lamp Warm", wafuBrightness: "Lamp Brightness", wafuTemp: "Lamp Color Temp", wafuColor: "Lamp Color",
     cozyScene: "Cozy (AC + Japanese lamp)",
@@ -204,6 +209,7 @@ export const AT: Record<AdminLang, Dict> = {
     assignDesc: "为每个房间选择空调・灯光并保存（可按 SwitchBot App 中设置的名称选择）。",
     ac: "空调", light: "灯光",
     galaxy: "🌌 银河（星空投影仪）", galaxyOn: "银河开", galaxyOff: "银河关",
+    nest: "🪵 鸟巢（藤编灯）", nestOn: "鸟巢开", nestOff: "鸟巢关",
     wafu: "🏮 和风灯（行灯・智能灯泡）", wafuOn: "和风灯开", wafuOff: "和风灯关",
     wafuWarm: "和风灯暖色", wafuBrightness: "和风灯亮度", wafuTemp: "和风灯色温", wafuColor: "和风灯颜色",
     cozyScene: "和风模式（空调＋和风灯）",

@@ -22,6 +22,7 @@ interface Props {
   lng?: number | null; // ジオフェンス: 建物の経度
   radiusM?: number | null; // 許可半径(m)
   hasGalaxy?: boolean; // ギャラクシーモード (プラネタリウム) 対応の部屋
+  hasNest?: boolean; // NESTモード (藤編みボールランプ) 対応の部屋
   hasWafu?: boolean; // 和風ライト(行灯) 対応の部屋
 }
 
@@ -83,7 +84,7 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasWafu,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -341,6 +342,13 @@ export default function ControlPanel({
           <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
             <GalaxyCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
               onState={setGalaxyActive} />
+          </motion.div>
+        )}
+
+        {/* NESTモード (藤編みボールランプ。対応部屋のみ) */}
+        {hasNest && (
+          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>
+            <NestCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
           </motion.div>
         )}
 
@@ -1365,6 +1373,92 @@ function GalaxyCard({
           {t.on.toUpperCase()}
         </motion.button>
         <motion.button whileTap={{ scale: 0.96 }} onClick={() => send("off")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-white/15
+            bg-white/5 py-3 text-sm text-white/60 active:bg-white/10 disabled:opacity-50">
+          {busy === "off" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {t.off.toUpperCase()}
+        </motion.button>
+      </div>
+    </HudPanel>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* NESTモード: 藤編みボールランプ (対応部屋のみ・単体ON/OFF)             */
+/* ------------------------------------------------------------------ */
+function NestCard({
+  roomSlug, admin, guard, t,
+}: {
+  roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
+  t: typeof T["en"];
+}) {
+  const [last, setLast] = useState<"on" | "off" | null>(null);
+  const [busy, setBusy] = useState<"on" | "off" | null>(null);
+  const [fx, setFx] = useState(0);
+  const on = last === "on";
+
+  const send = async (which: "on" | "off") => {
+    if (busy) return;
+    primeVoice();
+    if (guard && !(await guard())) return;
+    blip(); sweep();
+    setBusy(which); setFx((f) => f + 1);
+    const ok = await callDevice(roomSlug, which === "on" ? "nest_on" : "nest_off", admin);
+    if (ok) {
+      setLast(which); toggleServo(which === "on");
+      speakOneOf(which === "on"
+        ? ["Nest mode engaged", "Warm light online", "Cozy glow, activated"]
+        : ["Nest mode off", "Warm light standby", "Dimming the glow"]);
+    } else sfxError();
+    setBusy(null);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
+  };
+
+  return (
+    <HudPanel tone="amber" active={on} contentClassName="flex-col items-center overflow-hidden px-6 py-7">
+      <Corners tone={on ? "amber" : "cyan"} />
+      <CommandFX trigger={fx} tone="amber" />
+
+      {/* カード内の暖色グロー (常時ゆらめく) */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="anim-nebula absolute -left-8 -top-10 h-40 w-40 rounded-full bg-amber-500/15 blur-2xl" />
+        <div className="anim-nebula absolute -bottom-12 -right-6 h-40 w-40 rounded-full bg-orange-500/15 blur-2xl" style={{ animationDelay: "4s" }} />
+      </div>
+
+      <div className="relative flex w-full items-center gap-4">
+        {/* 藤編みボール: 交差する織り目のリング */}
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
+          <svg viewBox="0 0 100 100" className={`pointer-events-none absolute inset-[-8px] ${on ? "anim-spin-slow" : ""}`} style={SPIN}>
+            {[0, 30, 60, 90, 120, 150].map((deg) => (
+              <ellipse key={deg} cx="50" cy="50" rx="42" ry="15" fill="none"
+                stroke="#fbbf24" strokeOpacity={on ? 0.5 : 0.2} strokeWidth="0.8"
+                transform={`rotate(${deg} 50 50)`} />
+            ))}
+          </svg>
+          <motion.div animate={{ scale: on ? [1, 1.1, 1] : 1, opacity: on ? 1 : 0.55 }}
+            transition={on ? { repeat: Infinity, duration: 2.6 } : {}}
+            className={`flex h-12 w-12 items-center justify-center rounded-full border
+              ${on ? "border-amber-400/70 bg-amber-500/20 shadow-[0_0_30px_-4px_rgba(251,191,36,0.9)]" : "border-amber-400/30 bg-amber-500/10"}`}>
+            <LampFloor className={`h-6 w-6 ${on ? "text-amber-200" : "text-amber-300/60"}`} strokeWidth={1.5} />
+          </motion.div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[9px] tracking-[0.3em] text-amber-300/70">NEST MODE</p>
+          <p className={`mt-0.5 text-sm font-medium ${on ? "text-amber-100" : "text-amber-200/90"}`}>{t.nest}</p>
+          <p className="mt-0.5 truncate text-[11px] text-white/40">{t.nestDesc}</p>
+        </div>
+      </div>
+
+      {/* ON / OFF */}
+      <div className="relative mt-4 grid w-full grid-cols-2 gap-3">
+        <motion.button whileTap={{ scale: 0.96 }} onHoverStart={hoverTick} onClick={() => send("on")} disabled={!!busy}
+          className="clip-bevel-sm flex items-center justify-center gap-2 border border-amber-400/50
+            bg-amber-500/15 py-3 text-sm text-amber-200 active:bg-amber-500/30 disabled:opacity-50">
+          {busy === "on" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LampFloor className="h-4 w-4" />}
+          {t.on.toUpperCase()}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onHoverStart={hoverTick} onClick={() => send("off")} disabled={!!busy}
           className="clip-bevel-sm flex items-center justify-center gap-2 border border-white/15
             bg-white/5 py-3 text-sm text-white/60 active:bg-white/10 disabled:opacity-50">
           {busy === "off" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

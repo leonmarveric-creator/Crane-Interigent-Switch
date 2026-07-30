@@ -21,6 +21,7 @@ export interface Room {
   id: string; slug: string; display_name: string; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
   galaxy_device_id: string | null;
+  nest_device_id: string | null;
   wafu_device_id: string | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
@@ -361,7 +362,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
   const [filter, setFilter] = useState<string>("all");
   const actionLabel: Record<string, string> = {
     unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
-    galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
+    galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, nest_on: t.nestOn, nest_off: t.nestOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
     wafu_on_warm: t.wafuOn, wafu_warm: t.wafuWarm, wafu_brightness: t.wafuBrightness,
     wafu_temp: t.wafuTemp, wafu_color: t.wafuColor, welcome: t.welcomeScene, welcome_cozy: t.cozyScene, away: t.checkoutOff,
   };
@@ -434,6 +435,15 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
       .filter((d) => /projector|others|diy|tv/i.test(d.remoteType))
       .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
   ];
+  // NEST(藤編みボールランプ)候補: Bot/Plug等の物理デバイス + 照明/その他系IRリモコン
+  const nests = [
+    ...(info.deviceList ?? [])
+      .filter((d) => /bot|plug|bulb|light|strip|lamp/i.test(d.deviceType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+    ...ir
+      .filter((d) => /light|others|diy/i.test(d.remoteType))
+      .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
+  ];
   return (
     <section>
       {/* 部屋を追加 */}
@@ -464,7 +474,7 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {rooms.map((room) => (
-          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} wafus={wafus} sbError={info.error} t={t} />
+          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} nests={nests} wafus={wafus} sbError={info.error} t={t} />
         ))}
       </div>
     </section>
@@ -472,12 +482,13 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
 }
 
 function RoomManageCard({
-  room, acs, lights, galaxies, wafus, sbError, t,
+  room, acs, lights, galaxies, nests, wafus, sbError, t,
 }: {
   room: Room;
   acs: { deviceId: string; deviceName: string }[];
   lights: { deviceId: string; deviceName: string }[];
   galaxies: { deviceId: string; deviceName: string }[];
+  nests: { deviceId: string; deviceName: string }[];
   wafus: { deviceId: string; deviceName: string }[];
   sbError: string | null;
   t: T;
@@ -540,6 +551,15 @@ function RoomManageCard({
               </span>
               <select name="galaxy" defaultValue={room.galaxy_device_id ?? ""} className={`${selCls} mt-1 border-violet-400/30 py-2 text-xs`}>
                 <option value="">{t.none}</option>{galaxies.map(opt)}
+              </select>
+            </label>
+            {/* NESTモード: 藤編みボールランプのSwitchBot (割り当てるとゲスト画面に出現) */}
+            <label className="w-full text-[11px] text-amber-300/80">
+              <span className="flex items-center gap-1">{t.nest}
+                {room.nest_device_id && <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] tracking-widest text-amber-200">ENABLED</span>}
+              </span>
+              <select name="nest" defaultValue={room.nest_device_id ?? ""} className={`${selCls} mt-1 border-amber-400/30 py-2 text-xs`}>
+                <option value="">{t.none}</option>{nests.map(opt)}
               </select>
             </label>
             {/* 和風ライト(行灯): スマート電球のSwitchBot (割り当てるとゲスト画面に出現) */}

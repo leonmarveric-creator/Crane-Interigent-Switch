@@ -40,6 +40,8 @@ type Dict = {
   awayMode: string;
   galaxy: string;
   galaxyDesc: string;
+  nest: string;
+  nestDesc: string;
   wafu: string;
   wafuDesc: string;
   cozyMode: string;
@@ -70,6 +72,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
     comfortMode: "快適モード", awayMode: "外出（全部OFF）",
     galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影",
+    nest: "ネストモード", nestDesc: "藤編みの灯りで暖かな陰影を",
     wafu: "和風ライト", wafuDesc: "行灯のやわらかな間接照明",
     cozyMode: "和みモード", wafuDetails: "詳細設定", wafuWarmReset: "暖色に戻す", wafuBack: "操作画面に戻る",
     brightness: "明るさ", colorTemp: "色温度", color: "カラー",
@@ -88,6 +91,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
     comfortMode: "Comfort", awayMode: "Away (all off)",
     galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room",
+    nest: "Nest Mode", nestDesc: "Warm woven light with soft shadows",
     wafu: "Japanese Lamp", wafuDesc: "Soft andon accent lighting",
     cozyMode: "Cozy", wafuDetails: "Settings", wafuWarmReset: "Reset to warm", wafuBack: "Back to controls",
     brightness: "Brightness", colorTemp: "Color temp", color: "Color",
@@ -106,6 +110,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
     comfortMode: "舒适模式", awayMode: "外出（全关）",
     galaxy: "银河模式", galaxyDesc: "在房间投影满天星空",
+    nest: "鸟巢模式", nestDesc: "藤编暖光，投下柔和光影",
     wafu: "和风灯", wafuDesc: "行灯柔和的间接照明",
     cozyMode: "和风模式", wafuDetails: "详细设置", wafuWarmReset: "恢复暖色", wafuBack: "返回操作画面",
     brightness: "亮度", colorTemp: "色温", color: "颜色",
@@ -124,6 +129,7 @@ export const T: Record<Lang, Dict> = {
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)",
     galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영",
+    nest: "네스트 모드", nestDesc: "라탄 조명으로 따뜻한 그림자를",
     wafu: "일본풍 조명", wafuDesc: "안돈의 부드러운 간접 조명",
     cozyMode: "포근 모드", wafuDetails: "상세 설정", wafuWarmReset: "따뜻한 색으로", wafuBack: "조작 화면으로",
     brightness: "밝기", colorTemp: "색온도", color: "색상",

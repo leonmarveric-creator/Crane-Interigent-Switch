@@ -37,6 +37,7 @@ export async function logDevice(entry: {
 export type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
   | "galaxy_on" | "galaxy_off" // ギャラクシーモード: プラネタリウムプロジェクター
+  | "nest_on" | "nest_off" // NESTモード: 藤編みボールランプ(間接照明)
   | "wafu_on" | "wafu_off" // 和風ライト(行灯): スマート電球 ON/OFF
   | "wafu_on_warm" // ON + 既定の暖色 (管理者ON用)
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
@@ -109,6 +110,15 @@ export async function executeDeviceAction(
       }
       return { ok: r.ok };
     }
+    case "nest_on":
+    case "nest_off": {
+      // NESTモード: 藤編みボールランプを単体でON/OFF (他ライトには干渉しない)
+      if (!room.switchbot_nest_device_id) return { ok: false, error: "NO_NEST" };
+      const r = action === "nest_on"
+        ? await deviceTurnOn(sbCreds, room.switchbot_nest_device_id)
+        : await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
+      return { ok: r.ok };
+    }
     case "wafu_on":
     case "wafu_off": {
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
@@ -173,7 +183,7 @@ export async function executeDeviceAction(
       return { ok };
     }
     case "away": {
-      // 外出: エアコン + 照明 + ギャラクシー OFF
+      // 外出: エアコン + 照明 + ギャラクシー + NEST OFF
       let ok = true;
       if (room.switchbot_ac_device_id) {
         const r = await acTurnOff(sbCreds, room.switchbot_ac_device_id); ok = ok && r.ok;
@@ -183,6 +193,9 @@ export async function executeDeviceAction(
       }
       if (room.switchbot_galaxy_device_id) {
         const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_nest_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_nest_device_id); ok = ok && r.ok;
       }
       if (room.switchbot_wafu_device_id) {
         const r = await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id); ok = ok && r.ok;

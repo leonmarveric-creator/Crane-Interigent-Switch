@@ -7,6 +7,7 @@
 export type DeviceAction =
   | "unlock" | "lock" | "ac_on" | "ac_off" | "light_on" | "light_off"
   | "galaxy_on" | "galaxy_off"
+  | "nest_on" | "nest_off"
   | "wafu_on" | "wafu_off"
   | "wafu_on_warm" | "wafu_warm"
   | "wafu_brightness" | "wafu_temp" | "wafu_color"
