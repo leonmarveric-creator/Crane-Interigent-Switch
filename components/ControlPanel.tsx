@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
-import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient } from "@/lib/sfx";
+import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
 
 interface Props {
   roomSlug: string;
@@ -516,8 +516,21 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
   useEffect(() => {
     charge(); // 起動チャージ音
     speakOneOf(["All systems online", "Good evening. Systems online", "J.A.R.V.I.S online"]); // iOSではジェスチャー外のため鳴らない場合あり
+    // 各ターミナル行の出現に同期した段階ビープ (行表示は delay 0.25 + i*0.4)
+    const beeps = [0, 1, 2, 3, 4].map((i) =>
+      setTimeout(() => bootStage(i), 250 + i * 400)
+    );
+    // "SECURE LINK" 確立時のデータ転送音
+    const link = setTimeout(() => dataBurst(), 1050);
+    // ルーム識別 (ターゲットロック) の照準音
+    const lock = setTimeout(() => reticleLock(), 1650);
+    // 起動完了の到達和音
+    const chord = setTimeout(() => systemChord(), 2300);
     const id = setTimeout(onDone, 2600);
-    return () => clearTimeout(id);
+    return () => {
+      clearTimeout(id); clearTimeout(chord); clearTimeout(link); clearTimeout(lock);
+      beeps.forEach(clearTimeout);
+    };
   }, [onDone]);
 
   const lines = [
@@ -826,6 +839,25 @@ function AmbientFX() {
       {/* まれに走るRGBグリッチ */}
       <div className="anim-glitch absolute inset-0 mix-blend-screen"
         style={{ background: "repeating-linear-gradient(0deg, rgba(34,211,238,0.10) 0, rgba(34,211,238,0.10) 1px, transparent 2px, transparent 4px)" }} />
+
+      {/* ホログラフィックなデータ列 (背景に降る微細なコード) */}
+      {[...Array(6)].map((_, i) => (
+        <div key={i}
+          className="anim-datafall absolute top-0 font-mono text-[9px] leading-[1.15] tracking-[0.15em] text-cyan-300/25"
+          style={{
+            left: `${8 + i * 16}%`,
+            animationDuration: `${9 + (i % 4) * 3}s`,
+            animationDelay: `${i * 1.7}s`,
+            writingMode: "vertical-rl",
+          }}>
+          {["01001", "1100101", "A7F3", "0xE1", "10110", "SYS", "9F2C", "01"][i % 8]}
+          {["1010", "0x4D", "READY", "0110", "C3", "10011", "0xB", "SYNC"][(i + 3) % 8]}
+        </div>
+      ))}
+
+      {/* 画面をゆっくり横断する水平走査ビーム */}
+      <div className="anim-hscan absolute inset-x-0 top-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.55), transparent)" }} />
     </div>
   );
 }
@@ -1116,7 +1148,7 @@ function ToggleCard({
     setBusy(which); setFx((f) => f + 1);
     const ok = await callDevice(roomSlug, which === "on" ? onAction : offAction, admin);
     if (ok) {
-      setLast(which); (which === "on" ? powerUp : powerDown)();
+      setLast(which); toggleServo(which === "on"); (which === "on" ? powerUp : powerDown)();
       speakOneOf(which === "on"
         ? [`${label} online`, `${label} engaged`, `${label} activated`]
         : [`${label} offline`, `${label} standby`, `${label} deactivated`]);
@@ -1152,14 +1184,14 @@ function ToggleCard({
 
       {/* ON / OFF ボタン */}
       <div className="grid w-full grid-cols-2 gap-2">
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("on")} disabled={!!busy}
+        <motion.button whileTap={{ scale: 0.95 }} onHoverStart={hoverTick} onClick={() => send("on")} disabled={!!busy}
           className={`clip-bevel-sm flex items-center justify-center gap-1 border py-2.5 text-xs disabled:opacity-50
             ${accent === "cyan" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200"
               : accent === "rose" ? "border-rose-400/50 bg-rose-500/15 text-rose-200"
               : "border-amber-400/50 bg-amber-500/15 text-amber-200"}`}>
           {busy === "on" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.on.toUpperCase()}
         </motion.button>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => send("off")} disabled={!!busy}
+        <motion.button whileTap={{ scale: 0.95 }} onHoverStart={hoverTick} onClick={() => send("off")} disabled={!!busy}
           className="clip-bevel-sm flex items-center justify-center gap-1 border border-white/15 bg-white/5 py-2.5 text-xs text-white/60 disabled:opacity-50">
           {busy === "off" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {t.off.toUpperCase()}
         </motion.button>

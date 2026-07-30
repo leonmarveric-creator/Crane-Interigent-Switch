@@ -301,6 +301,59 @@ export function hoverTick() {
   noise(c, t, 0.03, 0.006, 6000, 3000);
 }
 
+/** トグル操作のサーボ音: ON=上昇クリック / OFF=下降クリック (機械式の手応え)。 */
+export function toggleServo(on: boolean) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  // メカのカチッ (短い帯域ノイズ)
+  noise(c, t, 0.045, 0.02, on ? 2600 : 1400, on ? 5200 : 900);
+  // サーボの動き (周波数スイープ)
+  osc(c, "sawtooth", on ? 320 : 620, on ? 660 : 300, t, 0.11, 0.016, 4);
+  osc(c, "sine", on ? 880 : 500, on ? 1240 : 360, t + 0.02, 0.09, 0.012);
+}
+
+/** システム到達の和音: シーン成功時などの充実した確定音 (ドミナント→トニック)。 */
+export function systemChord() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  // 立ち上がりのきらめき
+  noise(c, t, 0.18, 0.01, 1200, 7000);
+  // 明るいメジャー和音を軽くアルペジオ (C - E - G - C)
+  [523, 659, 784, 1046].forEach((f, i) => {
+    osc(c, "sine", f, f, t + i * 0.05, 0.55, 0.02);
+    osc(c, "triangle", f * 0.5, f * 0.5, t + i * 0.05, 0.5, 0.01, 5);
+  });
+}
+
+/** データ転送のバースト: 微細なステップノイズ (背景/読み込み/情報更新)。 */
+export function dataBurst() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  for (let i = 0; i < 7; i++) {
+    const f = 1400 + Math.random() * 3200;
+    osc(c, "square", f, f, t + i * 0.028, 0.02, 0.006);
+  }
+  noise(c, t, 0.2, 0.006, 3000, 6000);
+}
+
+/** ターゲットロック: 2音でカチッと固定する照準音 (カード選択/フォーカス)。 */
+export function reticleLock() {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  osc(c, "sine", 1200, 1200, t, 0.05, 0.014);
+  osc(c, "sine", 1800, 1800, t + 0.06, 0.06, 0.016);
+  noise(c, t + 0.06, 0.04, 0.006, 5000, 2500);
+}
+
+/** 起動シーケンスの段階ビープ: BootSequenceの行表示に同期させる (i=0,1,2...)。 */
+export function bootStage(i: number) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const base = 640 + i * 120;
+  osc(c, "sine", base, base * 1.5, t, 0.09, 0.014);
+  noise(c, t, 0.05, 0.006, 3000, 6500);
+}
+
 /* -------------------------------------------------------------------------- */
 /* アンビエント: アークリアクターの低い持続ハム (opt-in・任意ON)。            */
 /* -------------------------------------------------------------------------- */

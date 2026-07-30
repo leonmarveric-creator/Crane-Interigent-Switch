@@ -245,3 +245,42 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @media (prefers-reduced-motion: reduce) {
   .anim-kenburns { animation: none; transform: none; }
 }
+
+/* ===== 先進HUD 追加演出 ===== */
+/* ホログラフィックなデータ列 (背景に降る微細なコード) */
+@keyframes dataFall {
+  0%   { transform: translateY(-30%); opacity: 0; }
+  8%   { opacity: 0.5; }
+  92%  { opacity: 0.5; }
+  100% { transform: translateY(130%); opacity: 0; }
+}
+.anim-datafall { animation: dataFall linear infinite; will-change: transform; }
+
+/* カード表面を一度だけ走る光沢シーン (トリガ時) */
+@keyframes sheen {
+  0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  12%  { opacity: 0.7; }
+  100% { transform: translateX(240%) skewX(-18deg); opacity: 0; }
+}
+.anim-sheen { animation: sheen 0.9s ease-out forwards; }
+
+/* 照準ロックのリングが一度だけ収束 */
+@keyframes reticlePing {
+  0%   { transform: scale(1.6); opacity: 0; }
+  30%  { opacity: 0.9; }
+  100% { transform: scale(0.9); opacity: 0; }
+}
+.anim-reticleping { animation: reticlePing 0.6s ease-out forwards; }
+
+/* 水平の走査ビーム (画面をゆっくり横断) */
+@keyframes hscan {
+  0%   { transform: translateY(0); opacity: 0; }
+  10%  { opacity: 0.55; }
+  90%  { opacity: 0.55; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+.anim-hscan { animation: hscan 9s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-datafall, .anim-sheen, .anim-reticleping, .anim-hscan { animation: none; }
+}
