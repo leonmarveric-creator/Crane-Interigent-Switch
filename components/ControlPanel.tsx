@@ -336,14 +336,22 @@ export default function ControlPanel({
           <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
         </motion.div>
 
+        {/* ギャラクシーモード (目玉機能。スクロールせず気づけるよう上部に配置) */}
+        {hasGalaxy && (
+          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+            <GalaxyCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
+              onState={setGalaxyActive} />
+          </motion.div>
+        )}
+
         {/* 光目覚まし (スクロールせず見えるよう上部に配置) */}
-        <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+        <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}>
           <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
         </motion.div>
 
         {/* デバイスグリッド */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
           className="mt-5 grid grid-cols-2 gap-4">
           <ToggleCard
             roomSlug={roomSlug} admin={admin} guard={guardCommand}
@@ -359,14 +367,6 @@ export default function ControlPanel({
             <WafuCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
           )}
         </motion.div>
-
-        {/* ギャラクシーモード (プラネタリウム対応の部屋のみ) */}
-        {hasGalaxy && (
-          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <GalaxyCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
-              onState={setGalaxyActive} />
-          </motion.div>
-        )}
       </div>
     </main>
   );

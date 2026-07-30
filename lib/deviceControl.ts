@@ -97,6 +97,16 @@ export async function executeDeviceAction(
       const r = action === "galaxy_on"
         ? await deviceTurnOn(sbCreds, room.switchbot_galaxy_device_id)
         : await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+      // ギャラクシーON時は、星空を引き立てるため他のライト(通常/和風)を消灯する。
+      // 消灯の失敗はギャラクシー本体の結果に影響させない(ベストエフォート)。
+      if (action === "galaxy_on" && r.ok) {
+        if (room.switchbot_light_device_id) {
+          await lightTurnOff(sbCreds, room.switchbot_light_device_id);
+        }
+        if (room.switchbot_wafu_device_id) {
+          await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
+        }
+      }
       return { ok: r.ok };
     }
     case "wafu_on":
@@ -145,12 +155,20 @@ export async function executeDeviceAction(
       return { ok };
     }
     case "welcome_cozy": {
-      // 和みモード: エアコン適温ON + 和風ライトを暖色で点灯 (メイン照明は点けない)
+      // 和みモード: エアコン適温ON + 和風ライトを暖色で点灯。
+      // 和みの雰囲気を出すため、和風以外のライト(通常照明/ギャラクシー)は消灯する。
       let ok = await sceneAcComfort(sbCreds, room);
       if (room.switchbot_wafu_device_id) {
         const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
         const warm = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id);
         ok = ok && on.ok && warm;
+      }
+      // 消灯はベストエフォート(失敗しても和みモード全体の結果には影響させない)。
+      if (room.switchbot_light_device_id) {
+        await lightTurnOff(sbCreds, room.switchbot_light_device_id);
+      }
+      if (room.switchbot_galaxy_device_id) {
+        await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
       }
       return { ok };
     }
