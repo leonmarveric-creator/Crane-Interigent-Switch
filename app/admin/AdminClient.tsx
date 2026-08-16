@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Copy, Check, Download, RefreshCw, Ban, LogOut, DoorOpen, KeyRound,
   QrCode, Globe, ExternalLink, Snowflake, CalendarDays, ClipboardList, Wrench,
-  Image as ImageIcon, History, PowerOff, Loader2, Home, Upload, LampFloor,
+  Image as ImageIcon, History, PowerOff, Loader2, Home, Upload, LampFloor, Droplets,
 } from "lucide-react";
 import { LANGS, LANG_LABEL } from "@/lib/i18n";
 import {
@@ -134,6 +134,10 @@ export default function AdminClient({
           </div>
           <div className="flex items-center gap-2">
             <SyncNowButton t={t} />
+            <a href="/admin/tank" title="便槽モニタリング"
+              className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200 active:scale-95">
+              <Droplets className="h-4 w-4" />
+            </a>
             <LangSwitch lang={lang} onChange={changeLang} />
             <button onClick={logout}
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs active:scale-95">
