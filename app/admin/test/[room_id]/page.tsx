@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import ControlPanel from "@/components/ControlPanel";
+import RoomModeSwitch from "@/components/RoomModeSwitch";
 import AccessDenied from "@/components/AccessDenied";
 import { isLang, type Lang } from "@/lib/i18n";
 
@@ -28,13 +28,14 @@ export default async function AdminTestRoomPage({
   if (!room) return <AccessDenied lang={lang} />;
 
   return (
-    <ControlPanel
+    <RoomModeSwitch
       roomSlug={room.slug}
       roomName={room.display_name}
       checkOut={new Date().toISOString()}
       initialLang={lang}
       admin
       imageUrl={room.image_url}
+      posterUrl={`/rooms/poster-${room.slug}.jpg`}
       hasGalaxy={!!room.switchbot_galaxy_device_id}
       hasNest={!!room.switchbot_nest_device_id}
       hasWafu={!!room.switchbot_wafu_device_id}

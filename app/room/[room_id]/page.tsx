@@ -4,7 +4,7 @@ import { verifySession, roomCookieName } from "@/lib/roomSession";
 import { isLang, type Lang } from "@/lib/i18n";
 import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
-import ControlPanel from "@/components/ControlPanel";
+import RoomModeSwitch from "@/components/RoomModeSwitch";
 
 export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 
@@ -51,12 +51,13 @@ export default async function RoomPage({
   }
 
   return (
-    <ControlPanel
+    <RoomModeSwitch
       roomSlug={params.room_id}
       roomName={stays.room.display_name}
       checkOut={matched.check_out}
       initialLang={lang}
       imageUrl={stays.room.image_url}
+      posterUrl={`/rooms/poster-${params.room_id}.jpg`}
       lat={stays.room.lat}
       lng={stays.room.lng}
       radiusM={stays.room.geofence_radius_m}
