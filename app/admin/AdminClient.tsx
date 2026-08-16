@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, Fragment } from "react";
 import { useFormStatus } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,7 +18,7 @@ import {
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 
 export interface Room {
-  id: string; slug: string; display_name: string; is_active: boolean;
+  id: string; slug: string; display_name: string; building: string | null; is_active: boolean;
   ac_device_id: string | null; light_device_id: string | null;
   galaxy_device_id: string | null;
   nest_device_id: string | null;
@@ -52,6 +52,38 @@ const fmt = (iso: string, lang: AdminLang) =>
   new Date(iso).toLocaleString(LOCALE[lang], {
     month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo",
   });
+
+/* ---------------- 棟(building) の区別ヘルパ ----------------
+   Crane Nest（春夏秋冬）と Crane Nest 2（松竹梅林荷）を色分け・グループ化して
+   管理しやすくする。既知の棟名は色を固定、未知の棟はニュートラル色。 */
+const BUILDING_ORDER = ["Crane Nest", "Crane Nest 2"];
+const buildingName = (room: Room): string => room.building || "Crane Nest";
+function buildingTone(name: string): string {
+  if (name === "Crane Nest 2") return "border-violet-400/40 bg-violet-500/15 text-violet-200";
+  if (name === "Crane Nest") return "border-cyan-400/40 bg-cyan-500/15 text-cyan-200";
+  return "border-white/20 bg-white/10 text-white/60";
+}
+function BuildingBadge({ name }: { name: string }) {
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${buildingTone(name)}`}>
+      {name}
+    </span>
+  );
+}
+function groupByBuilding(rooms: Room[]): { name: string; rooms: Room[] }[] {
+  const map = new Map<string, Room[]>();
+  for (const r of rooms) {
+    const b = buildingName(r);
+    if (!map.has(b)) map.set(b, []);
+    map.get(b)!.push(r);
+  }
+  const names = Array.from(map.keys()).sort((a, b) => {
+    const ia = BUILDING_ORDER.indexOf(a);
+    const ib = BUILDING_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+  });
+  return names.map((name) => ({ name, rooms: map.get(name)! }));
+}
 
 /**
  * 送信ボタン (サーバーアクション用)。
@@ -266,7 +298,14 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
             </tr>
           </thead>
           <tbody>
-            {rooms.map((room) => {
+            {groupByBuilding(rooms).map((group) => (
+              <Fragment key={group.name}>
+                <tr className="bg-white/[0.03]">
+                  <td colSpan={5} className="px-4 py-2">
+                    <BuildingBadge name={group.name} />
+                  </td>
+                </tr>
+                {group.rooms.map((room) => {
               const hit = todayByRoom.get(room.slug);
               const r = hit?.r;
               return (
@@ -296,7 +335,9 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
                   </td>
                 </tr>
               );
-            })}
+                })}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       </div>
@@ -463,6 +504,12 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
             <input type="text" name="slug" required placeholder="aki" pattern="[a-zA-Z0-9\-\s]+"
               className={`${selCls} font-mono lowercase`} />
           </Field>
+          <Field label="棟 / Building">
+            <select name="building" defaultValue="Crane Nest" className={selCls}>
+              <option value="Crane Nest">Crane Nest</option>
+              <option value="Crane Nest 2">Crane Nest 2</option>
+            </select>
+          </Field>
           <div className="sm:col-span-2">
             <Field label={t.icalLabel}>
               <input type="text" name="airbnb_ical_url" placeholder="https://www.airbnb.com/calendar/ical/..." className={`${selCls} text-xs`} />
@@ -476,11 +523,20 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
         </form>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {rooms.map((room) => (
-          <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} nests={nests} wafus={wafus} sbError={info.error} t={t} />
-        ))}
-      </div>
+      {groupByBuilding(rooms).map((group) => (
+        <div key={group.name} className="mb-6">
+          <div className="mb-3 flex items-center gap-2">
+            <BuildingBadge name={group.name} />
+            <span className="text-[11px] text-white/40">{group.rooms.length} {t.tabRooms}</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {group.rooms.map((room) => (
+              <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} nests={nests} wafus={wafus} sbError={info.error} t={t} />
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
@@ -516,7 +572,10 @@ function RoomManageCard({
               {t.rename}
             </SubmitButton>
           </form>
-          <p className="font-mono text-[11px] text-white/40">{room.slug}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="font-mono text-[11px] text-white/40">{room.slug}</p>
+            <BuildingBadge name={buildingName(room)} />
+          </div>
           <div className="mt-2 flex gap-2">
             <button onClick={async () => { await navigator.clipboard.writeText(room.url); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
               className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">

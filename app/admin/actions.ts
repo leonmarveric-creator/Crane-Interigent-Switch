@@ -89,10 +89,11 @@ export async function addRoom(formData: FormData) {
     .replace(/[^a-z0-9-]/g, "")
     .replace(/^-+|-+$/g, "");
   const airbnb_ical_url = String(formData.get("airbnb_ical_url") || "").trim() || null;
+  const building = String(formData.get("building") || "").trim() || "Crane Nest";
   if (!display_name || !slug) throw new Error("MISSING_FIELDS");
 
   const { error } = await supabaseAdmin.from("rooms").insert({
-    slug, display_name, airbnb_ical_url, is_active: true,
+    slug, display_name, building, airbnb_ical_url, is_active: true,
   });
   if (error) throw new Error(error.code === "23505" ? "SLUG_EXISTS: 同じslugの部屋があります" : error.message);
   revalidatePath("/admin");

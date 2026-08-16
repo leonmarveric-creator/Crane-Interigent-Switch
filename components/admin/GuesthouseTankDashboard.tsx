@@ -320,86 +320,80 @@ const TANK_I18N: Record<AdminLocale, TankDict> = {
 
 const LOCALE_TAG: Record<AdminLocale, string> = { zh: "zh-CN", ja: "ja-JP", en: "en-US" };
 
-// 状態ごとの配色（Tailwindのクラスは静的文字列で持つ＝purgeされないように）
+// 状態ごとの配色（ダークHUD調。Tailwindのクラスは静的文字列で持つ＝purgeされないように）
 const STATUS_STYLE: Record<
   TankStatus,
-  { chip: string; bar: string; ring: string; soft: string; text: string }
+  { chip: string; bar: string; ring: string; soft: string; text: string; glow: string; wave: string }
 > = {
   safe: {
-    chip: "bg-emerald-100 text-emerald-700",
-    bar: "from-emerald-400 to-emerald-500",
-    ring: "border-emerald-300",
-    soft: "bg-emerald-50",
-    text: "text-emerald-700",
+    chip: "bg-emerald-400/15 text-emerald-300 border border-emerald-400/30",
+    bar: "from-emerald-400 to-cyan-400",
+    ring: "border-emerald-400/40",
+    soft: "bg-emerald-500/5",
+    text: "text-emerald-300",
+    glow: "16,185,129",
+    wave: "%2334d399",
   },
   caution: {
-    chip: "bg-amber-100 text-amber-700",
-    bar: "from-amber-400 to-amber-500",
-    ring: "border-amber-300",
-    soft: "bg-amber-50",
-    text: "text-amber-700",
+    chip: "bg-amber-400/15 text-amber-300 border border-amber-400/30",
+    bar: "from-amber-400 to-orange-400",
+    ring: "border-amber-400/40",
+    soft: "bg-amber-500/5",
+    text: "text-amber-300",
+    glow: "251,191,36",
+    wave: "%23fbbf24",
   },
   alert: {
-    chip: "bg-red-100 text-red-700",
-    bar: "from-red-500 to-rose-600",
-    ring: "border-red-300",
-    soft: "bg-red-50",
-    text: "text-red-700",
+    chip: "bg-red-500/15 text-red-300 border border-red-500/40",
+    bar: "from-rose-500 to-red-600",
+    ring: "border-red-500/50",
+    soft: "bg-red-500/5",
+    text: "text-red-300",
+    glow: "244,63,94",
+    wave: "%23fb7185",
   },
 };
 
-// アニメーション用CSS（コンポーネント内に1回だけ注入）
+// アニメーション用CSS（ダークHUD調。コンポーネント内に1回だけ注入）
 const TANK_CSS = `
 @keyframes tankWave { from { background-position-x: 0; } to { background-position-x: 72px; } }
-@keyframes tankBob { 0%,100% { transform: translateY(-50%); } 50% { transform: translateY(-58%); } }
+@keyframes tankBob { 0%,100% { transform: translateY(-50%); } 50% { transform: translateY(-60%); } }
 @keyframes tankShimmer { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
-@keyframes tankAlertPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.45); } 70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); } }
-@keyframes tankFloatUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes tankAlertPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(244,63,94,.5); } 70% { box-shadow: 0 0 0 14px rgba(244,63,94,0); } }
+@keyframes tankFloatUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes tankPop { 0% { transform: scale(.82); opacity: .35; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes tankSweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
-@keyframes tankScan { 0% { transform: translateY(-100%); opacity: 0; } 18%,78% { opacity: .55; } 100% { transform: translateY(100%); opacity: 0; } }
+@keyframes tankGrid { from { transform: translateY(0); } to { transform: translateY(46px); } }
+@keyframes tankScan { 0% { transform: translateY(-100%); opacity: 0; } 18%,78% { opacity: .5; } 100% { transform: translateY(120%); opacity: 0; } }
 @keyframes tankSignal { 0%,100% { transform: scale(1); opacity: .75; } 50% { transform: scale(1.35); opacity: 1; } }
+@keyframes tankBubble { 0% { transform: translateY(0) scale(1); opacity: 0; } 12% { opacity: .9; } 100% { transform: translateY(-190px) scale(.4); opacity: 0; } }
+@keyframes tankSweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 .tank-fill { transition: height 1100ms cubic-bezier(.22,1,.36,1); }
-.tank-console {
-  background:
-    linear-gradient(135deg, rgba(240,253,250,.92), rgba(255,255,255,.98) 38%, rgba(255,247,237,.82)),
-    repeating-linear-gradient(90deg, rgba(15,23,42,.035) 0 1px, transparent 1px 26px);
-}
+.tank-console { background: radial-gradient(120% 80% at 15% 0%, rgba(34,211,238,.06), transparent 60%), #080d18; }
 .tank-console::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 8%, rgba(255,255,255,.7) 24%, transparent 42%);
-  animation: tankSweep 7s ease-in-out infinite;
+  content: ""; position: absolute; inset: -2px 0 0 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(rgba(34,211,238,.10) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.10) 1px, transparent 1px);
+  background-size: 46px 46px; animation: tankGrid 8s linear infinite; -webkit-mask-image: linear-gradient(#000, transparent 70%); mask-image: linear-gradient(#000, transparent 70%);
 }
-.tank-scanline {
-  position: absolute; inset: -20% 0;
-  background: linear-gradient(180deg, transparent, rgba(14,165,233,.22), transparent);
-  animation: tankScan 4.8s ease-in-out infinite;
+.tank-console::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 8%, rgba(34,211,238,.06) 22%, transparent 40%);
+  animation: tankSweep 9s ease-in-out infinite;
 }
-.tank-signal-dot {
-  display: inline-block; height: .5rem; width: .5rem; border-radius: 9999px;
-  animation: tankSignal 1.8s ease-in-out infinite;
-}
+.tank-scanline { position: absolute; inset: -20% 0; background: linear-gradient(180deg, transparent, rgba(34,211,238,.35), transparent); animation: tankScan 4.8s ease-in-out infinite; }
+.tank-signal-dot { display: inline-block; height: .5rem; width: .5rem; border-radius: 9999px; animation: tankSignal 1.8s ease-in-out infinite; }
 .tank-wave {
-  position: absolute; top: 0; left: 0; right: 0; height: 12px;
-  transform: translateY(-50%);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='12' viewBox='0 0 72 12'%3E%3Cpath d='M0 6 Q18 -1 36 6 T72 6 V12 H0 Z' fill='%23ffffff' fill-opacity='0.45'/%3E%3C/svg%3E");
-  background-repeat: repeat-x; background-size: 72px 12px;
-  animation: tankWave 1.8s linear infinite, tankBob 3.2s ease-in-out infinite;
+  position: absolute; top: 0; left: 0; right: 0; height: 14px; transform: translateY(-50%);
+  background-repeat: repeat-x; background-size: 72px 14px;
+  animation: tankWave 1.8s linear infinite, tankBob 3.4s ease-in-out infinite;
 }
-.tank-shimmer {
-  position: absolute; inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%);
-  background-size: 200% 100%;
-  animation: tankShimmer 3.4s ease-in-out infinite;
-}
+.tank-shimmer { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.20) 50%, transparent 70%); background-size: 200% 100%; animation: tankShimmer 3.4s ease-in-out infinite; }
+.tank-bubble { position: absolute; bottom: 6px; border-radius: 9999px; background: rgba(255,255,255,.55); animation: tankBubble 4.5s ease-in infinite; }
 .tank-alert-pulse { animation: tankAlertPulse 1.8s ease-out infinite; }
 .tank-floatup { animation: tankFloatUp .5s ease-out both; }
 .tank-pop { animation: tankPop .45s cubic-bezier(.22,1,.36,1); display: inline-block; }
+.hud-corner { position: absolute; height: 18px; width: 18px; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
-  .tank-console::before, .tank-scanline, .tank-signal-dot, .tank-wave, .tank-shimmer, .tank-alert-pulse, .tank-floatup, .tank-pop { animation: none !important; }
+  .tank-console::before, .tank-console::after, .tank-scanline, .tank-signal-dot, .tank-wave, .tank-shimmer, .tank-bubble, .tank-alert-pulse, .tank-floatup, .tank-pop { animation: none !important; }
 }
 `;
 
@@ -578,38 +572,44 @@ export default function GuesthouseTankDashboard() {
     );
   }
   if (!data) {
-    return <p className="py-24 text-center text-slate-400">{L.noData}</p>;
+    return <p className="py-24 text-center font-mono text-sm text-slate-500">{L.noData}</p>;
   }
 
   const isAlert = data.summary.status === "alert";
   const litersToAlert = Math.max(0, Math.round(data.summary.alertLine - data.currentLiters));
   const wxpusherState = data.alerted ? L.wxpusherSent : isAlert ? L.wxpusherReady : L.wxpusherWatching;
   const wxpusherTone = data.alerted
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
     : isAlert
-      ? "border-amber-200 bg-amber-50 text-amber-700"
-      : "border-cyan-200 bg-cyan-50 text-cyan-700";
+      ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+      : "border-cyan-400/25 bg-cyan-400/10 text-cyan-200";
 
   return (
-    <div className="tank-console relative overflow-hidden rounded-2xl border border-teal-100/80 p-3 shadow-inner shadow-white sm:p-5">
+    <div className="tank-console relative overflow-hidden rounded-2xl border border-cyan-400/20 p-4 text-slate-100 shadow-[0_0_60px_-15px_rgba(34,211,238,0.25)] sm:p-6">
       <style>{TANK_CSS}</style>
+      {/* HUDコーナーブラケット */}
+      <span className="hud-corner left-2 top-2 border-l-2 border-t-2 border-cyan-300/40" />
+      <span className="hud-corner right-2 top-2 border-r-2 border-t-2 border-cyan-300/40" />
+      <span className="hud-corner bottom-2 left-2 border-b-2 border-l-2 border-cyan-300/40" />
+      <span className="hud-corner bottom-2 right-2 border-b-2 border-r-2 border-cyan-300/40" />
 
       {/* ===== ヘッダー ===== */}
-      <div className="relative z-10 mb-5 flex flex-col gap-4 border-b border-slate-200/70 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative z-10 mb-5 flex flex-col gap-4 border-b border-cyan-400/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-3">
-            <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-sm ${isAlert ? "border-red-200 text-red-600" : "border-teal-200 text-teal-600"}`}>
+            <span className={`relative inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-white/5 backdrop-blur ${isAlert ? "border-red-500/40 text-red-300" : "border-cyan-400/30 text-cyan-300"}`}>
               <Droplets className="h-6 w-6" />
             </span>
             <div>
-              <h1 className="text-2xl font-extrabold tracking-normal text-slate-950">{L.title}</h1>
-              <p className="text-xs font-semibold text-slate-400">
-                {L.updated}: {new Date(data.updatedAt).toLocaleString(LOCALE_TAG[locale] || "zh-CN")}
-              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-400/70">Tank Monitor</p>
+              <h1 className="text-2xl font-extrabold tracking-tight text-white">{L.title}</h1>
             </div>
           </div>
-          <p className="max-w-2xl text-sm leading-6 text-slate-500">
+          <p className="max-w-2xl text-sm leading-6 text-slate-400">
             {L.subtitle(data.litersPerGuestPerDay, data.summary.alertLine)}
+          </p>
+          <p className="mt-1 font-mono text-[11px] text-slate-500">
+            {L.updated}: {new Date(data.updatedAt).toLocaleString(LOCALE_TAG[locale] || "ja-JP")}
           </p>
         </div>
 
@@ -618,7 +618,7 @@ export default function GuesthouseTankDashboard() {
             <button
               onClick={sendTestAlert}
               disabled={saving || testingAlert}
-              className="flex items-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-cyan-400/20 disabled:opacity-50"
             >
               {testingAlert ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellRing className="h-3.5 w-3.5" />}
               {L.testAlert}
@@ -626,7 +626,7 @@ export default function GuesthouseTankDashboard() {
             <button
               onClick={syncAirbnb}
               disabled={saving || testingAlert}
-              className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:-translate-y-0.5 hover:border-rose-300/50 hover:bg-rose-400/20 disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
               {L.sync}
@@ -634,7 +634,7 @@ export default function GuesthouseTankDashboard() {
             <button
               onClick={refreshEvaluate}
               disabled={saving || testingAlert}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:border-brand-300 hover:text-brand-700 hover:shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:text-cyan-200 disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {L.recalc}
@@ -645,13 +645,13 @@ export default function GuesthouseTankDashboard() {
               icon={<Waves className="h-4 w-4" />}
               label={L.liveMeter}
               value={`${data.summary.pct}%`}
-              className="border-sky-200 bg-sky-50 text-sky-700"
+              className="border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
             />
             <SignalPill
               icon={<Activity className="h-4 w-4" />}
               label={L.actionLine}
               value={`${litersToAlert} L`}
-              className={isAlert ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-700"}
+              className={isAlert ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-amber-400/30 bg-amber-400/10 text-amber-200"}
             />
             <SignalPill
               icon={<MessageCircle className="h-4 w-4" />}
@@ -666,30 +666,30 @@ export default function GuesthouseTankDashboard() {
 
       {/* ===== ステータスカード ===== */}
       <div
-        className={`tank-floatup relative z-10 mb-5 flex flex-col gap-3 overflow-hidden rounded-xl border ${style.ring} ${style.soft} p-5 sm:flex-row sm:items-center sm:justify-between ${isAlert ? "tank-alert-pulse" : ""}`}
+        className={`tank-floatup relative z-10 mb-5 flex flex-col gap-3 overflow-hidden rounded-xl border ${style.ring} ${style.soft} bg-white/[0.02] p-5 sm:flex-row sm:items-center sm:justify-between ${isAlert ? "tank-alert-pulse" : ""}`}
       >
-        <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${style.bar}`} />
+        <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${style.bar}`} />
         <div className="flex items-center gap-3">
           <span className="text-3xl" aria-hidden>{emoji}</span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${style.chip}`}>{st.label}</span>
-              <span className="text-xs font-semibold text-slate-400">{data.alerted ? L.wxpusherSent : L.wxpusherWatching}</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-slate-400">{data.alerted ? L.wxpusherSent : L.wxpusherWatching}</span>
             </div>
             <p className={`mt-1 text-lg font-extrabold ${style.text}`}>{st.message}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-extrabold text-slate-900">
+          <p className="font-mono text-3xl font-extrabold text-white [text-shadow:0_0_18px_rgba(34,211,238,.35)]">
             <span key={Math.round(data.currentLiters)} className="tank-pop">{Math.round(data.currentLiters)}</span>
-            <span className="ml-1 text-base font-semibold text-slate-400">/ {data.capacityLiters} L</span>
+            <span className="ml-1 text-base font-semibold text-slate-500">/ {data.capacityLiters} L</span>
           </p>
           <p className={`text-sm font-bold ${style.text}`}>{data.summary.pct}%</p>
         </div>
       </div>
 
       {isAlert && (
-        <div className="tank-floatup relative z-10 mb-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="tank-floatup relative z-10 mb-5 flex items-center gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200">
           <BellRing className="h-5 w-5 shrink-0" />
           <span>{L.pumpCallout}</span>
         </div>
@@ -697,40 +697,60 @@ export default function GuesthouseTankDashboard() {
 
       <div className="relative z-10 grid gap-5 lg:grid-cols-[280px_1fr]">
         {/* ===== 縦型タンクメーター（アニメーション） ===== */}
-        <div className="tank-floatup rounded-xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-900/5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-600">
-            <Gauge className="h-4 w-4 text-brand-600" /> {L.meterTitle}
+        <div className="tank-floatup rounded-xl border border-cyan-400/15 bg-white/[0.03] p-5">
+          <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-cyan-300/80">
+            <Gauge className="h-4 w-4" /> {L.meterTitle}
           </div>
           <div className="flex items-end justify-center gap-4">
-            <div className="relative h-72 w-32 overflow-hidden rounded-[1.4rem] border-2 border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 shadow-inner">
-              <div className="absolute left-1/2 top-2 z-20 h-1.5 w-14 -translate-x-1/2 rounded-full bg-slate-300/70" />
+            <div className="relative h-72 w-32 overflow-hidden rounded-[1.4rem] border-2 border-cyan-400/20 bg-gradient-to-b from-[#0a1120] to-[#05080f] shadow-[inset_0_0_30px_rgba(0,0,0,.6)]">
+              <div className="absolute left-1/2 top-2 z-20 h-1.5 w-14 -translate-x-1/2 rounded-full bg-cyan-400/30" />
               <div className="tank-scanline z-10" />
-              {/* 水量（さざ波・シマー付き） */}
+              {/* 水量（さざ波・シマー・気泡付き） */}
               <div
                 className={`tank-fill absolute bottom-0 left-0 w-full bg-gradient-to-t ${style.bar}`}
-                style={{ height: `${fillPct}%` }}
+                style={{ height: `${fillPct}%`, boxShadow: `0 0 26px rgba(${style.glow},.55)` }}
               >
-                {fillPct > 1 && <div className="tank-wave" />}
+                {fillPct > 1 && (
+                  <div
+                    className="tank-wave"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='14' viewBox='0 0 72 14'%3E%3Cpath d='M0 7 Q18 0 36 7 T72 7 V14 H0 Z' fill='${style.wave}' fill-opacity='0.85'/%3E%3C/svg%3E")`,
+                    }}
+                  />
+                )}
                 <div className="tank-shimmer" />
+                {fillPct > 8 &&
+                  [0, 1, 2, 3].map((i) => (
+                    <span
+                      key={i}
+                      className="tank-bubble"
+                      style={{
+                        left: `${16 + i * 21}%`,
+                        height: `${4 + (i % 3) * 2}px`,
+                        width: `${4 + (i % 3) * 2}px`,
+                        animationDelay: `${i * 0.9}s`,
+                      }}
+                    />
+                  ))}
               </div>
               {/* 警告ライン（赤い破線） */}
               <div
-                className="absolute left-0 z-10 w-full border-t-2 border-dashed border-red-500"
+                className="absolute left-0 z-10 w-full border-t-2 border-dashed border-red-400/80"
                 style={{ bottom: `${alertLinePct}%` }}
               >
-                <span className="absolute -top-4 right-1 rounded bg-red-500 px-1 text-[10px] font-bold text-white">
+                <span className="absolute -top-4 right-1 rounded bg-red-500 px-1 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,.6)]">
                   {L.warn}
                 </span>
               </div>
               {/* 中央のパーセント表示 */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <span key={data.summary.pct} className="tank-pop rounded-lg border border-white/80 bg-white/75 px-2.5 py-1 text-sm font-extrabold text-slate-800 shadow-sm backdrop-blur">
+                <span key={data.summary.pct} className="tank-pop rounded-lg border border-cyan-400/20 bg-black/40 px-2.5 py-1 font-mono text-sm font-extrabold text-white backdrop-blur [text-shadow:0_0_12px_rgba(34,211,238,.5)]">
                   {data.summary.pct}%
                 </span>
               </div>
             </div>
           </div>
-          <p className="mt-4 text-center text-sm font-bold text-slate-700">
+          <p className="mt-4 text-center font-mono text-sm font-bold text-slate-300">
             {Math.round(data.currentLiters)} L / {data.capacityLiters} L（{data.summary.pct}%）
           </p>
         </div>
@@ -759,22 +779,22 @@ export default function GuesthouseTankDashboard() {
           </div>
 
           {/* 手動補正 */}
-          <div className="tank-floatup rounded-xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-900/5">
-            <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-600">
-              <Users className="h-4 w-4 text-brand-600" /> {L.overrideTitle}
+          <div className="tank-floatup rounded-xl border border-cyan-400/15 bg-white/[0.03] p-5">
+            <div className="mb-1 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-cyan-300/80">
+              <Users className="h-4 w-4" /> {L.overrideTitle}
             </div>
-            <p className="mb-3 text-xs text-slate-400">{L.overrideHint}</p>
+            <p className="mb-3 text-xs text-slate-500">{L.overrideHint}</p>
             <div className="flex flex-wrap items-end gap-3">
-              <label className="text-xs font-semibold text-slate-500">
+              <label className="text-xs font-semibold text-slate-400">
                 {L.targetDate}
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="mt-1 block rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-brand-400 focus:outline-none"
+                  className="mt-1 block rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 [color-scheme:dark] focus:border-cyan-400/50 focus:outline-none"
                 />
               </label>
-              <label className="text-xs font-semibold text-slate-500">
+              <label className="text-xs font-semibold text-slate-400">
                 {L.overrideGuests}
                 <input
                   type="number"
@@ -783,13 +803,13 @@ export default function GuesthouseTankDashboard() {
                   placeholder="4"
                   value={guests}
                   onChange={(e) => setGuests(e.target.value)}
-                  className="mt-1 block w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-brand-400 focus:outline-none"
+                  className="mt-1 block w-28 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 [color-scheme:dark] focus:border-cyan-400/50 focus:outline-none"
                 />
               </label>
               <button
                 onClick={submitOverride}
                 disabled={saving || testingAlert}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-900 shadow-[0_0_20px_-4px_rgba(34,211,238,.7)] transition hover:-translate-y-0.5 hover:shadow-[0_0_26px_-2px_rgba(34,211,238,.9)] disabled:opacity-50"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 {L.applyOverride}
@@ -797,7 +817,7 @@ export default function GuesthouseTankDashboard() {
               <button
                 onClick={clearOverride}
                 disabled={saving || testingAlert}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-slate-300 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:border-white/20 disabled:opacity-50"
               >
                 {L.backToAuto}
               </button>
@@ -805,15 +825,15 @@ export default function GuesthouseTankDashboard() {
           </div>
 
           {/* 汲み取り完了リセット */}
-          <div className="tank-floatup rounded-xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-900/5">
+          <div className="tank-floatup rounded-xl border border-cyan-400/15 bg-white/[0.03] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-700">{L.pumpTitle}</p>
-                <p className="text-xs text-slate-400">{L.pumpHint}</p>
+                <p className="text-sm font-semibold text-slate-200">{L.pumpTitle}</p>
+                <p className="text-xs text-slate-500">{L.pumpHint}</p>
               </div>
               <button
                 onClick={() => setConfirmReset(true)}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-300 hover:text-brand-700 hover:shadow-sm"
+                className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-200 transition hover:-translate-y-0.5 hover:border-red-400/50 hover:bg-red-500/20"
               >
                 <Truck className="h-4 w-4" /> {L.pumpButton}
               </button>
@@ -822,22 +842,22 @@ export default function GuesthouseTankDashboard() {
 
           {/* 宿泊ログ */}
           {data.logs.length > 0 && (
-            <div className="tank-floatup overflow-hidden rounded-xl border border-slate-200 bg-white/90 shadow-sm shadow-slate-900/5">
-              <div className="bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500">{L.logTitle}</div>
+            <div className="tank-floatup overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
+              <div className="bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-slate-400">{L.logTitle}</div>
               <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/5">
                   {data.logs.slice(0, 10).map((l) => (
-                    <tr key={l.date} className="transition hover:bg-slate-50">
-                      <td className="px-4 py-2 text-slate-600">{l.date}</td>
-                      <td className="px-4 py-2 text-slate-800">
+                    <tr key={l.date} className="transition hover:bg-white/5">
+                      <td className="px-4 py-2 font-mono text-slate-400">{l.date}</td>
+                      <td className="px-4 py-2 text-slate-200">
                         {L.guestsUnit(l.guests)}
                         {l.overridden && (
-                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          <span className="ml-2 rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                             {L.overrideBadge}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-right font-semibold text-slate-700">+{l.liters} L</td>
+                      <td className="px-4 py-2 text-right font-mono font-semibold text-cyan-200">+{l.liters} L</td>
                     </tr>
                   ))}
                 </tbody>
@@ -849,24 +869,24 @@ export default function GuesthouseTankDashboard() {
 
       {/* ===== 確認ダイアログ ===== */}
       {confirmReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="tank-pop w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <div className="mb-2 flex items-center gap-2 text-red-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="tank-pop w-full max-w-sm rounded-xl border border-cyan-400/20 bg-[#0b1020] p-6 text-slate-100 shadow-[0_0_50px_-10px_rgba(34,211,238,.4)]">
+            <div className="mb-2 flex items-center gap-2 text-red-300">
               <Truck className="h-5 w-5" />
-              <h3 className="text-lg font-extrabold text-slate-900">{L.confirmTitle}</h3>
+              <h3 className="text-lg font-extrabold text-white">{L.confirmTitle}</h3>
             </div>
-            <p className="mb-5 text-sm text-slate-500">{L.confirmBody(todayStr())}</p>
+            <p className="mb-5 text-sm text-slate-400">{L.confirmBody(todayStr())}</p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmReset(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300"
               >
                 {L.cancel}
               </button>
               <button
                 onClick={doReset}
                 disabled={resetting}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-[0_0_20px_-4px_rgba(244,63,94,.8)] disabled:opacity-50"
               >
                 {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
                 {L.doReset}
@@ -878,7 +898,7 @@ export default function GuesthouseTankDashboard() {
 
       {/* ===== トースト ===== */}
       {toast && (
-        <div className="tank-pop fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+        <div className="tank-pop fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-cyan-400/30 bg-[#0b1020] px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-[0_0_30px_-6px_rgba(34,211,238,.5)]">
           {toast}
         </div>
       )}
@@ -886,7 +906,7 @@ export default function GuesthouseTankDashboard() {
   );
 }
 
-// ---- 小さなステータスピル ----
+// ---- 小さなステータスピル（HUD） ----
 function SignalPill({
   icon,
   label,
@@ -901,8 +921,8 @@ function SignalPill({
   pulse?: boolean;
 }) {
   return (
-    <div className={`min-h-[68px] rounded-xl border px-3 py-2 shadow-sm shadow-white/80 ${className}`}>
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase">
+    <div className={`min-h-[68px] rounded-xl border px-3 py-2 backdrop-blur ${className}`}>
+      <div className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider">
         <span className={`${pulse ? "tank-signal-dot" : ""} inline-block h-2 w-2 rounded-full bg-current opacity-80`} />
         {icon}
         <span className="truncate">{label}</span>
@@ -912,7 +932,7 @@ function SignalPill({
   );
 }
 
-// ---- 小さなメトリクスカード ----
+// ---- 小さなメトリクスカード（HUD） ----
 function Metric({
   icon,
   label,
@@ -925,13 +945,13 @@ function Metric({
   sub?: string;
 }) {
   return (
-    <div className="tank-floatup min-h-[112px] rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-900/5 transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span className="text-brand-600">{icon}</span>
+    <div className="tank-floatup min-h-[112px] rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 transition hover:-translate-y-0.5 hover:border-cyan-400/30">
+      <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-slate-400">
+        <span className="text-cyan-300">{icon}</span>
         {label}
       </div>
-      <p className="mt-1 text-xl font-extrabold text-slate-900">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+      <p className="mt-1 text-xl font-extrabold text-white">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
     </div>
   );
 }

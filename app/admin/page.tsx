@@ -14,7 +14,8 @@ export default async function AdminPage() {
 
   const { data: roomRows } = await supabaseAdmin
     .from("rooms")
-    .select("id, slug, display_name, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, switchbot_nest_device_id, switchbot_wafu_device_id, image_url, lat, lng, geofence_radius_m")
+    .select("id, slug, display_name, building, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, switchbot_nest_device_id, switchbot_wafu_device_id, image_url, lat, lng, geofence_radius_m")
+    .order("building")
     .order("slug");
 
   const { data: reservations } = await supabaseAdmin
@@ -32,7 +33,7 @@ export default async function AdminPage() {
         color: { dark: "#0b0f1a", light: "#ffffff" },
       });
       return {
-        id: r.id, slug: r.slug, display_name: r.display_name, is_active: r.is_active,
+        id: r.id, slug: r.slug, display_name: r.display_name, building: r.building ?? null, is_active: r.is_active,
         ac_device_id: r.switchbot_ac_device_id ?? null,
         light_device_id: r.switchbot_light_device_id ?? null,
         galaxy_device_id: r.switchbot_galaxy_device_id ?? null,
