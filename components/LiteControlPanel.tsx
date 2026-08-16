@@ -55,32 +55,19 @@ const TONE: Record<Tone, string> = {
   rose: "border-rose-400/50 bg-rose-400/20 text-rose-100 active:bg-rose-400/35",
 };
 
-// ---- 部屋ごとのテーマ（名前に合わせた色＋モチーフ模様） ----
-//   rgb: アクセント色 / motif: 背景に敷く小さなSVG模様（accentで着色済み）
-type ThemeDef = { rgb: string; motif: string };
-const THEME: Record<string, ThemeDef> = {
-  // 春詠 — 桜（ピンクの花）
-  "room-spring": { rgb: "249,168,212", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='46' height='46' viewBox='0 0 46 46'><g fill='#f9a8d4' fill-opacity='0.16'><circle cx='23' cy='15' r='3.2'/><circle cx='16' cy='21' r='3.2'/><circle cx='30' cy='21' r='3.2'/><circle cx='18.5' cy='29' r='3.2'/><circle cx='27.5' cy='29' r='3.2'/></g><circle cx='23' cy='23' r='2' fill='#fde68a' fill-opacity='0.5'/></svg>" },
-  // 夏涼 — 水の波
-  "room-summer": { rgb: "94,234,212", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'><path d='M0 12 Q12 3 24 12 T48 12' fill='none' stroke='#5eead4' stroke-opacity='0.24' stroke-width='2'/></svg>" },
-  // 秋灯 — 紅葉（ダイヤ形の葉）
-  "room-autumn": { rgb: "251,146,60", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g fill='#fb923c' fill-opacity='0.18'><rect x='16' y='16' width='11' height='11' transform='rotate(45 22 22)'/></g><path d='M22 27 V33' stroke='#fb923c' stroke-opacity='0.18' stroke-width='1.6'/></svg>" },
-  // 冬宵 — 雪の結晶
-  "room-winter": { rgb: "147,197,253", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g stroke='#93c5fd' stroke-opacity='0.22' stroke-width='1.6'><path d='M22 10 V34 M10 22 H34 M13.5 13.5 L30.5 30.5 M30.5 13.5 L13.5 30.5'/></g></svg>" },
-  // 松 — 松葉（シェブロン）
-  "room-matsu": { rgb: "250,204,21", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g stroke='#facc15' stroke-opacity='0.20' stroke-width='2' fill='none'><path d='M12 26 L22 14 L32 26'/><path d='M16 32 L22 24 L28 32'/></g></svg>" },
-  // 竹 — 竹の節
-  "room-take": { rgb: "134,239,172", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g stroke='#86efac' stroke-opacity='0.24' stroke-width='2'><path d='M15 6 V38 M29 6 V38'/></g><g stroke='#86efac' stroke-opacity='0.34' stroke-width='2'><path d='M12 17 H18 M26 27 H32'/></g></svg>" },
-  // 梅 — 梅の花（紅）
-  "room-ume": { rgb: "251,113,133", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='46' height='46' viewBox='0 0 46 46'><g fill='#fb7185' fill-opacity='0.18'><circle cx='23' cy='15' r='3.4'/><circle cx='16' cy='21' r='3.4'/><circle cx='30' cy='21' r='3.4'/><circle cx='18.5' cy='29' r='3.4'/><circle cx='27.5' cy='29' r='3.4'/></g><circle cx='23' cy='23' r='2' fill='#fde68a' fill-opacity='0.55'/></svg>" },
-  // 林 — 木の葉
-  "room-hayashi": { rgb: "163,230,53", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g fill='#a3e635' fill-opacity='0.16'><ellipse cx='22' cy='22' rx='4.5' ry='10' transform='rotate(35 22 22)'/></g><path d='M22 22 L27 15' stroke='#a3e635' stroke-opacity='0.2' stroke-width='1.4'/></svg>" },
-  // 荷 — 蓮の花びら
-  "room-ni": { rgb: "240,171,252", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><g fill='#f0abfc' fill-opacity='0.17'><path d='M22 8 C26 17 26 24 22 29 C18 24 18 17 22 8 Z'/><path d='M12 15 C19 19 21 24 21 29 C15 28 12 22 12 15 Z'/><path d='M32 15 C25 19 23 24 23 29 C29 28 32 22 32 15 Z'/></g></svg>" },
+// ---- 部屋ごとのアクセント色（名前に合わせた色） ----
+const THEME_RGB: Record<string, string> = {
+  "room-spring": "249,168,212", // 春詠 桜
+  "room-summer": "94,234,212",  // 夏涼 水
+  "room-autumn": "251,146,60",  // 秋灯 紅葉
+  "room-winter": "147,197,253", // 冬宵 雪
+  "room-matsu": "250,204,21",   // 松
+  "room-take": "134,239,172",   // 竹
+  "room-ume": "251,113,133",    // 梅
+  "room-hayashi": "163,230,53", // 林
+  "room-ni": "240,171,252",     // 荷 蓮
 };
-const DEFAULT_THEME: ThemeDef = { rgb: "34,211,238", motif: "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'><circle cx='22' cy='22' r='2' fill='#22d3ee' fill-opacity='0.18'/></svg>" };
-const getTheme = (slug: string): ThemeDef => THEME[slug] || DEFAULT_THEME;
-const motifUrl = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+const getRgb = (slug: string): string => THEME_RGB[slug] || "34,211,238";
 
 function ActionBtn({
   roomSlug, admin, action, value, label, Icon, tone,
@@ -216,72 +203,68 @@ export default function LiteControlPanel({
   const t = T[lang];
   const e = EXTRA[lang];
   const wafuOn: DeviceAction = admin ? "wafu_on_warm" : "wafu_on";
-  const theme = getTheme(roomSlug);
-  const accent = `rgb(${theme.rgb})`;
-  const labelStyle = { color: `rgba(${theme.rgb},0.95)` };
+  const rgb = getRgb(roomSlug);
+  const accent = `rgb(${rgb})`;
+  const labelStyle = { color: `rgba(${rgb},0.95)` };
 
   return (
-    <main className="relative min-h-dvh bg-[#0c111b] text-white">
-      {/* 背景: ポスター（明るめ）＋ テーマ色グロー ＋ 部屋名モチーフ模様 */}
-      <div className="pointer-events-none fixed inset-0">
+    <main className="min-h-dvh bg-[#0b0f18] text-white">
+      {/* ヒーロー: 部屋アートを上部に大きく。背景は単色で見やすく整理。 */}
+      <div className="relative h-56 w-full overflow-hidden sm:h-64">
         {posterUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={posterUrl}
             alt={roomName}
-            className="h-full w-full object-cover opacity-60"
+            className="h-full w-full object-cover object-top"
             onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        {/* 少し明るい暗幕（テーマ色を上部に薄く） */}
+        {/* 下方向へ単色にフェード（テキストを読みやすく） */}
         <div
           className="absolute inset-0"
-          style={{ background: `radial-gradient(120% 70% at 50% 0%, rgba(${theme.rgb},0.20), transparent 60%), linear-gradient(180deg, rgba(12,17,27,0.45) 0%, rgba(12,17,27,0.70) 55%, #0c111b 100%)` }}
+          style={{ background: "linear-gradient(180deg, rgba(11,15,24,0.10) 0%, rgba(11,15,24,0.35) 45%, rgba(11,15,24,0.85) 80%, #0b0f18 100%)" }}
         />
-        {/* 部屋名にちなんだモチーフ模様（うっすら） */}
-        <div className="absolute inset-0 opacity-70" style={{ backgroundImage: motifUrl(theme.motif), backgroundRepeat: "repeat" }} />
+        {/* 上部バー: 言語 / 通常UIへ */}
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+          <label className="flex items-center gap-1 rounded-lg border border-white/15 bg-black/45 px-2 py-1 text-xs text-white/90 backdrop-blur">
+            <Globe className="h-3.5 w-3.5" />
+            <select
+              value={lang}
+              onChange={(ev) => setLang(ev.target.value as Lang)}
+              className="bg-transparent focus:outline-none [&>option]:text-black"
+            >
+              {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
+            </select>
+          </label>
+          {onSwitchMode && (
+            <button
+              onClick={onSwitchMode}
+              className="flex items-center gap-1 rounded-lg border border-white/20 bg-black/45 px-2.5 py-1.5 text-xs font-semibold text-white/90 backdrop-blur active:bg-white/10"
+            >
+              <PanelsTopLeft className="h-3.5 w-3.5" /> {e.full}
+            </button>
+          )}
+        </div>
+        {/* 下部: バッジ / 部屋名 / チェックアウト */}
+        <div className="absolute inset-x-0 bottom-0 p-4">
+          <span
+            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
+            style={{ color: accent, borderColor: `rgba(${rgb},0.6)`, background: `rgba(${rgb},0.16)` }}
+          >
+            {e.lite}
+          </span>
+          <h1 className="mt-1 truncate text-3xl font-extrabold drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{roomName}</h1>
+          {!admin && (
+            <p className="mt-0.5 text-[11px] text-white/70">
+              {t.checkout}: {new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-md px-4 pb-16 pt-6">
-        {/* ヘッダー */}
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
-                style={{ color: accent, borderColor: `rgba(${theme.rgb},0.5)`, background: `rgba(${theme.rgb},0.14)` }}
-              >
-                {e.lite}
-              </span>
-            </div>
-            <h1 className="mt-1 truncate text-2xl font-extrabold">{roomName}</h1>
-            {!admin && (
-              <p className="mt-0.5 text-[11px] text-white/45">
-                {t.checkout}: {new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
-              </p>
-            )}
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <label className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
-              <Globe className="h-3.5 w-3.5" />
-              <select
-                value={lang}
-                onChange={(ev) => setLang(ev.target.value as Lang)}
-                className="bg-transparent text-white/80 focus:outline-none [&>option]:text-black"
-              >
-                {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
-              </select>
-            </label>
-            {onSwitchMode && (
-              <button
-                onClick={onSwitchMode}
-                className="flex items-center gap-1 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2.5 py-1.5 text-xs font-semibold text-violet-200 active:bg-violet-400/25"
-              >
-                <PanelsTopLeft className="h-3.5 w-3.5" /> {e.full}
-              </button>
-            )}
-          </div>
-        </div>
+      {/* 操作エリア: 単色背景で見やすく・整理された配置 */}
+      <div className="mx-auto max-w-md px-4 pb-16 pt-5">
 
         {/* 施錠 */}
         <div className="mb-4 grid grid-cols-2 gap-3">
