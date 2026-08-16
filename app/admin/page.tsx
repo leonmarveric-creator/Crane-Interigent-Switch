@@ -20,7 +20,7 @@ export default async function AdminPage() {
 
   const { data: reservations } = await supabaseAdmin
     .from("reservations")
-    .select("id, room_id, source, check_in, check_out, status, guest_name, guest_lang, unlock_pin, airbnb_reservation_url")
+    .select("id, room_id, assigned_room_id, source, check_in, check_out, status, guest_name, guest_lang, unlock_pin, airbnb_reservation_url")
     .order("check_in", { ascending: false })
     .limit(100);
 
@@ -50,10 +50,14 @@ export default async function AdminPage() {
 
   const enriched: Reservation[] = (reservations ?? []).map((r) => {
     const room = roomMap.get(r.room_id);
+    const aroom = r.assigned_room_id ? roomMap.get(r.assigned_room_id) : undefined;
     return {
       id: r.id,
       room_name: room?.display_name ?? "—",
       room_slug: room?.slug ?? "",
+      assigned_room_id: r.assigned_room_id ?? null,
+      assigned_room_name: aroom?.display_name ?? null,
+      assigned_room_slug: aroom?.slug ?? null,
       source: r.source,
       status: r.status,
       guest_name: r.guest_name,

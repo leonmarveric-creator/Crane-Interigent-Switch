@@ -39,10 +39,14 @@ export async function getActiveStays(roomSlug: string): Promise<ActiveStays | nu
   const { data: reservations } = await supabaseAdmin
     .from("reservations")
     .select("id, room_id, guest_lang, check_in, check_out, unlock_pin, welcomed_at")
-    .eq("room_id", room.id)
     .eq("status", "active")
     .lte("check_in", nowIso)
     .gt("check_out", nowIso)
+    // 「物理的にこの部屋にいる予約」を対象にする:
+    //   1) この部屋へ割り当て済み(assigned_room_id = この部屋)
+    //   2) 未割り当て(assigned_room_id is null)で、元の部屋がこの部屋
+    //   ※割り当てが一切無ければ 2) だけになり、従来と同じ挙動。
+    .or(`assigned_room_id.eq.${room.id},and(assigned_room_id.is.null,room_id.eq.${room.id})`)
     .order("check_in", { ascending: false }); // 直近チェックインを優先
 
   if (!reservations || reservations.length === 0) return null;

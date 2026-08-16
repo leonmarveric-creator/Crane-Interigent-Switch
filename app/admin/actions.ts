@@ -122,6 +122,22 @@ export async function assignDevices(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/**
+ * 予約を別の部屋へ「割り当て（寄せ）」。実際に泊まる物理部屋を上書きする。
+ * 空文字なら解除（元の予約どおり）。看板の付け替え運用に対応。
+ */
+export async function assignReservation(formData: FormData) {
+  requireAdmin();
+  const id = String(formData.get("id") || "");
+  const target = String(formData.get("assigned_room_id") || "").trim();
+  if (!id) return;
+  await supabaseAdmin
+    .from("reservations")
+    .update({ assigned_room_id: target || null })
+    .eq("id", id);
+  revalidatePath("/admin");
+}
+
 /** 部屋のジオフェンス(座標・半径)を更新。空欄で解除。 */
 export async function updateGeofence(formData: FormData) {
   requireAdmin();

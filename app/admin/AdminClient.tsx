@@ -13,7 +13,7 @@ import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom, assignReservation,
 } from "./actions";
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 
@@ -29,6 +29,9 @@ export interface Room {
 }
 export interface Reservation {
   id: string; room_name: string; room_slug: string;
+  assigned_room_id: string | null;
+  assigned_room_name?: string | null;
+  assigned_room_slug?: string | null;
   source: "ical" | "manual"; status: "active" | "cancelled" | "completed";
   guest_name: string | null; guest_lang: string;
   check_in: string; check_out: string;
@@ -314,6 +317,11 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
                     <div className="flex items-center gap-2">
                       <RoomThumb room={room} size={32} />
                       <span className="font-medium">{room.display_name}</span>
+                      {r?.assigned_room_id && (
+                        <span className="rounded-full border border-violet-400/40 bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200">
+                          → {r.assigned_room_name}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-2 py-3">
@@ -349,6 +357,7 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
 /* ---------------- Reservations tab ---------------- */
 function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservations: Reservation[]; t: T; lang: AdminLang }) {
   const [filter, setFilter] = useState<string>("all");
+  const [assignMode, setAssignMode] = useState(false); // 客室割り当て（寄せ）モード
   const shown = useMemo(
     () => reservations.filter((r) => filter === "all" || r.room_slug === filter),
     [reservations, filter]
@@ -389,13 +398,20 @@ function ReservationsTab({ rooms, reservations, t, lang }: { rooms: Room[]; rese
         </form>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={t.all} />
         {rooms.map((r) => <FilterChip key={r.id} active={filter === r.slug} onClick={() => setFilter(r.slug)} label={r.display_name} />)}
+        <button
+          onClick={() => { blip(); setAssignMode((v) => !v); }}
+          className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${assignMode ? "border-violet-400/50 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/5 text-white/55"}`}
+          title="看板の付け替え運用に合わせ、予約を別の部屋に寄せる"
+        >
+          <DoorOpen className="h-3.5 w-3.5" /> 客室割り当て
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {shown.map((r) => <ReservationCard key={r.id} r={r} t={t} lang={lang} />)}
+        {shown.map((r) => <ReservationCard key={r.id} r={r} rooms={rooms} assignMode={assignMode} t={t} lang={lang} />)}
         {shown.length === 0 && <p className="col-span-full py-12 text-center text-sm text-white/40">{t.noReservations}</p>}
       </div>
     </section>
@@ -887,9 +903,10 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
-function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang }) {
+function ReservationCard({ r, rooms, assignMode, t, lang }: { r: Reservation; rooms: Room[]; assignMode: boolean; t: T; lang: AdminLang }) {
   const [copied, setCopied] = useState(false);
   const active = r.status === "active";
+  const assigned = !!r.assigned_room_id;
   const copyPin = async () => {
     if (!r.unlock_pin) return;
     await navigator.clipboard.writeText(r.unlock_pin);
@@ -903,6 +920,11 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
           <div className="flex flex-wrap items-center gap-2">
             <DoorOpen className="h-4 w-4 text-cyan-300" />
             <span className="font-medium">{r.room_name}</span>
+            {assigned && (
+              <span className="rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-200">
+                → {r.assigned_room_name}
+              </span>
+            )}
             <span className={`rounded-full px-2 py-0.5 text-[10px] tracking-wide
               ${active ? "bg-emerald-500/15 text-emerald-300" : r.status === "cancelled" ? "bg-rose-500/15 text-rose-300" : "bg-white/10 text-white/50"}`}>
               {r.status}
@@ -948,6 +970,30 @@ function ReservationCard({ r, t, lang }: { r: Reservation; t: T; lang: AdminLang
           </form>
         )}
       </div>
+
+      {/* 客室割り当て（寄せ）モード時のみ表示。看板を付け替えて別の部屋に泊まらせる。 */}
+      {assignMode && (
+        <form action={assignReservation} className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+          <input type="hidden" name="id" value={r.id} />
+          <span className="text-[11px] font-semibold text-violet-200">泊まる部屋</span>
+          <select
+            name="assigned_room_id"
+            defaultValue={r.assigned_room_id ?? ""}
+            className="rounded-lg border border-violet-400/30 bg-black/40 px-2 py-1.5 text-xs text-violet-100 [&>option]:text-black"
+          >
+            <option value="">元の部屋（{r.room_name}）</option>
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.display_name}（{room.building || "Crane Nest"}）
+              </option>
+            ))}
+          </select>
+          <SubmitButton savedText={t.saved}
+            className="rounded-lg border border-violet-400/50 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-200">
+            割り当て
+          </SubmitButton>
+        </form>
+      )}
     </motion.div>
   );
 }
