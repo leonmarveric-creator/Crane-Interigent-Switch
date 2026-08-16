@@ -459,6 +459,8 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
 
 /* ---------------- Rooms tab ---------------- */
 function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
+  const [filter, setFilter] = useState<string>("all"); // 棟フィルタ ("all" | 棟名)
+  const [showAdd, setShowAdd] = useState(false);        // 「部屋を追加」フォームの開閉
   const ir = info.infraredRemoteList ?? [];
   const acs = ir.filter((d) => /air\s*conditioner/i.test(d.remoteType));
   const lights = ir.filter((d) => /light/i.test(d.remoteType));
@@ -489,41 +491,68 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
       .filter((d) => /light|others|diy/i.test(d.remoteType))
       .map((d) => ({ deviceId: d.deviceId, deviceName: d.deviceName })),
   ];
+  const groups = groupByBuilding(rooms);
+  const visibleGroups = filter === "all" ? groups : groups.filter((g) => g.name === filter);
+
   return (
     <section>
-      {/* 部屋を追加 */}
-      <div className="clip-bevel mb-6 border border-emerald-400/20 bg-[#070a12]/80 p-5 backdrop-blur-xl">
-        <div className="mb-4 flex items-center gap-2 text-sm text-emerald-200">
-          <Plus className="h-4 w-4" /> {t.addRoomTitle}
-        </div>
-        <form action={addRoom} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label={t.roomNameLabel}>
-            <input type="text" name="display_name" required placeholder="AKI" className={selCls} />
-          </Field>
-          <Field label={t.slugLabel}>
-            <input type="text" name="slug" required placeholder="aki" pattern="[a-zA-Z0-9\-\s]+"
-              className={`${selCls} font-mono lowercase`} />
-          </Field>
-          <Field label="棟 / Building">
-            <select name="building" defaultValue="Crane Nest" className={selCls}>
-              <option value="Crane Nest">Crane Nest</option>
-              <option value="Crane Nest 2">Crane Nest 2</option>
-            </select>
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label={t.icalLabel}>
-              <input type="text" name="airbnb_ical_url" placeholder="https://www.airbnb.com/calendar/ical/..." className={`${selCls} text-xs`} />
-            </Field>
-          </div>
-          <p className="text-[10px] text-white/35 sm:col-span-2">💡 {t.slugHint}</p>
-          <SubmitButton savedText={t.saved} idleIcon={<Plus className="h-4 w-4" />}
-            className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
-            {t.addRoomBtn}
-          </SubmitButton>
-        </form>
+      {/* 棟フィルタ + 追加トグル（スクロールしても上部に固定） */}
+      <div className="sticky top-0 z-20 -mx-1 mb-4 flex flex-wrap items-center gap-2 bg-[#04060c]/85 px-1 py-2 backdrop-blur-xl">
+        <button
+          onClick={() => { navTick(); setFilter("all"); }}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === "all" ? "border-cyan-400/50 bg-cyan-500/20 text-cyan-100" : "border-white/10 bg-white/5 text-white/50"}`}
+        >
+          ALL <span className="opacity-60">{rooms.length}</span>
+        </button>
+        {groups.map((g) => (
+          <button
+            key={g.name}
+            onClick={() => { navTick(); setFilter(g.name); }}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === g.name ? `${buildingTone(g.name)} ring-1 ring-white/15` : "border-white/10 bg-white/5 text-white/50"}`}
+          >
+            {g.name} <span className="opacity-60">{g.rooms.length}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => { blip(); setShowAdd((v) => !v); }}
+          className="ml-auto flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+        >
+          <Plus className="h-3.5 w-3.5" /> {t.addRoomTitle}
+        </button>
       </div>
 
-      {groupByBuilding(rooms).map((group) => (
+      {/* 部屋を追加（開閉式・既定は閉じる） */}
+      {showAdd && (
+        <div className="clip-bevel mb-6 border border-emerald-400/20 bg-[#070a12]/80 p-5 backdrop-blur-xl">
+          <form action={addRoom} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={t.roomNameLabel}>
+              <input type="text" name="display_name" required placeholder="AKI" className={selCls} />
+            </Field>
+            <Field label={t.slugLabel}>
+              <input type="text" name="slug" required placeholder="aki" pattern="[a-zA-Z0-9\-\s]+"
+                className={`${selCls} font-mono lowercase`} />
+            </Field>
+            <Field label="棟 / Building">
+              <select name="building" defaultValue={filter === "all" ? "Crane Nest" : filter} className={selCls}>
+                <option value="Crane Nest">Crane Nest</option>
+                <option value="Crane Nest 2">Crane Nest 2</option>
+              </select>
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label={t.icalLabel}>
+                <input type="text" name="airbnb_ical_url" placeholder="https://www.airbnb.com/calendar/ical/..." className={`${selCls} text-xs`} />
+              </Field>
+            </div>
+            <p className="text-[10px] text-white/35 sm:col-span-2">💡 {t.slugHint}</p>
+            <SubmitButton savedText={t.saved} idleIcon={<Plus className="h-4 w-4" />}
+              className="sm:col-span-2 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 active:bg-emerald-500/30">
+              {t.addRoomBtn}
+            </SubmitButton>
+          </form>
+        </div>
+      )}
+
+      {visibleGroups.map((group) => (
         <div key={group.name} className="mb-6">
           <div className="mb-3 flex items-center gap-2">
             <BuildingBadge name={group.name} />
