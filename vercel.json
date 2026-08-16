@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/sync-ical", "schedule": "0 15 * * *" }
+    { "path": "/api/cron/sync-ical", "schedule": "0 15 * * *" },
+    { "path": "/api/admin/tank/sync", "schedule": "0 */6 * * *" }
   ]
 }
