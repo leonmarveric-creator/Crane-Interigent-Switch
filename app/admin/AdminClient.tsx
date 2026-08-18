@@ -806,21 +806,73 @@ function RoomThumb({ room, size }: { room: Room; size: number }) {
 
 /* ---------------- Device test tab ---------------- */
 function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
+  // 棟ごとに「全部屋の照明・機器を一括OFF」（チェックアウト後の消し忘れ対策）
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<{ building: string; ok: number; total: number } | null>(null);
+  const [armed, setArmed] = useState<string | null>(null); // 誤操作防止: 1度目で武装→2度目で実行
+
+  const allOff = async (building: string, groupRooms: Room[]) => {
+    setBusy(building); setResult(null); setArmed(null);
+    let ok = 0;
+    for (const room of groupRooms) {
+      try {
+        const res = await fetch("/api/admin/test-device", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomSlug: room.slug, action: "away" }),
+        });
+        if (res.ok) ok++;
+      } catch { /* noop */ }
+    }
+    setBusy(null);
+    setResult({ building, ok, total: groupRooms.length });
+  };
+
   return (
     <section>
       <div className="mb-1 flex items-center gap-2 text-sm text-violet-200">
         <Wrench className="h-4 w-4" /> {t.testTitle}
       </div>
       <p className="mb-4 text-xs text-white/40">{t.testDesc}</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {rooms.map((room) => (
-          <a key={room.id} href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-between rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-100 active:bg-violet-500/20">
-            <span className="flex items-center gap-2"><RoomThumb room={room} size={32} />{room.display_name}</span>
-            <span className="flex items-center gap-1 text-xs text-violet-300/80">{t.openTest}<ExternalLink className="h-3.5 w-3.5" /></span>
-          </a>
-        ))}
-      </div>
+
+      {groupByBuilding(rooms).map((group) => {
+        const isBusy = busy === group.name;
+        const isArmed = armed === group.name;
+        const res = result && result.building === group.name ? result : null;
+        return (
+          <div key={group.name} className="mb-6">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <BuildingBadge name={group.name} />
+              <span className="text-[11px] text-white/40">{group.rooms.length} {t.tabRooms}</span>
+              <span className="h-px flex-1 bg-white/10" />
+              {/* 棟の全部屋を一括OFF（エアコン/照明/ギャラクシー/NEST/和風ライト） */}
+              <button
+                onClick={() => { blip(); if (isBusy) return; if (isArmed) { allOff(group.name, group.rooms); } else { setArmed(group.name); setTimeout(() => setArmed((a) => (a === group.name ? null : a)), 4000); } }}
+                disabled={isBusy}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isArmed ? "border-rose-400/70 bg-rose-500/25 text-rose-100" : "border-rose-400/40 bg-rose-500/10 text-rose-200"} disabled:opacity-50`}
+                title="この棟の全部屋の照明・機器をOFF（チェックアウト後の消し忘れ対策）"
+              >
+                {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PowerOff className="h-3.5 w-3.5" />}
+                {isBusy ? "OFF中…" : isArmed ? "もう一度で実行" : "全部屋OFF"}
+              </button>
+            </div>
+
+            {res && (
+              <p className="mb-2 text-[11px] text-emerald-300/90">✓ {res.building}: {res.ok}/{res.total} 部屋をOFFにしました</p>
+            )}
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {group.rooms.map((room) => (
+                <a key={room.id} href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-100 active:bg-violet-500/20">
+                  <span className="flex items-center gap-2"><RoomThumb room={room} size={32} />{room.display_name}</span>
+                  <span className="flex items-center gap-1 text-xs text-violet-300/80">{t.openTest}<ExternalLink className="h-3.5 w-3.5" /></span>
+                </a>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }
