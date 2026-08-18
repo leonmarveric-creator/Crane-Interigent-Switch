@@ -40,9 +40,16 @@ interface TankSummary {
   pct: number;
   status: TankStatus;
   alertLine: number;
+  cautionLine?: number;
+  smellLine?: number;
+  odorSeason?: boolean;
   remainingLiters: number;
   upcomingGuestsPerDay: number;
   forecastDays: number | null;
+  totalGuestNights?: number;
+  daysSinceEmptied?: number;
+  guestNightsToAlert?: number;
+  guestNightsToSmell?: number;
 }
 interface TankResponse {
   capacityLiters: number;
@@ -124,7 +131,7 @@ const TANK_I18N: Record<AdminLocale, TankDict> = {
   zh: {
     title: "粪池监测",
     subtitle: (p, a) =>
-      `自有预订＋Airbnb（邮件导入）自动计算。已取消自动排除，仅按已过住宿夜 ${p}L/人 累加。达到80%（${a}L）自动通知。`,
+      `按预订＋Airbnb自动计算（简易水洗）。按已过住宿夜 ${p}L/人 累加，异味出现前预警（夏季6-9月提前）。警告线 ${a}L。`,
     sync: "Airbnb同步",
     recalc: "重新计算",
     testAlert: "通知测试",
@@ -189,7 +196,7 @@ const TANK_I18N: Record<AdminLocale, TankDict> = {
   ja: {
     title: "便槽モニタリング",
     subtitle: (p, a) =>
-      `自社予約＋Airbnb（メール取込）から自動計算。キャンセルは自動除外し、過ぎた宿泊夜だけを ${p}L/人 で積算。80%（${a}L）で自動通知。`,
+      `自社予約＋Airbnbから自動計算（簡易水洗）。過ぎた宿泊夜×${p}L/人で積算し、匂いが出る前に警告（夏6〜9月は早め）。警告ライン ${a}L。`,
     sync: "Airbnb同期",
     recalc: "再計算",
     testAlert: "通知テスト",
@@ -254,7 +261,7 @@ const TANK_I18N: Record<AdminLocale, TankDict> = {
   en: {
     title: "Tank Monitor",
     subtitle: (p, a) =>
-      `Auto-calculated from your bookings + Airbnb (email import). Cancellations excluded; only past nights counted at ${p}L/guest. Alerts at 80% (${a}L).`,
+      `Auto-calculated from bookings + Airbnb (low-flush). Past nights × ${p}L/guest; alerts before odor (earlier in summer, Jun–Sep). Alert line ${a}L.`,
     sync: "Sync Airbnb",
     recalc: "Recalculate",
     testAlert: "Test alert",
@@ -315,6 +322,28 @@ const TANK_I18N: Record<AdminLocale, TankDict> = {
     actionLine: "Pump-out line",
     liveMeter: "Live level",
     pumpCallout: "Tank is over 80%. Arrange a pump-out, then reset after completion.",
+  },
+};
+
+// 追加ラベル（延べ人泊・匂いライン・夏季モード）。TankDictを肥大化させないよう別辞書に。
+const TANK_EXTRA: Record<AdminLocale, {
+  accum: string; nights: (n: number) => string; elapsed: (n: number) => string;
+  toAlert: string; toSmell: string; smell: string; summer: string; warnGuests: (n: number) => string;
+}> = {
+  zh: {
+    accum: "累计入住", nights: (n) => `${n}人晚`, elapsed: (n) => `已过${n}天`,
+    toAlert: "距警告", toSmell: "距异味", smell: "异味线", summer: "夏季模式·提前警告",
+    warnGuests: (n) => `约${n}人晚后`,
+  },
+  ja: {
+    accum: "延べ宿泊", nights: (n) => `${n}人泊`, elapsed: (n) => `${n}日経過`,
+    toAlert: "警告まで", toSmell: "匂いまで", smell: "匂いライン", summer: "夏季モード・早め警告",
+    warnGuests: (n) => `あと約${n}人泊`,
+  },
+  en: {
+    accum: "Accumulated", nights: (n) => `${n} guest-nights`, elapsed: (n) => `${n} days`,
+    toAlert: "To alert", toSmell: "To odor", smell: "Odor line", summer: "Summer mode · early alert",
+    warnGuests: (n) => `~${n} more nights`,
   },
 };
 
@@ -409,6 +438,7 @@ export default function GuesthouseTankDashboard() {
     if (isAdminLocale(saved)) setLocale(saved);
   }, []);
   const L = TANK_I18N[locale] || TANK_I18N.ja;
+  const EX = TANK_EXTRA[locale] || TANK_EXTRA.ja;
 
   const [data, setData] = useState<TankResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -562,6 +592,11 @@ export default function GuesthouseTankDashboard() {
     return Math.min(100, (data.summary.alertLine / data.capacityLiters) * 100);
   }, [data]);
 
+  const smellLinePct = useMemo(() => {
+    if (!data || !data.summary.smellLine) return null;
+    return Math.min(100, (data.summary.smellLine / data.capacityLiters) * 100);
+  }, [data]);
+
   const fillPct = data ? Math.min(100, data.summary.pct) : 0;
 
   if (loading) {
@@ -602,7 +637,14 @@ export default function GuesthouseTankDashboard() {
             </span>
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-400/70">Tank Monitor</p>
-              <h1 className="text-2xl font-extrabold tracking-tight text-white">{L.title}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-extrabold tracking-tight text-white">{L.title}</h1>
+                {data.summary.odorSeason && (
+                  <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
+                    ☀️ {EX.summer}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-slate-400">
@@ -733,12 +775,23 @@ export default function GuesthouseTankDashboard() {
                     />
                   ))}
               </div>
-              {/* 警告ライン（赤い破線） */}
+              {/* 匂いライン（実測・実線） */}
+              {smellLinePct !== null && (
+                <div
+                  className="absolute left-0 z-10 w-full border-t-2 border-rose-400/90"
+                  style={{ bottom: `${smellLinePct}%` }}
+                >
+                  <span className="absolute -top-4 left-1 rounded bg-rose-600 px-1 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,.6)]">
+                    👃 {data.summary.smellLine}L
+                  </span>
+                </div>
+              )}
+              {/* 警告ライン（汲み取り手配・赤い破線） */}
               <div
-                className="absolute left-0 z-10 w-full border-t-2 border-dashed border-red-400/80"
+                className="absolute left-0 z-10 w-full border-t-2 border-dashed border-amber-400/80"
                 style={{ bottom: `${alertLinePct}%` }}
               >
-                <span className="absolute -top-4 right-1 rounded bg-red-500 px-1 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,.6)]">
+                <span className="absolute -top-4 right-1 rounded bg-amber-500 px-1 text-[10px] font-bold text-black shadow-[0_0_10px_rgba(251,191,36,.6)]">
                   {L.warn}
                 </span>
               </div>
@@ -775,6 +828,22 @@ export default function GuesthouseTankDashboard() {
               label={L.forecast}
               value={data.summary.forecastDays === null ? "—" : L.aboutDays(data.summary.forecastDays)}
               sub={data.summary.upcomingGuestsPerDay > 0 ? L.upcomingAvg(data.summary.upcomingGuestsPerDay) : L.noUpcoming}
+            />
+          </div>
+
+          {/* 延べ人泊・警告まで（何泊/何人でいっぱいになったか） */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Metric
+              icon={<Users className="h-4 w-4" />}
+              label={EX.accum}
+              value={EX.nights(data.summary.totalGuestNights ?? 0)}
+              sub={EX.elapsed(data.summary.daysSinceEmptied ?? 0)}
+            />
+            <Metric
+              icon={<BellRing className="h-4 w-4" />}
+              label={EX.toAlert}
+              value={EX.nights(data.summary.guestNightsToAlert ?? 0)}
+              sub={data.summary.smellLine ? `${EX.toSmell} ${EX.nights(data.summary.guestNightsToSmell ?? 0)}` : undefined}
             />
           </div>
 

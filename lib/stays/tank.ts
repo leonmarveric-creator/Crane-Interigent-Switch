@@ -5,15 +5,43 @@
 //   （通知やDBアクセスは tankAlerts.ts / tankStore.ts 側に分離している）
 // =========================================================
 
-// ---- 既定値（あとから管理画面や環境変数で上書き可能な想定） ----
+// ---- 既定値（実測ベース。あとから管理画面/DBで上書き可能） ----
+//   Crane Nest の便槽 実測:
+//     ・実質容量 ≈ 300L
+//     ・匂いが出始める ≈ 270L（≈90%）
+//     ・夏(6〜9月)は匂いが出やすいので早めに警告する
+//   → 匂い(270L)の手前で汲み取りを手配できるよう、警告ラインを下に置く。
 export const TANK_DEFAULTS = {
-  capacityLiters: 600, // タンク総容量 L
-  litersPerGuestPerDay: 3.5, // 簡易水洗トイレ 1人1日あたりの使用量 L
-  cautionPct: 0.6, // 🟡 注意ライン（60%）
-  alertPct: 0.8, // 🔴 警告ライン（80%）
+  capacityLiters: 300, // 実質タンク容量 L（実測）
+  litersPerGuestPerDay: 3.0, // 簡易水洗トイレ 1人1泊あたりの使用量 L（尿＋便＋流し水の目安。実データで較正推奨）
+  smellPct: 0.9, // 👃 匂いが出始める実測ライン（≈270L / 300L）
+  // 通常期
+  cautionPct: 0.7, // 🟡 注意（≈210L）
+  alertPct: 0.8, // 🔴 警告＝汲み取り手配（≈240L・匂いの手前）
+  // 夏(6〜9月)は匂いが出やすいので早めに
+  summerCautionPct: 0.6, // 🟡 夏の注意（≈180L）
+  summerAlertPct: 0.7, // 🔴 夏の警告（≈210L）
+  summerMonths: [6, 7, 8, 9],
 } as const;
 
 export type TankStatus = "safe" | "caution" | "alert";
+
+// ---- 季節（匂いが出やすい夏）判定 ----
+//   便槽の「今月」は日本時間(JST)基準で判定する。
+const TANK_JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+export function jstMonth(now: Date = new Date()): number {
+  return new Date(now.getTime() + TANK_JST_OFFSET_MS).getUTCMonth() + 1;
+}
+export function isOdorSeason(now: Date = new Date()): boolean {
+  return (TANK_DEFAULTS.summerMonths as readonly number[]).includes(jstMonth(now));
+}
+// その時期に適用される警告/注意しきい値（%）
+export function effectiveAlertPct(now: Date = new Date()): number {
+  return isOdorSeason(now) ? TANK_DEFAULTS.summerAlertPct : TANK_DEFAULTS.alertPct;
+}
+export function effectiveCautionPct(now: Date = new Date()): number {
+  return isOdorSeason(now) ? TANK_DEFAULTS.summerCautionPct : TANK_DEFAULTS.cautionPct;
+}
 
 // その日の宿泊ログ
 export interface DailyLog {
@@ -142,12 +170,25 @@ export function tankPct(currentLiters: number, capacityLiters: number): number {
   return Math.min(999, Math.max(0, (currentLiters / capacityLiters) * 100));
 }
 
-// 警告ライン（L）。既定では 600 * 0.8 = 480L。
+// 警告ライン（L）。季節で変動（夏は早め）。既定300Lなら 通常240L / 夏210L。
 export function alertLineLiters(
   capacityLiters: number,
-  alertPct: number = TANK_DEFAULTS.alertPct
+  now: Date = new Date()
 ): number {
-  return roundL(capacityLiters * alertPct);
+  return roundL(capacityLiters * effectiveAlertPct(now));
+}
+
+// 注意ライン（L）。既定300Lなら 通常210L / 夏180L。
+export function cautionLineLiters(
+  capacityLiters: number,
+  now: Date = new Date()
+): number {
+  return roundL(capacityLiters * effectiveCautionPct(now));
+}
+
+// 匂いが出始める実測ライン（L）。既定300Lなら 270L。
+export function smellLineLiters(capacityLiters: number): number {
+  return roundL(capacityLiters * TANK_DEFAULTS.smellPct);
 }
 
 // 満杯までの残り猶予（L）。マイナスにはしない。
@@ -155,13 +196,27 @@ export function remainingLiters(currentLiters: number, capacityLiters: number): 
   return roundL(Math.max(0, capacityLiters - currentLiters));
 }
 
-// 現在の状態区分を判定
-export function statusFor(currentLiters: number, capacityLiters: number): TankStatus {
+// 現在の状態区分を判定（季節で変動）
+export function statusFor(
+  currentLiters: number,
+  capacityLiters: number,
+  now: Date = new Date()
+): TankStatus {
   if (capacityLiters <= 0) return "safe";
   const p = currentLiters / capacityLiters;
-  if (p >= TANK_DEFAULTS.alertPct) return "alert";
-  if (p >= TANK_DEFAULTS.cautionPct) return "caution";
+  if (p >= effectiveAlertPct(now)) return "alert";
+  if (p >= effectiveCautionPct(now)) return "caution";
   return "safe";
+}
+
+// ある水量ライン(L)に達するまでの「残り人泊」。簡易水洗の1人あたり量で割る。
+export function guestNightsToLiters(
+  currentLiters: number,
+  targetLiters: number,
+  perGuest: number = TANK_DEFAULTS.litersPerGuestPerDay
+): number {
+  if (perGuest <= 0) return 0;
+  return Math.max(0, Math.ceil((targetLiters - currentLiters) / perGuest));
 }
 
 // 直近ログの平均宿泊人数（予測日数の基礎値）。既定で直近7日分を見る。
@@ -172,16 +227,19 @@ export function recentAvgGuests(logs: DailyLog[], window = 7): number {
   return total / recent.length;
 }
 
-// 満杯までの残り予測日数。宿泊が0（またはデータ無し）の場合は算出不能として null。
+// 目標ライン(既定=満杯)までの残り予測日数。宿泊が0（またはデータ無し）の場合は null。
+//   targetLiters に警告ラインを渡せば「あと何日で警告か」を出せる。
 export function forecastDays(
   currentLiters: number,
   capacityLiters: number,
   guestsPerDay: number,
-  perGuest: number = TANK_DEFAULTS.litersPerGuestPerDay
+  perGuest: number = TANK_DEFAULTS.litersPerGuestPerDay,
+  targetLiters?: number
 ): number | null {
   const daily = guestsPerDay * perGuest;
   if (daily <= 0) return null;
-  const remain = remainingLiters(currentLiters, capacityLiters);
+  const target = typeof targetLiters === "number" ? targetLiters : capacityLiters;
+  const remain = roundL(Math.max(0, target - currentLiters));
   return Math.floor(remain / daily);
 }
 

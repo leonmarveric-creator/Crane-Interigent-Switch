@@ -48,7 +48,7 @@ function buildLines(p: AlertPayload): string[] {
   }
 
   return [
-    "し尿タンクの累積水量が警告ライン（80%）を超えました。",
+    "し尿タンクが汲み取り手配の警告ラインに達しました（匂いが出る前に手配してください）。",
     `現在の水量：${roundL(p.currentLiters)} L / ${p.capacityLiters} L（${Math.round(p.pct)}%）`,
     `警告ライン：${p.alertLine} L を超過`,
     "至急バキュームカーの手配をお願いします。",

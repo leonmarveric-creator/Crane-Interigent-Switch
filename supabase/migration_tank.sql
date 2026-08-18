@@ -25,8 +25,8 @@
 -- 1. タンクの状態（シングルトン: id=1 の1棟運用。複数棟化する場合は行を増やす）
 create table if not exists public.stays_tank_state (
   id                 integer primary key default 1,
-  capacity_liters    numeric not null default 600,    -- タンク総容量
-  liters_per_guest   numeric not null default 3.5,    -- 1人1日あたり使用量
+  capacity_liters    numeric not null default 300,    -- 実質タンク容量 L（実測）
+  liters_per_guest   numeric not null default 3.0,    -- 簡易水洗 1人1泊あたり L（実測較正推奨）
   last_emptied_date  date    not null default current_date,  -- 前回汲み取り日
   alerted            boolean not null default false,  -- 警告通知済みフラグ（多重通知抑制）
   updated_at         timestamptz not null default now()
