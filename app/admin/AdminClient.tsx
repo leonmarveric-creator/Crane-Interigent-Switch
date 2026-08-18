@@ -810,6 +810,22 @@ function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<{ building: string; ok: number; total: number } | null>(null);
   const [armed, setArmed] = useState<string | null>(null); // 誤操作防止: 1度目で武装→2度目で実行
+  const [roomBusy, setRoomBusy] = useState<string | null>(null); // 部屋単位OFFの実行中(room.id)
+  const [roomDone, setRoomDone] = useState<string | null>(null); // 部屋単位OFFの完了表示(room.id)
+
+  const roomOff = async (room: Room) => {
+    if (roomBusy) return;
+    blip(); setRoomBusy(room.id); setRoomDone(null);
+    try {
+      const res = await fetch("/api/admin/test-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomSlug: room.slug, action: "away" }),
+      });
+      if (res.ok) { setRoomDone(room.id); setTimeout(() => setRoomDone((d) => (d === room.id ? null : d)), 2000); }
+    } catch { /* noop */ }
+    setRoomBusy(null);
+  };
 
   const allOff = async (building: string, groupRooms: Room[]) => {
     setBusy(building); setResult(null); setArmed(null);
@@ -862,13 +878,31 @@ function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
             )}
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {group.rooms.map((room) => (
-                <a key={room.id} href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-2xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-100 active:bg-violet-500/20">
-                  <span className="flex items-center gap-2"><RoomThumb room={room} size={32} />{room.display_name}</span>
-                  <span className="flex items-center gap-1 text-xs text-violet-300/80">{t.openTest}<ExternalLink className="h-3.5 w-3.5" /></span>
-                </a>
-              ))}
+              {group.rooms.map((room) => {
+                const rBusy = roomBusy === room.id;
+                const rDone = roomDone === room.id;
+                return (
+                  <div key={room.id}
+                    className="flex items-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/10 px-3 py-2.5">
+                    <a href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
+                      className="flex min-w-0 flex-1 items-center gap-2 text-sm text-violet-100">
+                      <RoomThumb room={room} size={32} />
+                      <span className="truncate">{room.display_name}</span>
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-violet-300/70" />
+                    </a>
+                    {/* この部屋だけOFF（エアコン/照明/機器） */}
+                    <button
+                      onClick={() => roomOff(room)}
+                      disabled={rBusy}
+                      className={`flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${rDone ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-200" : "border-rose-400/40 bg-rose-500/10 text-rose-200 active:bg-rose-500/25"}`}
+                      title="この部屋の照明・機器をOFF"
+                    >
+                      {rBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : rDone ? <Check className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
+                      {rDone ? "OFF✓" : "OFF"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
