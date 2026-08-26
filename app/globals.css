@@ -1,4 +1,4 @@
-/* 和風・軽量モード用の明朝／ゴシック（LiteControlPanel で使用） */
+/* 和風UI用の明朝／ゴシック（LiteControlPanel で使用） */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
 
 @tailwind base;
@@ -16,6 +16,12 @@ html, body {
 /* iOS Safari の time input ネイティブ装飾を近未来寄りに */
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8) sepia(1) saturate(5) hue-rotate(220deg);
+}
+
+/* 和風UIの時刻入力は明るい画面に馴染ませる */
+.wafu-time::-webkit-calendar-picker-indicator {
+  filter: sepia(0.3) saturate(0.8) hue-rotate(350deg);
+  opacity: 0.7;
 }
 
 /* ===== 近未来アニメーション ===== */

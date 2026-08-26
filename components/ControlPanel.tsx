@@ -10,6 +10,7 @@ import {
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
+import AddToHomePrompt from "@/components/AddToHomePrompt";
 
 interface Props {
   roomSlug: string;
@@ -316,6 +317,14 @@ export default function ControlPanel({
             <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </motion.header>
+
+        {!admin && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+            className="mb-4">
+            <AddToHomePrompt lang={lang} roomName={roomName} variant="tech" />
+          </motion.div>
+        )}
 
         {/* 位置制限の常設案内 (有効な部屋のみ) */}
         {geoEnabled && (

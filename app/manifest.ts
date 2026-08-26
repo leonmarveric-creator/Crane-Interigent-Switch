@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
 
-// Android/Chrome の「ホーム画面に追加」用 manifest。
+// Android/Chrome の「ホーム画面に追加」用の既定 manifest。
+// ゲスト操作画面では AddToHomePrompt が現在の部屋URL用 manifest に差し替える。
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Crane Switch",
     short_name: "Crane",
-    start_url: "/admin",
+    start_url: "/",
     display: "standalone",
     background_color: "#05060a",
     theme_color: "#05060a",

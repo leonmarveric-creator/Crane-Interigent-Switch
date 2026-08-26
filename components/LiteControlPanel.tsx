@@ -1,13 +1,13 @@
 "use client";
 
 // =========================================================
-// 軽量操作パネル（低スペック端末向け）／和風・簡潔テーマ
+// 和風操作パネル（低スペック端末にも軽い）／簡潔・清潔テーマ
 //   ・静止ポスター画像の背景のみ（動画/キャンバス/framer-motion なし）
-//   ・生成りの和紙調UI（背景=和紙色 / 文字=墨 / 差し色=藍・抹茶・朱ほか）
-//   ・大きなタップ操作ボタンだけの最小構成。デバイス操作は通常UIと同じ
+//   ・白い和紙調UI（背景=生成り / 文字=墨 / 差し色=藍・抹茶・朱ほか）
+//   ・大きな操作札だけの最小構成。デバイス操作はハイテクUIと同じ
 //     /api/devices/[slug]（ゲスト）/ /api/admin/test-device（管理テスト）を使用。
 //   ・多言語（ja/en/zh/ko）は既存 lib/i18n の T を流用。
-//   通常UIとの切り替えは onSwitchMode（RoomModeSwitch が制御）。
+//   ハイテクUIとの切り替えは onSwitchMode（RoomModeSwitch が制御）。
 // =========================================================
 import { useState, type CSSProperties, type ReactNode } from "react";
 import {
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import AddToHomePrompt from "@/components/AddToHomePrompt";
 
 export interface LiteProps {
   roomSlug: string;
@@ -27,14 +28,14 @@ export interface LiteProps {
   hasGalaxy?: boolean;
   hasNest?: boolean;
   hasWafu?: boolean;
-  onSwitchMode?: () => void; // 通常UIへ
+  onSwitchMode?: () => void; // ハイテクUIへ
 }
 
 const EXTRA: Record<Lang, { lite: string; full: string; scenes: string; devices: string }> = {
-  ja: { lite: "軽量モード", full: "通常UIへ", scenes: "シーン", devices: "機器" },
-  en: { lite: "Lite mode", full: "Full UI", scenes: "Scenes", devices: "Devices" },
-  zh: { lite: "轻量模式", full: "完整界面", scenes: "场景", devices: "设备" },
-  ko: { lite: "라이트 모드", full: "전체 UI", scenes: "장면", devices: "기기" },
+  ja: { lite: "和風", full: "ハイテクへ", scenes: "シーン", devices: "照明設備" },
+  en: { lite: "Wafu", full: "Hi-Tech", scenes: "Scenes", devices: "Lights" },
+  zh: { lite: "和风", full: "高科技", scenes: "场景", devices: "照明" },
+  ko: { lite: "와풍", full: "하이테크", scenes: "장면", devices: "조명" },
 };
 
 // 明朝体（見出し・時刻用）。globals.css で Noto Serif JP を読み込み。
@@ -49,15 +50,15 @@ function vibe() {
 }
 
 type Tone = "matcha" | "ai" | "asagi" | "yamabuki" | "shu" | "fuji" | "neutral";
-// 和の差し色（点灯系のみ淡く色付け／オフ・中立は生成りの白札）
-const TONE: Record<Tone, string> = {
-  matcha:   "border-[#7c8b57]/45 bg-[#7c8b57]/[0.08] text-[#5f6c3e] active:bg-[#7c8b57]/[0.15]",
-  ai:       "border-[#3f5d78]/45 bg-[#3f5d78]/[0.07] text-[#33506a] active:bg-[#3f5d78]/[0.14]",
-  asagi:    "border-[#59858c]/45 bg-[#59858c]/[0.08] text-[#3f6b71] active:bg-[#59858c]/[0.15]",
-  yamabuki: "border-[#c0913a]/45 bg-[#c0913a]/[0.10] text-[#93701f] active:bg-[#c0913a]/[0.17]",
-  shu:      "border-[#b5533b]/45 bg-[#b5533b]/[0.08] text-[#96402c] active:bg-[#b5533b]/[0.15]",
-  fuji:     "border-[#7a6e9c]/45 bg-[#7a6e9c]/[0.08] text-[#5c5280] active:bg-[#7a6e9c]/[0.15]",
-  neutral:  "border-[#e2dccb] bg-[#faf8f2] text-[#6d685d] active:bg-[#efe9dd]",
+// 和の差し色。札自体は白く保ち、左罫だけで機能を見分ける。
+const TONE: Record<Tone, { mark: string; text: string }> = {
+  matcha:   { mark: "#7c8b57", text: "#53613d" },
+  ai:       { mark: "#3f5d78", text: "#344f66" },
+  asagi:    { mark: "#59858c", text: "#3f676d" },
+  yamabuki: { mark: "#c0913a", text: "#816326" },
+  shu:      { mark: "#b5533b", text: "#88402f" },
+  fuji:     { mark: "#7a6e9c", text: "#585077" },
+  neutral:  { mark: "#b8ae9b", text: "#655f54" },
 };
 
 // ---- 部屋ごとのアクセント色（名前に合わせた色） ----
@@ -87,6 +88,12 @@ function ActionBtn({
 }) {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<null | boolean>(null);
+  const toneToken = TONE[tone];
+  const tileStyle: CSSProperties = {
+    borderColor: "#ded6c7",
+    color: toneToken.text,
+    boxShadow: `inset 3px 0 0 ${toneToken.mark}, 0 10px 24px -22px rgba(44,42,38,0.45)`,
+  };
   const run = async () => {
     if (busy) return;
     vibe();
@@ -101,7 +108,8 @@ function ActionBtn({
     <button
       onClick={run}
       disabled={busy}
-      className={`relative flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-2xl border p-3 text-center transition active:scale-[0.99] disabled:opacity-60 ${TONE[tone]}`}
+      style={tileStyle}
+      className="relative flex min-h-[82px] flex-col items-center justify-center gap-2 rounded-lg border bg-[#fffdf8]/95 p-3 text-center transition active:scale-[0.99] active:bg-[#f3efe6] disabled:opacity-60"
     >
       {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : <Icon className="h-6 w-6" strokeWidth={1.5} />}
       <span className="text-[13px] font-medium leading-tight tracking-[0.02em]">{label}</span>
@@ -115,7 +123,7 @@ function ActionBtn({
   );
 }
 
-// 光目覚まし（アラーム）— 通常UIと同じエンドポイント/JST計算を軽量に実装
+// 光目覚まし（アラーム）— ハイテクUIと同じエンドポイント/JST計算を軽量に実装
 function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t: (typeof T)["ja"] }) {
   const [time, setTime] = useState("07:00");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
@@ -165,7 +173,7 @@ function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t
   };
 
   return (
-    <div className="rounded-2xl border border-[#e2dccb] bg-[#faf8f2] p-4">
+    <div className="rounded-lg border border-[#ded6c7] bg-[#fffdf8]/95 p-4 shadow-[0_10px_24px_-22px_rgba(44,42,38,0.45)]">
       <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold tracking-[0.02em] text-[#5c5280]">
         <AlarmClock className="h-[18px] w-[18px]" strokeWidth={1.5} /> {t.wakeLight}
       </div>
@@ -175,12 +183,12 @@ function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t
           value={time}
           onChange={(ev) => { setTime(ev.target.value); setState("idle"); }}
           style={{ fontFamily: MINCHO }}
-          className="min-w-0 flex-1 rounded-xl border border-[#d6cfbb] bg-[#efe9dd] px-3 py-2.5 text-center text-[26px] tracking-[0.12em] text-[#4a4560] [color-scheme:light] focus:border-[#7a6e9c]/60 focus:outline-none"
+          className="wafu-time min-w-0 flex-1 rounded-lg border border-[#d6cfbb] bg-[#f4efe6] px-3 py-2.5 text-center text-[24px] tracking-[0.08em] text-[#4a4560] [color-scheme:light] focus:border-[#7a6e9c]/60 focus:outline-none"
         />
         <button
           onClick={() => send(false)}
           disabled={state === "busy"}
-          className="flex h-[52px] items-center gap-1.5 rounded-xl border border-[#7a6e9c]/45 bg-[#7a6e9c]/[0.12] px-5 text-[13px] font-semibold text-[#5c5280] active:bg-[#7a6e9c]/[0.2] disabled:opacity-60"
+          className="flex h-[52px] items-center gap-1.5 rounded-lg border border-[#7a6e9c]/40 bg-[#f8f5ee] px-5 text-[13px] font-semibold text-[#5c5280] active:bg-[#eee8dc] disabled:opacity-60"
         >
           {state === "busy" && <Loader2 className="h-4 w-4 animate-spin" />}
           {state === "set" && <Check className="h-4 w-4 text-[#5f6c3e]" />}
@@ -214,16 +222,16 @@ export default function LiteControlPanel({
 
   // 生成りの和紙テクスチャ（麻の葉を極薄で敷く）
   const washiBg: CSSProperties = {
-    backgroundColor: "#f3efe6",
+    backgroundColor: "#f7f4ed",
     backgroundImage:
-      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104' viewBox='0 0 60 104'%3E%3Cg fill='none' stroke='%23b7ad95' stroke-width='0.6' opacity='0.28'%3E%3Cpath d='M30 0v52M30 52v52M0 26l30 26 30-26M0 78l30-26 30 26M0 26v52M60 26v52M0 26L30 0l30 26M0 78l30 26 30-26'/%3E%3C/g%3E%3C/svg%3E\")",
-    backgroundSize: "46px auto",
+      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104' viewBox='0 0 60 104'%3E%3Cg fill='none' stroke='%23b7ad95' stroke-width='0.55' opacity='0.18'%3E%3Cpath d='M30 0v52M30 52v52M0 26l30 26 30-26M0 78l30-26 30 26M0 26v52M60 26v52M0 26L30 0l30 26M0 78l30 26 30-26'/%3E%3C/g%3E%3C/svg%3E\"), linear-gradient(180deg, #fbfaf6 0%, #f2ece1 100%)",
+    backgroundSize: "54px auto, auto",
   };
 
   // セクション見出し（薄墨文字＋部屋アクセントの罫）
   const SecLabel = ({ children }: { children: ReactNode }) => (
-    <p className="mb-2 ml-0.5 mt-5 flex items-center gap-2 text-[11.5px] font-medium tracking-[0.2em] text-[#6d685d]">
-      <span className="inline-block h-3 w-[3px] rounded-sm" style={{ background: accent }} />
+    <p className="mb-2 ml-0.5 mt-5 flex items-center gap-2 text-[11.5px] font-medium tracking-[0.16em] text-[#6d685d]">
+      <span className="inline-block h-3 w-[2px] rounded-sm" style={{ background: accent }} />
       {children}
     </p>
   );
@@ -231,7 +239,7 @@ export default function LiteControlPanel({
   return (
     <main className="min-h-dvh text-[#2c2a26]" style={washiBg}>
       {/* ヒーロー: 部屋アートを上部に。下方向へ和紙色にフェード。 */}
-      <div className="relative h-56 w-full overflow-hidden sm:h-60">
+      <div className="relative h-52 w-full overflow-hidden sm:h-56">
         {posterUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -242,13 +250,10 @@ export default function LiteControlPanel({
           />
         )}
         {/* 和紙色へのフェード（テキストを読みやすく） */}
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(180deg, rgba(243,239,230,0) 0%, rgba(243,239,230,0.10) 42%, rgba(243,239,230,0.62) 74%, rgba(243,239,230,0.94) 90%, #f3efe6 100%)" }}
-        />
-        {/* 上部バー: 言語 / 通常UIへ */}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(247,244,237,0)_0%,rgba(247,244,237,0.18)_45%,rgba(247,244,237,0.78)_82%,#f7f4ed_100%)]" />
+        {/* 上部バー: 言語 / ハイテクへ */}
         <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3.5">
-          <label className="flex items-center gap-1.5 rounded-lg border border-[#d6cfbb]/90 bg-[#faf8f2]/85 px-2.5 py-1.5 text-xs text-[#2c2a26] backdrop-blur">
+          <label className="flex items-center gap-1.5 rounded-md border border-[#d6cfbb]/90 bg-[#fffdf8]/90 px-2.5 py-1.5 text-xs text-[#2c2a26] backdrop-blur">
             <Globe className="h-3.5 w-3.5 text-[#6d685d]" />
             <select
               value={lang}
@@ -261,7 +266,7 @@ export default function LiteControlPanel({
           {onSwitchMode && (
             <button
               onClick={onSwitchMode}
-              className="flex items-center gap-1.5 rounded-lg border border-[#d6cfbb]/90 bg-[#faf8f2]/85 px-3 py-1.5 text-xs font-semibold text-[#2c2a26] backdrop-blur active:bg-[#efe9dd]"
+              className="flex items-center gap-1.5 rounded-md border border-[#d6cfbb]/90 bg-[#fffdf8]/90 px-3 py-1.5 text-xs font-semibold text-[#2c2a26] backdrop-blur active:bg-[#efe9dd]"
             >
               <PanelsTopLeft className="h-3.5 w-3.5 text-[#6d685d]" /> {e.full}
             </button>
@@ -270,13 +275,13 @@ export default function LiteControlPanel({
         {/* 下部: バッジ / 部屋名 / チェックアウト */}
         <div className="absolute inset-x-0 bottom-0 p-5">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border bg-[#faf8f2]/90 px-3 py-1 text-[10.5px] font-semibold tracking-[0.18em] text-[#6d685d] backdrop-blur"
+            className="inline-flex items-center gap-1.5 rounded-md border bg-[#fffdf8]/90 px-3 py-1 text-[10.5px] font-semibold tracking-[0.18em] text-[#6d685d] backdrop-blur"
             style={{ borderColor: `rgba(${rgb},0.5)` }}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
             {e.lite}
           </span>
-          <h1 className="mt-2 truncate text-3xl font-semibold tracking-[0.06em]" style={{ fontFamily: MINCHO }}>{roomName}</h1>
+          <h1 className="mt-2 truncate text-[28px] font-semibold leading-tight tracking-[0.06em]" style={{ fontFamily: MINCHO }}>{roomName}</h1>
           {!admin && (
             <p className="mt-1 text-[11.5px] text-[#6d685d]">
               {t.checkout}: <span className="text-[#2c2a26]">{new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
@@ -287,6 +292,11 @@ export default function LiteControlPanel({
 
       {/* 操作エリア */}
       <div className="mx-auto max-w-md px-5 pb-16 pt-2">
+        {!admin && (
+          <div className="mb-4">
+            <AddToHomePrompt lang={lang} roomName={roomName} variant="wafu" />
+          </div>
+        )}
 
         {/* 施錠 */}
         <div className="mt-2 grid grid-cols-2 gap-3">
