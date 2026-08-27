@@ -6,6 +6,7 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "..");
 const deviceControlPath = path.join(root, "lib", "deviceControl.ts");
 const deviceClientPath = path.join(root, "lib", "deviceClient.ts");
+const controlPanelPath = path.join(root, "components", "ControlPanel.tsx");
 const cronPath = path.join(root, "app", "api", "cron", "galaxy-auto-off", "route.ts");
 
 function read(filePath) {
@@ -68,4 +69,17 @@ test("galaxy auto-off cron route processes rooms whose deadline has passed", () 
   assert.match(source, /executeDeviceAction\(room,\s*"galaxy_off"/);
   assert.match(source, /\.update\(\{\s*galaxy_auto_off_at:\s*dueAt\s*\}\)/);
   assert.match(source, /logDevice/);
+});
+
+test("high-tech scene controls expose a quick Japanese lamp off action", () => {
+  const source = read(controlPanelPath);
+  const start = source.indexOf("function SceneButtons");
+  assert.notEqual(start, -1, "missing SceneButtons");
+  const end = source.indexOf("/* スマートロック", start);
+  assert.notEqual(end, -1, "missing end of SceneButtons section");
+  const section = source.slice(start, end);
+
+  assert.match(section, /"wafu_off"/);
+  assert.match(section, /run\("wafu_off"\)/);
+  assert.match(section, /\{t\.wafu\}.*\{t\.off\}/s);
 });

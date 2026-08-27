@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles, Radio, Moon,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, PowerOff, Sparkles, Radio, Moon,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
@@ -970,9 +970,9 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* シーンボタン: 快適モード / おやすみ / 外出全OFF                       */
+/* シーンボタン: 快適モード / おやすみ / 和み / 外出OFF                   */
 /* ------------------------------------------------------------------ */
-type SceneAction = "welcome" | "welcome_cozy" | "good_night" | "away";
+type SceneAction = "welcome" | "welcome_cozy" | "wafu_off" | "good_night" | "away";
 function SceneButtons({
   roomSlug, admin, guard, t, hasWafu, onGalaxyState,
 }: {
@@ -990,11 +990,13 @@ function SceneButtons({
     const ok = await callDevice(roomSlug, a, admin);
     if (ok) {
       if (a === "away" || a === "good_night" || a === "welcome_cozy") onGalaxyState?.(false);
-      (a === "away" || a === "good_night" ? powerDown : powerUp)();
+      (a === "away" || a === "good_night" || a === "wafu_off" ? powerDown : powerUp)();
       speakOneOf(a === "away"
         ? ["Goodbye", "Powering down", "Have a safe trip"]
         : a === "good_night"
         ? ["Good night", "Lights dimmed", "Rest mode engaged"]
+        : a === "wafu_off"
+        ? [`${t.wafu} offline`, "Japanese lamp off", "Ambient lighting off"]
         : a === "welcome_cozy"
         ? ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"]
         : ["Welcome home", "Comfort mode engaged", "Systems set for your return"]);
@@ -1024,17 +1026,6 @@ function SceneButtons({
             : <Moon className="h-6 w-6 text-cyan-300" strokeWidth={1.7} />}
           <span className="text-sm text-cyan-200">{t.goodNightMode}</span>
         </HudPanel>
-        <div className={hasWafu ? "" : "col-span-2"}>
-          <HudPanel tone="violet" onClick={() => run("away")} small
-            contentClassName="flex-col items-center gap-2 px-4 py-5">
-            <Corners tone="cyan" />
-            <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
-            {busy === "away"
-              ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
-              : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
-            <span className="text-sm text-violet-200">{t.awayMode}</span>
-          </HudPanel>
-        </div>
         {hasWafu && (
           <HudPanel tone="rose" onClick={() => run("welcome_cozy")} small
             contentClassName="items-center justify-center gap-2 px-4 py-4">
@@ -1046,6 +1037,28 @@ function SceneButtons({
             <span className="text-sm text-rose-200">{t.cozyMode}</span>
           </HudPanel>
         )}
+        {hasWafu && (
+          <HudPanel tone="rose" onClick={() => run("wafu_off")} small
+            contentClassName="items-center justify-center gap-2 px-4 py-4">
+            <Corners tone="rose" />
+            <CommandFX trigger={fx?.a === "wafu_off" ? fx.n : 0} tone="rose" />
+            {busy === "wafu_off"
+              ? <Loader2 className="h-5 w-5 animate-spin text-rose-200/80" />
+              : <PowerOff className="h-5 w-5 text-rose-200/80" strokeWidth={1.7} />}
+            <span className="text-sm text-rose-200/90">{t.wafu} {t.off}</span>
+          </HudPanel>
+        )}
+        <div className="col-span-2">
+          <HudPanel tone="violet" onClick={() => run("away")} small
+            contentClassName="flex-col items-center gap-2 px-4 py-4">
+            <Corners tone="cyan" />
+            <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
+            {busy === "away"
+              ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
+              : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
+            <span className="text-sm text-violet-200">{t.awayMode}</span>
+          </HudPanel>
+        </div>
       </div>
     </div>
   );
