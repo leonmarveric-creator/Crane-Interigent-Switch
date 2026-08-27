@@ -425,7 +425,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
     unlock: t.unlock, lock: t.lock, ac_on: t.acOn, ac_off: t.acOff, light_on: t.lightOn, light_off: t.lightOff,
     galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, nest_on: t.nestOn, nest_off: t.nestOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
     wafu_on_warm: t.wafuOn, wafu_warm: t.wafuWarm, wafu_brightness: t.wafuBrightness,
-    wafu_temp: t.wafuTemp, wafu_color: t.wafuColor, welcome: t.welcomeScene, welcome_cozy: t.cozyScene, away: t.checkoutOff,
+    wafu_temp: t.wafuTemp, wafu_color: t.wafuColor, welcome: t.welcomeScene, welcome_cozy: t.cozyScene, good_night: t.goodNightScene, away: t.checkoutOff,
   };
   const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
   const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);

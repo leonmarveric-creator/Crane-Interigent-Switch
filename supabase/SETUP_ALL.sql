@@ -1,7 +1,7 @@
 -- =============================================================================
 --  IoT Guest Control — Supabase 初回セットアップ (これ1本を SQL Editor で実行)
 --  内容: 基本スキーマ + 全migration(PIN/URL/ウェルカム/ジオフェンス/画像/
---        ログ/PIN試行/テストアラーム/ギャラクシー/和風ライト)
+--        ログ/PIN試行/テストアラーム/ギャラクシー/ギャラクシー自動OFF/和風ライト)
 --  すべて idempotent。再実行してもエラーになりません。
 --  ※ 部屋データ(seed_rooms.sql)は秘密鍵を含むため含めていません。
 --    部屋は管理画面から追加してください。
@@ -50,6 +50,7 @@ create table if not exists public.rooms (
   switchbot_ac_device_id     text,                  -- エアコン (Virtual IR)
   switchbot_light_device_id  text,                  -- 照明 (Virtual IR)
   switchbot_galaxy_device_id text,                  -- ギャラクシー (プラネタリウム / 物理デバイス)
+  galaxy_auto_off_at         timestamptz,           -- ギャラクシー自動OFF予定時刻
   switchbot_nest_device_id   text,                  -- NEST (藤編みボールランプ / 物理デバイス)
   switchbot_wafu_device_id   text,                  -- 和風ライト/行灯 (スマート電球)
   -- SwitchBotのトークン/シークレットは全部屋共通になりがちなので環境変数で持つ想定。
@@ -61,6 +62,13 @@ create table if not exists public.rooms (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+
+comment on column public.rooms.galaxy_auto_off_at is
+  'ギャラクシーモードONから90分後に自動OFFするための予定時刻 (UTC)';
+
+create index if not exists idx_rooms_galaxy_auto_off_due
+  on public.rooms (galaxy_auto_off_at)
+  where galaxy_auto_off_at is not null;
 
 -- =============================================================================
 --  reservations
@@ -267,6 +275,18 @@ alter table rooms
 
 comment on column rooms.switchbot_galaxy_device_id is
   'プラネタリウムプロジェクターを操作する SwitchBot デバイスID (null = ギャラクシーモード非対応の部屋)';
+
+-- ##### migration: galaxy_auto_off #####
+-- ギャラクシーモード自動OFF: ONから90分後にCronがOFFするための期限
+alter table public.rooms
+  add column if not exists galaxy_auto_off_at timestamptz;
+
+comment on column public.rooms.galaxy_auto_off_at is
+  'ギャラクシーモードONから90分後に自動OFFするための予定時刻 (UTC)';
+
+create index if not exists idx_rooms_galaxy_auto_off_due
+  on public.rooms (galaxy_auto_off_at)
+  where galaxy_auto_off_at is not null;
 
 -- ##### migration: nest #####
 -- NESTモード: 部屋ごとの藤編みボールランプ(間接照明)用 SwitchBot デバイス

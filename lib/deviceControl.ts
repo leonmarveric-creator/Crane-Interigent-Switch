@@ -7,6 +7,28 @@ import { supabaseAdmin } from "./supabaseAdmin";
 
 /** 和風ライトのデフォルト暖色: 電球色 2700K・明るさ100%。 */
 export const WAFU_DEFAULT_WARM = { kelvin: 2700, brightness: 100 } as const;
+export const GALAXY_AUTO_OFF_MS = 90 * 60 * 1000;
+
+async function setGalaxyAutoOffAt(
+  room: any,
+  galaxy_auto_off_at: string | null,
+  expectedAutoOffAt?: string
+): Promise<boolean> {
+  if (!room.id) return true;
+
+  let q = supabaseAdmin
+    .from("rooms")
+    .update({ galaxy_auto_off_at })
+    .eq("id", room.id);
+  if (expectedAutoOffAt) q = q.eq("galaxy_auto_off_at", expectedAutoOffAt);
+
+  const { error } = await q;
+  if (error) {
+    console.error("galaxy auto-off update failed", error);
+    return false;
+  }
+  return true;
+}
 
 /** 和風ライトを既定の暖色 (2700K・100%) に設定する共通処理。 */
 async function applyWafuWarm(creds: SwitchBotCreds, deviceId: string): Promise<boolean> {
@@ -42,7 +64,7 @@ export type DeviceAction =
   | "wafu_on_warm" // ON + 既定の暖色 (管理者ON用)
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
   | "wafu_brightness" | "wafu_temp" | "wafu_color" // 詳細: 明るさ / 色温度 / フルカラー (value必須)
-  | "welcome" | "welcome_cozy" | "away"; // シーン: 快適 / 和み / 外出全OFF
+  | "welcome" | "welcome_cozy" | "good_night" | "away"; // シーン: 快適 / 和み / おやすみ / 外出全OFF
 
 /**
  * 部屋(秘密鍵込み)に対してデバイス操作を実行する共通ロジック。
@@ -107,6 +129,13 @@ export async function executeDeviceAction(
         if (room.switchbot_wafu_device_id) {
           await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
         }
+        const autoOffAt = new Date(Date.now() + GALAXY_AUTO_OFF_MS).toISOString();
+        const scheduled = await setGalaxyAutoOffAt(room, autoOffAt);
+        return { ok: scheduled, error: scheduled ? undefined : "GALAXY_AUTO_OFF_FAILED" };
+      }
+      if (action === "galaxy_off" && r.ok) {
+        const cleared = await setGalaxyAutoOffAt(room, null, value);
+        return { ok: cleared, error: cleared ? undefined : "GALAXY_AUTO_OFF_CLEAR_FAILED" };
       }
       return { ok: r.ok };
     }
@@ -178,7 +207,26 @@ export async function executeDeviceAction(
         await lightTurnOff(sbCreds, room.switchbot_light_device_id);
       }
       if (room.switchbot_galaxy_device_id) {
-        await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+        if (r.ok) await setGalaxyAutoOffAt(room, null);
+      }
+      return { ok };
+    }
+    case "good_night": {
+      // おやすみ: エアコンは維持し、部屋のライト系だけをまとめて消灯する。
+      let ok = true;
+      if (room.switchbot_light_device_id) {
+        const r = await lightTurnOff(sbCreds, room.switchbot_light_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_galaxy_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
+        if (r.ok) await setGalaxyAutoOffAt(room, null);
+      }
+      if (room.switchbot_nest_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_nest_device_id); ok = ok && r.ok;
+      }
+      if (room.switchbot_wafu_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id); ok = ok && r.ok;
       }
       return { ok };
     }
@@ -193,6 +241,7 @@ export async function executeDeviceAction(
       }
       if (room.switchbot_galaxy_device_id) {
         const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
+        if (r.ok) await setGalaxyAutoOffAt(room, null);
       }
       if (room.switchbot_nest_device_id) {
         const r = await deviceTurnOff(sbCreds, room.switchbot_nest_device_id); ok = ok && r.ok;

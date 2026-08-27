@@ -349,6 +349,7 @@ export default function LiteControlPanel({
         <SecLabel>{e.scenes}</SecLabel>
         <div className="grid grid-cols-2 gap-3">
           <ActionBtn roomSlug={roomSlug} admin={admin} action="welcome" label={t.comfortMode} Icon={Home} tone="matcha" />
+          <ActionBtn roomSlug={roomSlug} admin={admin} action="good_night" label={t.goodNightMode} Icon={Moon} tone="ai" />
           <ActionBtn roomSlug={roomSlug} admin={admin} action="away" label={t.awayMode} Icon={Power} tone="neutral" />
         </div>
 

@@ -23,7 +23,8 @@ Next.js (App Router) ── Server Componentで滞在を検証
    │
    └─ Vercel Cron
          ├─ /api/cron/sync-ical   (毎時) iCal差分同期
-         └─ /api/cron/wake-alarm  (2分毎) 光目覚まし点灯
+         ├─ /api/cron/wake-alarm  (2分毎) 光目覚まし点灯
+         └─ /api/cron/galaxy-auto-off (1〜5分毎) ギャラクシー自動OFF
 
 Supabase (PostgreSQL)  rooms / reservations / alarms  ※RLSで全拒否→service_role経由のみ
 ```
@@ -44,6 +45,7 @@ Supabase (PostgreSQL)  rooms / reservations / alarms  ※RLSで全拒否→servi
 | `app/api/alarms/[room_id]/route.ts` | 光目覚まし設定 |
 | `app/api/cron/sync-ical/route.ts` | iCal 差分同期 |
 | `app/api/cron/wake-alarm/route.ts` | 光目覚まし点灯 |
+| `app/api/cron/galaxy-auto-off/route.ts` | ギャラクシー自動OFF |
 | `app/room/[room_id]/page.tsx` | ゲスト画面（サーバで検証） |
 | `components/ControlPanel.tsx` | 操作UI（ロック/AC/照明/目覚まし/言語） |
 | `components/AccessDenied.tsx` | サイバー風アクセス拒否画面 |
@@ -59,6 +61,8 @@ npm run dev
 ```
 
 各部屋を `rooms` に登録（slug, デバイスID, Sesame鍵, iCal URL）。Vercel へデプロイし、`vercel.json` の Cron が自動で有効化されます。`CRON_SECRET` を Vercel の環境変数とCron設定の Bearer に一致させてください。
+
+既存DBへ反映する場合は `supabase/migration_galaxy_auto_off.sql` を追加で実行してください。ギャラクシーモードをONにすると `rooms.galaxy_auto_off_at` に90分後の時刻が入り、`/api/cron/galaxy-auto-off` が期限切れの部屋を自動OFFします。
 
 ---
 

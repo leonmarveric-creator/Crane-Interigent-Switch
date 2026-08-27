@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles, Radio,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, Sparkles, Radio, Moon,
   Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
@@ -338,7 +338,7 @@ export default function ControlPanel({
 
         {/* シーン: 快適モード / 外出 */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
-          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} />
+          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} onGalaxyState={setGalaxyActive} />
         </motion.div>
 
         {/* スマートロック (主役) */}
@@ -970,12 +970,15 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* シーンボタン: 快適モード / 外出全OFF                                 */
+/* シーンボタン: 快適モード / おやすみ / 外出全OFF                       */
 /* ------------------------------------------------------------------ */
-type SceneAction = "welcome" | "welcome_cozy" | "away";
+type SceneAction = "welcome" | "welcome_cozy" | "good_night" | "away";
 function SceneButtons({
-  roomSlug, admin, guard, t, hasWafu,
-}: { roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"]; hasWafu?: boolean }) {
+  roomSlug, admin, guard, t, hasWafu, onGalaxyState,
+}: {
+  roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
+  t: typeof T["en"]; hasWafu?: boolean; onGalaxyState?: (on: boolean) => void;
+}) {
   const [busy, setBusy] = useState<SceneAction | null>(null);
   const [fx, setFx] = useState<{ n: number; a: SceneAction } | null>(null);
 
@@ -986,9 +989,12 @@ function SceneButtons({
     blip(); sweep(); setBusy(a); setFx((p) => ({ n: (p?.n ?? 0) + 1, a }));
     const ok = await callDevice(roomSlug, a, admin);
     if (ok) {
-      (a === "away" ? powerDown : powerUp)();
+      if (a === "away" || a === "good_night" || a === "welcome_cozy") onGalaxyState?.(false);
+      (a === "away" || a === "good_night" ? powerDown : powerUp)();
       speakOneOf(a === "away"
         ? ["Goodbye", "Powering down", "Have a safe trip"]
+        : a === "good_night"
+        ? ["Good night", "Lights dimmed", "Rest mode engaged"]
         : a === "welcome_cozy"
         ? ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"]
         : ["Welcome home", "Comfort mode engaged", "Systems set for your return"]);
@@ -1009,27 +1015,38 @@ function SceneButtons({
             : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
           <span className="text-sm text-emerald-200">{t.comfortMode}</span>
         </HudPanel>
-        <HudPanel tone="violet" onClick={() => run("away")} small
+        <HudPanel tone="cyan" onClick={() => run("good_night")} small
           contentClassName="flex-col items-center gap-2 px-4 py-5">
-          <Corners tone="emerald" />
-          <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
-          {busy === "away"
-            ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
-            : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
-          <span className="text-sm text-violet-200">{t.awayMode}</span>
+          <Corners tone="cyan" />
+          <CommandFX trigger={fx?.a === "good_night" ? fx.n : 0} tone="cyan" />
+          {busy === "good_night"
+            ? <Loader2 className="h-6 w-6 animate-spin text-cyan-300" />
+            : <Moon className="h-6 w-6 text-cyan-300" strokeWidth={1.7} />}
+          <span className="text-sm text-cyan-200">{t.goodNightMode}</span>
         </HudPanel>
+        <div className={hasWafu ? "" : "col-span-2"}>
+          <HudPanel tone="violet" onClick={() => run("away")} small
+            contentClassName="flex-col items-center gap-2 px-4 py-5">
+            <Corners tone="cyan" />
+            <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
+            {busy === "away"
+              ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
+              : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
+            <span className="text-sm text-violet-200">{t.awayMode}</span>
+          </HudPanel>
+        </div>
+        {hasWafu && (
+          <HudPanel tone="rose" onClick={() => run("welcome_cozy")} small
+            contentClassName="items-center justify-center gap-2 px-4 py-4">
+            <Corners tone="rose" />
+            <CommandFX trigger={fx?.a === "welcome_cozy" ? fx.n : 0} tone="rose" />
+            {busy === "welcome_cozy"
+              ? <Loader2 className="h-5 w-5 animate-spin text-rose-300" />
+              : <LampFloor className="h-5 w-5 text-rose-300" strokeWidth={1.7} />}
+            <span className="text-sm text-rose-200">{t.cozyMode}</span>
+          </HudPanel>
+        )}
       </div>
-      {hasWafu && (
-        <HudPanel tone="rose" onClick={() => run("welcome_cozy")} small
-          contentClassName="items-center justify-center gap-2 px-4 py-4">
-          <Corners tone="rose" />
-          <CommandFX trigger={fx?.a === "welcome_cozy" ? fx.n : 0} tone="rose" />
-          {busy === "welcome_cozy"
-            ? <Loader2 className="h-5 w-5 animate-spin text-rose-300" />
-            : <LampFloor className="h-5 w-5 text-rose-300" strokeWidth={1.7} />}
-          <span className="text-sm text-rose-200">{t.cozyMode}</span>
-        </HudPanel>
-      )}
     </div>
   );
 }
@@ -1370,6 +1387,7 @@ function GalaxyCard({
           <p className="font-mono text-[9px] tracking-[0.3em] text-violet-300/70">GALAXY MODE</p>
           <p className={`mt-0.5 text-sm font-medium ${on ? "text-violet-100" : "text-violet-200/90"}`}>{t.galaxy}</p>
           <p className="mt-0.5 truncate text-[11px] text-white/40">{t.galaxyDesc}</p>
+          <p className="mt-1 text-[10px] text-violet-200/60">{t.galaxyAutoOff}</p>
         </div>
       </div>
 

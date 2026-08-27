@@ -92,6 +92,7 @@ type Dict = {
   when: string;
   checkoutOff: string;
   welcomeScene: string;
+  goodNightScene: string;
   syncNow: string;
   syncing: string;
   syncDone: string;
@@ -144,6 +145,7 @@ export const AT: Record<AdminLang, Dict> = {
     srcGuest: "ゲスト", srcAdmin: "管理者", srcCron: "自動", when: "日時",
     checkoutOff: "退室OFF（エアコン・照明）",
     welcomeScene: "ウェルカム（エアコン＋照明ON）",
+    goodNightScene: "おやすみ（ライトOFF）",
     syncNow: "今すぐ同期", syncing: "同期中…", syncDone: "同期完了", syncFail: "同期失敗",
     addRoomTitle: "部屋を追加",
     roomNameLabel: "部屋名（あとで変更可）",
@@ -191,6 +193,7 @@ export const AT: Record<AdminLang, Dict> = {
     srcGuest: "Guest", srcAdmin: "Host", srcCron: "Auto", when: "Time",
     checkoutOff: "Turn off (AC & Light)",
     welcomeScene: "Welcome (AC + Light on)",
+    goodNightScene: "Good Night (lights off)",
     syncNow: "Sync now", syncing: "Syncing…", syncDone: "Synced", syncFail: "Sync failed",
     addRoomTitle: "Add a room",
     roomNameLabel: "Room name (can change later)",
@@ -238,6 +241,7 @@ export const AT: Record<AdminLang, Dict> = {
     srcGuest: "房客", srcAdmin: "房东", srcCron: "自动", when: "时间",
     checkoutOff: "关闭（空调·灯光）",
     welcomeScene: "欢迎（空调＋灯光开）",
+    goodNightScene: "晚安（关灯）",
     syncNow: "立即同步", syncing: "同步中…", syncDone: "同步完成", syncFail: "同步失败",
     addRoomTitle: "添加房间",
     roomNameLabel: "房间名称（之后可修改）",

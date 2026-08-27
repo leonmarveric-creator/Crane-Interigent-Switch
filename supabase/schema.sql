@@ -40,6 +40,7 @@ create table if not exists public.rooms (
   switchbot_ac_device_id     text,                  -- エアコン (Virtual IR)
   switchbot_light_device_id  text,                  -- 照明 (Virtual IR)
   switchbot_galaxy_device_id text,                  -- ギャラクシー (プラネタリウム / 物理デバイス)
+  galaxy_auto_off_at         timestamptz,           -- ギャラクシー自動OFF予定時刻
   switchbot_nest_device_id   text,                  -- NEST (藤編みボールランプ / 物理デバイス)
   switchbot_wafu_device_id   text,                  -- 和風ライト/行灯 (スマート電球)
   -- SwitchBotのトークン/シークレットは全部屋共通になりがちなので環境変数で持つ想定。
@@ -51,6 +52,13 @@ create table if not exists public.rooms (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+
+comment on column public.rooms.galaxy_auto_off_at is
+  'ギャラクシーモードONから90分後に自動OFFするための予定時刻 (UTC)';
+
+create index if not exists idx_rooms_galaxy_auto_off_due
+  on public.rooms (galaxy_auto_off_at)
+  where galaxy_auto_off_at is not null;
 
 -- =============================================================================
 --  reservations

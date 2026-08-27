@@ -1,7 +1,7 @@
 # 無料cron設定ガイド（Vercel Hobby向け）
 
 Vercel Hobbyプランはcronが**1日1回まで**で、毎時・数分毎の実行はデプロイが失敗する。
-そこで **cron-job.org（無料・1分間隔OK）** から2つのAPIを叩いて、光目覚ましと予約同期を無料で動かす。
+そこで **cron-job.org（無料・1分間隔OK）** から3つのAPIを叩いて、光目覚まし・ギャラクシー自動OFF・予約同期を無料で動かす。
 
 ## 前提：CRON_SECRET を確認
 Vercel のプロジェクト設定 → Environment Variables に `CRON_SECRET` があること。
@@ -9,14 +9,15 @@ Vercel のプロジェクト設定 → Environment Variables に `CRON_SECRET` �
 
 本番URLを `https://あなたのアプリ.vercel.app` とする。
 
-## 叩くURL（2つ）
+## 叩くURL（3つ）
 
 | 用途 | URL | 推奨間隔 |
 |---|---|---|
 | 光目覚まし点灯 | `https://あなたのアプリ.vercel.app/api/cron/wake-alarm` | 1〜2分 |
+| ギャラクシー自動OFF | `https://あなたのアプリ.vercel.app/api/cron/galaxy-auto-off` | 1〜5分 |
 | Airbnb予約同期 | `https://あなたのアプリ.vercel.app/api/cron/sync-ical` | 15〜30分 |
 
-※ 4部屋あっても **wake-alarm は1本でOK**。エンドポイントが「時刻の来た全アラーム」を
+※ 4部屋あっても **wake-alarm / galaxy-auto-off は各1本でOK**。エンドポイントが「時刻の来た全対象」を
 まとめて処理するので、部屋ごとにcronを分ける必要はない。
 
 ## 認証（どちらか）
@@ -33,12 +34,16 @@ Vercel のプロジェクト設定 → Environment Variables に `CRON_SECRET` �
 7. 保存。
 8. 同じ手順でもう1つ作る：
    - Title `sync-ical` / URL `.../api/cron/sync-ical` / Schedule「Every 30 minutes」/ 同じ認証ヘッダ。
+9. ギャラクシー自動OFF用も作る：
+   - Title `galaxy-auto-off` / URL `.../api/cron/galaxy-auto-off` / Schedule「Every 5 minutes」/ 同じ認証ヘッダ。
 
 ## 動作確認
 - cron-job.org の各ジョブの「History」でステータス 200 が返っていればOK。
 - 401 が返る場合は CRON_SECRET の不一致（ヘッダの値を確認）。
 - 光目覚ましは、テストページか予約中の部屋で時刻を「今から2〜3分後」に設定し、
   実際にライトが点くか確認する。
+- ギャラクシー自動OFFは、ギャラクシーモードをONにした後、Supabase の `rooms.galaxy_auto_off_at`
+  に90分後の時刻が入ることを確認する。
 
 ## 補足
 - `vercel.json` には無料枠内の「1日1回 sync-ical（0:00 JST）」だけ残してある（予約同期の保険）。
