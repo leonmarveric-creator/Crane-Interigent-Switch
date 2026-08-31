@@ -1,10 +1,96 @@
-// Web Audio API による近未来サウンド (音声ファイル不要・合成)。
+// Web Audio API による近未来サウンド + 同梱AIアシスタント音声。
 // iOS: AudioContext はユーザー操作(タップ)内で resume すれば鳴る。
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
+let activeVoiceAudio: HTMLAudioElement | null = null;
+let activeSfxAudio: HTMLAudioElement | null = null;
+let voicePrimed = false;
 
-export function setMuted(m: boolean) { muted = m; if (m) stopAmbient(); }
+const VOICE_AUDIO_BASE = "/audio/voice/current/";
+const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
+  "All systems online": "current-natural-voice-01-all-systems-online.mp3",
+  "Good evening. Systems online": "current-natural-voice-02-good-evening-systems-online.mp3",
+  "J.A.R.V.I.S online": "current-natural-voice-03-jarvis-online.mp3",
+  "Access granted. Welcome": "current-natural-voice-04-access-granted-welcome.mp3",
+  "Goodbye": "current-natural-voice-05-goodbye.mp3",
+  "Powering down": "current-natural-voice-06-powering-down.mp3",
+  "Have a safe trip": "current-natural-voice-07-have-a-safe-trip.mp3",
+  "Good night": "current-natural-voice-08-good-night.mp3",
+  "Lights dimmed": "current-natural-voice-09-lights-dimmed.mp3",
+  "Rest mode engaged": "current-natural-voice-10-rest-mode-engaged.mp3",
+  "Japanese Lamp offline": "current-natural-voice-11-japanese-lamp-offline.mp3",
+  "Japanese lamp off": "current-natural-voice-12-japanese-lamp-off.mp3",
+  "Ambient lighting off": "current-natural-voice-13-ambient-lighting-off.mp3",
+  "Cozy mode engaged": "current-natural-voice-14-cozy-mode-engaged.mp3",
+  "Setting a warm mood": "current-natural-voice-15-setting-a-warm-mood.mp3",
+  "Relax and unwind": "current-natural-voice-16-relax-and-unwind.mp3",
+  "Welcome home": "current-natural-voice-17-welcome-home.mp3",
+  "Comfort mode engaged": "current-natural-voice-18-comfort-mode-engaged.mp3",
+  "Systems set for your return": "current-natural-voice-19-systems-set-for-your-return.mp3",
+  "Door unlocked": "current-natural-voice-20-door-unlocked.mp3",
+  "Access granted": "current-natural-voice-21-access-granted.mp3",
+  "Welcome in": "current-natural-voice-22-welcome-in.mp3",
+  "Door secured": "current-natural-voice-23-door-secured.mp3",
+  "Locked and secured": "current-natural-voice-24-locked-and-secured.mp3",
+  "Lockdown engaged": "current-natural-voice-25-lockdown-engaged.mp3",
+  "Air Con online": "current-natural-voice-26-air-con-online.mp3",
+  "Air Con engaged": "current-natural-voice-27-air-con-engaged.mp3",
+  "Air Con activated": "current-natural-voice-28-air-con-activated.mp3",
+  "Air Con offline": "current-natural-voice-29-air-con-offline.mp3",
+  "Air Con standby": "current-natural-voice-30-air-con-standby.mp3",
+  "Air Con deactivated": "current-natural-voice-31-air-con-deactivated.mp3",
+  "Light online": "current-natural-voice-32-light-online.mp3",
+  "Light engaged": "current-natural-voice-33-light-engaged.mp3",
+  "Light activated": "current-natural-voice-34-light-activated.mp3",
+  "Light offline": "current-natural-voice-35-light-offline.mp3",
+  "Light standby": "current-natural-voice-36-light-standby.mp3",
+  "Light deactivated": "current-natural-voice-37-light-deactivated.mp3",
+  "Japanese Lamp online": "current-natural-voice-38-japanese-lamp-online.mp3",
+  "Ambient lighting engaged": "current-natural-voice-39-ambient-lighting-engaged.mp3",
+  "Warm glow activated": "current-natural-voice-40-warm-glow-activated.mp3",
+  "Restoring warm tone": "current-natural-voice-41-restoring-warm-tone.mp3",
+  "Warm preset applied": "current-natural-voice-42-warm-preset-applied.mp3",
+  "Galaxy mode engaged": "current-natural-voice-43-galaxy-mode-engaged.mp3",
+  "Opening the cosmos": "current-natural-voice-44-opening-the-cosmos.mp3",
+  "Enjoy the stars": "current-natural-voice-45-enjoy-the-stars.mp3",
+  "Returning to Earth": "current-natural-voice-46-returning-to-earth.mp3",
+  "Galaxy mode off": "current-natural-voice-47-galaxy-mode-off.mp3",
+  "Goodnight, stargazer": "current-natural-voice-48-goodnight-stargazer.mp3",
+  "Nest mode engaged": "current-natural-voice-49-nest-mode-engaged.mp3",
+  "Warm light online": "current-natural-voice-50-warm-light-online.mp3",
+  "Cozy glow, activated": "current-natural-voice-51-cozy-glow-activated.mp3",
+  "Nest mode off": "current-natural-voice-52-nest-mode-off.mp3",
+  "Warm light standby": "current-natural-voice-53-warm-light-standby.mp3",
+  "Dimming the glow": "current-natural-voice-54-dimming-the-glow.mp3",
+};
+
+const VOICE_LABEL_ALIASES: Array<[string, string]> = [
+  ["Air Con", "Air Con"],
+  ["エアコン", "Air Con"],
+  ["空调", "Air Con"],
+  ["에어컨", "Air Con"],
+  ["Light", "Light"],
+  ["照明", "Light"],
+  ["灯光", "Light"],
+  ["조명", "Light"],
+  ["Japanese Lamp", "Japanese Lamp"],
+  ["Japanese lamp", "Japanese Lamp"],
+  ["和風ライト", "Japanese Lamp"],
+  ["和风灯", "Japanese Lamp"],
+  ["일본풍 조명", "Japanese Lamp"],
+];
+
+const GALAXY_ON_AUDIO_URL = "/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.wav";
+
+export function setMuted(m: boolean) {
+  muted = m;
+  if (!m) return;
+  stopAmbient();
+  stopVoiceAudio();
+  stopSfxAudio();
+  if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+}
 
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -145,10 +231,79 @@ export function speakOneOf(lines: string[]) {
   speak(lines[Math.floor(Math.random() * lines.length)]);
 }
 
+function canonicalVoiceText(text: string): string {
+  const trimmed = text.trim();
+  for (const [label, canonicalLabel] of VOICE_LABEL_ALIASES) {
+    if (trimmed.startsWith(`${label} `)) {
+      return `${canonicalLabel}${trimmed.slice(label.length)}`;
+    }
+  }
+  return trimmed;
+}
+
+function naturalVoiceUrl(text: string): string | null {
+  const filename = VOICE_AUDIO_BY_TEXT[canonicalVoiceText(text)];
+  return filename ? `${VOICE_AUDIO_BASE}${filename}` : null;
+}
+
+function stopVoiceAudio() {
+  if (!activeVoiceAudio) return;
+  activeVoiceAudio.pause();
+  activeVoiceAudio.currentTime = 0;
+  activeVoiceAudio = null;
+}
+
+function stopSfxAudio() {
+  if (!activeSfxAudio) return;
+  activeSfxAudio.pause();
+  activeSfxAudio.currentTime = 0;
+  activeSfxAudio = null;
+}
+
+function playNaturalVoice(text: string): boolean {
+  const url = naturalVoiceUrl(text);
+  if (!url || typeof Audio === "undefined") return false;
+  try {
+    stopVoiceAudio();
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    const a = new Audio(url);
+    a.preload = "auto";
+    a.volume = 1;
+    activeVoiceAudio = a;
+    a.onended = () => {
+      if (activeVoiceAudio === a) activeVoiceAudio = null;
+    };
+    void a.play().catch(() => {
+      if (activeVoiceAudio === a) activeVoiceAudio = null;
+      if (!muted) speakWithBrowser(text);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function primeNaturalVoice() {
+  if (voicePrimed || typeof Audio === "undefined") return;
+  const url = naturalVoiceUrl("Access granted");
+  if (!url) return;
+  try {
+    const a = new Audio(url);
+    a.preload = "auto";
+    a.volume = 0.01;
+    void a.play().then(() => {
+      a.pause();
+      a.currentTime = 0;
+      voicePrimed = true;
+    }).catch(() => { /* user gesture may still be required */ });
+  } catch { /* ignore */ }
+}
+
 /** 音声をユーザー操作内で先行起動 (iOSで後続のspeakを鳴らせるようにする)。 */
 export function primeVoice() {
   if (typeof window === "undefined") return;
   try { ac(); } catch { /* audio */ }
+  try { primeNaturalVoice(); } catch { /* audio */ }
   try {
     const ss = window.speechSynthesis;
     if (ss) {
@@ -191,6 +346,12 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
 /** AIアシスタント音声 (Web Speech API・無料)。自然な女性ボイス・落ち着いた話速。 */
 export function speak(text: string) {
   if (muted) return;
+  if (playNaturalVoice(text)) return;
+  speakWithBrowser(text);
+}
+
+/** AIアシスタント音声のブラウザ合成フォールバック。 */
+function speakWithBrowser(text: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   try {
     const v = chosenVoice || pickVoice();
@@ -259,7 +420,28 @@ export function holo() {
 }
 
 /** ギャラクシーモードON: 夢のような上昇シマー和音 (星空展開) */
-export function galaxyOn() {
+function playGalaxyOnAsset(): boolean {
+  if (typeof Audio === "undefined") return false;
+  try {
+    stopSfxAudio();
+    const a = new Audio(GALAXY_ON_AUDIO_URL);
+    a.preload = "auto";
+    a.volume = 0.95;
+    activeSfxAudio = a;
+    a.onended = () => {
+      if (activeSfxAudio === a) activeSfxAudio = null;
+    };
+    void a.play().catch(() => {
+      if (activeSfxAudio === a) activeSfxAudio = null;
+      syntheticGalaxyOn();
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function syntheticGalaxyOn() {
   const c = ac(); if (!c || muted) return;
   const t = c.currentTime;
   // ゆっくり開く和音 (A - C# - E - A)
@@ -273,6 +455,12 @@ export function galaxyOn() {
     const f = 2000 + Math.random() * 2500;
     osc(c, "sine", f, f, t + 0.25 + i * 0.14, 0.12, 0.012);
   }
+}
+
+export function galaxyOn() {
+  if (muted) return;
+  if (playGalaxyOnAsset()) return;
+  syntheticGalaxyOn();
 }
 
 /** ギャラクシーモードOFF: 静かに閉じる下降 */
