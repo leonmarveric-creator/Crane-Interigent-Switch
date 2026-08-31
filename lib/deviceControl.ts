@@ -120,11 +120,14 @@ export async function executeDeviceAction(
       const r = action === "galaxy_on"
         ? await deviceTurnOn(sbCreds, room.switchbot_galaxy_device_id)
         : await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
-      // ギャラクシーON時は、星空を引き立てるため他のライト(通常/和風)を消灯する。
+      // ギャラクシーON時は、星空を引き立てるため他のライト(通常/NEST/和風)を消灯する。
       // 消灯の失敗はギャラクシー本体の結果に影響させない(ベストエフォート)。
       if (action === "galaxy_on" && r.ok) {
         if (room.switchbot_light_device_id) {
           await lightTurnOff(sbCreds, room.switchbot_light_device_id);
+        }
+        if (room.switchbot_nest_device_id) {
+          await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
         }
         if (room.switchbot_wafu_device_id) {
           await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);

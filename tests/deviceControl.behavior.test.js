@@ -59,6 +59,20 @@ test("galaxy_on stores a ninety-minute auto-off deadline and galaxy_off clears i
   assert.match(extractCase(source, "galaxy_off"), /setGalaxyAutoOffAt\(room,\s*null/);
 });
 
+test("galaxy_on turns off every other light in the room", () => {
+  const block = extractCase(read(deviceControlPath), "galaxy_on");
+
+  for (const expected of [
+    "switchbot_light_device_id",
+    "switchbot_nest_device_id",
+    "switchbot_wafu_device_id",
+  ]) {
+    assert.match(block, new RegExp(expected), `${expected} should be turned off by galaxy_on`);
+  }
+
+  assert.match(block, /deviceTurnOff\(sbCreds,\s*room\.switchbot_nest_device_id\)/);
+});
+
 test("galaxy auto-off cron route processes rooms whose deadline has passed", () => {
   const source = read(cronPath);
   assert.match(source, /CRON_SECRET/);
