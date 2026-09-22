@@ -21,6 +21,11 @@ type Dict = {
   setAlarm: string;
   clearAlarm: string;
   alarmSet: string;
+  wakeFlameName: string;
+  wakeFlameDescription: string;
+  wakeHorizonName: string;
+  wakeHorizonDescription: string;
+  wakeHorizonUnavailable: string;
   welcome: string;
   checkout: string;
   sending: string;
@@ -66,6 +71,11 @@ export const T: Record<Lang, Dict> = {
     unlock: "解錠", lock: "施錠", locked: "施錠中", unlocked: "解錠済み",
     ac: "エアコン", light: "照明", on: "オン", off: "オフ",
     wakeLight: "光目覚まし", setAlarm: "設定", clearAlarm: "解除", alarmSet: "セット完了",
+    wakeFlameName: "Flame On",
+    wakeFlameDescription: "設定時刻にメインライトが点灯します。",
+    wakeHorizonName: "Horizon Rise",
+    wakeHorizonDescription: "10分前から和風ライトが徐々に明るくなり、設定時刻にメインライトが点灯。5分後に和風ライトだけ自動消灯します。",
+    wakeHorizonUnavailable: "この部屋には和風ライトがないため選択できません。",
     welcome: "ようこそ", checkout: "チェックアウト",
     sending: "送信中…", success: "完了", failed: "失敗しました",
     accessDenied: "アクセス拒否", accessDeniedDesc: "このリンクは無効か、滞在期間外です。",
@@ -85,6 +95,11 @@ export const T: Record<Lang, Dict> = {
     unlock: "Unlock", lock: "Lock", locked: "Locked", unlocked: "Unlocked",
     ac: "Air Con", light: "Light", on: "On", off: "Off",
     wakeLight: "Wake Light", setAlarm: "Set", clearAlarm: "Clear", alarmSet: "Alarm set",
+    wakeFlameName: "Flame On",
+    wakeFlameDescription: "The main light turns on at the set time.",
+    wakeHorizonName: "Horizon Rise",
+    wakeHorizonDescription: "The Japanese lamp gradually brightens from 10 minutes before, the main light turns on at the set time, and only the Japanese lamp turns off 5 minutes later.",
+    wakeHorizonUnavailable: "This room has no Japanese lamp, so this mode is unavailable.",
     welcome: "Welcome", checkout: "Check-out",
     sending: "Sending…", success: "Done", failed: "Failed",
     accessDenied: "Access Denied", accessDeniedDesc: "This link is invalid or outside your stay period.",
@@ -104,6 +119,11 @@ export const T: Record<Lang, Dict> = {
     unlock: "开锁", lock: "上锁", locked: "已上锁", unlocked: "已开锁",
     ac: "空调", light: "灯光", on: "开", off: "关",
     wakeLight: "光唤醒", setAlarm: "设定", clearAlarm: "取消", alarmSet: "已设定",
+    wakeFlameName: "Flame On",
+    wakeFlameDescription: "主灯会在设定时间亮起。",
+    wakeHorizonName: "Horizon Rise",
+    wakeHorizonDescription: "和风灯从提前10分钟开始逐渐变亮，主灯在设定时间亮起，5分钟后仅自动关闭和风灯。",
+    wakeHorizonUnavailable: "此房间没有和风灯，因此无法选择此模式。",
     welcome: "欢迎", checkout: "退房",
     sending: "发送中…", success: "完成", failed: "失败",
     accessDenied: "拒绝访问", accessDeniedDesc: "此链接无效或不在入住期间内。",
@@ -123,6 +143,11 @@ export const T: Record<Lang, Dict> = {
     unlock: "잠금 해제", lock: "잠금", locked: "잠김", unlocked: "열림",
     ac: "에어컨", light: "조명", on: "켜기", off: "끄기",
     wakeLight: "라이트 알람", setAlarm: "설정", clearAlarm: "해제", alarmSet: "설정 완료",
+    wakeFlameName: "Flame On",
+    wakeFlameDescription: "설정 시간에 메인 조명이 켜집니다.",
+    wakeHorizonName: "Horizon Rise",
+    wakeHorizonDescription: "10분 전부터 일본풍 조명이 서서히 밝아지고 설정 시간에 메인 조명이 켜진 뒤, 5분 후 일본풍 조명만 자동으로 꺼집니다.",
+    wakeHorizonUnavailable: "이 객실에는 일본풍 조명이 없어 선택할 수 없습니다.",
     welcome: "환영합니다", checkout: "체크아웃",
     sending: "전송 중…", success: "완료", failed: "실패",
     accessDenied: "접근 거부", accessDeniedDesc: "이 링크는 유효하지 않거나 숙박 기간이 아닙니다.",

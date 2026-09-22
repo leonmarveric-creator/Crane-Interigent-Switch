@@ -82,6 +82,14 @@ const VOICE_LABEL_ALIASES: Array<[string, string]> = [
 ];
 
 const GALAXY_ON_AUDIO_URL = "/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.wav";
+export type MagicTone = "gold" | "teal" | "rose" | "blue" | "green";
+const MAGIC_TONE_ROOT: Record<MagicTone, number> = {
+  gold: 392,
+  teal: 523,
+  rose: 277,
+  blue: 440,
+  green: 349,
+};
 
 export function setMuted(m: boolean) {
   muted = m;
@@ -100,6 +108,10 @@ function ac(): AudioContext | null {
   if (ctx.state === "suspended") ctx.resume();
   if (!master) buildChain(ctx);
   return ctx;
+}
+
+export function primeMagicAudio() {
+  if (!muted) void ac();
 }
 
 // マスター + 軽いディレイ残響 (サイバーな空間感)
@@ -540,6 +552,86 @@ export function bootStage(i: number) {
   const base = 640 + i * 120;
   osc(c, "sine", base, base * 1.5, t, 0.09, 0.014);
   noise(c, t, 0.05, 0.006, 3000, 6500);
+}
+
+function magicRoot(tone: MagicTone | string) {
+  const key = tone in MAGIC_TONE_ROOT ? tone as MagicTone : "gold";
+  return MAGIC_TONE_ROOT[key];
+}
+
+/** 魔法陣が開く時のオリジナル効果音。公式作品由来の音源は使わない。 */
+export function magicCircleChime(tone: MagicTone | string = "gold") {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const root = magicRoot(tone);
+  noise(c, t, 0.46, 0.018, 8800, 1100);
+  osc(c, "sine", root * 0.5, root * 1.02, t, 0.56, 0.026);
+  osc(c, "triangle", root, root * 2, t + 0.03, 0.46, 0.021, 7);
+  [root * 1.5, root * 2, root * 2.5].forEach((f, i) => {
+    osc(c, "sine", f, f * 1.08, t + 0.12 + i * 0.055, 0.28, 0.017);
+  });
+}
+
+/** ボタン押下と同時に、呪文の声へ重ねる短い発動音。 */
+export function magicActionStart(tone: MagicTone | string = "gold") {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const root = magicRoot(tone);
+  noise(c, t, 0.24, 0.014, 7200, 1600);
+  osc(c, "sine", root * 2, root * 3, t, 0.22, 0.024);
+  osc(c, "triangle", root, root * 1.75, t + 0.04, 0.26, 0.018, 6);
+  osc(c, "sine", root * 4, root * 4.5, t + 0.18, 0.16, 0.014);
+}
+
+/** コマンド完了時の魔法的な返答音。失敗時は低く崩れる。 */
+export function magicActionResolve(success = true) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  if (success) {
+    [659, 784, 1046].forEach((f, i) => osc(c, "sine", f, f * 1.02, t + i * 0.055, 0.22, 0.018));
+    noise(c, t, 0.16, 0.007, 6400, 3600);
+    return;
+  }
+  noise(c, t, 0.18, 0.018, 2800, 440);
+  osc(c, "square", 180, 92, t, 0.22, 0.024);
+}
+
+/** 杖で空気を切るようなオリジナル魔法音。映画由来の音源は使わない。 */
+export function spellCast(success = true) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const root = success ? 392 : 220;
+  noise(c, t, 0.22, success ? 0.018 : 0.026, success ? 9000 : 4200, success ? 1200 : 260);
+  osc(c, "sine", root, root * 2, t, 0.42, success ? 0.028 : 0.018);
+  osc(c, "triangle", root * 1.5, root * 3, t + 0.05, 0.34, success ? 0.022 : 0.014, 8);
+  [root * 2, root * 2.5, root * 3].forEach((f, i) => {
+    osc(c, "sine", f, success ? f * 1.25 : f * 0.72, t + 0.2 + i * 0.055, 0.2, success ? 0.018 : 0.012);
+  });
+  if (!success) {
+    osc(c, "square", 130, 95, t + 0.25, 0.24, 0.028);
+  }
+}
+
+/** マジカルモード専用: 呪文を唱え終えた後に広がる魔法の余韻。 */
+export function magicIncantationEcho(tone: MagicTone | string = "gold") {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime;
+  const root = magicRoot(tone);
+  noise(c, t, 0.48, 0.014, 1400, 7800);
+  noise(c, t + 0.2, 0.63, 0.006, 8600, 1800);
+  osc(c, "sine", root * 0.5, root * 0.505, t + 0.05, 1.15, 0.018);
+  const chimeNotes = [
+    { ratio: 1, at: 0.1, level: 0.014 },
+    { ratio: 1.5, at: 0.25, level: 0.017 },
+    { ratio: 1.25, at: 0.42, level: 0.014 },
+    { ratio: 2, at: 0.59, level: 0.012 },
+  ];
+  chimeNotes.forEach(({ ratio, at, level }) => {
+    const note = root * ratio;
+    osc(c, "sine", note, note * 0.998, t + at, 0.61, level);
+    osc(c, "sine", note * 2.01, note * 2, t + at, 0.35, level * 0.3);
+    osc(c, "sine", note, note * 0.996, t + at + 0.21, 0.48, level * 0.24);
+  });
 }
 
 /* -------------------------------------------------------------------------- */

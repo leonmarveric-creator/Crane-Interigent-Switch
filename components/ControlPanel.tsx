@@ -5,11 +5,12 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, PowerOff, Sparkles, Radio, Moon,
-  Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
+  Sun, Sunrise, Flame, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
-import { blip, powerUp, powerDown, error as sfxError, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
+import type { WakeLightMode } from "@/lib/wakePrewake";
+import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
 
 interface Props {
@@ -363,7 +364,7 @@ export default function ControlPanel({
 
         {/* 光目覚まし (スクロールせず見えるよう上部に配置) */}
         <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}>
-          <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} />
+          <WakeCard roomSlug={roomSlug} checkOut={checkOut} t={t} lang={lang} admin={admin} hasWafu={hasWafu} />
         </motion.div>
 
         {/* デバイスグリッド */}
@@ -1559,13 +1560,21 @@ function GalaxyOverlay() {
 /* 光目覚まし カード (タイムピッカー)                                   */
 /* ------------------------------------------------------------------ */
 function WakeCard({
-  roomSlug, checkOut, t, lang, admin,
+  roomSlug, checkOut, t, lang, admin, hasWafu,
 }: {
-  roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang; admin?: boolean;
+  roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang; admin?: boolean; hasWafu?: boolean;
 }) {
   const [time, setTime] = useState("07:00");
+  const [mode, setMode] = useState<WakeLightMode>("flame_on");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
   const [err, setErr] = useState<string | null>(null);
+
+  const selectMode = (nextMode: WakeLightMode, label: string) => {
+    navTick();
+    speak(label);
+    setMode(nextMode);
+    setState("idle");
+  };
 
   const submit = async () => {
     blip();
@@ -1589,8 +1598,8 @@ function WakeCard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(admin
-          ? { roomSlug, fireAtIso: fire.toISOString() }
-          : { fireAtIso: fire.toISOString() }),
+          ? { roomSlug, fireAtIso: fire.toISOString(), mode }
+          : { fireAtIso: fire.toISOString(), mode }),
       });
       if (res.ok) { setState("set"); sfxConfirm(); }
       else {
@@ -1612,6 +1621,34 @@ function WakeCard({
           <AlarmClock className="h-5 w-5 text-violet-300" strokeWidth={1.6} />
           <span className="text-sm text-violet-200">{t.wakeLight}</span>
           <span className="anim-breathe ml-auto inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />
+        </div>
+
+        <div className="mt-3">
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.wakeLight}>
+            <button
+              type="button"
+              aria-pressed={mode === "flame_on"}
+              onClick={() => selectMode("flame_on", t.wakeFlameName)}
+              className={`clip-bevel-sm flex min-h-11 items-center justify-center gap-2 border px-2 text-[12px] font-semibold transition ${mode === "flame_on" ? "border-amber-300/55 bg-amber-300/14 text-amber-100" : "border-white/10 bg-black/25 text-white/55"}`}
+            >
+              <Flame className="h-4 w-4" strokeWidth={1.6} />
+              {t.wakeFlameName}
+            </button>
+            <button
+              type="button"
+              aria-pressed={mode === "horizon_rise"}
+              disabled={!hasWafu}
+              onClick={() => selectMode("horizon_rise", t.wakeHorizonName)}
+              className={`clip-bevel-sm flex min-h-11 items-center justify-center gap-2 border px-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${mode === "horizon_rise" ? "border-violet-300/60 bg-violet-300/16 text-violet-100" : "border-white/10 bg-black/25 text-white/55"}`}
+            >
+              <Sunrise className="h-4 w-4" strokeWidth={1.6} />
+              {t.wakeHorizonName}
+            </button>
+          </div>
+          <p className="mt-2 min-h-[34px] text-[11px] leading-relaxed text-violet-100/68">
+            {mode === "horizon_rise" ? t.wakeHorizonDescription : t.wakeFlameDescription}
+          </p>
+          {!hasWafu && <p className="mt-1 text-[10px] text-amber-200/58">{t.wakeHorizonUnavailable}</p>}
         </div>
 
         <div className="mt-4 flex items-center gap-3">

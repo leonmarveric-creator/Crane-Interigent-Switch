@@ -125,6 +125,13 @@ create table if not exists public.alarms (
   fire_at        timestamptz not null,              -- 点灯予定時刻 (UTC)
   is_enabled     boolean not null default true,
   triggered_at   timestamptz,                       -- 実行済みなら記録 (二重実行防止)
+  wake_mode      text not null default 'flame_on'
+    check (wake_mode in ('flame_on', 'horizon_rise')),
+  wafu_prewake_started_at timestamptz,              -- 和風ライトの10分前ランプアップ開始時刻
+  wafu_prewake_step integer not null default 0
+    check (wafu_prewake_step between 0 and 5),
+  wafu_auto_off_at timestamptz,                     -- Horizon Rise の和風ライト消灯予定
+  wafu_auto_off_completed_at timestamptz,           -- 和風ライト消灯の実行済み時刻
 
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -304,3 +311,54 @@ alter table rooms
 
 comment on column rooms.switchbot_wafu_device_id is
   '和風ライト(行灯)を操作する SwitchBot デバイスID / スマート電球 (null = 和風ライト非対応の部屋)';
+
+-- ##### migration: wake_prewake #####
+-- 光目覚まし10分前から和風ライトを段階的に明るくする進捗
+alter table public.alarms
+  add column if not exists wafu_prewake_started_at timestamptz,
+  add column if not exists wafu_prewake_step integer not null default 0;
+
+do $$ begin
+  alter table public.alarms
+    add constraint chk_alarms_wafu_prewake_step
+    check (wafu_prewake_step between 0 and 5);
+exception when duplicate_object then null; end $$;
+
+create index if not exists idx_alarms_wafu_prewake
+  on public.alarms (fire_at, wafu_prewake_step)
+  where is_enabled = true and triggered_at is null;
+
+comment on column public.alarms.wafu_prewake_started_at is
+  '光目覚ましの10分前から和風ライトのランプアップを開始した時刻';
+
+comment on column public.alarms.wafu_prewake_step is
+  '和風ライトのランプアップ進捗 (0=未開始, 1-5=明るさ段階)';
+
+-- ##### migration: wake_modes #####
+-- Flame On / Horizon Rise の選択と、Horizon Rise の5分後自動消灯
+alter table public.alarms
+  add column if not exists wake_mode text not null default 'flame_on',
+  add column if not exists wafu_auto_off_at timestamptz,
+  add column if not exists wafu_auto_off_completed_at timestamptz;
+
+do $$ begin
+  alter table public.alarms
+    add constraint chk_alarms_wake_mode
+    check (wake_mode in ('flame_on', 'horizon_rise'));
+exception when duplicate_object then null; end $$;
+
+create index if not exists idx_alarms_wafu_auto_off
+  on public.alarms (wafu_auto_off_at)
+  where is_enabled = true
+    and wake_mode = 'horizon_rise'
+    and triggered_at is not null
+    and wafu_auto_off_completed_at is null;
+
+comment on column public.alarms.wake_mode is
+  '光目覚まし種別: flame_on=設定時刻にメインライト、horizon_rise=10分前から和風ライト+5分後自動消灯';
+
+comment on column public.alarms.wafu_auto_off_at is
+  'Horizon Riseでメインライト点灯5分後に和風ライトだけを消す予定時刻';
+
+comment on column public.alarms.wafu_auto_off_completed_at is
+  'Horizon Riseの和風ライト自動消灯が成功した時刻';

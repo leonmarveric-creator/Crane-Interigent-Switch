@@ -2,7 +2,7 @@
 
 ゲストが滞在期間中のみ専用URLから、自室のスマートロック（Sesame 5）とエアコン・照明（SwitchBot ハブミニ）を操作できる Web アプリ。予約は Airbnb iCal の自動同期と手動追加のハイブリッド。
 
-近未来・サイバー調のダークUI（グラスモーフィズム＋ネオン）、アイコン中心の多言語（日本語 / English / 中文 / 한국어）モバイルファースト設計。
+近未来・サイバー調、和風、マジカルの3つのゲストUIモードを選べる、アイコン中心の多言語（日本語 / English / 中文 / 한국어）モバイルファースト設計。
 
 ---
 
@@ -23,7 +23,7 @@ Next.js (App Router) ── Server Componentで滞在を検証
    │
    └─ Vercel Cron
          ├─ /api/cron/sync-ical   (毎時) iCal差分同期
-         ├─ /api/cron/wake-alarm  (2分毎) 光目覚まし点灯
+         ├─ /api/cron/wake-alarm  (1〜2分毎) 2種類の光目覚まし点灯＋Horizon Rise後処理
          └─ /api/cron/galaxy-auto-off (1〜5分毎) ギャラクシー自動OFF
 
 Supabase (PostgreSQL)  rooms / reservations / alarms  ※RLSで全拒否→service_role経由のみ
@@ -44,10 +44,14 @@ Supabase (PostgreSQL)  rooms / reservations / alarms  ※RLSで全拒否→servi
 | `app/api/devices/[room_id]/route.ts` | デバイス操作プロキシ |
 | `app/api/alarms/[room_id]/route.ts` | 光目覚まし設定 |
 | `app/api/cron/sync-ical/route.ts` | iCal 差分同期 |
-| `app/api/cron/wake-alarm/route.ts` | 光目覚まし点灯 |
+| `app/api/cron/wake-alarm/route.ts` | Flame On点灯／Horizon Riseの10分前ランプアップ・5分後和風ライト消灯 |
 | `app/api/cron/galaxy-auto-off/route.ts` | ギャラクシー自動OFF |
 | `app/room/[room_id]/page.tsx` | ゲスト画面（サーバで検証） |
 | `components/ControlPanel.tsx` | 操作UI（ロック/AC/照明/目覚まし/言語） |
+| `components/MagicalControlPanel.tsx` | マジカルUI（各室に固定された動く肖像画と共通の金装飾額縁・補助的な木製ワンド・幾何学模様の魔法陣・ギャラクシー専用の星図演出・各操作のルーン付きアイコン・部屋ごとに固定した録音済み呪文音声） |
+| `public/magic-seasons/` | HARU/NATU/AKI/FUYU の元コンセプト画像（UIには非表示） |
+| `public/magic-portraits/` | 宿泊中の部屋に固定表示する動く肖像画MP4とポスター画像 |
+| `public/magic-portraits/ornate-frame.png` | 4室共通で動画の上へ重ねる透過金装飾額縁 |
 | `components/AccessDenied.tsx` | サイバー風アクセス拒否画面 |
 | `lib/i18n.ts` | ja/en/zh/ko 辞書 |
 
@@ -62,7 +66,7 @@ npm run dev
 
 各部屋を `rooms` に登録（slug, デバイスID, Sesame鍵, iCal URL）。Vercel へデプロイし、`vercel.json` の Cron が自動で有効化されます。`CRON_SECRET` を Vercel の環境変数とCron設定の Bearer に一致させてください。
 
-既存DBへ反映する場合は `supabase/migration_galaxy_auto_off.sql` を追加で実行してください。ギャラクシーモードをONにすると `rooms.galaxy_auto_off_at` に90分後の時刻が入り、`/api/cron/galaxy-auto-off` が期限切れの部屋を自動OFFします。
+既存DBへ反映する場合は `supabase/migration_galaxy_auto_off.sql`、`supabase/migration_wake_prewake.sql`、`supabase/migration_wake_modes.sql` を追加で実行してください。ギャラクシーモードをONにすると `rooms.galaxy_auto_off_at` に90分後の時刻が入り、`/api/cron/galaxy-auto-off` が期限切れの部屋を自動OFFします。光目覚ましは、Flame Onなら設定時刻にメインライトを点灯します。Horizon Riseなら10分前から和風ライトを段階的に明るくし、設定時刻にメインライトを点灯して、5分後に和風ライトだけを自動消灯します。
 
 ---
 

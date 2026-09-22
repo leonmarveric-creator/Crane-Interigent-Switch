@@ -115,3 +115,19 @@ test("localized device labels resolve to the same natural voice assets", () => {
     assert.ok(source.includes(expected), `${expected} should be included in label aliases`);
   }
 });
+
+test("magical mode has synthetic casting sound effects for spell buttons", () => {
+  const source = read(sfxPath);
+
+  assert.match(source, /type MagicTone/);
+  assert.match(source, /MAGIC_TONE_ROOT/);
+  assert.match(source, /export function magicCircleChime/);
+  assert.match(source, /export function magicActionStart/);
+  assert.match(source, /export function magicActionResolve/);
+  assert.match(source, /杖で空気を切るようなオリジナル魔法音/);
+  const afterVoice = source.slice(source.indexOf("export function magicIncantationEcho"), source.indexOf("/* -------------------------------------------------------------------------- */", source.indexOf("export function magicIncantationEcho")));
+  assert.match(afterVoice, /const chimeNotes/);
+  assert.match(afterVoice, /noise\(c, t, [\s\S]*?1400, 7800\)/);
+  assert.match(afterVoice, /noise\(c, t \+ 0\.2, [\s\S]*?8600, 1800\)/);
+  assert.match(afterVoice, /at \+ 0\.21/);
+});

@@ -12,10 +12,12 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb, Sparkles, Moon,
-  Home, Power, Loader2, Globe, PanelsTopLeft, Lamp, AlarmClock, Check, type LucideIcon,
+  Home, Power, Loader2, Globe, PanelsTopLeft, Lamp, AlarmClock, Check, Flame, Sunrise, type LucideIcon,
 } from "lucide-react";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import type { WakeLightMode } from "@/lib/wakePrewake";
+import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
 
 export interface LiteProps {
@@ -124,10 +126,19 @@ function ActionBtn({
 }
 
 // 光目覚まし（アラーム）— ハイテクUIと同じエンドポイント/JST計算を軽量に実装
-function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t: (typeof T)["ja"] }) {
+function WakeLite({ roomSlug, admin, t, hasWafu }: { roomSlug: string; admin?: boolean; t: (typeof T)["ja"]; hasWafu?: boolean }) {
   const [time, setTime] = useState("07:00");
+  const [mode, setMode] = useState<WakeLightMode>("flame_on");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
   const [err, setErr] = useState<string | null>(null);
+
+  const selectMode = (nextMode: WakeLightMode, label: string) => {
+    try { sfxSetMuted(localStorage.getItem("guestMuted") === "1"); } catch { /* keep current audio setting */ }
+    navTick();
+    speak(label);
+    setMode(nextMode);
+    setState("idle");
+  };
 
   const send = async (clear?: boolean) => {
     vibe();
@@ -149,10 +160,10 @@ function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           admin
-            ? { roomSlug, ...(clear ? { clear: true } : { fireAtIso }) }
+            ? { roomSlug, ...(clear ? { clear: true } : { fireAtIso, mode }) }
             : clear
               ? { clear: true }
-              : { fireAtIso }
+              : { fireAtIso, mode }
         ),
       });
       if (res.ok) {
@@ -176,6 +187,33 @@ function WakeLite({ roomSlug, admin, t }: { roomSlug: string; admin?: boolean; t
     <div className="rounded-lg border border-[#ded6c7] bg-[#fffdf8]/95 p-4 shadow-[0_10px_24px_-22px_rgba(44,42,38,0.45)]">
       <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold tracking-[0.02em] text-[#5c5280]">
         <AlarmClock className="h-[18px] w-[18px]" strokeWidth={1.5} /> {t.wakeLight}
+      </div>
+      <div className="mb-3">
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.wakeLight}>
+          <button
+            type="button"
+            aria-pressed={mode === "flame_on"}
+            onClick={() => selectMode("flame_on", t.wakeFlameName)}
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-2 text-[12px] font-semibold transition ${mode === "flame_on" ? "border-[#b98b38]/55 bg-[#f7e8c9] text-[#75561f]" : "border-[#d6cfbb] bg-[#f4efe6] text-[#777064]"}`}
+          >
+            <Flame className="h-4 w-4" strokeWidth={1.6} />
+            {t.wakeFlameName}
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "horizon_rise"}
+            disabled={!hasWafu}
+            onClick={() => selectMode("horizon_rise", t.wakeHorizonName)}
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${mode === "horizon_rise" ? "border-[#8f7dae]/60 bg-[#ebe4f1] text-[#574a70]" : "border-[#d6cfbb] bg-[#f4efe6] text-[#777064]"}`}
+          >
+            <Sunrise className="h-4 w-4" strokeWidth={1.6} />
+            {t.wakeHorizonName}
+          </button>
+        </div>
+        <p className="mt-2 min-h-[34px] text-[11px] leading-relaxed text-[#6d685d]">
+          {mode === "horizon_rise" ? t.wakeHorizonDescription : t.wakeFlameDescription}
+        </p>
+        {!hasWafu && <p className="mt-1 text-[10px] text-[#9b7040]">{t.wakeHorizonUnavailable}</p>}
       </div>
       <div className="flex items-center gap-2.5">
         <input
@@ -355,7 +393,7 @@ export default function LiteControlPanel({
 
         {/* 光目覚まし */}
         <div className="mt-5">
-          <WakeLite roomSlug={roomSlug} admin={admin} t={t} />
+          <WakeLite roomSlug={roomSlug} admin={admin} t={t} hasWafu={hasWafu} />
         </div>
       </div>
     </main>
