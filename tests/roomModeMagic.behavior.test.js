@@ -197,6 +197,7 @@ test("supplied ornate frame overlays the cropped moving portrait in every room",
   assert.match(source, /className="portrait-frame-image"/);
   assert.match(source, /src="\/magic-portraits\/ornate-frame\.png"/);
   assert.match(source, /\.portrait-window video\s*\{[^}]*width: 116%/);
+  assert.match(source, /\.portrait-window video\s*\{[^}]*max-width: none;/);
   assert.match(source, /\.portrait-window\s*\{[^}]*left: 19%/);
 });
 

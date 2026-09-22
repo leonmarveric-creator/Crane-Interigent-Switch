@@ -1491,6 +1491,7 @@ export default function MagicalControlPanel({
           top: -8%;
           width: 116%;
           height: 116%;
+          max-width: none;
           object-fit: cover;
           object-position: center;
         }
