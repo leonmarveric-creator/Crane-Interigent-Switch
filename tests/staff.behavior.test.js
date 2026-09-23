@@ -200,3 +200,12 @@ test("staff images are not blocked by the login redirect (login page shows the i
   assert.match(m, /isStaticFile = \/\\\.\(\?:jpg\|jpeg\|png/);
   assert.match(m, /!isStaticFile\)/);
 });
+
+test("staff login accepts letters (no numeric-only keyboard) and reports a missing STAFF_PASSWORD", () => {
+  const page = read("app", "staff", "login", "page.tsx");
+  assert.doesNotMatch(page, /inputMode="numeric"/);
+  assert.doesNotMatch(page, /-mt-6/);
+  const route = read("app", "api", "staff", "login", "route.ts");
+  assert.match(route, /NOT_CONFIGURED/);
+  assert.match(route, /password\.trim\(\) !== \(process\.env\.STAFF_PASSWORD \?\? ""\)\.trim\(\)/);
+});
