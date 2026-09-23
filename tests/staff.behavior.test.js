@@ -209,3 +209,13 @@ test("staff login accepts letters (no numeric-only keyboard) and reports a missi
   assert.match(route, /NOT_CONFIGURED/);
   assert.match(route, /password\.trim\(\) !== \(process\.env\.STAFF_PASSWORD \?\? ""\)\.trim\(\)/);
 });
+
+test("home-screen shortcut for /staff opens /staff (own manifest + icons), not /admin", () => {
+  const m = JSON.parse(read("public", "staff", "manifest.webmanifest"));
+  assert.equal(m.start_url, "/staff");
+  assert.equal(m.scope, "/staff");
+  assert.match(read("app", "staff", "layout.tsx"), /manifest: "\/staff\/manifest\.webmanifest"/);
+  assert.ok(!fs.existsSync(path.join(root, "app", "manifest.ts"))); // ファイル規約だと上書きできない
+  assert.match(read("middleware.ts"), /webmanifest\)\$/);
+  assert.ok(fs.existsSync(path.join(root, "public", "staff", "apple-touch-icon.png")));
+});

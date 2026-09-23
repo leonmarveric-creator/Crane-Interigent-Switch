@@ -18,7 +18,7 @@ export function middleware(req: NextRequest) {
   }
   // スタッフ画面: Cookie が無ければログインへ (中身の検証はページ側で行う)
   // (画像などの静的ファイル /staff/xiaobo.jpg・/staff/icon.png はログイン画面でも使うので除外)
-  const isStaticFile = /\.(?:jpg|jpeg|png|webp|svg|ico)$/i.test(pathname);
+  const isStaticFile = /\.(?:jpg|jpeg|png|webp|svg|ico|webmanifest)$/i.test(pathname);
   if (pathname.startsWith("/staff") && pathname !== "/staff/login" && !isStaticFile) {
     const staff = req.cookies.get("staff_session")?.value;
     const admin = req.cookies.get("admin_session")?.value;

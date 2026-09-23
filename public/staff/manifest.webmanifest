@@ -1,0 +1,14 @@
+{
+  "name": "Xiaobo 助手",
+  "short_name": "Xiaobo",
+  "id": "/staff",
+  "start_url": "/staff",
+  "scope": "/staff",
+  "display": "standalone",
+  "background_color": "#f6efe2",
+  "theme_color": "#f6efe2",
+  "icons": [
+    { "src": "/staff/icon-192.png?v=2", "sizes": "192x192", "type": "image/png" },
+    { "src": "/staff/icon.png?v=2", "sizes": "512x512", "type": "image/png" }
+  ]
+}
