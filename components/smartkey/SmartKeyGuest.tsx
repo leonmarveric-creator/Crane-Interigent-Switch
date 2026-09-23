@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import SmartKeyScreen, { type Door, type CmdResult } from "./SmartKeyScreen";
 import type { GuestKeyData, KeyState, SmartKeySettings } from "@/lib/smartkeyLogic";
@@ -42,6 +42,11 @@ export default function SmartKeyGuest({
   const answer = useRef<((ok: boolean) => void) | null>(null);
   const t = SK[lang];
   const base = `/api/key/${encodeURIComponent(data.entranceSlug)}`;
+  const roomPanelHref = data.roomSlug ? `/room/${data.roomSlug}?lang=${lang === "zh-TW" ? "zh" : lang}` : null;
+  // お部屋の操作パネルを先読みしておく (押した瞬間に切り替わるように)
+  useEffect(() => {
+    if (state === "active" && roomPanelHref) { try { router.prefetch(roomPanelHref); } catch { /* noop */ } }
+  }, [router, state, roomPanelHref]);
 
   const post = async (url: string, body: unknown): Promise<CmdResult> => {
     try {
@@ -88,7 +93,7 @@ export default function SmartKeyGuest({
           try { localStorage.setItem("skLang", l); } catch { /* noop */ }
         }}
         doors={data.roomSlug ? 2 : 1}
-        roomPanelHref={data.roomSlug ? `/room/${data.roomSlug}?lang=${lang === "zh-TW" ? "zh" : lang}` : null}
+        roomPanelHref={roomPanelHref}
         onVerify={async (name, digits) => {
           const r = await post(`${base}/verify`, { name, digits });
           if (r.ok) router.refresh();

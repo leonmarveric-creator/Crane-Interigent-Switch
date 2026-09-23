@@ -6,10 +6,11 @@
 //   実際の通信は onVerify / onCommand に委ねる (ゲスト=API, 管理=シミュレーション or 実機)。
 // =========================================================
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   KeyRound, Globe, CalendarDays, Lock, LockOpen, Loader2, Eye, EyeOff, Clock, Wifi, Copy, Check,
-  MessageCircle, ShieldCheck, AlertTriangle, Ban, DoorOpen, ChevronRight, UserRound, Hash,
+  MessageCircle, ShieldCheck, AlertTriangle, Ban, DoorOpen, ChevronRight, UserRound, Hash, SlidersHorizontal,
 } from "lucide-react";
 import { SK, SK_LANGS, SK_LANG_LABEL, fmtStay, fmtTime, type SkLang } from "@/lib/smartkeyI18n";
 import type { GuestKeyData, KeyState, SmartKeySettings, LockMode } from "@/lib/smartkeyLogic";
@@ -263,13 +264,12 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
                 </p>
               )}
 
-              {door === "room" && !roomTabNoLock && p.roomPanelHref && (
-                <a href={p.roomPanelHref}
-                  className="mx-auto mt-4 flex w-fit items-center gap-1.5 text-[13px] font-medium text-[#1253b8]">
-                  <DoorOpen className="h-4 w-4" /> {t.roomPanel} <ChevronRight className="h-4 w-4" />
-                </a>
-              )}
             </div>
+
+            {/* お部屋の操作パネルへ (大きなカードで、どちらのタブでも表示) */}
+            {p.state === "active" && p.roomPanelHref && (
+              <RoomPanelCard href={p.roomPanelHref} t={t} roomName={p.data.roomName} />
+            )}
 
             {/* 情報カード */}
             {(p.state === "active" || p.state === "before") && (
@@ -514,12 +514,31 @@ function RoomNoLock({ t, href, roomName }: { t: (typeof SK)["ja"]; href?: string
       </span>
       {roomName && <p className="mt-4 text-lg font-bold">{roomName}</p>}
       <p className="mt-2 text-sm leading-relaxed text-[#10213f]/65">{t.roomNoLock}</p>
-      {href && (
-        <a href={href}
-          className="mt-5 flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0b2f6e] to-[#1d6fe0] px-6 py-3 text-sm font-bold text-white shadow-lg">
-          <DoorOpen className="h-4 w-4" /> {t.roomPanel}
-        </a>
-      )}
     </div>
+  );
+}
+
+/**
+ * お部屋の操作パネルへの大きなボタン。
+ *  - 画面に出た時点で先読み (prefetch) → 押すとすぐ切り替わる
+ *  - 押した瞬間に「開いています…」を表示 (反応が分かるように)
+ */
+function RoomPanelCard({ href, t, roomName }: { href: string; t: (typeof SK)["ja"]; roomName: string | null }) {
+  const [opening, setOpening] = useState(false);
+  return (
+    <Link href={href} prefetch onClick={() => setOpening(true)}
+      className="mt-4 flex items-center gap-3.5 rounded-3xl bg-gradient-to-r from-[#0b2f6e] to-[#1d6fe0] p-4 pr-3 text-white shadow-[0_16px_34px_-16px_rgba(11,47,110,0.8)] transition active:scale-[0.98]">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+        {opening ? <Loader2 className="h-6 w-6 animate-spin" /> : <SlidersHorizontal className="h-6 w-6" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        {roomName && <span className="mb-1 inline-block max-w-full truncate rounded-full bg-[#f5c542] px-2 py-0.5 text-[11px] font-bold leading-tight text-[#0b2f6e]">🏠 {roomName}</span>}
+        <span className="block text-[17px] font-bold leading-tight">{t.roomPanelTitle}</span>
+        <span className="mt-0.5 block text-[12.5px] leading-snug text-white/75">{opening ? t.opening : t.roomPanelSub}</span>
+      </span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#0b2f6e]">
+        <ChevronRight className="h-5 w-5" />
+      </span>
+    </Link>
   );
 }

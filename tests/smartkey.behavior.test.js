@@ -129,3 +129,12 @@ test("cmd route checks the location only for entrance unlock, and every language
   const guest = fs.readFileSync(path.join(root, "components", "smartkey", "SmartKeyGuest.tsx"), "utf8");
   assert.match(guest, /door === "entrance" && action === "unlock" && data\.geofence/);
 });
+
+test("room panel / entrance key links are prefetched Links with instant feedback", () => {
+  const screen = fs.readFileSync(path.join(root, "components", "smartkey", "SmartKeyScreen.tsx"), "utf8");
+  assert.match(screen, /<Link href=\{href\} prefetch onClick=\{\(\) => setOpening\(true\)\}/);
+  assert.match(screen, /<RoomPanelCard href=\{p\.roomPanelHref\}/);
+  const btn = fs.readFileSync(path.join(root, "components", "EntranceKeyButton.tsx"), "utf8");
+  assert.match(btn, /router\.prefetch\(url\)/);
+  assert.ok(fs.existsSync(path.join(root, "app", "key", "[entrance]", "loading.tsx")));
+});

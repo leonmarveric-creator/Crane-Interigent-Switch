@@ -23,7 +23,12 @@ export default async function RoomPage({
   params: { room_id: string };
   searchParams: { lang?: string };
 }) {
-  const stays = await getActiveStays(params.room_id);
+  // 滞在の確認と、エントランス一覧の取得を同時に (切り替えを速く)
+  const [stays, entRes] = await Promise.all([
+    getActiveStays(params.room_id),
+    supabaseAdmin.from("entrances").select("slug, building").eq("is_active", true).order("slug")
+      .then((r) => r, () => ({ data: null })),
+  ]);
   const primary = stays?.reservations[0];
 
   const lang: Lang = isLang(searchParams.lang)
@@ -53,12 +58,8 @@ export default async function RoomPage({
 
   // 「ようこそ、◯◯様」用の名前と、同じ棟のエントランス鍵画面へのリンク
   // (スマートキーのSQLが未実行でも部屋画面は表示できるよう、エラーは無視)
-  const [{ data: nameRow }, { data: ent }] = await Promise.all([
-    supabaseAdmin.from("reservations").select("guest_name, entrance_name").eq("id", matched.id).maybeSingle(),
-    supabaseAdmin.from("entrances").select("slug")
-      .eq("building", stays.room.building || "Crane Nest").eq("is_active", true)
-      .order("slug").limit(1).maybeSingle(),
-  ]);
+  const { data: nameRow } = await supabaseAdmin.from("reservations").select("guest_name, entrance_name").eq("id", matched.id).maybeSingle();
+  const ent = ((entRes as any)?.data ?? []).find((e: any) => e.building === (stays.room.building || "Crane Nest")) ?? null;
   const guestName = (nameRow as any)?.entrance_name || (nameRow as any)?.guest_name || null;
   const entranceHref = ent?.slug ? `/key/${ent.slug}` : null;
 

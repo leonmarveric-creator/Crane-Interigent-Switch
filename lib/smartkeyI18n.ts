@@ -39,6 +39,7 @@ type Dict = {
   digitsLabel: string; digitsHint: string; verifyBtn: string; verifying: string;
   badCode: string; ambiguous: string; lockedOut: string;
   roomPanel: string; roomNoLock: string; verifyAgain: string;
+  roomPanelTitle: string; roomPanelSub: string; opening: string;
 };
 
 export const SK: Record<SkLang, Dict> = {
@@ -74,6 +75,7 @@ export const SK: Record<SkLang, Dict> = {
     badCode: "一致するご予約が見つかりません。お名前と番号をご確認ください",
     ambiguous: "複数のご予約が見つかりました。サポートへご連絡ください",
     lockedOut: "入力回数の上限に達しました。10分ほど待ってからお試しください",
+    roomPanelTitle: "お部屋の操作パネル", roomPanelSub: "照明・エアコン・おやすみモード", opening: "開いています…",
     roomPanel: "お部屋の操作パネルを開く", roomNoLock: "お部屋の鍵はドアのテンキーをご利用ください。照明・エアコンは操作パネルから操作できます。",
     verifyAgain: "別のご予約で入り直す",
   },
@@ -109,6 +111,7 @@ export const SK: Record<SkLang, Dict> = {
     badCode: "No matching booking. Please check your name and digits",
     ambiguous: "More than one booking matched. Please contact support",
     lockedOut: "Too many attempts. Please try again in about 10 minutes",
+    roomPanelTitle: "Room controls", roomPanelSub: "Lights, air-con, sleep mode and more", opening: "Opening…",
     roomPanel: "Open room controls", roomNoLock: "Use the keypad on your room door. Lights and air-con are in the room controls.",
     verifyAgain: "Use a different booking",
   },
@@ -144,6 +147,7 @@ export const SK: Record<SkLang, Dict> = {
     badCode: "找不到相符的預訂，請確認姓名與號碼",
     ambiguous: "找到多筆預訂，請聯絡客服",
     lockedOut: "輸入次數已達上限，請約 10 分鐘後再試",
+    roomPanelTitle: "房間控制面板", roomPanelSub: "燈光・冷氣・睡眠模式等", opening: "正在開啟…",
     roomPanel: "開啟房間控制面板", roomNoLock: "房門請使用門上的密碼鍵盤。燈光與冷氣可在控制面板操作。",
     verifyAgain: "使用其他預訂重新登入",
   },
@@ -179,6 +183,7 @@ export const SK: Record<SkLang, Dict> = {
     badCode: "找不到匹配的预订，请确认姓名与号码",
     ambiguous: "找到多个预订，请联系客服",
     lockedOut: "输入次数已达上限，请约 10 分钟后再试",
+    roomPanelTitle: "房间控制面板", roomPanelSub: "灯光・空调・睡眠模式等", opening: "正在打开…",
     roomPanel: "打开房间控制面板", roomNoLock: "房门请使用门上的密码键盘。灯光和空调可在控制面板操作。",
     verifyAgain: "使用其他预订重新登录",
   },
@@ -214,6 +219,7 @@ export const SK: Record<SkLang, Dict> = {
     badCode: "일치하는 예약이 없습니다. 이름과 번호를 확인해 주세요",
     ambiguous: "여러 예약이 확인되었습니다. 고객센터에 문의해 주세요",
     lockedOut: "입력 횟수 한도에 도달했습니다. 10분 정도 후에 다시 시도해 주세요",
+    roomPanelTitle: "객실 제어판", roomPanelSub: "조명・에어컨・수면 모드 등", opening: "여는 중…",
     roomPanel: "객실 제어판 열기", roomNoLock: "객실 문은 도어 키패드를 이용해 주세요. 조명·에어컨은 제어판에서 조작할 수 있습니다.",
     verifyAgain: "다른 예약으로 다시 확인",
   },
