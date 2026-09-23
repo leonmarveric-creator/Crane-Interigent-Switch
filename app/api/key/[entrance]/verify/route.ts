@@ -5,6 +5,7 @@ import {
   getEntranceBySlug, getBuildingRooms, logEntrance, ENTRANCE_SCOPE, entranceCookieName,
 } from "@/lib/smartkey";
 import { pickReservation, effectiveRoomId, VERIFY_EARLY_MS, SESSION_GRACE_MS } from "@/lib/smartkeyLogic";
+import { withEffectiveTimes, STAY_SHIFT_WINDOW_MS, isMissingColumn } from "@/lib/stayTimes";
 
 export const runtime = "nodejs";
 
@@ -53,15 +54,19 @@ export async function POST(req: NextRequest, { params }: { params: { entrance: s
   let candidates: any[] = [];
   if (roomIds.length > 0) {
     const ids = roomIds.join(",");
-    const { data } = await supabaseAdmin
+    const base = "id, room_id, assigned_room_id, unlock_pin, guest_name, entrance_name, check_in, check_out, status";
+    const query = (cols: string) => supabaseAdmin
       .from("reservations")
-      .select("id, room_id, assigned_room_id, unlock_pin, guest_name, entrance_name, check_in, check_out, status")
+      .select(cols)
       .eq("status", "active")
       .eq("unlock_pin", digits)
-      .gt("check_out", new Date(now).toISOString())
-      .lte("check_in", new Date(now + VERIFY_EARLY_MS).toISOString())
+      .gt("check_out", new Date(now - STAY_SHIFT_WINDOW_MS).toISOString())
+      .lte("check_in", new Date(now + VERIFY_EARLY_MS + STAY_SHIFT_WINDOW_MS).toISOString())
       .or(`assigned_room_id.in.(${ids}),and(assigned_room_id.is.null,room_id.in.(${ids}))`);
-    candidates = data ?? [];
+    let res: any = await query(`${base}, early_checkin_at, late_checkout_at`);
+    if (isMissingColumn(res.error)) res = await query(base);
+    // 早期チェックイン / レイトチェックアウトを反映した時間で判定する
+    candidates = ((res.data ?? []) as any[]).map((r) => withEffectiveTimes(r));
   }
 
   const picked = pickReservation(candidates, { name, digits }, roomIds, now);

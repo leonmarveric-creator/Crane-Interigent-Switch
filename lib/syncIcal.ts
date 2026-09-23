@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { fetchIcalEvents, applyStayTimes, extractPhoneLast4, randomPin, extractReservationUrl } from "@/lib/ical";
+import { effectiveOut, isStayingAt, isMissingColumn, STAY_SHIFT_WINDOW_MS } from "@/lib/stayTimes";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 
 /**
@@ -84,27 +85,37 @@ export async function processRoom(room: { id: string; slug: string; airbnb_ical_
  */
 export async function checkoutCleanup(): Promise<number> {
   const endNow = new Date().toISOString();
-  const { data: ended } = await supabaseAdmin
+  const nowMs = Date.now();
+  // レイトチェックアウト中の予約は「終了」にしない (実際のチェックアウト時刻で判定)
+  let q: any = await supabaseAdmin
     .from("reservations")
-    .select("id, room_id")
+    .select("id, room_id, assigned_room_id, check_in, check_out, late_checkout_at, early_checkin_at")
     .eq("status", "active")
     .lt("check_out", endNow);
-  if (!ended || !ended.length) return 0;
+  if (isMissingColumn(q.error)) {
+    q = await supabaseAdmin.from("reservations").select("id, room_id, assigned_room_id, check_in, check_out")
+      .eq("status", "active").lt("check_out", endNow);
+  }
+  const ended = ((q.data ?? []) as any[]).filter((r) => new Date(effectiveOut(r)).getTime() <= nowMs);
+  if (!ended.length) return 0;
 
   const roomIds = [...new Set(ended.map((r) => r.room_id))];
   let offCount = 0;
   await Promise.all(roomIds.map(async (roomId) => {
     // 現在その部屋に滞在中の客がいれば絶対にOFFしない (退室後のみOFF)
-    const { data: occ } = await supabaseAdmin
+    // (早期チェックイン / レイトチェックアウトも考慮して「今いるか」を判定)
+    let oq: any = await supabaseAdmin
       .from("reservations")
-      .select("id")
+      .select("id, check_in, check_out, early_checkin_at, late_checkout_at")
       .eq("room_id", roomId)
       .eq("status", "active")
-      .lte("check_in", endNow)
-      .gt("check_out", endNow)
-      .limit(1)
-      .maybeSingle();
-    if (occ) return; // 在室中 → スキップ
+      .lte("check_in", new Date(nowMs + STAY_SHIFT_WINDOW_MS).toISOString())
+      .gt("check_out", new Date(nowMs - STAY_SHIFT_WINDOW_MS).toISOString());
+    if (isMissingColumn(oq.error)) {
+      oq = await supabaseAdmin.from("reservations").select("id, check_in, check_out")
+        .eq("room_id", roomId).eq("status", "active").lte("check_in", endNow).gt("check_out", endNow);
+    }
+    if (((oq.data ?? []) as any[]).some((r) => isStayingAt(r, nowMs))) return; // 在室中 → スキップ
 
     const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("id", roomId).maybeSingle();
     if (!room) return;

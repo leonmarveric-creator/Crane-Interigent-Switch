@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * /admin 配下を保護。ログインCookieが無ければ /admin/login へリダイレクト。
+ * /staff 配下 (スタッフ画面) も同様にログインを要求。
  * (ゲストの /room は対象外)
  */
 export function middleware(req: NextRequest) {
@@ -15,7 +16,18 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(url);
     }
   }
+  // スタッフ画面: Cookie が無ければログインへ (中身の検証はページ側で行う)
+  if (pathname.startsWith("/staff") && pathname !== "/staff/login") {
+    const staff = req.cookies.get("staff_session")?.value;
+    const admin = req.cookies.get("admin_session")?.value;
+    if (!staff && !(admin && admin === process.env.ADMIN_SESSION_TOKEN)) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/staff/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/:path*"] };
+export const config = { matcher: ["/admin/:path*", "/staff/:path*", "/staff"] };
