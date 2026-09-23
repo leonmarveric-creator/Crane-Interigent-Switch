@@ -58,6 +58,8 @@ export async function saveSmartKeySettings(input: Partial<SmartKeySettings>): Pr
   const { error } = await supabaseAdmin.from("smartkey_settings").upsert({
     id: 1,
     hold_ms: s.hold_ms,
+    entrance_lock: s.entrance_lock,
+    room_lock: s.room_lock,
     countdown_sec: s.countdown_sec,
     show_lock_now: s.show_lock_now,
     show_keypad_code: s.show_keypad_code,

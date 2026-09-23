@@ -67,3 +67,17 @@ test("secrets never leave the server and emergency stop guards unlock routes", (
   assert.match(read("app", "api", "devices", "[room_id]", "route.ts"), /isAppUnlockStopped/);
   assert.match(read("supabase", "SETUP_ALL.sql"), /create table if not exists public\.entrances/);
 });
+
+test("lock mode is chosen per door: timer / door sensor / off", async () => {
+  const { sanitizeSettings, DEFAULT_SMARTKEY_SETTINGS } = await import(logicPath);
+  assert.equal(DEFAULT_SMARTKEY_SETTINGS.entrance_lock, "timer");
+  const s = sanitizeSettings({ entrance_lock: "sensor", room_lock: "off" });
+  assert.equal(s.entrance_lock, "sensor");
+  assert.equal(s.room_lock, "off");
+  assert.equal(sanitizeSettings({ room_lock: "bogus" }).room_lock, "timer");
+  const screen = read("components", "smartkey", "SmartKeyScreen.tsx");
+  assert.match(screen, /d === "entrance" \? p\.settings\.entrance_lock : p\.settings\.room_lock/);
+  assert.match(screen, /cur\.mode !== "sensor" && \(p\.settings\.show_lock_now \|\| cur\.mode === "off"\)/);
+  assert.match(read("app", "admin", "smartkeyActions.ts"), /entrance_lock: s\.entrance_lock/);
+  assert.match(read("supabase", "migration_smartkey_lockmode.sql"), /add column if not exists entrance_lock text/);
+});

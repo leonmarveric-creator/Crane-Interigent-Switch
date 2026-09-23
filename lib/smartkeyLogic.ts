@@ -92,9 +92,18 @@ export function keyStateFor(r: { check_in: string; check_out: string; status: st
 export const reservationCode = (id: string) => id.replace(/-/g, "").slice(0, 8).toUpperCase();
 
 /* ---------------- 設定 (クライアントでも使う型と既定値) ---------------- */
+export const LOCK_MODES = ["timer", "sensor", "off"] as const;
+export type LockMode = (typeof LOCK_MODES)[number];
+const isLockMode = (v: unknown): v is LockMode => LOCK_MODES.includes(v as LockMode);
 export interface SmartKeySettings {
   app_unlock_enabled: boolean;
   hold_ms: number;
+  /** 解錠後の施錠方法 (ドアごと)
+   *  timer  = ◯秒後に自動施錠 (カウントダウン表示)
+   *  sensor = ドアを閉めると自動施錠 (Sesame のオープンセンサー)
+   *  off    = 自動施錠しない (ゲストが「施錠する」で閉める) */
+  entrance_lock: LockMode;
+  room_lock: LockMode;
   countdown_sec: number;
   show_lock_now: boolean;
   show_keypad_code: boolean;
@@ -105,6 +114,8 @@ export interface SmartKeySettings {
 export const DEFAULT_SMARTKEY_SETTINGS: SmartKeySettings = {
   app_unlock_enabled: true,
   hold_ms: 1200,
+  entrance_lock: "timer",
+  room_lock: "timer",
   countdown_sec: 8,
   show_lock_now: true,
   show_keypad_code: true,
@@ -122,6 +133,8 @@ export function sanitizeSettings(v: Partial<SmartKeySettings> | null | undefined
   return {
     app_unlock_enabled: bool(v?.app_unlock_enabled, d.app_unlock_enabled),
     hold_ms: num(v?.hold_ms, 500, 3000, d.hold_ms),
+    entrance_lock: isLockMode(v?.entrance_lock) ? v!.entrance_lock : d.entrance_lock,
+    room_lock: isLockMode(v?.room_lock) ? v!.room_lock : d.room_lock,
     countdown_sec: num(v?.countdown_sec, 3, 60, d.countdown_sec),
     show_lock_now: bool(v?.show_lock_now, d.show_lock_now),
     show_keypad_code: bool(v?.show_keypad_code, d.show_keypad_code),

@@ -28,7 +28,7 @@ type Dict = {
   entrance: string; room: string;
   hold: string; holdToUnlock: string; holdToUnlockRoom: string; keepHolding: string;
   unlocking: string; locking: string; unlocked: string; lockedDone: string;
-  autoLockIn: (n: number) => string; lockNow: string;
+  autoLockIn: (n: number) => string; lockNow: string; stayUnlocked: string; lockBtn: string; sensorLock: string;
   failed: string; rateLimit: string; stoppedMsg: string; notStarted: (when: string) => string;
   expiredMsg: string; noLock: string; genericErr: string;
   keypad: string; tapToShow: string; checkout: string; wifi: string; copy: string; copied: string;
@@ -46,7 +46,7 @@ export const SK: Record<SkLang, Dict> = {
     entrance: "エントランス", room: "お部屋",
     hold: "HOLD", holdToUnlock: "長押しで解錠", holdToUnlockRoom: "長押しでお部屋を解錠", keepHolding: "そのまま押し続けてください",
     unlocking: "解錠しています…", locking: "施錠しています…", unlocked: "解錠しました", lockedDone: "施錠しました",
-    autoLockIn: (n) => `${n}秒後に自動で施錠されます`, lockNow: "今すぐ施錠",
+    autoLockIn: (n) => `${n}秒後に自動で施錠されます`, lockNow: "今すぐ施錠", stayUnlocked: "自動では施錠されません。出るときは「施錠する」を押してください", sensorLock: "ドアを閉めると自動で施錠されます", lockBtn: "施錠する",
     failed: "鍵が応答しません。少し待ってもう一度お試しください",
     rateLimit: "操作回数の上限に達しました。1分ほど待ってからお試しください",
     stoppedMsg: "現在アプリでの解錠を一時停止しています。お手数ですがサポートへご連絡ください",
@@ -72,7 +72,7 @@ export const SK: Record<SkLang, Dict> = {
     entrance: "Entrance", room: "Room",
     hold: "HOLD", holdToUnlock: "Press and hold to unlock", holdToUnlockRoom: "Press and hold to unlock your room", keepHolding: "Keep holding…",
     unlocking: "Unlocking…", locking: "Locking…", unlocked: "Unlocked", lockedDone: "Locked",
-    autoLockIn: (n) => `Locks automatically in ${n}s`, lockNow: "Lock now",
+    autoLockIn: (n) => `Locks automatically in ${n}s`, lockNow: "Lock now", stayUnlocked: "It will not lock automatically. Tap “Lock” when you leave", sensorLock: "Locks automatically when the door closes", lockBtn: "Lock",
     failed: "The lock did not respond. Please wait a moment and try again",
     rateLimit: "Too many attempts. Please wait about a minute and try again",
     stoppedMsg: "App unlocking is temporarily paused. Please contact support",
@@ -98,7 +98,7 @@ export const SK: Record<SkLang, Dict> = {
     entrance: "大門", room: "房間",
     hold: "HOLD", holdToUnlock: "長按開鎖", holdToUnlockRoom: "長按打開房門", keepHolding: "請繼續按住",
     unlocking: "開鎖中…", locking: "上鎖中…", unlocked: "已開鎖", lockedDone: "已上鎖",
-    autoLockIn: (n) => `${n} 秒後自動上鎖`, lockNow: "立即上鎖",
+    autoLockIn: (n) => `${n} 秒後自動上鎖`, lockNow: "立即上鎖", stayUnlocked: "不會自動上鎖，離開時請按「上鎖」", sensorLock: "關上門後會自動上鎖", lockBtn: "上鎖",
     failed: "門鎖沒有回應，請稍候再試",
     rateLimit: "操作次數已達上限，請約 1 分鐘後再試",
     stoppedMsg: "目前暫停使用 App 開鎖，請聯絡客服",
@@ -124,7 +124,7 @@ export const SK: Record<SkLang, Dict> = {
     entrance: "大门", room: "房间",
     hold: "HOLD", holdToUnlock: "长按开锁", holdToUnlockRoom: "长按打开房门", keepHolding: "请继续按住",
     unlocking: "开锁中…", locking: "上锁中…", unlocked: "已开锁", lockedDone: "已上锁",
-    autoLockIn: (n) => `${n} 秒后自动上锁`, lockNow: "立即上锁",
+    autoLockIn: (n) => `${n} 秒后自动上锁`, lockNow: "立即上锁", stayUnlocked: "不会自动上锁，离开时请按「上锁」", sensorLock: "关上门后会自动上锁", lockBtn: "上锁",
     failed: "门锁没有响应，请稍后再试",
     rateLimit: "操作次数已达上限，请约 1 分钟后再试",
     stoppedMsg: "目前暂停使用 App 开锁，请联系客服",
@@ -150,7 +150,7 @@ export const SK: Record<SkLang, Dict> = {
     entrance: "현관", room: "객실",
     hold: "HOLD", holdToUnlock: "길게 눌러 잠금 해제", holdToUnlockRoom: "길게 눌러 객실 잠금 해제", keepHolding: "계속 누르고 계세요",
     unlocking: "잠금 해제 중…", locking: "잠그는 중…", unlocked: "잠금 해제됨", lockedDone: "잠겼습니다",
-    autoLockIn: (n) => `${n}초 후 자동으로 잠깁니다`, lockNow: "지금 잠그기",
+    autoLockIn: (n) => `${n}초 후 자동으로 잠깁니다`, lockNow: "지금 잠그기", stayUnlocked: "자동으로 잠기지 않습니다. 나갈 때 「잠그기」를 눌러 주세요", sensorLock: "문을 닫으면 자동으로 잠깁니다", lockBtn: "잠그기",
     failed: "도어락이 응답하지 않습니다. 잠시 후 다시 시도해 주세요",
     rateLimit: "조작 횟수 한도에 도달했습니다. 1분 정도 후에 다시 시도해 주세요",
     stoppedMsg: "현재 앱 잠금 해제가 일시 중지되었습니다. 고객센터에 문의해 주세요",

@@ -12,7 +12,7 @@ import {
   MessageCircle, ShieldCheck, AlertTriangle, Ban, DoorOpen, ChevronRight, UserRound, Hash,
 } from "lucide-react";
 import { SK, SK_LANGS, SK_LANG_LABEL, fmtStay, fmtTime, type SkLang } from "@/lib/smartkeyI18n";
-import type { GuestKeyData, KeyState, SmartKeySettings } from "@/lib/smartkeyLogic";
+import type { GuestKeyData, KeyState, SmartKeySettings, LockMode } from "@/lib/smartkeyLogic";
 
 export type Door = "entrance" | "room";
 export type CmdResult = { ok: boolean; error?: string };
@@ -35,8 +35,10 @@ export interface SmartKeyScreenProps {
 }
 
 type Phase = "idle" | "holding" | "sending" | "unlocked" | "locking" | "error";
-interface DoorUi { phase: Phase; msg: string | null; remaining: number }
-const IDLE: DoorUi = { phase: "idle", msg: null, remaining: 0 };
+interface DoorUi { phase: Phase; msg: string | null; remaining: number; mode: LockMode }
+const IDLE: DoorUi = { phase: "idle", msg: null, remaining: 0, mode: "timer" };
+/** センサー施錠のとき「OPEN」表示を出しておく秒数 (その後は施錠待ちの表示に戻す) */
+const SENSOR_OPEN_SEC = 30;
 
 export default function SmartKeyScreen(p: SmartKeyScreenProps) {
   const t = SK[p.lang];
@@ -57,9 +59,9 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
         let changed = false;
         const next = { ...u };
         (Object.keys(u) as Door[]).forEach((d) => {
-          if (u[d].phase === "unlocked") {
+          if (u[d].phase === "unlocked" && u[d].remaining > 0) {
             changed = true;
-            next[d] = u[d].remaining <= 1 ? { ...IDLE } : { ...u[d], remaining: u[d].remaining - 1 };
+            next[d] = u[d].remaining <= 1 ? { ...IDLE, mode: u[d].mode } : { ...u[d], remaining: u[d].remaining - 1 };
           }
         });
         return changed ? next : u;
@@ -75,13 +77,19 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
     : e === "NETWORK" ? t.genericErr
     : t.failed;
 
+  const modeOf = (d: Door): LockMode => (d === "entrance" ? p.settings.entrance_lock : p.settings.room_lock);
+
   const doUnlock = async () => {
     const d = door;
     set(d, { phase: "sending", msg: null });
     const r = await p.onCommand(d, "unlock").catch(() => ({ ok: false, error: "NETWORK" }));
     if (r.ok) {
       vibrate([20, 40, 60]);
-      set(d, { phase: "unlocked", msg: null, remaining: p.settings.countdown_sec });
+      const mode = modeOf(d);
+      set(d, {
+        phase: "unlocked", msg: null, mode,
+        remaining: mode === "timer" ? p.settings.countdown_sec : mode === "sensor" ? SENSOR_OPEN_SEC : -1,
+      });
     } else {
       vibrate([30, 60, 30]);
       set(d, { phase: "error", msg: errText(r.error) });
@@ -233,11 +241,11 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
                 )}
               </div>
 
-              {cur.phase === "unlocked" && p.settings.show_lock_now && !roomTabNoLock && (
+              {cur.phase === "unlocked" && cur.mode !== "sensor" && (p.settings.show_lock_now || cur.mode === "off") && !roomTabNoLock && (
                 <div className="mt-2 flex justify-center">
                   <button onClick={doLock}
                     className="flex items-center gap-2 rounded-full border border-[#1253b8]/30 bg-[#eaf1fc] px-5 py-2.5 text-sm font-semibold text-[#0b2f6e] active:scale-95">
-                    <Lock className="h-4 w-4" /> {t.lockNow}
+                    <Lock className="h-4 w-4" /> {cur.mode === "off" ? t.lockBtn : t.lockNow}
                   </button>
                 </div>
               )}
@@ -337,7 +345,8 @@ function HoldButton({
   const R = 118;
   const C = 2 * Math.PI * R;
   const unlocked = ui.phase === "unlocked";
-  const ring = unlocked ? ui.remaining / Math.max(1, countdown) : progress;
+  const stay = unlocked && ui.mode !== "timer"; // センサー施錠 / 自動施錠しない → 残り秒は出さない
+  const ring = stay ? 1 : unlocked ? ui.remaining / Math.max(1, countdown) : progress;
   const tone = unlocked
     ? "from-[#34d399] via-[#10b981] to-[#047857]"
     : ui.phase === "error"
@@ -346,7 +355,8 @@ function HoldButton({
     ? "from-[#cbd5e1] via-[#94a3b8] to-[#64748b]"
     : "from-[#5aa9f5] via-[#1d6fe0] to-[#0b3f94]";
 
-  const caption = unlocked ? t.autoLockIn(ui.remaining)
+  const caption = unlocked && ui.mode === "sensor" ? t.sensorLock
+    : stay ? t.stayUnlocked : unlocked ? t.autoLockIn(ui.remaining)
     : ui.phase === "sending" ? t.unlocking
     : ui.phase === "locking" ? t.locking
     : ui.phase === "holding" ? t.keepHolding
@@ -382,7 +392,7 @@ function HoldButton({
             ? <LockOpen className="h-[72px] w-[72px]" strokeWidth={2} />
             : <Lock className="h-[72px] w-[72px]" strokeWidth={2} />}
           <span className="mt-3 text-sm font-semibold tracking-[0.35em] text-white/85">
-            {unlocked ? `${ui.remaining}s` : t.hold}
+            {stay ? "OPEN" : unlocked ? `${ui.remaining}s` : t.hold}
           </span>
         </motion.button>
       </div>

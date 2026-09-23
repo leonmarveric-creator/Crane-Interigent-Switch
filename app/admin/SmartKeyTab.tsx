@@ -66,6 +66,10 @@ const L_JA = {
     noEntrances: "エントランスがまだありません。「エントランスを追加」から Sesame を登録してください。",
     guestSettings: "ゲスト画面の設定", savedState: "保存済み", unsaved: "未保存の変更",
     hold: "解錠までの長押し時間", holdHint: "短いほど素早く開きますが、誤操作しやすくなります",
+    autoLock: "解錠後の施錠方法", doorEntrance: "エントランス", doorRoom: "お部屋",
+    modeTimer: "◯秒後に施錠", modeSensor: "ドアセンサー", modeOff: "施錠しない",
+    modeSensorNote: "ドアセンサー：ドアを閉めると Sesame のオープンセンサーで自動施錠されます。ゲスト画面には「ドアを閉めると自動で施錠されます」と表示し、カウントダウンや「今すぐ施錠」は出しません（Sesame アプリでオープンセンサーの自動施錠を ON にしておいてください）。",
+    autoLockOffNote: "施錠しない：解錠後はゲストが「施錠する」を押すまで開いたままです（施錠ボタンを常に表示）。Sesame 本体も閉まらないよう、Sesame アプリでその鍵の「オートロック」も OFF にしてください。",
     countdown: "自動施錠までのカウントダウン", countdownHint: "解錠後に表示する秒数。実際の自動施錠時間は鍵本体の設定に合わせてください",
     showLockNow: "「今すぐ施錠」ボタンを表示", showKeypad: "暗証番号（テンキー用）を表示", showWifi: "Wi-Fi 情報を表示", showSupport: "「サポートに連絡」ボタンを表示",
     saveApply: "保存して反映", revert: "変更を取り消す", reset: "初期値に戻す",
@@ -103,6 +107,10 @@ const L: Record<AdminLang, LT> = {
     noEntrances: "No entrances yet. Register a Sesame with “Add entrance”.",
     guestSettings: "Guest screen settings", savedState: "Saved", unsaved: "Unsaved changes",
     hold: "Hold time to unlock", holdHint: "Shorter opens faster but is easier to trigger by mistake",
+    autoLock: "How it locks after unlocking", doorEntrance: "Entrance", doorRoom: "Room",
+    modeTimer: "After N sec", modeSensor: "Door sensor", modeOff: "Don't lock",
+    modeSensorNote: "Door sensor: the Sesame open sensor locks the door when it closes. The guest sees “Locks automatically when the door closes” with no countdown or “Lock now” (enable the open-sensor auto-lock in the Sesame app).",
+    autoLockOffNote: "Don't lock: the door stays unlocked until the guest taps “Lock” (always shown). Also turn OFF “Auto-lock” for that lock in the Sesame app.",
     countdown: "Auto-lock countdown", countdownHint: "Seconds shown after unlocking. Match the lock's own auto-lock setting",
     showLockNow: "Show “Lock now” button", showKeypad: "Show keypad code", showWifi: "Show Wi-Fi", showSupport: "Show “Contact support”",
     saveApply: "Save & apply", revert: "Discard changes", reset: "Reset to defaults",
@@ -137,6 +145,10 @@ const L: Record<AdminLang, LT> = {
     noEntrances: "还没有大门。请点击“添加大门”登记 Sesame。",
     guestSettings: "客人页面设置", savedState: "已保存", unsaved: "有未保存的更改",
     hold: "长按开锁时间", holdHint: "越短开得越快，但越容易误触",
+    autoLock: "开锁后的上锁方式", doorEntrance: "大门", doorRoom: "房间",
+    modeTimer: "N 秒后上锁", modeSensor: "门磁感应", modeOff: "不上锁",
+    modeSensorNote: "门磁感应：关门后由 Sesame 开门传感器自动上锁。客人页面显示「关上门后会自动上锁」，不显示倒计时和「立即上锁」（请在芝麻 App 中开启开门传感器的自动上锁）。",
+    autoLockOffNote: "不上锁：开锁后保持开启，直到客人按「上锁」（一直显示上锁按钮）。请同时在芝麻 App 中关闭该门锁的「自动上锁」。",
     countdown: "自动上锁倒计时", countdownHint: "开锁后显示的秒数。请与门锁本身的自动上锁设置一致",
     showLockNow: "显示“立即上锁”按钮", showKeypad: "显示键盘密码", showWifi: "显示 Wi-Fi", showSupport: "显示“联系客服”",
     saveApply: "保存并生效", revert: "取消更改", reset: "恢复默认",
@@ -541,7 +553,7 @@ function SettingsCard({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const keys: (keyof SmartKeySettings)[] = ["hold_ms", "countdown_sec", "show_lock_now", "show_keypad_code", "show_wifi", "show_support"];
+  const keys: (keyof SmartKeySettings)[] = ["hold_ms", "entrance_lock", "room_lock", "countdown_sec", "show_lock_now", "show_keypad_code", "show_wifi", "show_support"];
   const dirty = keys.some((k) => draft[k] !== saved[k]);
 
   const save = async () => {
@@ -568,8 +580,37 @@ function SettingsCard({
       <div className="space-y-5 p-5">
         <Slider label={t.hold} hint={t.holdHint} value={draft.hold_ms / 1000} min={0.5} max={3} step={0.1} unit={t.sec}
           onChange={(v) => setDraft({ ...draft, hold_ms: Math.round(v * 1000) })} display={(v) => v.toFixed(1)} />
-        <Slider label={t.countdown} hint={t.countdownHint} value={draft.countdown_sec} min={3} max={60} step={1} unit={t.sec}
-          onChange={(v) => setDraft({ ...draft, countdown_sec: Math.round(v) })} display={(v) => String(v)} />
+        {/* 解錠後の施錠方法 (ドアごと): 時間で / ドアセンサーで / 施錠しない */}
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-white/85">{t.autoLock}</p>
+          {([["entrance_lock", t.doorEntrance], ["room_lock", t.doorRoom]] as const).map(([key, label]) => (
+            <div key={key}>
+              <p className="mb-1.5 text-[11px] text-white/50">{label}</p>
+              <div className="grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-[11px] font-semibold">
+                {([["timer", t.modeTimer], ["sensor", t.modeSensor], ["off", t.modeOff]] as const).map(([m, ml]) => (
+                  <button key={m} type="button" onClick={() => setDraft({ ...draft, [key]: m })}
+                    className={`rounded-full px-1 py-2 transition ${draft[key] === m
+                      ? m === "off" ? "bg-amber-400 text-[#2a1a00]" : m === "sensor" ? "bg-emerald-400 text-[#022c1c]" : "bg-cyan-500 text-[#04121c]"
+                      : "text-white/55"}`}>
+                    {ml}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {(draft.entrance_lock === "timer" || draft.room_lock === "timer") && (
+          <Slider label={t.countdown} hint={t.countdownHint} value={draft.countdown_sec} min={3} max={60} step={1} unit={t.sec}
+            onChange={(v) => setDraft({ ...draft, countdown_sec: Math.round(v) })} display={(v) => String(v)} />
+        )}
+        {(draft.entrance_lock === "sensor" || draft.room_lock === "sensor") && (
+          <p className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-[11px] leading-relaxed text-emerald-100">🚪 {t.modeSensorNote}</p>
+        )}
+        {(draft.entrance_lock === "off" || draft.room_lock === "off") && (
+          <p className="flex items-start gap-1.5 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3 text-[11px] leading-relaxed text-amber-100">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t.autoLockOffNote}
+          </p>
+        )}
 
         <div className="space-y-2">
           {toggles.map(({ k, label }) => (
