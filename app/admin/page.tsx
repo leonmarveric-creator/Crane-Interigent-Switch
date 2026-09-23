@@ -123,6 +123,12 @@ export default async function AdminPage() {
       };
     })
   );
+  // 位置制限 (migration_entrance_geofence.sql 未実行でも落ちないよう別クエリ)
+  const { data: geoRows } = await supabaseAdmin.from("entrances").select("id, lat, lng, geofence_radius_m");
+  for (const g of (geoRows ?? []) as any[]) {
+    const e = entrances.find((x) => x.id === g.id);
+    if (e) { e.lat = g.lat ?? null; e.lng = g.lng ?? null; e.geofence_radius_m = g.geofence_radius_m ?? null; }
+  }
   const smartkeySettings = await getSmartKeySettings();
 
   // ---- Sesame 一覧（鍵の台帳） ----

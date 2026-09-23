@@ -15,7 +15,7 @@ import { SK, SK_LANGS, SK_LANG_LABEL, fmtStay, fmtTime, type SkLang } from "@/li
 import type { GuestKeyData, KeyState, SmartKeySettings, LockMode } from "@/lib/smartkeyLogic";
 
 export type Door = "entrance" | "room";
-export type CmdResult = { ok: boolean; error?: string };
+export type CmdResult = { ok: boolean; error?: string; distance?: number };
 
 export interface SmartKeyScreenProps {
   data: GuestKeyData;
@@ -70,8 +70,13 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
     return () => clearInterval(id);
   }, []);
 
-  const errText = (e?: string) =>
-    e === "RATE_LIMIT" ? t.rateLimit
+  const errText = (e?: string, distance?: number) =>
+    e === "GEO_FAR" ? t.geoFar(distance ?? 0)
+    : e === "GEO_DENIED" || e === "GEO_REQUIRED" ? t.geoDenied
+    : e === "GEO_UNAVAILABLE" ? t.geoUnavailable
+    : e === "GEO_IMPRECISE" ? t.geoImprecise
+    : e === "GEO_CANCEL" ? ""
+    : e === "RATE_LIMIT" ? t.rateLimit
     : e === "STOPPED" ? t.stoppedMsg
     : e === "NO_LOCK" ? t.noLock
     : e === "NETWORK" ? t.genericErr
@@ -82,7 +87,8 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
   const doUnlock = async () => {
     const d = door;
     set(d, { phase: "sending", msg: null });
-    const r = await p.onCommand(d, "unlock").catch(() => ({ ok: false, error: "NETWORK" }));
+    const r: CmdResult = await p.onCommand(d, "unlock").catch(() => ({ ok: false, error: "NETWORK" }));
+    if (r.error === "GEO_CANCEL") { set(d, { phase: "idle", msg: null }); return; }
     if (r.ok) {
       vibrate([20, 40, 60]);
       const mode = modeOf(d);
@@ -92,7 +98,7 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
       });
     } else {
       vibrate([30, 60, 30]);
-      set(d, { phase: "error", msg: errText(r.error) });
+      set(d, { phase: "error", msg: errText(r.error, r.distance) });
     }
   };
 
@@ -248,6 +254,13 @@ export default function SmartKeyScreen(p: SmartKeyScreenProps) {
                     <Lock className="h-4 w-4" /> {cur.mode === "off" ? t.lockBtn : t.lockNow}
                   </button>
                 </div>
+              )}
+
+              {/* 位置情報を使う理由 (エントランスに位置制限があるとき) */}
+              {door === "entrance" && p.data.geofence && p.state === "active" && !stopped && (
+                <p className="mx-auto mt-2 flex max-w-[20rem] items-start gap-1.5 rounded-2xl bg-[#eaf1fc] px-3 py-2 text-[11.5px] leading-snug text-[#10213f]/75">
+                  <span aria-hidden>📍</span> {t.geoNotice}
+                </p>
               )}
 
               {door === "room" && !roomTabNoLock && p.roomPanelHref && (

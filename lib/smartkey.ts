@@ -1,8 +1,9 @@
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { verifyScopedSession } from "./roomSession";
+import { withEffectiveTimes, isMissingColumn } from "./stayTimes";
 import {
-  DEFAULT_SMARTKEY_SETTINGS, sanitizeSettings, keyStateFor, reservationCode,
+  DEFAULT_SMARTKEY_SETTINGS, sanitizeSettings, keyStateFor, reservationCode, hasGeofence,
   type SmartKeySettings, type GuestKeyData, type KeyState,
 } from "./smartkeyLogic";
 
@@ -84,16 +85,17 @@ export async function resolveGuestKey(slug: string): Promise<GuestKeyContext | n
     roomName: null, roomSlug: null, roomHasLock: false,
     checkIn: null, checkOut: null, reservationCode: null,
     keypadCode: null, wifiSsid: null, wifiPassword: null, supportUrl: entrance.support_url ?? null,
+    geofence: hasGeofence(entrance),
   };
 
   const v = verifyScopedSession(ENTRANCE_SCOPE, cookies().get(entranceCookieName(slug))?.value);
   if (!v) return { entrance, settings, state: "verify", reservation: null, room: null, data: base };
 
-  const { data: reservation } = await supabaseAdmin
-    .from("reservations")
-    .select("id, room_id, assigned_room_id, status, check_in, check_out, guest_name, entrance_name, welcomed_at, guest_lang")
-    .eq("id", v.reservationId)
-    .maybeSingle();
+  const cols = "id, room_id, assigned_room_id, status, check_in, check_out, guest_name, entrance_name, welcomed_at, guest_lang";
+  let rr: any = await supabaseAdmin.from("reservations").select(`${cols}, early_checkin_at, late_checkout_at`).eq("id", v.reservationId).maybeSingle();
+  if (isMissingColumn(rr.error)) rr = await supabaseAdmin.from("reservations").select(cols).eq("id", v.reservationId).maybeSingle();
+  // 早期チェックイン / レイトチェックアウトを反映 (以降の check_in / check_out は実際に使える時間)
+  const reservation: any = rr.data ? withEffectiveTimes(rr.data) : null;
   if (!reservation) return { entrance, settings, state: "verify", reservation: null, room: null, data: base };
 
   const roomId = reservation.assigned_room_id || reservation.room_id;

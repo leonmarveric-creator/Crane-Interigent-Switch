@@ -515,3 +515,36 @@ do $$ begin
     add constraint chk_smartkey_lock_modes
     check (entrance_lock in ('timer','sensor','off') and room_lock in ('timer','sensor','off'));
 exception when duplicate_object then null; end $$;
+
+-- ##### migration: staff #####
+-- =============================================================================
+--  スタッフ画面 (/staff) 用
+--   reservations.early_checkin_at  … 早期チェックイン時刻 (NULL = 通常どおり)
+--   reservations.late_checkout_at  … レイトチェックアウト時刻 (NULL = 通常どおり)
+--     ※ Airbnb 同期は check_in / check_out だけを書き換えるので、ここは消えない
+--   rooms.cleaned_at               … 最後に「清掃完了」を押した時刻
+--  すべて idempotent。
+-- =============================================================================
+alter table public.reservations
+  add column if not exists early_checkin_at timestamptz,
+  add column if not exists late_checkout_at timestamptz;
+
+alter table public.rooms
+  add column if not exists cleaned_at timestamptz;
+
+-- =============================================================================
+--  エントランスの位置制限 (離れた場所からの誤解錠を防ぐ)
+--   entrances.lat / lng         … エントランスの位置 (NULL = 位置制限なし)
+--   entrances.geofence_radius_m … この距離 (m) 以内にいるときだけゲストが解錠できる
+--  位置情報はその場の判定だけに使い、保存しない。
+--  すべて idempotent。
+-- =============================================================================
+alter table public.entrances
+  add column if not exists lat double precision,
+  add column if not exists lng double precision,
+  add column if not exists geofence_radius_m integer not null default 100;
+
+do $$ begin
+  alter table public.entrances
+    add constraint chk_entrances_geofence_radius check (geofence_radius_m between 20 and 2000);
+exception when duplicate_object then null; end $$;

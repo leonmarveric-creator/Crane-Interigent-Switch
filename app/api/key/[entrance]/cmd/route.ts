@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSesameCommand, SESAME_CMD } from "@/lib/sesame";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { resolveGuestKey, entranceCreds, logEntrance, recentCommandCount } from "@/lib/smartkey";
-import { CMD_LIMIT_PER_MIN } from "@/lib/smartkeyLogic";
+import { CMD_LIMIT_PER_MIN, checkGeofence } from "@/lib/smartkeyLogic";
 
 export const runtime = "nodejs"; // aes-cmac のため Edge 不可
 
@@ -13,9 +13,13 @@ export const runtime = "nodejs"; // aes-cmac のため Edge 不可
  *  - 本人確認済み (ek_ Cookie) かつ 滞在期間中のみ
  *  - 緊急停止中は拒否
  *  - 1分あたり CMD_LIMIT_PER_MIN 回まで
+ *  - エントランスの解錠は、位置制限があれば近くにいるときだけ (body.pos = { lat, lng, acc })
+ *    位置情報は判定だけに使い、保存しない (ログには距離だけ残す)
  */
 export async function POST(req: NextRequest, { params }: { params: { entrance: string } }) {
-  const { door, action } = (await req.json().catch(() => ({}))) as { door?: string; action?: string };
+  const { door, action, pos } = (await req.json().catch(() => ({}))) as {
+    door?: string; action?: string; pos?: { lat?: unknown; lng?: unknown; acc?: unknown } | null;
+  };
   if ((door !== "entrance" && door !== "room") || (action !== "unlock" && action !== "lock")) {
     return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
   }
@@ -41,6 +45,17 @@ export async function POST(req: NextRequest, { params }: { params: { entrance: s
     if (door === "entrance") {
       const creds = entranceCreds(ctx.entrance);
       if (!creds) return NextResponse.json({ ok: false, error: "NO_LOCK" }, { status: 409 });
+      // 離れた場所からの誤解錠を防ぐ (施錠はどこからでも可)
+      if (action === "unlock") {
+        const g = checkGeofence(ctx.entrance, pos);
+        if (!g.ok) {
+          await logEntrance({
+            entrance_id: ctx.entrance.id, room_id: ctx.room?.id ?? null, reservation_id: ctx.reservation.id,
+            guest_name: guestName, action: g.error === "GEO_FAR" ? `unlock_far_${g.distance}m` : "unlock_no_location", success: false,
+          });
+          return NextResponse.json({ ok: false, error: g.error, distance: g.distance }, { status: 403 });
+        }
+      }
       const r = await sendSesameCommand(creds, action === "unlock" ? SESAME_CMD.UNLOCK : SESAME_CMD.LOCK, history);
       await logEntrance({
         entrance_id: ctx.entrance.id, room_id: ctx.room?.id ?? null, reservation_id: ctx.reservation.id,

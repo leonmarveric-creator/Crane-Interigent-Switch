@@ -96,3 +96,36 @@ test("room PIN flow asks for a name, greets the guest, and links to the entrance
     assert.match(src, /<EntranceKeyButton href=\{entranceHref\}/, f);
   }
 });
+
+test("entrance geofence: near is OK, far / no location / imprecise are refused", async () => {
+  const { checkGeofence, hasGeofence, distanceM } = await import(logicPath);
+  const e = { lat: 35.0, lng: 135.0, geofence_radius_m: 100 };
+  assert.equal(hasGeofence(e), true);
+  assert.equal(hasGeofence({ lat: null, lng: null }), false);
+  // 位置制限なしのエントランスは常に OK
+  assert.equal(checkGeofence({ lat: null, lng: null }, null).ok, true);
+  // 約 55m 北 → OK
+  assert.equal(checkGeofence(e, { lat: 35.0005, lng: 135.0, acc: 10 }).ok, true);
+  // 約 1.1km 北 → GEO_FAR (距離付き)
+  const far = checkGeofence(e, { lat: 35.01, lng: 135.0, acc: 10 });
+  assert.equal(far.ok, false);
+  assert.equal(far.error, "GEO_FAR");
+  assert.ok(far.distance > 1000 && far.distance < 1200);
+  // 約 130m + 誤差 40m → 大目に見て OK
+  assert.equal(checkGeofence(e, { lat: 35.00117, lng: 135.0, acc: 40 }).ok, true);
+  assert.equal(checkGeofence(e, null).error, "GEO_REQUIRED");
+  assert.equal(checkGeofence(e, { lat: "x", lng: 1 }).error, "GEO_REQUIRED");
+  assert.equal(checkGeofence(e, { lat: 35.0, lng: 135.0, acc: 3000 }).error, "GEO_IMPRECISE");
+  assert.ok(Math.abs(distanceM(35, 135, 35.001, 135) - 111) < 2);
+});
+
+test("cmd route checks the location only for entrance unlock, and every language explains why", () => {
+  const route = fs.readFileSync(path.join(root, "app", "api", "key", "[entrance]", "cmd", "route.ts"), "utf8");
+  assert.match(route, /if \(action === "unlock"\) \{\s*const g = checkGeofence\(ctx\.entrance, pos\)/);
+  const i18n = fs.readFileSync(path.join(root, "lib", "smartkeyI18n.ts"), "utf8");
+  for (const k of ["geoNotice", "geoAskBody", "geoDenied", "geoFar"]) {
+    assert.equal((i18n.match(new RegExp(`\\b${k}: (\"|\\(m\\) =>)`, "g")) || []).length, 5, k);
+  }
+  const guest = fs.readFileSync(path.join(root, "components", "smartkey", "SmartKeyGuest.tsx"), "utf8");
+  assert.match(guest, /door === "entrance" && action === "unlock" && data\.geofence/);
+});

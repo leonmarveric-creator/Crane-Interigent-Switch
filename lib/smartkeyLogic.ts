@@ -159,7 +159,52 @@ export interface GuestKeyData {
   wifiSsid: string | null;
   wifiPassword: string | null;
   supportUrl: string | null;
+  /** エントランスに位置制限がある (近くにいるときだけ解錠できる) */
+  geofence: boolean;
 }
 
 /** 1分あたりの操作上限 (連打・自動化対策)。 */
 export const CMD_LIMIT_PER_MIN = 10;
+
+/* ---------------- エントランスの位置制限 ---------------- */
+export const DEFAULT_GEOFENCE_M = 100;
+/** GPS の誤差として大目に見る最大距離 (m) */
+export const GEO_ACCURACY_SLACK_M = 50;
+/** これより誤差が大きい位置は判定に使わない (iPhone の「正確な位置情報」OFF など) */
+export const GEO_MAX_ACCURACY_M = 500;
+
+/** 2点間の距離 (m)。 */
+export function distanceM(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (bLat - aLat) * rad, dLng = (bLng - aLng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** エントランスに位置制限が設定されているか。 */
+export function hasGeofence(e: { lat?: unknown; lng?: unknown } | null | undefined): boolean {
+  return num(e?.lat) !== null && num(e?.lng) !== null;
+}
+
+export type GeoError = "GEO_REQUIRED" | "GEO_IMPRECISE" | "GEO_FAR";
+/**
+ * ゲストの現在地がエントランスの近くか判定する。
+ *  pos が無い → GEO_REQUIRED / 誤差が大きすぎる → GEO_IMPRECISE / 遠い → GEO_FAR (distance 付き)
+ */
+export function checkGeofence(
+  e: { lat?: unknown; lng?: unknown; geofence_radius_m?: unknown },
+  pos: { lat?: unknown; lng?: unknown; acc?: unknown } | null | undefined,
+): { ok: true; distance: number | null } | { ok: false; error: GeoError; distance?: number } {
+  const eLat = num(e.lat), eLng = num(e.lng);
+  if (eLat === null || eLng === null) return { ok: true, distance: null };
+  const lat = num(pos?.lat), lng = num(pos?.lng);
+  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, error: "GEO_REQUIRED" };
+  const acc = Math.max(0, num(pos?.acc) ?? 0);
+  if (acc > GEO_MAX_ACCURACY_M) return { ok: false, error: "GEO_IMPRECISE" };
+  const radius = num(e.geofence_radius_m) ?? DEFAULT_GEOFENCE_M;
+  const d = distanceM(eLat, eLng, lat, lng);
+  if (d - Math.min(acc, GEO_ACCURACY_SLACK_M) > radius) return { ok: false, error: "GEO_FAR", distance: Math.round(d) };
+  return { ok: true, distance: Math.round(d) };
+}

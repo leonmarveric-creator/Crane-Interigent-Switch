@@ -30,6 +30,7 @@ export interface AdminEntrance {
   has_secret: boolean; has_api_key: boolean; api_key_from_env: boolean;
   keypad_code: string | null; wifi_ssid: string | null; wifi_password: string | null; support_url: string | null;
   sesame_lock_id?: string | null;
+  lat?: number | null; lng?: number | null; geofence_radius_m?: number | null;
   url: string; qr: string;
 }
 export type { AdminSesameLock };
@@ -83,6 +84,10 @@ const L_JA = {
     logs: "入退館ログ", noLogs: "まだ記録がありません", when: "日時", who: "ゲスト", what: "操作", where: "場所",
     todayGuests: "このエントランスを使える予約（今〜24時間以内）", none: "なし", verified: "本人確認済み",
     locksMissing: "先に supabase/migration_sesame_locks.sql を実行してください", pickFromList: "上の「Sesame 一覧」に登録した鍵から選びます。新しい鍵は一覧の「Sesame を追加」から（QR画像で自動入力できます）。",
+    geoTitle: "位置制限（遠くからの誤解錠を防ぐ）", geoLat: "緯度", geoLng: "経度", geoRadius: "半径 (m)",
+    geoHere: "今いる場所を入れる（エントランスの前で押す）", geoHelp: "設定すると、ゲストはエントランスの近くにいるときだけ解錠できます（施錠・お部屋の鍵は制限なし）。空欄なら制限なし。位置情報は判定だけに使い保存しません。GPS の誤差があるので半径は 80〜150m がおすすめ。",
+    geoGetting: "取得中…", geoFail: "現在地を取得できませんでした", geoOn: "位置制限", geoOff: "位置制限なし", geoMissing: "先に supabase/migration_entrance_geofence.sql を実行してください",
+    logFar: "遠くからの解錠を拒否", logNoLoc: "位置情報なしで解錠を拒否",
     openPreview: "ゲスト画面のプレビュー・実機テスト（ツール → テスト）", previewTitle: "スマートキー：ゲスト画面プレビュー",
 };
 type LT = { [K in keyof typeof L_JA]: string };
@@ -124,6 +129,10 @@ const L: Record<AdminLang, LT> = {
     logs: "Entrance log", noLogs: "No records yet", when: "When", who: "Guest", what: "Action", where: "Where",
     todayGuests: "Bookings that can use this entrance (now – 24h)", none: "None", verified: "Verified",
     locksMissing: "Run supabase/migration_sesame_locks.sql first", pickFromList: "Choose from the Sesame list above. Add new locks with “Add Sesame” (QR image fills it in).",
+    geoTitle: "Location limit (prevents unlocking from far away)", geoLat: "Latitude", geoLng: "Longitude", geoRadius: "Radius (m)",
+    geoHere: "Use my current location (press at the entrance)", geoHelp: "When set, guests can unlock the entrance only when they are near it (locking and room doors are not limited). Leave blank for no limit. Location is only used for the check and never stored. Because of GPS error, 80–150 m is recommended.",
+    geoGetting: "Getting…", geoFail: "Could not get the current location", geoOn: "Location limit", geoOff: "No location limit", geoMissing: "Run supabase/migration_entrance_geofence.sql first",
+    logFar: "Unlock refused (too far)", logNoLoc: "Unlock refused (no location)",
     openPreview: "Guest screen preview & real test (Tools → Test)", previewTitle: "Smart key: guest screen preview",
   },
   zh: {
@@ -162,6 +171,10 @@ const L: Record<AdminLang, LT> = {
     logs: "出入记录", noLogs: "暂无记录", when: "时间", who: "客人", what: "操作", where: "地点",
     todayGuests: "可使用此大门的预订（现在〜24小时内）", none: "无", verified: "已确认",
     locksMissing: "请先执行 supabase/migration_sesame_locks.sql", pickFromList: "从上方「Sesame 列表」中选择。新门锁请用「添加 Sesame」（可用 QR 图片自动填写）。",
+    geoTitle: "位置限制（防止在远处误开）", geoLat: "纬度", geoLng: "经度", geoRadius: "半径 (m)",
+    geoHere: "填入当前位置（请在入口前按）", geoHelp: "设置后，客人只有在入口附近才能开门（锁门和房间门不受限制）。留空则不限制。位置信息只用于判断，不会保存。因为 GPS 有误差，建议半径 80〜150m。",
+    geoGetting: "获取中…", geoFail: "无法获取当前位置", geoOn: "位置限制", geoOff: "无位置限制", geoMissing: "请先执行 supabase/migration_entrance_geofence.sql",
+    logFar: "距离太远，拒绝开门", logNoLoc: "没有位置信息，拒绝开门",
     openPreview: "客人页面预览・真实测试（工具 → 测试）", previewTitle: "智能钥匙：客人页面预览",
   },
 };
@@ -355,6 +368,8 @@ function EntranceForm({
       <Field label={t.wifiSsid}><input name="wifi_ssid" defaultValue={e?.wifi_ssid ?? ""} className={inputCls} /></Field>
       <Field label={t.wifiPass}><input name="wifi_password" defaultValue={e?.wifi_password ?? ""} className={`${inputCls} font-mono`} /></Field>
 
+      <GeoFields e={e} t={t} inputCls={inputCls} />
+
       <div className="flex items-center gap-3 sm:col-span-2">
         <button type="submit" disabled={busy}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/15 py-3 text-sm text-emerald-200 disabled:opacity-60">
@@ -363,6 +378,38 @@ function EntranceForm({
         {msg && <span className={`text-xs ${msg.ok ? "text-emerald-300" : "text-rose-300"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>}
       </div>
     </form>
+  );
+}
+
+/* 位置制限 (緯度・経度・半径)。「今いる場所」で入力できる */
+function GeoFields({ e, t, inputCls }: { e?: AdminEntrance; t: LT; inputCls: string }) {
+  const [lat, setLat] = useState(e?.lat != null ? String(e.lat) : "");
+  const [lng, setLng] = useState(e?.lng != null ? String(e.lng) : "");
+  const [state, setState] = useState<"idle" | "getting" | "fail">("idle");
+  const here = () => {
+    if (!navigator.geolocation) { setState("fail"); return; }
+    setState("getting");
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setLat(p.coords.latitude.toFixed(6)); setLng(p.coords.longitude.toFixed(6)); setState("idle"); },
+      () => setState("fail"),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
+  return (
+    <div className="sm:col-span-2 rounded-2xl border border-amber-400/20 bg-amber-500/[0.05] p-3">
+      <p className="mb-2 text-[11px] font-semibold text-amber-200">📍 {t.geoTitle}</p>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label={t.geoLat}><input name="lat" value={lat} onChange={(x) => setLat(x.target.value)} inputMode="decimal" placeholder="35.000000" className={`${inputCls} font-mono`} /></Field>
+        <Field label={t.geoLng}><input name="lng" value={lng} onChange={(x) => setLng(x.target.value)} inputMode="decimal" placeholder="135.000000" className={`${inputCls} font-mono`} /></Field>
+        <Field label={t.geoRadius}><input name="geofence_radius_m" type="number" min={20} max={2000} defaultValue={e?.geofence_radius_m ?? 100} className={`${inputCls} font-mono`} /></Field>
+      </div>
+      <button type="button" onClick={here} disabled={state === "getting"}
+        className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-100 disabled:opacity-60">
+        {state === "getting" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "📍"} {state === "getting" ? t.geoGetting : t.geoHere}
+      </button>
+      {state === "fail" && <p className="mt-1 text-[11px] text-rose-300">{t.geoFail}</p>}
+      <p className="mt-2 text-[10px] leading-relaxed text-white/40">💡 {t.geoHelp}</p>
+    </div>
   );
 }
 
@@ -402,6 +449,7 @@ function EntranceCard({
           <p className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
             <Chip ok={ready}>🔑 {locks.find((l) => l.id === e.sesame_lock_id)?.name ?? (ready ? "Sesame" : t.notSet)}</Chip>
             {e.wifi_ssid && <Chip ok><Wifi className="inline h-3 w-3" /> {e.wifi_ssid}</Chip>}
+            <Chip ok={e.lat != null && e.lng != null}>📍 {e.lat != null && e.lng != null ? `${t.geoOn} ${e.geofence_radius_m ?? 100}m` : t.geoOff}</Chip>
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button onClick={async () => { await navigator.clipboard.writeText(e.url); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
@@ -709,6 +757,7 @@ function PreviewSection({
       entranceSlug: entrance?.slug ?? "preview",
       entranceName: entrance?.display_name ?? "Crane Nest Entrance",
       building: entrance?.building ?? "Crane Nest",
+      geofence: entrance?.lat != null && entrance?.lng != null,
       guestName: "CHEN",
       roomName: room?.display_name ?? "HARU",
       roomSlug: room?.slug ?? null,
@@ -854,7 +903,7 @@ function LogsCard({ logs, t, lang }: { logs: EntranceLog[]; t: LT; lang: AdminLa
                 <tr key={l.id} className="border-b border-white/5 last:border-0">
                   <td className="whitespace-nowrap px-4 py-2 text-white/50">{fmt(l.created_at, lang)}</td>
                   <td className="px-2 py-2">
-                    <span className="text-white/85">{label[l.action] ?? l.action}</span>
+                    <span className="text-white/85">{label[l.action] ?? (l.action.startsWith("unlock_far_") ? `📍 ${t.logFar} (${l.action.slice(11)})` : l.action === "unlock_no_location" ? `📍 ${t.logNoLoc}` : l.action)}</span>
                     <span className="block text-[10px] text-white/35">{[l.entrance_name, l.room_name].filter(Boolean).join(" · ")}</span>
                   </td>
                   <td className="px-2 py-2 text-white/65">{l.source === "admin" ? "Admin" : l.guest_name ?? "—"}</td>
