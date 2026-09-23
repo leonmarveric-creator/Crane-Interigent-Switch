@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizeRoomRequest } from "@/lib/auth";
 import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isAppUnlockStopped } from "@/lib/smartkey";
 
 export const runtime = "nodejs"; // crypto / aes-cmac のため Edge不可
 
@@ -19,6 +20,11 @@ export async function POST(
   const stay = await authorizeRoomRequest(params.room_id);
   if (!stay) {
     return NextResponse.json({ ok: false, error: "ACCESS_DENIED" }, { status: 403 });
+  }
+
+  // スマートキーの緊急停止中は、部屋パネルからの解錠も止める (施錠・家電操作は可)
+  if (action === "unlock" && (await isAppUnlockStopped())) {
+    return NextResponse.json({ ok: false, error: "STOPPED" }, { status: 423 });
   }
 
   try {

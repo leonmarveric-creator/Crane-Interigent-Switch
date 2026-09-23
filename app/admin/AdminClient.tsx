@@ -16,6 +16,7 @@ import {
   addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom, assignReservation,
 } from "./actions";
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
+import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
 
 export interface Room {
   id: string; slug: string; display_name: string; building: string | null; is_active: boolean;
@@ -25,6 +26,7 @@ export interface Room {
   wafu_device_id: string | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
+  has_lock?: boolean;
   url: string; qr: string;
 }
 export interface Reservation {
@@ -48,7 +50,8 @@ export interface LogEntry {
   action: string; source: string; success: boolean; created_at: string;
 }
 type T = (typeof AT)["ja"];
-type Tab = "today" | "reservations" | "rooms" | "history" | "test";
+type Tab = "today" | "reservations" | "rooms" | "smartkey" | "tools";
+type ToolsView = "test" | "history";
 
 const LOCALE: Record<AdminLang, string> = { ja: "ja-JP", en: "en-US", zh: "zh-CN" };
 const fmt = (iso: string, lang: AdminLang) =>
@@ -127,10 +130,11 @@ function SubmitButton({
 }
 
 export default function AdminClient({
-  rooms, reservations, switchbot, logs,
-}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[] }) {
+  rooms, reservations, switchbot, logs, smartkey,
+}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[]; smartkey: SmartKeyProps }) {
   const [lang, setLang] = useState<AdminLang>("ja");
   const [tab, setTab] = useState<Tab>("today");
+  const [toolsView, setToolsView] = useState<ToolsView>("test");
   const t = AT[lang];
 
   useEffect(() => {
@@ -184,8 +188,30 @@ export default function AdminClient({
         {tab === "today" && <TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "reservations" && <ReservationsTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} />}
-        {tab === "history" && <HistoryTab logs={logs} rooms={rooms} t={t} lang={lang} />}
-        {tab === "test" && <DeviceTestSection rooms={rooms} t={t} />}
+        {tab === "smartkey" && (
+          <SmartKeyTab {...smartkey} rooms={rooms} reservations={reservations} lang={lang}
+            onOpenPreview={() => { navTick(); setToolsView("test"); setTab("tools"); window.scrollTo(0, 0); }} />
+        )}
+        {tab === "tools" && (
+          <>
+            {/* ツール: テスト / 履歴 を切り替え (下ナビを5つに収めるため統合) */}
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-xs font-semibold">
+              {([["test", t.tabTest, Wrench], ["history", t.tabHistory, History]] as const).map(([k, label, Icon]) => (
+                <button key={k} onClick={() => { if (toolsView !== k) navTick(); setToolsView(k); }}
+                  className={`flex items-center justify-center gap-1.5 rounded-full py-2 transition ${toolsView === k ? "bg-cyan-500/20 text-cyan-100 shadow-[0_0_14px_-4px_rgba(34,211,238,0.7)]" : "text-white/50"}`}>
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+            {toolsView === "test" && (
+              <div className="space-y-10">
+                <DeviceTestSection rooms={rooms} t={t} />
+                <SmartKeyPreview entrances={smartkey.entrances} settings={smartkey.settings} rooms={rooms} lang={lang} />
+              </div>
+            )}
+            {toolsView === "history" && <HistoryTab logs={logs} rooms={rooms} t={t} lang={lang} />}
+          </>
+        )}
       </div>
 
       <BottomNav tab={tab} setTab={setTab} t={t} />
@@ -224,8 +250,8 @@ function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: 
     { key: "today", label: t.tabToday, Icon: CalendarDays },
     { key: "reservations", label: t.tabReservations, Icon: ClipboardList },
     { key: "rooms", label: t.tabRooms, Icon: DoorOpen },
-    { key: "history", label: t.tabHistory, Icon: History },
-    { key: "test", label: t.tabTest, Icon: Wrench },
+    { key: "smartkey", label: t.tabSmartKey, Icon: KeyRound },
+    { key: "tools", label: t.tabTools, Icon: Wrench },
   ];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-400/20 bg-[#070a12]/90 backdrop-blur-xl">

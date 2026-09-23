@@ -104,6 +104,8 @@ type Dict = {
   icalLabel: string;
   addRoomBtn: string;
   rename: string;
+  tabSmartKey: string;
+  tabTools: string;
 };
 
 export const AT: Record<AdminLang, Dict> = {
@@ -154,6 +156,8 @@ export const AT: Record<AdminLang, Dict> = {
     icalLabel: "Airbnb iCal URL（任意・あとで設定可）",
     addRoomBtn: "部屋を追加",
     rename: "名前を変更",
+    tabSmartKey: "スマートキー",
+    tabTools: "ツール",
   },
   en: {
     dashboard: "HOST DASHBOARD",
@@ -202,6 +206,8 @@ export const AT: Record<AdminLang, Dict> = {
     icalLabel: "Airbnb iCal URL (optional)",
     addRoomBtn: "Add room",
     rename: "Rename",
+    tabSmartKey: "Smart Key",
+    tabTools: "Tools",
   },
   zh: {
     dashboard: "房东控制台",
@@ -250,5 +256,7 @@ export const AT: Record<AdminLang, Dict> = {
     icalLabel: "Airbnb iCal URL（选填）",
     addRoomBtn: "添加房间",
     rename: "重命名",
+    tabSmartKey: "智能钥匙",
+    tabTools: "工具",
   },
 };

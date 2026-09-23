@@ -35,3 +35,30 @@ export function verifySession(token: string | undefined | null): { reservationId
   if (Date.now() > Number(expStr)) return null; // 期限切れ
   return { reservationId };
 }
+
+/**
+ * 用途(scope)付きのセッション。エントランス用など、部屋セッションと混ざらないよう
+ * HMAC の入力に scope を含める (トークン形式は signSession と同じ)。
+ */
+export function signScopedSession(scope: string, reservationId: string, expEpochMs: number): string {
+  const payload = `${reservationId}.${expEpochMs}`;
+  const sig = crypto.createHmac("sha256", secret()).update(`${scope}|${payload}`).digest("base64url");
+  return `${Buffer.from(payload).toString("base64url")}.${sig}`;
+}
+
+export function verifyScopedSession(scope: string, token: string | undefined | null): { reservationId: string } | null {
+  if (!token) return null;
+  const [b64, sig] = token.split(".");
+  if (!b64 || !sig) return null;
+  const payload = Buffer.from(b64, "base64url").toString();
+  const expected = crypto.createHmac("sha256", secret()).update(`${scope}|${payload}`).digest("base64url");
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  } catch {
+    return null;
+  }
+  const [reservationId, expStr] = payload.split(".");
+  if (!reservationId || !expStr) return null;
+  if (Date.now() > Number(expStr)) return null;
+  return { reservationId };
+}

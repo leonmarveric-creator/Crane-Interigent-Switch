@@ -61,3 +61,31 @@ export async function sendSesameCommand(
   // candyhouse は成功時 200 を返す。
   return { ok: res.ok, status: res.status };
 }
+
+/**
+ * Sesame の状態取得 (接続確認用)。
+ * GET https://app.candyhouse.co/api/sesame2/{uuid}
+ *   → { batteryPercentage, CHSesame2Status: "locked" | "unlocked" | "moved", timestamp, wm2State }
+ */
+export async function getSesameStatus(
+  creds: Pick<SesameCreds, "deviceUuid" | "apiKey">
+): Promise<{ ok: boolean; status: number; locked?: boolean | null; battery?: number | null; online?: boolean | null }> {
+  try {
+    const res = await fetch(`https://app.candyhouse.co/api/sesame2/${creds.deviceUuid}`, {
+      headers: { "x-api-key": creds.apiKey },
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    const j: any = await res.json().catch(() => ({}));
+    const s = String(j?.CHSesame2Status ?? "").toLowerCase();
+    return {
+      ok: true,
+      status: res.status,
+      locked: s === "locked" ? true : s === "unlocked" ? false : null,
+      battery: typeof j?.batteryPercentage === "number" ? j.batteryPercentage : null,
+      online: typeof j?.wm2State === "boolean" ? j.wm2State : null,
+    };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}

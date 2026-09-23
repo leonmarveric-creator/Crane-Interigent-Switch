@@ -3,6 +3,8 @@ import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { listDevices } from "@/lib/switchbot";
 import AdminClient, { type Room, type Reservation, type SwitchBotInfo, type LogEntry } from "./AdminClient";
+import type { AdminEntrance, EntranceLog } from "./SmartKeyTab";
+import { getSmartKeySettings } from "@/lib/smartkey";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,7 @@ export default async function AdminPage() {
 
   const { data: roomRows } = await supabaseAdmin
     .from("rooms")
-    .select("id, slug, display_name, building, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, switchbot_nest_device_id, switchbot_wafu_device_id, image_url, lat, lng, geofence_radius_m")
+    .select("id, slug, display_name, building, is_active, switchbot_ac_device_id, switchbot_light_device_id, switchbot_galaxy_device_id, switchbot_nest_device_id, switchbot_wafu_device_id, image_url, lat, lng, geofence_radius_m, sesame_device_uuid, sesame_secret_key, sesame_api_key")
     .order("building")
     .order("slug");
 
@@ -41,6 +43,7 @@ export default async function AdminPage() {
         wafu_device_id: r.switchbot_wafu_device_id ?? null,
         image_url: r.image_url ?? null,
         lat: r.lat ?? null, lng: r.lng ?? null, radius: r.geofence_radius_m ?? 150,
+        has_lock: !!(r.sesame_device_uuid && r.sesame_secret_key && r.sesame_api_key),
         url, qr,
       };
     })
@@ -97,5 +100,46 @@ export default async function AdminPage() {
     created_at: l.created_at,
   }));
 
-  return <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} />;
+  // ---- スマートキー（エントランス） ----
+  // テーブル未作成 (migration_smartkey.sql 未実行) でも管理画面が落ちないよう、エラーは空扱い。
+  const { data: entranceRows, error: entranceErr } = await supabaseAdmin
+    .from("entrances")
+    .select("id, slug, display_name, building, is_active, sesame_device_uuid, sesame_secret_key, sesame_api_key, keypad_code, wifi_ssid, wifi_password, support_url")
+    .order("building")
+    .order("slug");
+  const entrances: AdminEntrance[] = await Promise.all(
+    (entranceRows ?? []).map(async (e) => {
+      const url = `${baseUrl}/key/${e.slug}`;
+      const qr = await QRCode.toDataURL(url, { width: 720, margin: 1, color: { dark: "#0b2f6e", light: "#ffffff" } });
+      return {
+        id: e.id, slug: e.slug, display_name: e.display_name, building: e.building, is_active: e.is_active,
+        sesame_device_uuid: e.sesame_device_uuid ?? null,
+        has_secret: !!e.sesame_secret_key,
+        has_api_key: !!e.sesame_api_key || !!process.env.SESAME_API_KEY,
+        api_key_from_env: !e.sesame_api_key && !!process.env.SESAME_API_KEY,
+        keypad_code: e.keypad_code ?? null, wifi_ssid: e.wifi_ssid ?? null, wifi_password: e.wifi_password ?? null,
+        support_url: e.support_url ?? null,
+        url, qr,
+      };
+    })
+  );
+  const smartkeySettings = await getSmartKeySettings();
+  const entranceMap = new Map(entrances.map((e) => [e.id, e]));
+  const { data: elogRows } = await supabaseAdmin
+    .from("entrance_logs")
+    .select("id, entrance_id, room_id, guest_name, action, source, success, created_at")
+    .order("created_at", { ascending: false })
+    .limit(80);
+  const entranceLogs: EntranceLog[] = (elogRows ?? []).map((l) => ({
+    id: l.id,
+    entrance_name: l.entrance_id ? entranceMap.get(l.entrance_id)?.display_name ?? "—" : null,
+    room_name: l.room_id ? roomMap.get(l.room_id)?.display_name ?? "—" : null,
+    guest_name: l.guest_name ?? null,
+    action: l.action, source: l.source, success: l.success, created_at: l.created_at,
+  }));
+
+  return (
+    <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs}
+      smartkey={{ entrances, settings: smartkeySettings, logs: entranceLogs, setupMissing: !!entranceErr }} />
+  );
 }
