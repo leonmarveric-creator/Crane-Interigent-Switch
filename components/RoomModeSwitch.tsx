@@ -32,6 +32,10 @@ export interface RoomModeSwitchProps {
   hasGalaxy?: boolean;
   hasNest?: boolean;
   hasWafu?: boolean;
+  /** ゲストが入力した名前 (「ようこそ、◯◯様」) */
+  guestName?: string | null;
+  /** 同じ棟のエントランス鍵画面 (/key/[slug]) */
+  entranceHref?: string | null;
 }
 
 const SEL: Record<Lang, {
@@ -173,6 +177,8 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasGalaxy={props.hasGalaxy}
         hasNest={props.hasNest}
         hasWafu={props.hasWafu}
+        guestName={props.guestName}
+        entranceHref={props.entranceHref}
         onSwitchMode={() => choose("normal")}
       />
     );
@@ -191,6 +197,8 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasGalaxy={props.hasGalaxy}
         hasNest={props.hasNest}
         hasWafu={props.hasWafu}
+        guestName={props.guestName}
+        entranceHref={props.entranceHref}
         onSwitchTech={() => choose("normal")}
         onSwitchWafu={() => choose("lite")}
       />
@@ -213,6 +221,8 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasGalaxy={props.hasGalaxy}
         hasNest={props.hasNest}
         hasWafu={props.hasWafu}
+        guestName={props.guestName}
+        entranceHref={props.entranceHref}
       />
       <div className="fixed left-3 top-3 z-[60] flex items-center gap-1.5">
         <button

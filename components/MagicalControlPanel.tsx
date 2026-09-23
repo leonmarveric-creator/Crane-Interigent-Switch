@@ -26,7 +26,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
-import { LANGS, LANG_LABEL, T, type Lang } from "@/lib/i18n";
+import { GX, LANGS, LANG_LABEL, T, type Lang } from "@/lib/i18n";
+import EntranceKeyButton from "@/components/EntranceKeyButton";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { magicIncantationEcho, primeMagicAudio, setMuted as sfxSetMuted, spellCast } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
@@ -43,6 +44,8 @@ export interface MagicalProps {
   hasWafu?: boolean;
   onSwitchTech?: () => void;
   onSwitchWafu?: () => void;
+  guestName?: string | null;
+  entranceHref?: string | null;
 }
 
 const MAGIC_COPY: Record<Lang, {
@@ -908,6 +911,8 @@ export default function MagicalControlPanel({
   hasWafu,
   onSwitchTech,
   onSwitchWafu,
+  guestName,
+  entranceHref,
 }: MagicalProps) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -1131,6 +1136,9 @@ export default function MagicalControlPanel({
 
         <section className="pt-2 text-center">
           <p className="text-[10px] font-semibold uppercase text-[#d8bf86]/70">{copy.mode}</p>
+          {guestName && (
+            <p className="truncate text-[13px] font-semibold text-[#ffe7b3]">✦ {GX[lang].welcomeName(guestName)} ✦</p>
+          )}
           <h1 className="truncate text-[24px] font-semibold leading-tight text-[#fff6dd]">{roomName}</h1>
           {!admin && (
             <p className="text-[10px] text-[#d8bf86]/64">
@@ -1179,6 +1187,12 @@ export default function MagicalControlPanel({
             {lastIncantation}
           </p>
         </section>
+
+        {entranceHref && (
+          <div className="mb-2">
+            <EntranceKeyButton href={entranceHref} lang={lang} variant="magic" />
+          </div>
+        )}
 
         <SectionLabel>{copy.circles}</SectionLabel>
         <div className="magic-primary-grid grid grid-cols-2 gap-1.5">

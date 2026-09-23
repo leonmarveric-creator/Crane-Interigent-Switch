@@ -5,6 +5,7 @@ import { isLang, type Lang } from "@/lib/i18n";
 import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 
@@ -50,8 +51,21 @@ export default async function RoomPage({
     );
   }
 
+  // 「ようこそ、◯◯様」用の名前と、同じ棟のエントランス鍵画面へのリンク
+  // (スマートキーのSQLが未実行でも部屋画面は表示できるよう、エラーは無視)
+  const [{ data: nameRow }, { data: ent }] = await Promise.all([
+    supabaseAdmin.from("reservations").select("guest_name, entrance_name").eq("id", matched.id).maybeSingle(),
+    supabaseAdmin.from("entrances").select("slug")
+      .eq("building", stays.room.building || "Crane Nest").eq("is_active", true)
+      .order("slug").limit(1).maybeSingle(),
+  ]);
+  const guestName = (nameRow as any)?.entrance_name || (nameRow as any)?.guest_name || null;
+  const entranceHref = ent?.slug ? `/key/${ent.slug}` : null;
+
   return (
     <RoomModeSwitch
+      guestName={guestName}
+      entranceHref={entranceHref}
       roomSlug={params.room_id}
       roomName={stays.room.display_name}
       checkOut={matched.check_out}

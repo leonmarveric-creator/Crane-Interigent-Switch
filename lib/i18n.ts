@@ -166,3 +166,35 @@ export const T: Record<Lang, Dict> = {
 };
 
 export const isLang = (v: unknown): v is Lang => LANGS.includes(v as Lang);
+
+/** ゲスト名の表示・エントランス導線・PIN画面の名前入力 (スマートキー連携で追加)。 */
+export const GX: Record<Lang, {
+  welcomeName: (name: string) => string;
+  entranceKey: string;
+  entranceKeySub: string;
+  nameLabel: string;
+  namePh: string;
+  nameRequired: string;
+  pinLabel: string;
+}> = {
+  ja: {
+    welcomeName: (n) => `ようこそ、${n} 様`,
+    entranceKey: "エントランスを開ける", entranceKeySub: "建物入口の鍵・Wi-Fi・暗証番号",
+    nameLabel: "お名前", namePh: "例: CHEN", nameRequired: "お名前を入力してください", pinLabel: "電話番号の下4桁",
+  },
+  en: {
+    welcomeName: (n) => `Welcome, ${n}`,
+    entranceKey: "Open the entrance", entranceKeySub: "Building door key · Wi-Fi · door code",
+    nameLabel: "Your name", namePh: "e.g. CHEN", nameRequired: "Please enter your name", pinLabel: "Last 4 digits of your phone",
+  },
+  zh: {
+    welcomeName: (n) => `欢迎，${n}`,
+    entranceKey: "打开大门", entranceKeySub: "大楼入口钥匙・Wi-Fi・密码",
+    nameLabel: "姓名", namePh: "例：CHEN", nameRequired: "请输入姓名", pinLabel: "手机号码后 4 位",
+  },
+  ko: {
+    welcomeName: (n) => `${n} 님, 환영합니다`,
+    entranceKey: "현관 열기", entranceKeySub: "건물 입구 키・Wi-Fi・비밀번호",
+    nameLabel: "이름", namePh: "예: CHEN", nameRequired: "이름을 입력해 주세요", pinLabel: "전화번호 뒤 4자리",
+  },
+};

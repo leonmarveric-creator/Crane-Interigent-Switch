@@ -15,7 +15,8 @@ import {
   Home, Power, Loader2, Globe, PanelsTopLeft, Lamp, AlarmClock, Check, Flame, Sunrise, type LucideIcon,
 } from "lucide-react";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
-import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import EntranceKeyButton from "@/components/EntranceKeyButton";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
@@ -31,6 +32,8 @@ export interface LiteProps {
   hasNest?: boolean;
   hasWafu?: boolean;
   onSwitchMode?: () => void; // ハイテクUIへ
+  guestName?: string | null;
+  entranceHref?: string | null;
 }
 
 const EXTRA: Record<Lang, { lite: string; full: string; scenes: string; devices: string }> = {
@@ -249,7 +252,7 @@ function WakeLite({ roomSlug, admin, t, hasWafu }: { roomSlug: string; admin?: b
 
 export default function LiteControlPanel({
   roomSlug, roomName, checkOut, initialLang, admin,
-  posterUrl, hasGalaxy, hasNest, hasWafu, onSwitchMode,
+  posterUrl, hasGalaxy, hasNest, hasWafu, onSwitchMode, guestName, entranceHref,
 }: LiteProps) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
@@ -319,7 +322,12 @@ export default function LiteControlPanel({
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
             {e.lite}
           </span>
-          <h1 className="mt-2 truncate text-[28px] font-semibold leading-tight tracking-[0.06em]" style={{ fontFamily: MINCHO }}>{roomName}</h1>
+          {guestName && (
+            <p className="mt-2 truncate text-[13px] font-semibold tracking-[0.08em] text-[#574f43]" style={{ fontFamily: MINCHO }}>
+              {GX[lang].welcomeName(guestName)}
+            </p>
+          )}
+          <h1 className={`${guestName ? "mt-0.5" : "mt-2"} truncate text-[28px] font-semibold leading-tight tracking-[0.06em]`} style={{ fontFamily: MINCHO }}>{roomName}</h1>
           {!admin && (
             <p className="mt-1 text-[11.5px] text-[#6d685d]">
               {t.checkout}: <span className="text-[#2c2a26]">{new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
@@ -330,6 +338,11 @@ export default function LiteControlPanel({
 
       {/* 操作エリア */}
       <div className="mx-auto max-w-md px-5 pb-16 pt-2">
+        {entranceHref && (
+          <div className="mb-3">
+            <EntranceKeyButton href={entranceHref} lang={lang} variant="wafu" />
+          </div>
+        )}
         {!admin && (
           <div className="mb-4">
             <AddToHomePrompt lang={lang} roomName={roomName} variant="wafu" />

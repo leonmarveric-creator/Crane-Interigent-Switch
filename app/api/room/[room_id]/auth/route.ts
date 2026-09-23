@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveStays } from "@/lib/auth";
-import { signSession, roomCookieName } from "@/lib/roomSession";
+import { signSession, roomCookieName, signScopedSession } from "@/lib/roomSession";
+import { ENTRANCE_SCOPE, entranceCookieName } from "@/lib/smartkey";
+import { nameMatches, SESSION_GRACE_MS } from "@/lib/smartkeyLogic";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -20,7 +22,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { room_id: string } }
 ) {
-  const { pin } = (await req.json().catch(() => ({}))) as { pin?: string };
+  const { pin, name: rawName } = (await req.json().catch(() => ({}))) as { pin?: string; name?: string };
+  const name = String(rawName ?? "").trim().slice(0, 60);
   const slug = params.room_id;
 
   // --- ロックアウト判定: 直近WINDOW_MIN分の失敗回数を確認 ---
@@ -43,9 +46,15 @@ export async function POST(
   }
 
   const entered = pin?.trim();
-  const match = entered
-    ? stays.reservations.find((r) => r.unlock_pin && r.unlock_pin === entered)
-    : undefined;
+  // 同じPINの予約が重なっていたら、入力された名前で絞る
+  const hits = entered ? stays.reservations.filter((r) => r.unlock_pin && r.unlock_pin === entered) : [];
+  let match = hits[0];
+  if (hits.length > 1 && name) {
+    const { data: named } = await supabaseAdmin
+      .from("reservations").select("id, guest_name, entrance_name").in("id", hits.map((h) => h.id));
+    const hit = (named ?? []).find((r: any) => nameMatches(name, r.guest_name) || nameMatches(name, r.entrance_name));
+    if (hit) match = hits.find((h) => h.id === hit.id) ?? match;
+  }
   if (!match) {
     // 失敗を記録 (次回以降のロックアウト判定に使用)
     await supabaseAdmin.from("pin_attempts").insert({ room_slug: slug });
@@ -55,16 +64,32 @@ export async function POST(
   // 認証成功 → その部屋の失敗履歴をクリア (ロックを解除)
   await supabaseAdmin.from("pin_attempts").delete().eq("room_slug", slug);
 
+  // 入力された名前を保存 (部屋画面・エントランス画面の「ようこそ、◯◯様」に使う)
+  if (name) {
+    await supabaseAdmin.from("reservations")
+      .update({ entrance_name: name, entrance_verified_at: new Date().toISOString() })
+      .eq("id", match.id)
+      .then(() => null, () => null); // 列が未作成でも認証は通す
+  }
+
   const exp = new Date(match.check_out).getTime();
   const token = signSession(match.id, exp);
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(roomCookieName(params.room_id), token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(exp),
-  });
+  const cookieBase = { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
+  res.cookies.set(roomCookieName(params.room_id), token, { ...cookieBase, expires: new Date(exp) });
+
+  // 同じ棟のエントランスも本人確認なしで使えるように、エントランス用セッションも発行
+  try {
+    const { data: ents } = await supabaseAdmin
+      .from("entrances").select("slug")
+      .eq("building", stays.room.building || "Crane Nest").eq("is_active", true);
+    const keyExp = exp + SESSION_GRACE_MS;
+    for (const e of ents ?? []) {
+      res.cookies.set(entranceCookieName(e.slug), signScopedSession(ENTRANCE_SCOPE, match.id, keyExp), {
+        ...cookieBase, expires: new Date(keyExp),
+      });
+    }
+  } catch { /* エントランス未設定でも部屋の認証は成功させる */ }
   return res;
 }

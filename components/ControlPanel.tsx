@@ -7,13 +7,16 @@ import {
   AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, PowerOff, Sparkles, Radio, Moon,
   Sun, Sunrise, Flame, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
-import { T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
+import EntranceKeyButton from "@/components/EntranceKeyButton";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
 
 interface Props {
+  guestName?: string | null;
+  entranceHref?: string | null;
   roomSlug: string;
   roomName: string;
   checkOut: string;
@@ -86,7 +89,7 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -280,9 +283,11 @@ export default function ControlPanel({
           <div className="flex items-start gap-3">
             <ArcReactor active={ambientOn} />
             <div>
-            <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">
-              {t.welcome.toUpperCase()}
-            </p>
+            {guestName ? (
+              <p className="text-[13px] font-semibold tracking-wide text-cyan-200/90">{GX[lang].welcomeName(guestName)}</p>
+            ) : (
+              <p className="font-mono text-[11px] tracking-[0.3em] text-cyan-400/70">{t.welcome.toUpperCase()}</p>
+            )}
             <h1 className="mt-1 text-2xl font-semibold tracking-wide"><DecodeText text={roomName} /></h1>
             {admin ? (
               <a href="/admin" className="mt-1 inline-block text-xs text-violet-300/80">
@@ -318,6 +323,12 @@ export default function ControlPanel({
             <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </motion.header>
+
+        {entranceHref && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mb-4">
+            <EntranceKeyButton href={entranceHref} lang={lang} variant="tech" />
+          </motion.div>
+        )}
 
         {!admin && (
           <motion.div

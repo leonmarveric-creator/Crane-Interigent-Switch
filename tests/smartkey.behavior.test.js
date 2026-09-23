@@ -81,3 +81,18 @@ test("lock mode is chosen per door: timer / door sensor / off", async () => {
   assert.match(read("app", "admin", "smartkeyActions.ts"), /entrance_lock: s\.entrance_lock/);
   assert.match(read("supabase", "migration_smartkey_lockmode.sql"), /add column if not exists entrance_lock text/);
 });
+
+test("room PIN flow asks for a name, greets the guest, and links to the entrance key", () => {
+  const gate = read("components", "PinGate.tsx");
+  assert.match(gate, /JSON\.stringify\(\{ pin, name: name\.trim\(\) \}\)/);
+  const auth = read("app", "api", "room", "[room_id]", "auth", "route.ts");
+  assert.match(auth, /entrance_name: name/);
+  assert.match(auth, /signScopedSession\(ENTRANCE_SCOPE, match\.id, keyExp\)/);
+  const page = read("app", "room", "[room_id]", "page.tsx");
+  assert.match(page, /entranceHref = ent\?\.slug \? `\/key\/\$\{ent\.slug\}` : null/);
+  for (const f of ["ControlPanel.tsx", "LiteControlPanel.tsx", "MagicalControlPanel.tsx"]) {
+    const src = read("components", f);
+    assert.match(src, /GX\[lang\]\.welcomeName\(guestName\)/, f);
+    assert.match(src, /<EntranceKeyButton href=\{entranceHref\}/, f);
+  }
+});
