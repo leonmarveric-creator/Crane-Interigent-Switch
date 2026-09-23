@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { listDevices } from "@/lib/switchbot";
 import AdminClient, { type Room, type Reservation, type SwitchBotInfo, type LogEntry } from "./AdminClient";
-import type { AdminEntrance, EntranceLog } from "./SmartKeyTab";
+import type { AdminEntrance, EntranceLog, AdminSesameLock } from "./SmartKeyTab";
 import { getSmartKeySettings } from "@/lib/smartkey";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +124,27 @@ export default async function AdminPage() {
     })
   );
   const smartkeySettings = await getSmartKeySettings();
+
+  // ---- Sesame 一覧（鍵の台帳） ----
+  // migration_sesame_locks.sql 未実行でも落ちないよう、別クエリでエラーは無視する。
+  const [{ data: lockRows, error: lockErr }, { data: roomLockRows }, { data: entLockRows }] = await Promise.all([
+    supabaseAdmin.from("sesame_locks").select("id, name, device_uuid, secret_key, api_key, note").order("name"),
+    supabaseAdmin.from("rooms").select("id, sesame_lock_id"),
+    supabaseAdmin.from("entrances").select("id, sesame_lock_id"),
+  ]);
+  const roomLockMap = new Map<string, string | null>((roomLockRows ?? []).map((r: any) => [r.id, r.sesame_lock_id ?? null]));
+  const entLockMap = new Map<string, string | null>((entLockRows ?? []).map((e: any) => [e.id, e.sesame_lock_id ?? null]));
+  rooms.forEach((r) => { r.sesame_lock_id = roomLockMap.get(r.id) ?? null; });
+  entrances.forEach((e) => { e.sesame_lock_id = entLockMap.get(e.id) ?? null; });
+  const locks: AdminSesameLock[] = (lockRows ?? []).map((l: any) => ({
+    id: l.id, name: l.name, device_uuid: l.device_uuid, note: l.note ?? null,
+    has_secret: !!l.secret_key,
+    has_api_key: !!l.api_key || !!process.env.SESAME_API_KEY,
+    used_by: [
+      ...rooms.filter((r) => r.sesame_lock_id === l.id).map((r) => r.display_name),
+      ...entrances.filter((e) => e.sesame_lock_id === l.id).map((e) => e.display_name),
+    ],
+  }));
   const entranceMap = new Map(entrances.map((e) => [e.id, e]));
   const { data: elogRows } = await supabaseAdmin
     .from("entrance_logs")
@@ -140,6 +161,6 @@ export default async function AdminPage() {
 
   return (
     <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs}
-      smartkey={{ entrances, settings: smartkeySettings, logs: entranceLogs, setupMissing: !!entranceErr }} />
+      smartkey={{ entrances, settings: smartkeySettings, logs: entranceLogs, setupMissing: !!entranceErr, locks, locksMissing: !!lockErr }} />
   );
 }

@@ -13,6 +13,7 @@
     "aes-cmac": "^4.0.0",
     "framer-motion": "^11.3.0",
     "googleapis": "^140.0.1",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.408.0",
     "next": "^14.2.5",
     "node-ical": "^0.18.0",

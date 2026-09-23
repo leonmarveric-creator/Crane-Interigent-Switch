@@ -22,14 +22,17 @@ import {
 import type { AdminLang } from "@/lib/adminI18n";
 import { saveEntrance, saveSmartKeySettings, setAppUnlockEnabled } from "./smartkeyActions";
 import type { Room, Reservation } from "./AdminClient";
+import { SesameLocksSection, LockSelect, type AdminSesameLock } from "./SesameLocks";
 
 export interface AdminEntrance {
   id: string; slug: string; display_name: string; building: string; is_active: boolean;
   sesame_device_uuid: string | null;
   has_secret: boolean; has_api_key: boolean; api_key_from_env: boolean;
   keypad_code: string | null; wifi_ssid: string | null; wifi_password: string | null; support_url: string | null;
+  sesame_lock_id?: string | null;
   url: string; qr: string;
 }
+export type { AdminSesameLock };
 export interface EntranceLog {
   id: string; entrance_name: string | null; room_name: string | null; guest_name: string | null;
   action: string; source: string; success: boolean; created_at: string;
@@ -39,6 +42,8 @@ export interface SmartKeyProps {
   settings: SmartKeySettings;
   logs: EntranceLog[];
   setupMissing: boolean;
+  locks: AdminSesameLock[];
+  locksMissing: boolean;
 }
 
 /* ---------------- 管理画面の文言 (ja / en / zh) ---------------- */
@@ -73,6 +78,7 @@ const L_JA = {
     targetEntrance: "動かすエントランス", targetRoom: "動かすお部屋", noLockRoom: "（鍵未設定）",
     logs: "入退館ログ", noLogs: "まだ記録がありません", when: "日時", who: "ゲスト", what: "操作", where: "場所",
     todayGuests: "このエントランスを使える予約（今〜24時間以内）", none: "なし", verified: "本人確認済み",
+    locksMissing: "先に supabase/migration_sesame_locks.sql を実行してください", pickFromList: "上の「Sesame 一覧」に登録した鍵から選びます。新しい鍵は一覧の「Sesame を追加」から（QR画像で自動入力できます）。",
     openPreview: "ゲスト画面のプレビュー・実機テスト（ツール → テスト）", previewTitle: "スマートキー：ゲスト画面プレビュー",
 };
 type LT = { [K in keyof typeof L_JA]: string };
@@ -109,6 +115,7 @@ const L: Record<AdminLang, LT> = {
     targetEntrance: "Entrance to operate", targetRoom: "Room to operate", noLockRoom: "(no lock)",
     logs: "Entrance log", noLogs: "No records yet", when: "When", who: "Guest", what: "Action", where: "Where",
     todayGuests: "Bookings that can use this entrance (now – 24h)", none: "None", verified: "Verified",
+    locksMissing: "Run supabase/migration_sesame_locks.sql first", pickFromList: "Choose from the Sesame list above. Add new locks with “Add Sesame” (QR image fills it in).",
     openPreview: "Guest screen preview & real test (Tools → Test)", previewTitle: "Smart key: guest screen preview",
   },
   zh: {
@@ -142,6 +149,7 @@ const L: Record<AdminLang, LT> = {
     targetEntrance: "要操作的大门", targetRoom: "要操作的房间", noLockRoom: "（未设置门锁）",
     logs: "出入记录", noLogs: "暂无记录", when: "时间", who: "客人", what: "操作", where: "地点",
     todayGuests: "可使用此大门的预订（现在〜24小时内）", none: "无", verified: "已确认",
+    locksMissing: "请先执行 supabase/migration_sesame_locks.sql", pickFromList: "从上方「Sesame 列表」中选择。新门锁请用「添加 Sesame」（可用 QR 图片自动填写）。",
     openPreview: "客人页面预览・真实测试（工具 → 测试）", previewTitle: "智能钥匙：客人页面预览",
   },
 };
@@ -153,7 +161,7 @@ const fmt = (iso: string, lang: AdminLang) =>
   new Date(iso).toLocaleString(LOCALE[lang], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" });
 
 export default function SmartKeyTab({
-  entrances, settings, logs, setupMissing, rooms, reservations, lang, onOpenPreview,
+  entrances, settings, logs, setupMissing, rooms, reservations, lang, onOpenPreview, locks, locksMissing,
 }: SmartKeyProps & { rooms: Room[]; reservations: Reservation[]; lang: AdminLang; onOpenPreview?: () => void }) {
   const t = L[lang];
   const [draft, setDraft] = useState<SmartKeySettings>(settings);
@@ -180,7 +188,9 @@ export default function SmartKeyTab({
 
       <EmergencyCard enabled={settings.app_unlock_enabled} t={t} />
 
-      <EntrancesSection entrances={entrances} buildings={buildings} rooms={rooms} reservations={reservations} t={t} lang={lang} />
+      <SesameLocksSection locks={locks} missing={locksMissing} lang={lang} />
+
+      <EntrancesSection entrances={entrances} buildings={buildings} rooms={rooms} reservations={reservations} t={t} lang={lang} locks={locks} locksMissing={locksMissing} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
@@ -243,8 +253,8 @@ function EmergencyCard({ enabled, t }: { enabled: boolean; t: LT }) {
 
 /* ---------------- エントランス一覧 / 追加 ---------------- */
 function EntrancesSection({
-  entrances, buildings, rooms, reservations, t, lang,
-}: { entrances: AdminEntrance[]; buildings: string[]; rooms: Room[]; reservations: Reservation[]; t: LT; lang: AdminLang }) {
+  entrances, buildings, rooms, reservations, t, lang, locks, locksMissing,
+}: { entrances: AdminEntrance[]; buildings: string[]; rooms: Room[]; reservations: Reservation[]; t: LT; lang: AdminLang; locks: AdminSesameLock[]; locksMissing: boolean }) {
   const [adding, setAdding] = useState(false);
   return (
     <div>
@@ -260,7 +270,7 @@ function EntrancesSection({
 
       {adding && (
         <div className={`${card} mb-4 p-5`}>
-          <EntranceForm buildings={buildings} t={t} onDone={() => setAdding(false)} />
+          <EntranceForm buildings={buildings} t={t} onDone={() => setAdding(false)} locks={locks} locksMissing={locksMissing} lang={lang} />
         </div>
       )}
 
@@ -270,14 +280,16 @@ function EntrancesSection({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {entrances.map((e) => (
-          <EntranceCard key={e.id} e={e} buildings={buildings} rooms={rooms} reservations={reservations} t={t} lang={lang} />
+          <EntranceCard key={e.id} e={e} buildings={buildings} rooms={rooms} reservations={reservations} t={t} lang={lang} locks={locks} locksMissing={locksMissing} />
         ))}
       </div>
     </div>
   );
 }
 
-function EntranceForm({ e, buildings, t, onDone }: { e?: AdminEntrance; buildings: string[]; t: LT; onDone?: () => void }) {
+function EntranceForm({
+  e, buildings, t, onDone, locks, locksMissing, lang,
+}: { e?: AdminEntrance; buildings: string[]; t: LT; onDone?: () => void; locks: AdminSesameLock[]; locksMissing: boolean; lang: AdminLang }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -317,22 +329,13 @@ function EntranceForm({ e, buildings, t, onDone }: { e?: AdminEntrance; building
 
       <div className="sm:col-span-2 mt-1 rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.04] p-3">
         <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-cyan-200"><KeyRound className="h-3.5 w-3.5" /> Sesame</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label={t.uuid}><input name="sesame_device_uuid" defaultValue={e?.sesame_device_uuid ?? ""} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className={`${inputCls} font-mono text-xs`} /></Field>
-          <Field label={<>{t.secret}{e && <Status ok={e.has_secret} />}</>}>
-            <input name="sesame_secret_key" type="password" autoComplete="off" placeholder={e?.has_secret ? t.keepBlank : "0123abcd…"} className={`${inputCls} font-mono text-xs`} />
-          </Field>
-          <Field label={<>{t.apiKey}{e && <Status ok={e.has_api_key} env={e.api_key_from_env} />}</>}>
-            <input name="sesame_api_key" type="password" autoComplete="off" placeholder={e?.has_api_key ? t.keepBlank : "SESAME_API_KEY"} className={`${inputCls} font-mono text-xs`} />
-          </Field>
-          {e && (
-            <div className="flex flex-col justify-end gap-1 pb-1 text-[11px] text-white/45">
-              {e.has_secret && <label className="flex items-center gap-1.5"><input type="checkbox" name="clear_secret" className="accent-rose-500" /> {t.clearSecret}</label>}
-              {e.has_api_key && !e.api_key_from_env && <label className="flex items-center gap-1.5"><input type="checkbox" name="clear_api_key" className="accent-rose-500" /> {t.clearApi}</label>}
-            </div>
-          )}
-        </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-white/35">💡 {t.sesameHelp}</p>
+        {locksMissing ? (
+          <p className="text-[11px] text-amber-200">{t.locksMissing}</p>
+        ) : (
+          <LockSelect locks={locks} value={e?.sesame_lock_id ?? null} hasLegacy={!!e?.sesame_device_uuid && !e?.sesame_lock_id}
+            name="sesame_lock_id" lang={lang} className={inputCls} />
+        )}
+        <p className="mt-2 text-[10px] leading-relaxed text-white/35">💡 {t.pickFromList}</p>
       </div>
 
       <Field label={t.keypad}><input name="keypad_code" defaultValue={e?.keypad_code ?? ""} inputMode="numeric" className={`${inputCls} font-mono`} /></Field>
@@ -352,8 +355,8 @@ function EntranceForm({ e, buildings, t, onDone }: { e?: AdminEntrance; building
 }
 
 function EntranceCard({
-  e, buildings, rooms, reservations, t, lang,
-}: { e: AdminEntrance; buildings: string[]; rooms: Room[]; reservations: Reservation[]; t: LT; lang: AdminLang }) {
+  e, buildings, rooms, reservations, t, lang, locks, locksMissing,
+}: { e: AdminEntrance; buildings: string[]; rooms: Room[]; reservations: Reservation[]; t: LT; lang: AdminLang; locks: AdminSesameLock[]; locksMissing: boolean }) {
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [big, setBig] = useState(false);
@@ -385,9 +388,7 @@ function EntranceCard({
           </div>
           <p className="mt-0.5 truncate font-mono text-[11px] text-white/40">/key/{e.slug}</p>
           <p className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
-            <Chip ok={!!e.sesame_device_uuid}>UUID</Chip>
-            <Chip ok={e.has_secret}>Secret</Chip>
-            <Chip ok={e.has_api_key}>API{e.api_key_from_env ? " (env)" : ""}</Chip>
+            <Chip ok={ready}>🔑 {locks.find((l) => l.id === e.sesame_lock_id)?.name ?? (ready ? "Sesame" : t.notSet)}</Chip>
             {e.wifi_ssid && <Chip ok><Wifi className="inline h-3 w-3" /> {e.wifi_ssid}</Chip>}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -434,7 +435,7 @@ function EntranceCard({
       </button>
       {editing && (
         <div className="border-t border-white/10 p-4">
-          <EntranceForm e={e} buildings={buildings} t={t} />
+          <EntranceForm e={e} buildings={buildings} t={t} locks={locks} locksMissing={locksMissing} lang={lang} />
         </div>
       )}
 

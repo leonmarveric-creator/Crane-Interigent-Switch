@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/adminAuth";
 import { logEntrance } from "@/lib/smartkey";
 import { sanitizeSettings, type SmartKeySettings } from "@/lib/smartkeyLogic";
+import { assignEntranceLock } from "./sesameActions";
 
 const slugify = (v: string) =>
   v.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
@@ -21,34 +22,30 @@ export async function saveEntrance(formData: FormData): Promise<{ ok: boolean; e
   const building = str("building");
   if (!display_name || !building) return { ok: false, error: "名前と棟は必須です" };
 
-  const uuid = str("sesame_device_uuid");
-  if (uuid && !/^[0-9a-f-]{32,36}$/i.test(uuid)) return { ok: false, error: "Sesame UUID の形式が正しくありません" };
-  const secret = str("sesame_secret_key").replace(/\s/g, "");
-  if (secret && !/^[0-9a-f]{32}$/i.test(secret)) return { ok: false, error: "シークレットキーは32桁の16進数です" };
-
   const row: Record<string, unknown> = {
     display_name,
     building,
     is_active: formData.get("is_active") === "on",
-    sesame_device_uuid: uuid || null,
     keypad_code: str("keypad_code") || null,
     wifi_ssid: str("wifi_ssid") || null,
     wifi_password: str("wifi_password") || null,
     support_url: str("support_url") || null,
   };
-  if (secret) row.sesame_secret_key = secret.toLowerCase();
-  if (str("sesame_api_key")) row.sesame_api_key = str("sesame_api_key");
-  if (formData.get("clear_secret") === "on") row.sesame_secret_key = null;
-  if (formData.get("clear_api_key") === "on") row.sesame_api_key = null;
+  // Sesame は「Sesame 一覧」から選ぶ ("__keep" = 変更しない / "" = なし)
+  const lockSel = formData.has("sesame_lock_id") ? String(formData.get("sesame_lock_id") ?? "") : "__keep";
 
   if (id) {
     const { error } = await supabaseAdmin.from("entrances").update(row).eq("id", id);
     if (error) return { ok: false, error: error.message };
+    const a = await assignEntranceLock(id, lockSel);
+    if (!a.ok) return a;
   } else {
     const slug = slugify(str("slug") || display_name);
     if (!slug) return { ok: false, error: "slug（半角英数とハイフン）を入力してください" };
-    const { error } = await supabaseAdmin.from("entrances").insert({ ...row, slug });
+    const { data: created, error } = await supabaseAdmin.from("entrances").insert({ ...row, slug }).select("id").single();
     if (error) return { ok: false, error: error.code === "23505" ? "同じ slug のエントランスがあります" : error.message };
+    const a = await assignEntranceLock(created.id, lockSel);
+    if (!a.ok) return a;
   }
   revalidatePath("/admin");
   return { ok: true };

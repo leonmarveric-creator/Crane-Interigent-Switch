@@ -12,11 +12,12 @@ export const runtime = "nodejs";
  * POST /api/admin/smartkey
  *   { target: "entrance", entranceId, action: "unlock" | "lock" | "status" }
  *   { target: "room", roomSlug, action: "unlock" | "lock" }
+ *   { target: "lock", lockId, action: "unlock" | "lock" | "status" }
  */
 export async function POST(req: NextRequest) {
   if (!isAdmin()) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
-  const { target, entranceId, roomSlug, action } = (await req.json().catch(() => ({}))) as {
-    target?: string; entranceId?: string; roomSlug?: string; action?: string;
+  const { target, entranceId, roomSlug, lockId, action } = (await req.json().catch(() => ({}))) as {
+    target?: string; entranceId?: string; roomSlug?: string; lockId?: string; action?: string;
   };
 
   try {
@@ -33,6 +34,22 @@ export async function POST(req: NextRequest) {
       if (action !== "unlock" && action !== "lock") return NextResponse.json({ ok: false, error: "BAD_ACTION" }, { status: 400 });
       const r = await sendSesameCommand(creds, action === "unlock" ? SESAME_CMD.UNLOCK : SESAME_CMD.LOCK, "Admin");
       await logEntrance({ entrance_id: e.id, action, source: "admin", success: r.ok });
+      return NextResponse.json({ ok: r.ok, error: r.ok ? undefined : "DEVICE_ERROR" }, { status: r.ok ? 200 : 502 });
+    }
+
+    if (target === "lock") {
+      // Sesame 一覧の1台を直接操作 (状態確認 / 解錠 / 施錠)
+      const { data: l } = await supabaseAdmin.from("sesame_locks").select("*").eq("id", lockId ?? "").maybeSingle();
+      if (!l) return NextResponse.json({ ok: false, error: "NO_LOCK" }, { status: 404 });
+      const creds = { deviceUuid: l.device_uuid, secretKey: l.secret_key, apiKey: l.api_key || process.env.SESAME_API_KEY || "" };
+      if (!creds.apiKey) return NextResponse.json({ ok: false, error: "NO_API_KEY" }, { status: 409 });
+      if (action === "status") {
+        const s = await getSesameStatus(creds);
+        return NextResponse.json({ ...s, error: s.ok ? undefined : "DEVICE_ERROR" }, { status: s.ok ? 200 : 502 });
+      }
+      if (action !== "unlock" && action !== "lock") return NextResponse.json({ ok: false, error: "BAD_ACTION" }, { status: 400 });
+      const r = await sendSesameCommand(creds, action === "unlock" ? SESAME_CMD.UNLOCK : SESAME_CMD.LOCK, "Admin");
+      await logEntrance({ entrance_id: null, guest_name: l.name, action: `lock_${action}`, source: "admin", success: r.ok });
       return NextResponse.json({ ok: r.ok, error: r.ok ? undefined : "DEVICE_ERROR" }, { status: r.ok ? 200 : 502 });
     }
 

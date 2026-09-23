@@ -17,6 +17,7 @@ import {
 } from "./actions";
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
+import { RoomLockForm, type AdminSesameLock } from "./SesameLocks";
 
 export interface Room {
   id: string; slug: string; display_name: string; building: string | null; is_active: boolean;
@@ -27,6 +28,7 @@ export interface Room {
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
   has_lock?: boolean;
+  sesame_lock_id?: string | null;
   url: string; qr: string;
 }
 export interface Reservation {
@@ -187,7 +189,7 @@ export default function AdminClient({
 
         {tab === "today" && <TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "reservations" && <ReservationsTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
-        {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} />}
+        {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} locks={smartkey.locks} locksMissing={smartkey.locksMissing} lang={lang} />}
         {tab === "smartkey" && (
           <SmartKeyTab {...smartkey} rooms={rooms} reservations={reservations} lang={lang}
             onOpenPreview={() => { navTick(); setToolsView("test"); setTab("tools"); window.scrollTo(0, 0); }} />
@@ -500,7 +502,7 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
 }
 
 /* ---------------- Rooms tab ---------------- */
-function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T }) {
+function RoomsTab({ rooms, info, t, locks, locksMissing, lang }: { rooms: Room[]; info: SwitchBotInfo; t: T; locks: AdminSesameLock[]; locksMissing: boolean; lang: AdminLang }) {
   const [filter, setFilter] = useState<string>("all"); // 棟フィルタ ("all" | 棟名)
   const [showAdd, setShowAdd] = useState(false);        // 「部屋を追加」フォームの開閉
   const ir = info.infraredRemoteList ?? [];
@@ -603,7 +605,7 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {group.rooms.map((room) => (
-              <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} nests={nests} wafus={wafus} sbError={info.error} t={t} />
+              <RoomManageCard key={room.id} room={room} acs={acs} lights={lights} galaxies={galaxies} nests={nests} wafus={wafus} sbError={info.error} t={t} locks={locks} locksMissing={locksMissing} lang={lang} />
             ))}
           </div>
         </div>
@@ -613,8 +615,9 @@ function RoomsTab({ rooms, info, t }: { rooms: Room[]; info: SwitchBotInfo; t: T
 }
 
 function RoomManageCard({
-  room, acs, lights, galaxies, nests, wafus, sbError, t,
+  room, acs, lights, galaxies, nests, wafus, sbError, t, locks, locksMissing, lang,
 }: {
+  locks: AdminSesameLock[]; locksMissing: boolean; lang: AdminLang;
   room: Room;
   acs: { deviceId: string; deviceName: string }[];
   lights: { deviceId: string; deviceName: string }[];
@@ -660,6 +663,13 @@ function RoomManageCard({
         </div>
         <img src={room.qr} alt="QR" className="h-16 w-16 rounded-lg bg-white p-1" />
       </div>
+
+      {/* 鍵（Sesame）: Sesame 一覧から選ぶ */}
+      {!locksMissing && (
+        <div className="border-t border-white/10 p-4">
+          <RoomLockForm roomId={room.id} value={room.sesame_lock_id ?? null} hasLegacy={!!room.has_lock && !room.sesame_lock_id} locks={locks} lang={lang} />
+        </div>
+      )}
 
       {/* デバイス割り当て */}
       <div className="border-t border-white/10 p-4">
