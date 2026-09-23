@@ -194,3 +194,9 @@ test("Face ID / passkey login: registration needs a staff session, login issues 
   assert.match(read("lib", "staffPasskey.ts"), /readChallenge[\s\S]*timingSafeEqual/);
   assert.match(read("supabase", "migration_staff_passkeys.sql"), /enable row level security/);
 });
+
+test("staff images are not blocked by the login redirect (login page shows the illustration)", () => {
+  const m = read("middleware.ts");
+  assert.match(m, /isStaticFile = \/\\\.\(\?:jpg\|jpeg\|png/);
+  assert.match(m, /!isStaticFile\)/);
+});
