@@ -35,19 +35,16 @@ test("good_night is exposed as a client and server device action", () => {
 });
 
 test("good_night turns off every light-capable device without touching air conditioning", () => {
-  const block = extractCase(read(deviceControlPath), "good_night");
-
-  for (const expected of [
-    "switchbot_light_device_id",
-    "switchbot_galaxy_device_id",
-    "switchbot_nest_device_id",
-    "switchbot_wafu_device_id",
-    "lightTurnOff",
-    "deviceTurnOff",
-  ]) {
-    assert.match(block, new RegExp(expected), `${expected} should be used by good_night`);
+  const src = read(deviceControlPath);
+  const block = extractCase(src, "good_night");
+  for (const helper of ["offLight()", "offGalaxy()", "offNest()", "offWafu()"]) {
+    assert.ok(block.includes(helper), `${helper} should be used by good_night`);
   }
-
+  // 共通の消灯ヘルパーが正しい機器を消していること
+  assert.match(src, /const offLight = [^\n]*lightTurnOff\(sbCreds, room\.switchbot_light_device_id\)/);
+  assert.match(src, /const offNest = [^\n]*deviceTurnOff\(sbCreds, room\.switchbot_nest_device_id\)/);
+  assert.match(src, /const offWafu = [^\n]*deviceTurnOff\(sbCreds, room\.switchbot_wafu_device_id\)/);
+  assert.match(src, /const offGalaxy = [\s\S]{0,200}deviceTurnOff\(sbCreds, room\.switchbot_galaxy_device_id\)[\s\S]{0,80}setGalaxyAutoOffAt\(room, null\)/);
   assert.doesNotMatch(block, /switchbot_ac_device_id|acTurnOn|acTurnOff|acSetAll/);
 });
 
@@ -61,16 +58,7 @@ test("galaxy_on stores a ninety-minute auto-off deadline and galaxy_off clears i
 
 test("galaxy_on turns off every other light in the room", () => {
   const block = extractCase(read(deviceControlPath), "galaxy_on");
-
-  for (const expected of [
-    "switchbot_light_device_id",
-    "switchbot_nest_device_id",
-    "switchbot_wafu_device_id",
-  ]) {
-    assert.match(block, new RegExp(expected), `${expected} should be turned off by galaxy_on`);
-  }
-
-  assert.match(block, /deviceTurnOff\(sbCreds,\s*room\.switchbot_nest_device_id\)/);
+  assert.match(block, /Promise\.all\(\[offLight\(\), offNest\(\), offWafu\(\)\]\)/);
 });
 
 test("galaxy auto-off cron route processes rooms whose deadline has passed", () => {

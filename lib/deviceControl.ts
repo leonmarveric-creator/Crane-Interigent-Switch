@@ -113,7 +113,20 @@ export async function executeDeviceAction(
     secret: room.switchbot_secret ?? process.env.SWITCHBOT_SECRET!,
   };
 
-  if (DREAM_FADE_CANCEL.has(action)) await cancelDreamFade(room);
+  if (DREAM_FADE_CANCEL.has(action) && room.dream_fade_started_at !== null) await cancelDreamFade(room);
+
+  // 「ついでに消す」灯り。複数の機器は同時に送る (IR はライブラリ側で 1 つずつ順番に送信)。
+  // 失敗しても例外にせず false を返す (ベストエフォート)。
+  const safe = async (fn: () => Promise<boolean>) => { try { return await fn(); } catch { return false; } };
+  const offLight = () => safe(async () => !room.switchbot_light_device_id || (await lightTurnOff(sbCreds, room.switchbot_light_device_id)).ok);
+  const offNest = () => safe(async () => !room.switchbot_nest_device_id || (await deviceTurnOff(sbCreds, room.switchbot_nest_device_id)).ok);
+  const offWafu = () => safe(async () => !room.switchbot_wafu_device_id || (await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id)).ok);
+  const offGalaxy = () => safe(async () => {
+    if (!room.switchbot_galaxy_device_id) return true;
+    const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+    if (r.ok) await setGalaxyAutoOffAt(room, null);
+    return r.ok;
+  });
 
   switch (action) {
     case "unlock":
@@ -156,15 +169,7 @@ export async function executeDeviceAction(
       // ギャラクシーON時は、星空を引き立てるため他のライト(通常/NEST/和風)を消灯する。
       // 消灯の失敗はギャラクシー本体の結果に影響させない(ベストエフォート)。
       if (action === "galaxy_on" && r.ok) {
-        if (room.switchbot_light_device_id) {
-          await lightTurnOff(sbCreds, room.switchbot_light_device_id);
-        }
-        if (room.switchbot_nest_device_id) {
-          await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
-        }
-        if (room.switchbot_wafu_device_id) {
-          await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
-        }
+        await Promise.all([offLight(), offNest(), offWafu()]);
         const autoOffAt = new Date(Date.now() + GALAXY_AUTO_OFF_MS).toISOString();
         const scheduled = await setGalaxyAutoOffAt(room, autoOffAt);
         return { ok: scheduled, error: scheduled ? undefined : "GALAXY_AUTO_OFF_FAILED" };
@@ -184,12 +189,7 @@ export async function executeDeviceAction(
         ? await deviceTurnOn(sbCreds, room.switchbot_nest_device_id)
         : await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
       if (action === "nest_on" && r.ok) {
-        if (room.switchbot_light_device_id) await lightTurnOff(sbCreds, room.switchbot_light_device_id);
-        if (room.switchbot_galaxy_device_id) {
-          const g = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
-          if (g.ok) await setGalaxyAutoOffAt(room, null);
-        }
-        if (room.switchbot_wafu_device_id) await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
+        await Promise.all([offLight(), offGalaxy(), offWafu()]);
       }
       return { ok: r.ok };
     }
@@ -231,105 +231,66 @@ export async function executeDeviceAction(
     }
     case "welcome": {
       // 快適モード: エアコン適温ON(季節判定) + メイン照明ON
-      let ok = await sceneAcComfort(sbCreds, room);
-      if (room.switchbot_light_device_id) {
-        const r = await lightTurnOn(sbCreds, room.switchbot_light_device_id);
-        ok = ok && r.ok;
-      }
-      return { ok };
+      const [ac, light] = await Promise.all([
+        safe(() => sceneAcComfort(sbCreds, room)),
+        safe(async () => !room.switchbot_light_device_id || (await lightTurnOn(sbCreds, room.switchbot_light_device_id)).ok),
+      ]);
+      return { ok: ac && light };
     }
     case "welcome_cozy": {
       // 和みモード: エアコン適温ON + 和風ライトを暖色で点灯。
       // 和みの雰囲気を出すため、和風以外のライト(通常照明/ギャラクシー/NEST)は消灯する。
-      let ok = await sceneAcComfort(sbCreds, room);
-      if (room.switchbot_wafu_device_id) {
-        const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
-        const warm = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id);
-        ok = ok && on.ok && warm;
-      }
       // 消灯はベストエフォート(失敗しても和みモード全体の結果には影響させない)。
-      if (room.switchbot_light_device_id) {
-        await lightTurnOff(sbCreds, room.switchbot_light_device_id);
-      }
-      if (room.switchbot_galaxy_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
-        if (r.ok) await setGalaxyAutoOffAt(room, null);
-      }
-      if (room.switchbot_nest_device_id) {
-        await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
-      }
-      return { ok };
+      const [ac, wafu] = await Promise.all([
+        safe(() => sceneAcComfort(sbCreds, room)),
+        safe(async () => {
+          if (!room.switchbot_wafu_device_id) return true;
+          const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
+          const warm = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id);
+          return on.ok && warm;
+        }),
+        offLight(), offGalaxy(), offNest(),
+      ]);
+      return { ok: ac && wafu };
     }
     case "normal": {
       // ノーマル: ギャラクシー / NEST / 和み などから「メインライトだけ点灯」の状態に戻す。
       // エアコンはそのまま。メインライトの点灯結果を返し、他ライトの消灯はベストエフォート。
-      let ok = true;
-      if (room.switchbot_light_device_id) {
-        const r = await lightTurnOn(sbCreds, room.switchbot_light_device_id); ok = r.ok;
-      }
-      if (room.switchbot_galaxy_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
-        if (r.ok) await setGalaxyAutoOffAt(room, null);
-      }
-      if (room.switchbot_nest_device_id) await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
-      if (room.switchbot_wafu_device_id) await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
+      const [ok] = await Promise.all([
+        safe(async () => !room.switchbot_light_device_id || (await lightTurnOn(sbCreds, room.switchbot_light_device_id)).ok),
+        offGalaxy(), offNest(), offWafu(),
+      ]);
       return { ok };
     }
     case "dream_fade": {
       // Dream Fade: 和風ライト以外の灯りを消し、和風ライトだけを暖色 (2700K・60%) で点灯。
       // 以後 30 分かけて Cron が少しずつ暗くし、最後に消灯する。エアコンはそのまま。
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
-      const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
-      const t = await bulbSetColorTemperature(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.kelvin);
-      const b = await bulbSetBrightness(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.brightness);
-      if (room.switchbot_light_device_id) await lightTurnOff(sbCreds, room.switchbot_light_device_id);
-      if (room.switchbot_galaxy_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
-        if (r.ok) await setGalaxyAutoOffAt(room, null);
-      }
-      if (room.switchbot_nest_device_id) await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
-      if (!(on.ok && t.ok && b.ok)) return { ok: false };
+      const [wafu] = await Promise.all([
+        safe(async () => {
+          const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
+          const t = await bulbSetColorTemperature(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.kelvin);
+          const b = await bulbSetBrightness(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.brightness);
+          return on.ok && t.ok && b.ok;
+        }),
+        offLight(), offGalaxy(), offNest(),
+      ]);
+      if (!wafu) return { ok: false };
       const saved = await setDreamFade(room, new Date().toISOString());
       return saved ? { ok: true } : { ok: false, error: "DREAM_FADE_SQL_NEEDED" };
     }
     case "good_night": {
       // おやすみ: エアコンは維持し、部屋のライト系だけをまとめて消灯する。
-      let ok = true;
-      if (room.switchbot_light_device_id) {
-        const r = await lightTurnOff(sbCreds, room.switchbot_light_device_id); ok = ok && r.ok;
-      }
-      if (room.switchbot_galaxy_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
-        if (r.ok) await setGalaxyAutoOffAt(room, null);
-      }
-      if (room.switchbot_nest_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_nest_device_id); ok = ok && r.ok;
-      }
-      if (room.switchbot_wafu_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id); ok = ok && r.ok;
-      }
-      return { ok };
+      const all = await Promise.all([offLight(), offGalaxy(), offNest(), offWafu()]);
+      return { ok: all.every(Boolean) };
     }
     case "away": {
       // 外出: エアコン + 照明 + ギャラクシー + NEST OFF
-      let ok = true;
-      if (room.switchbot_ac_device_id) {
-        const r = await acTurnOff(sbCreds, room.switchbot_ac_device_id); ok = ok && r.ok;
-      }
-      if (room.switchbot_light_device_id) {
-        const r = await lightTurnOff(sbCreds, room.switchbot_light_device_id); ok = ok && r.ok;
-      }
-      if (room.switchbot_galaxy_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id); ok = ok && r.ok;
-        if (r.ok) await setGalaxyAutoOffAt(room, null);
-      }
-      if (room.switchbot_nest_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_nest_device_id); ok = ok && r.ok;
-      }
-      if (room.switchbot_wafu_device_id) {
-        const r = await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id); ok = ok && r.ok;
-      }
-      return { ok };
+      const all = await Promise.all([
+        safe(async () => !room.switchbot_ac_device_id || (await acTurnOff(sbCreds, room.switchbot_ac_device_id)).ok),
+        offLight(), offGalaxy(), offNest(), offWafu(),
+      ]);
+      return { ok: all.every(Boolean) };
     }
     default:
       return { ok: false, error: "BAD_ACTION" };

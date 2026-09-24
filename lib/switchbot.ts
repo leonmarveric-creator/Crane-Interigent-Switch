@@ -29,11 +29,30 @@ function authHeaders({ token, secret }: SwitchBotCreds) {
   };
 }
 
-async function sendCommand(
-  creds: SwitchBotCreds,
-  deviceId: string,
-  body: { command: string; parameter?: string; commandType?: string }
-): Promise<{ ok: boolean; status: number; payload: unknown }> {
+/**
+ * 赤外線 (IR) リモコンの仮想デバイスか。
+ *   IR: "01-202301011234-12345678" のようにハイフン入り / 実機 (電球・プラグ等): "C271111EC0AB" のような16進。
+ */
+export function isIrDevice(deviceId: string): boolean {
+  return deviceId.includes("-");
+}
+
+/**
+ * IR の命令は 1 台のハブから順番に送信されるので、同時に送ると取りこぼすことがある。
+ * IR だけは 1 つずつ、少し間隔 (IR_GAP_MS) を空けて送る。Wi-Fi の実機は待たずに並行で送る。
+ */
+const IR_GAP_MS = 350;
+let irChain: Promise<unknown> = Promise.resolve();
+function queueIr<T>(fn: () => Promise<T>): Promise<T> {
+  const run = irChain.then(fn, fn);
+  irChain = run.then(
+    () => new Promise((r) => setTimeout(r, IR_GAP_MS)),
+    () => new Promise((r) => setTimeout(r, IR_GAP_MS)),
+  );
+  return run;
+}
+
+async function postCommand(creds: SwitchBotCreds, deviceId: string, body: object) {
   const res = await fetch(`${BASE}/devices/${deviceId}/commands`, {
     method: "POST",
     headers: authHeaders(creds),
@@ -44,6 +63,16 @@ async function sendCommand(
   // SwitchBotは body.statusCode === 100 が成功
   const ok = res.ok && (payload as any)?.statusCode === 100;
   return { ok, status: res.status, payload };
+}
+
+async function sendCommand(
+  creds: SwitchBotCreds,
+  deviceId: string,
+  body: { command: string; parameter?: string; commandType?: string }
+): Promise<{ ok: boolean; status: number; payload: unknown }> {
+  const ir = isIrDevice(deviceId);
+  const attempt = () => postCommand(creds, deviceId, body);
+  return ir ? queueIr(attempt) : attempt();
 }
 
 /** デバイス一覧を取得 (管理画面でID確認用)。 */

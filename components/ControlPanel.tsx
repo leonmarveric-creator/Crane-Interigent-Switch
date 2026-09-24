@@ -136,7 +136,16 @@ export default function ControlPanel({
   const [muted, setMuted] = useState(false);
   const [galaxyActive, setGalaxyActive] = useState(false); // 星空オーバーレイ表示
   const [galaxyLaunch, setGalaxyLaunch] = useState(0); // ギャラクシー起動演出
-  const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
+  // 起動演出 (ゲスト時のみ): この端末でこの部屋を初めて開いたときだけフル演出 (約2.6秒)。
+  // 2回目以降は 0.5 秒の短い起動 (リアクターが光って ONLINE) ですぐ操作できるようにする。
+  const [booting, setBooting] = useState<"pending" | "full" | "quick" | null>(admin ? null : "pending");
+  useEffect(() => {
+    if (admin) return;
+    const key = `techBooted:${roomSlug}`;
+    let seen = false;
+    try { seen = localStorage.getItem(key) === "1"; localStorage.setItem(key, "1"); } catch { /* ignore */ }
+    setBooting(seen ? "quick" : "full");
+  }, [admin, roomSlug]);
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
   const [ambientOn, setAmbientOn] = useState(false); // アークリアクターのハム (opt-in)
@@ -216,7 +225,9 @@ export default function ControlPanel({
 
       {/* 起動シーケンス */}
       <AnimatePresence>
-        {booting && <BootSequence onDone={() => setBooting(false)} roomName={roomName} />}
+        {booting === "pending" && <div key="boot-pending" className="fixed inset-0 z-[70] bg-[#04060c]" />}
+        {booting === "full" && <BootSequence key="boot-full" onDone={() => setBooting(null)} roomName={roomName} />}
+        {booting === "quick" && <QuickBoot key="boot-quick" onDone={() => setBooting(null)} roomName={roomName} />}
       </AnimatePresence>
 
       {/* 背景: 動くオーロラ + 走査線 + グリッド (スマホの傾き / 指の位置で少し動く = 奥行き) */}
@@ -583,6 +594,30 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* ------------------------------------------------------------------ */
 /* 起動シーケンス (JARVIS ブート)                                       */
 /* ------------------------------------------------------------------ */
+/** 2回目以降の短い起動 (約0.5秒): リアクターが一瞬光って「SYSTEMS ONLINE」→ すぐ操作画面へ */
+function QuickBoot({ onDone, roomName }: { onDone: () => void; roomName: string }) {
+  useEffect(() => {
+    systemChord(); // フル演出の最後と同じ到達和音 (新しい音は足さない)
+    const id = setTimeout(onDone, 520);
+    return () => clearTimeout(id);
+  }, [onDone]);
+  return (
+    <motion.div
+      exit={{ opacity: 0, filter: "blur(6px)" }} transition={{ duration: 0.3 }}
+      onClick={onDone}
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#04060c]">
+      <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, ease: "easeOut" }}>
+        <ArcReactorX size={130} active progress={1} />
+      </motion.div>
+      <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.25 }}
+        className="mt-4 font-mono text-[11px] tracking-[0.3em] text-cyan-200">
+        <span className="text-emerald-400">›</span> SYSTEMS ONLINE · {roomName.toUpperCase()}
+      </motion.p>
+      <div className="anim-bootflash-quick pointer-events-none absolute inset-0 bg-cyan-50" />
+    </motion.div>
+  );
+}
+
 function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
   // 充電ゲージ 0 → 1 (2.4 秒)
   const [charged, setCharged] = useState(0);
@@ -629,7 +664,7 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
     <motion.div
       exit={{ opacity: 0, filter: "blur(6px)" }} transition={{ duration: 0.5 }}
       onClick={onDone}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#04060c] px-8">
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#04060c] px-8">
       {/* アークリアクター (充電ゲージが満ちていく) */}
       <div className="mb-6">
         <ArcReactorX size={190} active progress={charged} />
@@ -926,10 +961,10 @@ function AmbientFX() {
 
 /** アイアンマン風 角カットパネル (エッジを光が周回)。 */
 function HudPanel({
-  tone = "cyan", active = false, onClick, contentClassName = "", small = false, children,
+  tone = "cyan", active = false, onClick, contentClassName = "", small = false, className = "", children,
 }: {
   tone?: keyof typeof TONES; active?: boolean; onClick?: () => void;
-  contentClassName?: string; small?: boolean; children: React.ReactNode;
+  contentClassName?: string; small?: boolean; className?: string; children: React.ReactNode;
 }) {
   const c = TONES[tone];
   const clip = small ? "clip-bevel-sm" : "clip-bevel";
@@ -940,7 +975,7 @@ function HudPanel({
       onClick={onClick} whileTap={onClick ? { scale: 0.97 } : undefined}
       onPointerEnter={onClick ? hoverTick : undefined}
       role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
-      className={`${clip} relative ${onClick ? "cursor-pointer" : ""}`}
+      className={`${clip} relative ${onClick ? "cursor-pointer" : ""} ${className}`}
       style={active ? { filter: `drop-shadow(0 0 22px ${c.light})` } : undefined}>
       {/* 静的エッジ */}
       <span className={`${clip} pointer-events-none absolute inset-0`} style={{ background: c.edge }} />
@@ -1031,8 +1066,91 @@ function voiceLabel(a: VoiceAction, t: typeof T["en"]): string {
   }
 }
 
+/**
+ * 横長のモードカードの背景アニメーション (SVG + CSS だけで軽い)。ON と OFF で見え方が変わる。
+ *  ギャラクシー: OFF = まばらな星 / ON = 星がまたたき、渦巻く星雲がゆっくり回り、流れ星が走る
+ *  ネスト:       OFF = 藤編みの模様がうっすら / ON = 編み目の奥から暖かい光が呼吸するように灯る
+ *  Dream Fade:   OFF = 小さな月 / ON = 夕焼けから夜空へゆっくり移る空と、光る月・漂う光の粒
+ *  和み:         OFF = 行灯の輪郭 / ON = 行灯の灯りがやわらかく揺らぐ
+ */
+function ModeScene({ k, on }: { k: "galaxy" | "nest" | "cozy" | "dream"; on: boolean }) {
+  const stars = (n: number, seed: number) => Array.from({ length: n }, (_, j) => ({
+    x: (j * 37 + seed * 11) % 100, y: (j * 53 + seed * 7) % 100, s: 1 + ((j * 13) % 3) * 0.6, d: 1.8 + (j % 5) * 0.6, dl: (j % 7) * 0.35,
+  }));
+  if (k === "galaxy") {
+    return (
+      <span aria-hidden className="pointer-events-none absolute inset-[1.5px] overflow-hidden">
+        {on && (
+          <span className="absolute left-[45%] top-1/2 flex h-0 w-0 items-center justify-center">
+            <span className="mc-spin block h-[260px] w-[260px] shrink-0 rounded-full"
+              style={{ background: "conic-gradient(from 0deg, transparent 0deg, rgba(167,139,250,0.55) 40deg, transparent 100deg, rgba(56,189,248,0.4) 160deg, transparent 220deg, rgba(244,114,182,0.45) 290deg, transparent 360deg)", filter: "blur(14px)" }} />
+          </span>
+        )}
+        {stars(on ? 26 : 9, 3).map((p, j) => (
+          <span key={j} className="absolute rounded-full bg-white"
+            style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.s, height: p.s, opacity: on ? undefined : 0.35,
+              animation: on ? `twinkle ${p.d}s ease-in-out ${p.dl}s infinite` : undefined, boxShadow: on ? "0 0 6px rgba(255,255,255,0.9)" : undefined }} />
+        ))}
+        {on && <span className="mc-shoot absolute left-[70%] top-[18%] h-px w-16 rotate-[-18deg] bg-gradient-to-l from-white to-transparent" />}
+      </span>
+    );
+  }
+  if (k === "nest") {
+    return (
+      <span aria-hidden className="pointer-events-none absolute inset-[1.5px] overflow-hidden">
+        {on && <span className="mc-breathe absolute left-[20%] top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(251,191,36,0.45), rgba(251,146,60,0.15) 45%, transparent 70%)" }} />}
+        <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 200 60">
+          {Array.from({ length: 14 }, (_, j) => (
+            <g key={j} stroke="rgba(251,191,36,1)" strokeOpacity={on ? 0.22 : 0.08} strokeWidth="0.6" fill="none">
+              <path d={`M${j * 16 - 20} 0 Q ${j * 16} 30 ${j * 16 - 20} 60`} />
+              <path d={`M${j * 16 + 20} 0 Q ${j * 16} 30 ${j * 16 + 20} 60`} />
+            </g>
+          ))}
+        </svg>
+      </span>
+    );
+  }
+  if (k === "dream") {
+    return (
+      <span aria-hidden className="pointer-events-none absolute inset-[1.5px] overflow-hidden">
+        {on && <span className="mc-dusk absolute inset-0 opacity-60"
+          style={{ backgroundImage: "linear-gradient(180deg, rgba(251,146,60,0.35), rgba(190,24,93,0.25) 30%, rgba(76,29,149,0.35) 60%, rgba(2,6,23,0.2) 100%)", backgroundSize: "100% 300%" }} />}
+        <span className={`absolute right-[30%] top-1/2 h-7 w-7 -translate-y-1/2 rounded-full ${on ? "mc-moon" : ""}`}
+          style={{ boxShadow: on ? "inset -7px -2px 0 0 rgba(254,243,199,0.95), 0 0 18px rgba(254,243,199,0.35)" : "inset -6px -2px 0 0 rgba(254,243,199,0.25)" }} />
+        {on && stars(10, 9).map((p, j) => (
+          <span key={j} className="mc-float absolute rounded-full bg-amber-100"
+            style={{ left: `${p.x}%`, top: `${40 + (p.y % 60)}%`, width: 2, height: 2, animationDelay: `${p.dl * 2}s`, animationDuration: `${6 + p.d}s` }} />
+        ))}
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-[1.5px] overflow-hidden">
+      {on && <span className="mc-flicker absolute left-[20%] top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(251,113,133,0.35), rgba(251,146,60,0.12) 50%, transparent 70%)" }} />}
+    </span>
+  );
+}
+
+/** 「ギャラクシーモード」→ ["ギャラクシー", "モード"] (狭いタイルでは語の区切りで改行するため) */
+function splitModeLabel(label: string): [string, string] {
+  const m = label.match(/^(.*?)(\s*(?:モード|Mode|模式|모드))$/);
+  return m && m[1] ? [m[1], m[2]] : [label, ""];
+}
+/** OFF ボタンの色 (モードの枠と同じ色) */
+const OFF_STYLE: Record<string, string> = {
+  cyan: "border-cyan-300/40 bg-cyan-400/10 text-cyan-100",
+  emerald: "border-emerald-300/40 bg-emerald-400/10 text-emerald-100",
+  violet: "border-violet-300/40 bg-violet-400/15 text-violet-100",
+  amber: "border-amber-300/40 bg-amber-400/15 text-amber-100",
+  rose: "border-rose-300/40 bg-rose-400/15 text-rose-100",
+};
+
 type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy" | "dream";
-type BusyKey = ModeKey | "galaxyOff" | "nestOff";
+type BusyKey = ModeKey | "galaxyOff" | "nestOff" | "wafuOff";
+/** 下に OFF ボタンを付けるモード (和み・Dream Fade の OFF は和風ライトを消す) */
+type OffKey = "galaxy" | "nest" | "cozy" | "dream";
 function ModeGrid({
   roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
 }: {
@@ -1043,6 +1161,29 @@ function ModeGrid({
   const [active, setActive] = useState<ModeKey | null>(null);
   const [busy, setBusy] = useState<BusyKey | null>(null);
   const [fx, setFx] = useState<{ n: number; k: ModeKey } | null>(null);
+  // Dream Fade の開始時刻 (残り時間の表示用。この端末で押したときだけ分かる)
+  const dreamKey = `dreamStart:${roomSlug}`;
+  const [dreamStart, setDreamStartState] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const setDreamStart = (v: number | null) => {
+    setDreamStartState(v);
+    try { if (v) localStorage.setItem(dreamKey, String(v)); else localStorage.removeItem(dreamKey); } catch { /* ignore */ }
+  };
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(dreamKey));
+      if (v && Date.now() - v < 30 * 60 * 1000) { setDreamStartState(v); setActive("dream"); }
+    } catch { /* ignore */ }
+  }, [dreamKey]);
+  useEffect(() => {
+    if (!dreamStart) return;
+    const id = setInterval(() => {
+      setNowTick(Date.now());
+      if (Date.now() - dreamStart >= 30 * 60 * 1000) { setDreamStart(null); setActive((a) => (a === "dream" ? null : a)); }
+    }, 20000);
+    return () => clearInterval(id);
+  }, [dreamStart]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dreamLeft = dreamStart ? Math.max(0, Math.ceil((dreamStart + 30 * 60 * 1000 - nowTick) / 60000)) : null;
   // Dream Fade の説明: 押したあとにだけ表示し、しばらくすると自動で閉じる (場所を取らない)
   const [dreamInfo, setDreamInfo] = useState(false);
   useEffect(() => {
@@ -1052,17 +1193,23 @@ function ModeGrid({
   }, [dreamInfo]);
 
   const modes: { k: ModeKey; action: DeviceAction; tone: keyof typeof TONES; icon: typeof Lightbulb; label: string; desc: string; show: boolean; voice: string[] }[] = [
-    { k: "normal", action: "normal", tone: "cyan", icon: Lightbulb, label: t.normalMode, desc: t.normalDesc, show: true, voice: ["Welcome home", "Systems set for your return"] },
+    { k: "normal", action: "normal", tone: "cyan", icon: Lightbulb, label: `${t.normalMode}${t.modeSuffix}`, desc: t.normalDesc, show: true, voice: ["Welcome home", "Systems set for your return"] },
     { k: "welcome", action: "welcome", tone: "emerald", icon: Home, label: t.comfortMode, desc: t.comfortDesc, show: true, voice: ["Welcome home", "Comfort mode engaged", "Systems set for your return"] },
-    { k: "galaxy", action: "galaxy_on", tone: "violet", icon: Sparkles, label: t.galaxy.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.galaxyShort, show: !!hasGalaxy, voice: ["Galaxy mode engaged", "Opening the cosmos", "Enjoy the stars"] },
-    { k: "nest", action: "nest_on", tone: "amber", icon: LampFloor, label: t.nest.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.nestShort, show: !!hasNest, voice: ["Nest mode engaged", "Warm light online", "Cozy glow, activated"] },
+    { k: "galaxy", action: "galaxy_on", tone: "violet", icon: Sparkles, label: t.galaxy, desc: t.galaxyShort, show: !!hasGalaxy, voice: ["Galaxy mode engaged", "Opening the cosmos", "Enjoy the stars"] },
+    { k: "nest", action: "nest_on", tone: "amber", icon: LampFloor, label: t.nest, desc: t.nestShort, show: !!hasNest, voice: ["Nest mode engaged", "Warm light online", "Cozy glow, activated"] },
     { k: "cozy", action: "welcome_cozy", tone: "rose", icon: LampFloor, label: t.cozyMode, desc: t.cozyDesc, show: !!hasWafu, voice: ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"] },
     { k: "dream", action: "dream_fade", tone: "violet", icon: MoonStar, label: t.dreamMode, desc: t.dreamDesc, show: !!hasWafu, voice: ["Good night", "Lights dimmed", "Rest mode engaged"] },
   ];
   const list = modes.filter((m) => m.show);
 
+  // ON と OFF をほぼ同時に押しても 1 つしか動かないよう、押した瞬間にロックする
+  const lock = useRef(false);
   const run = async (m: (typeof modes)[number]) => {
-    if (busy) return;
+    if (busy || lock.current) return;
+    lock.current = true;
+    try { await runInner(m); } finally { lock.current = false; }
+  };
+  const runInner = async (m: (typeof modes)[number]) => {
     primeVoice();
     if (guard && !(await guard())) return;
     blip(); sweep();
@@ -1070,6 +1217,7 @@ function ModeGrid({
     const ok = await callDevice(roomSlug, m.action, admin);
     if (ok) {
       setActive(m.k);
+      if (m.k === "dream") { setDreamStart(Date.now()); setNowTick(Date.now()); } else setDreamStart(null);
       onGalaxyState?.(m.k === "galaxy");
       if (m.k === "galaxy") { galaxyOn(); onGalaxyLaunch?.(); } else if (m.k === "nest") toggleServo(true); else if (m.k === "dream") powerDown(); else powerUp();
       if (m.k === "dream") setDreamInfo(true);
@@ -1080,23 +1228,33 @@ function ModeGrid({
   };
 
   // ギャラクシー / ネストだけを止める小さな OFF ボタン (効果音・音声は以前のカードと同じ)
-  const stop = async (k: "galaxy" | "nest") => {
-    const key: BusyKey = k === "galaxy" ? "galaxyOff" : "nestOff";
-    if (busy) return;
+  const stop = async (k: OffKey) => {
+    if (busy || lock.current) return;
+    lock.current = true;
+    try { await stopInner(k); } finally { lock.current = false; }
+  };
+  const stopInner = async (k: OffKey) => {
+    const key: BusyKey = k === "galaxy" ? "galaxyOff" : k === "nest" ? "nestOff" : "wafuOff";
     primeVoice();
     if (guard && !(await guard())) return;
     blip(); sweep();
     setBusy(key);
-    const ok = await callDevice(roomSlug, k === "galaxy" ? "galaxy_off" : "nest_off", admin);
+    const action: DeviceAction = k === "galaxy" ? "galaxy_off" : k === "nest" ? "nest_off" : "wafu_off";
+    const ok = await callDevice(roomSlug, action, admin);
     if (ok) {
-      setActive((a) => (a === k ? null : a));
+      setActive((a) => (a === k || ((k === "cozy" || k === "dream") && (a === "cozy" || a === "dream")) ? null : a));
+      if (k === "cozy" || k === "dream") setDreamStart(null);
       if (k === "galaxy") {
         onGalaxyState?.(false);
         galaxyOff();
         speakOneOf(["Returning to Earth", "Galaxy mode off", "Goodnight, stargazer"]);
-      } else {
+      } else if (k === "nest") {
         toggleServo(false);
         speakOneOf(["Nest mode off", "Warm light standby", "Dimming the glow"]);
+      } else {
+        // 和み / Dream Fade の OFF = 和風ライトを消す (和風ライトの OFF と同じ音)
+        powerDown();
+        speakOneOf([`${t.wafu} offline`, "Ambient lighting off"]);
       }
     } else sfxError();
     setBusy(null);
@@ -1122,42 +1280,60 @@ function ModeGrid({
         {list.map((m, i) => {
           const on = active === m.k;
           const Icon = m.icon;
-          const wide = list.length % 2 === 1 && i === list.length - 1; // 奇数個なら最後を横長に
+          const offKey: OffKey | null = m.k === "galaxy" || m.k === "nest" || m.k === "cozy" || m.k === "dream" ? m.k : null;
+          // ON/OFF のあるモードは横幅いっぱいの特別なカードにする (ノーマル / 快適 は 2 列のまま)
+          const wide = offKey !== null || (list.filter((x) => x.k === "normal" || x.k === "welcome").length % 2 === 1 && !offKey);
+          const [head, suffix] = splitModeLabel(m.label);
+          const tileBody = (
+            <>
+              <span className={`relative flex shrink-0 items-center justify-center rounded-full border ${offKey ? "h-11 w-11" : "h-9 w-9"} ${on ? "border-white/40 bg-white/10" : "border-white/10 bg-black/30"}`}>
+                {busy === m.k
+                  ? <Loader2 className={`h-[18px] w-[18px] animate-spin ${ICON_COLOR[m.tone]}`} />
+                  : <Icon className={`h-[18px] w-[18px] ${ICON_COLOR[m.tone]}`} strokeWidth={1.7} />}
+                {on && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />}
+              </span>
+              <span className="relative min-w-0 flex-1">
+                {/* 「ギャラクシー」「モード」の間でだけ改行する */}
+                <span className={`block font-semibold leading-tight ${offKey ? "text-[15px]" : "text-[13px]"} ${on ? "text-white" : "text-white/85"}`}>
+                  <span className="inline-block">{head}</span>{suffix && <span className="inline-block">{suffix}</span>}
+                </span>
+                <span className={`mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 leading-tight text-white/50 ${offKey ? "text-[11px]" : "text-[10px]"}`}>
+                  {m.desc}
+                  {/* 状態: 実行中 / 待機中 (Dream Fade は残り時間) */}
+                  {offKey && (
+                    <span className={`rounded-full border px-1.5 py-px font-mono text-[8.5px] tracking-[0.16em] ${on ? OFF_STYLE[m.tone] : "border-white/10 text-white/30"}`}>
+                      {on ? (m.k === "dream" && dreamLeft !== null ? `${dreamLeft} MIN` : "ACTIVE") : "STANDBY"}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </>
+          );
           return (
-            <div key={m.k} className={wide ? "col-span-2" : ""}>
-              <HudPanel tone={m.tone} active={on} onClick={() => run(m)} small
-                contentClassName={`items-center px-3 py-3 ${m.k === "galaxy" || m.k === "nest" ? "gap-2" : "gap-2.5"}`}>
+            <div key={m.k} className={wide ? "col-span-2" : "h-full"}>
+              {/* OFF があるモードは、ON と OFF を同じ枠 (同じ色) の中に上下で分けて置く。
+                  ON / OFF は別々のボタンで、間に仕切りと余白があるので同時に押しにくい。 */}
+              <HudPanel tone={m.tone} active={on} small onClick={offKey ? undefined : () => run(m)} className="h-full"
+                contentClassName={offKey ? "h-full items-stretch" : "h-full items-center gap-2.5 px-3 py-3"}>
                 <CommandFX trigger={fx?.k === m.k ? fx.n : 0} tone={m.tone} />
-                {/* ギャラクシーはタイルの中にも星をまたたかせる */}
-                {m.k === "galaxy" && (
-                  <span className="pointer-events-none absolute inset-0">
-                    {[...Array(on ? 12 : 6)].map((_, j) => (
-                      <span key={j} className="absolute rounded-full bg-white"
-                        style={{ left: `${(j * 37 + 13) % 94}%`, top: `${(j * 53 + 9) % 88}%`, width: 1.5, height: 1.5,
-                          animation: `twinkle ${2 + (j % 4) * 0.7}s ease-in-out ${(j % 5) * 0.4}s infinite`, boxShadow: "0 0 5px rgba(255,255,255,0.9)" }} />
-                    ))}
-                  </span>
-                )}
-                <span className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${on ? "border-white/40 bg-white/10" : "border-white/10 bg-white/[0.03]"}`}>
-                  {busy === m.k
-                    ? <Loader2 className={`h-[18px] w-[18px] animate-spin ${ICON_COLOR[m.tone]}`} />
-                    : <Icon className={`h-[18px] w-[18px] ${ICON_COLOR[m.tone]}`} strokeWidth={1.7} />}
-                  {on && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />}
-                </span>
-                <span className="relative min-w-0 flex-1">
-                  <span className={`block whitespace-nowrap text-[13px] font-semibold leading-tight ${on ? "text-white" : "text-white/85"}`}>{m.label}</span>
-                  <span className="mt-0.5 block text-[10px] leading-tight text-white/45">{m.desc}</span>
-                </span>
-                {(m.k === "galaxy" || m.k === "nest") && (
-                  <button type="button" aria-label={`${m.label} OFF`}
-                    onClick={(e) => { e.stopPropagation(); stop(m.k as "galaxy" | "nest"); }}
-                    className="relative -my-1 -mr-1.5 flex h-8 w-[26px] shrink-0 flex-col items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/60 active:scale-95 active:bg-white/10">
-                    {busy === (m.k === "galaxy" ? "galaxyOff" : "nestOff")
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <PowerOff className="h-3 w-3" strokeWidth={1.8} />}
-                    <span className="mt-0.5 font-mono text-[7px] leading-none">OFF</span>
-                  </button>
-                )}
+                {/* モードごとの背景アニメーション (ON と OFF で変わる) */}
+                {offKey && <ModeScene k={offKey} on={on} />}
+                {offKey ? (
+                  <>
+                    <button type="button" onClick={() => run(m)} aria-label={m.label}
+                      className="relative flex min-h-[68px] flex-1 items-center gap-3 px-3.5 py-3 text-left transition active:bg-white/[0.05]">
+                      {tileBody}
+                    </button>
+                    <span aria-hidden className="relative my-3 w-px" style={{ background: TONES[m.tone].edge }} />
+                    <button type="button" aria-label={`${m.label} OFF`} onClick={() => stop(offKey)} disabled={!!busy}
+                      className={`relative my-2.5 ml-2.5 mr-2.5 flex w-[74px] shrink-0 flex-col items-center justify-center gap-1 rounded-md border font-mono text-[11px] tracking-[0.2em] transition active:scale-[0.96] disabled:opacity-50 ${OFF_STYLE[m.tone]}`}>
+                      {busy === (offKey === "galaxy" ? "galaxyOff" : offKey === "nest" ? "nestOff" : "wafuOff")
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <PowerOff className="h-4 w-4" strokeWidth={1.8} />}
+                      OFF
+                    </button>
+                  </>
+                ) : tileBody}
               </HudPanel>
             </div>
           );

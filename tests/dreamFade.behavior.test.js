@@ -28,9 +28,7 @@ test("dream fade: 30 minutes, dims steadily, warmer at the end, then off", () =>
 test("dream fade: server action, cancel on other light actions, cron hook, SQL", () => {
   const dc = read("lib", "deviceControl.ts");
   const c = dc.slice(dc.indexOf('case "dream_fade"'), dc.indexOf('case "good_night"'));
-  assert.match(c, /lightTurnOff/);
-  assert.match(c, /switchbot_galaxy_device_id/);
-  assert.match(c, /switchbot_nest_device_id/);
+  assert.match(c, /offLight\(\), offGalaxy\(\), offNest\(\)/);
   assert.doesNotMatch(c, /acTurnOff/, "air-con untouched");
   assert.match(dc, /DREAM_FADE_CANCEL\.has\(action\)/);
   assert.match(read("app", "api", "cron", "wake-alarm", "route.ts"), /runDreamFade\(/);

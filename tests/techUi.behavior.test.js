@@ -65,12 +65,11 @@ test("modes are right under the entrance button; normal returns to main light on
   const dc = read("lib", "deviceControl.ts");
   const normal = dc.slice(dc.indexOf('case "normal"'), dc.indexOf('case "good_night"'));
   assert.match(normal, /lightTurnOn\(sbCreds, room\.switchbot_light_device_id\)/);
-  for (const id of ["galaxy", "nest", "wafu"]) assert.match(normal, new RegExp(`deviceTurnOff\\(sbCreds, room\\.switchbot_${id}_device_id\\)`));
+  for (const h of ["offGalaxy()", "offNest()", "offWafu()"]) assert.ok(normal.includes(h), h);
   const nest = dc.slice(dc.indexOf('case "nest_on"'), dc.indexOf('case "wafu_on"'));
-  assert.match(nest, /lightTurnOff/);
-  assert.match(nest, /switchbot_wafu_device_id/);
+  assert.match(nest, /offLight\(\), offGalaxy\(\), offWafu\(\)/);
   const cozy = dc.slice(dc.indexOf('case "welcome_cozy"'), dc.indexOf('case "normal"'));
-  assert.match(cozy, /deviceTurnOff\(sbCreds, room\.switchbot_nest_device_id\)/);
+  assert.match(cozy, /offLight\(\), offGalaxy\(\), offNest\(\)/);
   assert.match(read("lib", "deviceClient.ts"), /"normal"/);
 });
 
@@ -108,14 +107,26 @@ test("a language the guest picked is remembered (cookie) and used before the pho
   assert.match(read("app", "key", "[entrance]", "page.tsx"), /searchParams\.lang \?\? cookies\(\)\.get\(LANG_COOKIE\)\?\.value \?\? keyLangFromHeader/);
 });
 
-test("mode grid: galaxy and nest tiles have a compact OFF button with the original off sounds", () => {
+test("mode grid: galaxy / nest / cozy / dream have ON and OFF in the same colored frame (original off sounds); full mode names", () => {
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../components/ControlPanel.tsx"), "utf8");
   const grid = src.slice(src.indexOf("function ModeGrid"), src.indexOf("function SceneButtons"));
   assert.match(grid, /"galaxy_off"/);
   assert.match(grid, /"nest_off"/);
+  assert.match(grid, /"wafu_off"/);
   assert.match(grid, /galaxyOff\(\)/);
   assert.match(grid, /toggleServo\(false\)/);
-  assert.match(grid, /e\.stopPropagation\(\)/);
+  // ON と OFF は同じ枠 (HudPanel) の中で、別々のボタン + 仕切り、OFF は枠と同じ色
+  assert.match(grid, /onClick=\{offKey \? undefined : \(\) => run\(m\)\}/);
+  assert.match(grid, /<button type="button" onClick=\{\(\) => run\(m\)\}[\s\S]{0,900}aria-hidden className="relative my-3 w-px"[\s\S]{0,300}onClick=\{\(\) => stop\(offKey\)\}/);
+  assert.match(grid, /OFF_STYLE\[m\.tone\]/);
+  // ON と OFF の同時押し防止
+  assert.match(grid, /if \(busy \|\| lock\.current\) return;\s*lock\.current = true;/);
+  assert.match(grid, /const wide = offKey !== null/, "galaxy / nest / dream / cozy use the full width");
+  assert.match(src, /function ModeScene\(\{ k, on \}/, "background animation differs by ON/OFF");
+  assert.match(grid, /<ModeScene k=\{offKey\} on=\{on\} \/>/);
+  assert.match(grid, /label: t\.galaxy, desc/);
+  assert.match(grid, /label: t\.nest, desc/);
+  assert.match(grid, /label: `\$\{t\.normalMode\}\$\{t\.modeSuffix\}`/);
 });
 
 test("alarm save failure returns DB detail; combined wake SQL exists", () => {
@@ -143,4 +154,22 @@ test("away button is rendered above the lock card; the rest stay below the mode 
   const rest = src.indexOf('<SceneButtons part="rest"');
   assert.ok(away > 0 && away < lock, "away above lock");
   assert.ok(grid < rest, "good-night / wafu-off stay under the mode grid");
+});
+
+test("speed: quick boot on repeat visits, original geofence check, IR queue without resend, request timeout, server region next to Supabase (Sydney), light videos", () => {
+  const cp = read("components", "ControlPanel.tsx");
+  assert.match(cp, /techBooted:\$\{roomSlug\}/);
+  assert.match(cp, /function QuickBoot/);
+  assert.match(cp, /setTimeout\(onDone, 520\)/);
+  assert.match(cp, /3分キャッシュ/, "geofence check is back to the original");
+  assert.doesNotMatch(cp, /geoOkUntil|enableHighAccuracy: false/);
+  const sb = read("lib", "switchbot.ts");
+  assert.match(sb, /function isIrDevice/);
+  assert.match(sb, /queueIr\(attempt\)/);
+  assert.doesNotMatch(sb, /setTimeout\(res, 400\)/, "no automatic resend");
+  assert.match(read("lib", "deviceClient.ts"), /ctrl\.abort\(\), 20000/);
+  assert.deepEqual(JSON.parse(read("vercel.json")).regions, ["syd1"]);
+  for (const f of ["room-take.mp4", "room-ume.mp4"]) {
+    assert.ok(fs.statSync(path.join(root, "public", "rooms", f)).size < 1.5 * 1024 * 1024, f);
+  }
 });

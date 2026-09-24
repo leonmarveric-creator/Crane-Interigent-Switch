@@ -26,10 +26,20 @@ export async function callDevice(
   admin?: boolean,
   value?: string
 ): Promise<boolean> {
-  const res = await fetch(admin ? "/api/admin/test-device" : `/api/devices/${roomSlug}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(admin ? { roomSlug, action, value } : { action, value }),
-  });
-  return res.ok;
+  // 回線が悪いときにボタンが回り続けないよう、20 秒で打ち切る
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 20000) : null;
+  try {
+    const res = await fetch(admin ? "/api/admin/test-device" : `/api/devices/${roomSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(admin ? { roomSlug, action, value } : { action, value }),
+      signal: ctrl?.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
