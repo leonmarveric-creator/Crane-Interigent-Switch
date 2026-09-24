@@ -69,7 +69,14 @@ export async function POST(req: NextRequest) {
       ? new Date(getWafuAutoOffAtMs(fireAt.getTime())).toISOString()
       : null,
   });
-  if (error) return NextResponse.json({ ok: false, error: "SAVE_FAILED" }, { status: 500 });
+  if (error) {
+    // 原因が分かるよう DB のエラー内容も返す (列が無い・NOT NULL 違反なら SQL 未実行)
+    console.error("[alarm] insert failed", error);
+    return NextResponse.json(
+      { ok: false, error: "SAVE_FAILED", detail: `${error.code ?? ""} ${error.message ?? ""}`.trim() },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true, fireAt: fireAt.toISOString(), mode: wakeMode });
 }

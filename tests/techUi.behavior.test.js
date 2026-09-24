@@ -107,3 +107,24 @@ test("a language the guest picked is remembered (cookie) and used before the pho
   assert.ok(room.indexOf("isLang(saved)") < room.indexOf(": phoneLang"), "saved choice before phone language");
   assert.match(read("app", "key", "[entrance]", "page.tsx"), /searchParams\.lang \?\? cookies\(\)\.get\(LANG_COOKIE\)\?\.value \?\? keyLangFromHeader/);
 });
+
+test("mode grid: galaxy and nest tiles have a compact OFF button with the original off sounds", () => {
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../components/ControlPanel.tsx"), "utf8");
+  const grid = src.slice(src.indexOf("function ModeGrid"), src.indexOf("function SceneButtons"));
+  assert.match(grid, /"galaxy_off"/);
+  assert.match(grid, /"nest_off"/);
+  assert.match(grid, /galaxyOff\(\)/);
+  assert.match(grid, /toggleServo\(false\)/);
+  assert.match(grid, /e\.stopPropagation\(\)/);
+});
+
+test("alarm save failure returns DB detail; combined wake SQL exists", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  for (const f of ["app/api/alarms/[room_id]/route.ts", "app/api/admin/test-alarm/route.ts"]) {
+    assert.match(fs.readFileSync(path.join(__dirname, "..", f), "utf8"), /detail:/);
+  }
+  const sql = fs.readFileSync(path.join(__dirname, "../supabase/migration_wake_fix_all.sql"), "utf8");
+  assert.match(sql, /reservation_id drop not null/);
+  assert.match(sql, /wake_mode/);
+  assert.match(sql, /wafu_prewake_step/);
+});

@@ -996,6 +996,7 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 /*   ノーマル = ほかのモードからメインライトだけ点灯の状態に戻す          */
 /* ------------------------------------------------------------------ */
 type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy";
+type BusyKey = ModeKey | "galaxyOff" | "nestOff";
 function ModeGrid({
   roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
 }: {
@@ -1004,7 +1005,7 @@ function ModeGrid({
   onGalaxyLaunch?: () => void;
 }) {
   const [active, setActive] = useState<ModeKey | null>(null);
-  const [busy, setBusy] = useState<ModeKey | null>(null);
+  const [busy, setBusy] = useState<BusyKey | null>(null);
   const [fx, setFx] = useState<{ n: number; k: ModeKey } | null>(null);
 
   const modes: { k: ModeKey; action: DeviceAction; tone: keyof typeof TONES; icon: typeof Lightbulb; label: string; desc: string; show: boolean; voice: string[] }[] = [
@@ -1033,6 +1034,30 @@ function ModeGrid({
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
   };
 
+  // ギャラクシー / ネストだけを止める小さな OFF ボタン (効果音・音声は以前のカードと同じ)
+  const stop = async (k: "galaxy" | "nest") => {
+    const key: BusyKey = k === "galaxy" ? "galaxyOff" : "nestOff";
+    if (busy) return;
+    primeVoice();
+    if (guard && !(await guard())) return;
+    blip(); sweep();
+    setBusy(key);
+    const ok = await callDevice(roomSlug, k === "galaxy" ? "galaxy_off" : "nest_off", admin);
+    if (ok) {
+      setActive((a) => (a === k ? null : a));
+      if (k === "galaxy") {
+        onGalaxyState?.(false);
+        galaxyOff();
+        speakOneOf(["Returning to Earth", "Galaxy mode off", "Goodnight, stargazer"]);
+      } else {
+        toggleServo(false);
+        speakOneOf(["Nest mode off", "Warm light standby", "Dimming the glow"]);
+      }
+    } else sfxError();
+    setBusy(null);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
+  };
+
   const ICON_COLOR: Record<string, string> = { cyan: "text-cyan-300", emerald: "text-emerald-300", violet: "text-violet-300", amber: "text-amber-300", rose: "text-rose-300" };
   return (
     <div>
@@ -1048,7 +1073,7 @@ function ModeGrid({
           return (
             <div key={m.k} className={wide ? "col-span-2" : ""}>
               <HudPanel tone={m.tone} active={on} onClick={() => run(m)} small
-                contentClassName="items-center gap-2.5 px-3 py-3">
+                contentClassName={`items-center px-3 py-3 ${m.k === "galaxy" || m.k === "nest" ? "gap-2" : "gap-2.5"}`}>
                 <CommandFX trigger={fx?.k === m.k ? fx.n : 0} tone={m.tone} />
                 {/* ギャラクシーはタイルの中にも星をまたたかせる */}
                 {m.k === "galaxy" && (
@@ -1067,9 +1092,19 @@ function ModeGrid({
                   {on && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />}
                 </span>
                 <span className="relative min-w-0 flex-1">
-                  <span className={`block text-[13px] font-semibold leading-tight ${on ? "text-white" : "text-white/85"}`}>{m.label}</span>
+                  <span className={`block whitespace-nowrap text-[13px] font-semibold leading-tight ${on ? "text-white" : "text-white/85"}`}>{m.label}</span>
                   <span className="mt-0.5 block text-[10px] leading-tight text-white/45">{m.desc}</span>
                 </span>
+                {(m.k === "galaxy" || m.k === "nest") && (
+                  <button type="button" aria-label={`${m.label} OFF`}
+                    onClick={(e) => { e.stopPropagation(); stop(m.k as "galaxy" | "nest"); }}
+                    className="relative -my-1 -mr-1.5 flex h-8 w-[26px] shrink-0 flex-col items-center justify-center rounded-md border border-white/15 bg-white/[0.04] text-white/60 active:scale-95 active:bg-white/10">
+                    {busy === (m.k === "galaxy" ? "galaxyOff" : "nestOff")
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <PowerOff className="h-3 w-3" strokeWidth={1.8} />}
+                    <span className="mt-0.5 font-mono text-[7px] leading-none">OFF</span>
+                  </button>
+                )}
               </HudPanel>
             </div>
           );
@@ -1677,6 +1712,7 @@ function WakeCard({
         sfxError();
         const j = await res.json().catch(() => ({} as any));
         setErr(j?.error === "OUT_OF_STAY" ? "チェックアウト前の時刻にしてください / Set a time before check-out"
+          : j?.error === "SAVE_FAILED" && admin && j?.detail ? `SAVE_FAILED: ${j.detail}`
           : j?.error || `ERR ${res.status}`);
         setState("idle");
       }
