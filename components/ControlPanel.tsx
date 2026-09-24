@@ -15,6 +15,7 @@ import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVo
 import AddToHomePrompt from "@/components/AddToHomePrompt";
 import ArcReactorX from "@/components/tech/ArcReactorX";
 import TechPercent from "@/components/tech/TechPercent";
+import { CommandBeamLayer, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
 
 interface Props {
   guestName?: string | null;
@@ -139,6 +140,7 @@ export default function ControlPanel({
   const weather = useWeather(lat, lng);
   const t = T[lang];
   const mainRef = useRef<HTMLElement | null>(null);
+  const reactorRef = useRef<HTMLDivElement | null>(null);
   useParallax(mainRef);
 
   // アンビエントハムのON/OFF (ミュート時は自動停止)。
@@ -217,6 +219,9 @@ export default function ControlPanel({
         </AnimatePresence>
       </div>
 
+      {/* ボタン → リアクターから光線 */}
+      <CommandBeamLayer sourceRef={reactorRef} containerRef={mainRef} />
+
       {/* 起動シーケンス */}
       <AnimatePresence>
         {booting && <BootSequence onDone={() => setBooting(false)} roomName={roomName} />}
@@ -225,6 +230,10 @@ export default function ControlPanel({
       {/* 背景: 動くオーロラ + 走査線 + グリッド (スマホの傾き / 指の位置で少し動く = 奥行き) */}
       <div className="pointer-events-none absolute inset-0"
         style={{ transform: "translate3d(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -14px), 0)", transition: "transform 0.25s ease-out" }}>
+        {/* 3D の床グリッド / 粒子のネットワーク / 光のすじ */}
+        <PerspectiveFloor />
+        <NetworkField />
+        <LightStreaks />
         {/* 六角形グリッド (ゆっくり流れる) */}
         <div className="anim-hexdrift absolute inset-[-40px] opacity-[0.07]" style={{ backgroundImage: HEX_BG }} />
         <div className="anim-drift absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-400/30 blur-[110px]" />
@@ -324,7 +333,7 @@ export default function ControlPanel({
           transition={{ delay: 0.1 }}
           className="mb-5 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <ArcReactorX size={52} active={ambientOn} className="-ml-1 -mt-1" />
+            <div ref={reactorRef} className="-ml-1 -mt-1"><ArcReactorX size={52} active={ambientOn} /></div>
             <div>
             {guestName ? (
               <p className="text-[13px] font-semibold tracking-wide text-cyan-200/90">{GX[lang].welcomeName(guestName)}</p>
@@ -366,6 +375,14 @@ export default function ControlPanel({
             <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </motion.header>
+
+        {/* 常に動く HUD (レーダー + ゲージ) */}
+        {!admin && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.105 }}>
+            <TelemetryHud temp={weather?.temp ?? null} checkOut={checkOut}
+              devices={["LOCK", "LIGHT", "AIR", ...(hasWafu ? ["WAFU"] : []), ...(hasGalaxy ? ["GALAXY"] : []), ...(hasNest ? ["NEST"] : [])]} />
+          </motion.div>
+        )}
 
         {entranceHref && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mb-4">
@@ -1104,6 +1121,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
   const [result, setResult] = useState<boolean | null>(null);
   const [ripple, setRipple] = useState(0);
   const [fx, setFx] = useState(0);
+  const [shield, setShield] = useState<{ n: number; mode: "unlock" | "lock" }>({ n: 0, mode: "lock" });
 
   const run = useCallback(async (action: "unlock" | "lock") => {
     if (busy) return;
@@ -1114,6 +1132,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
     const ok = await callDevice(roomSlug, action, admin);
     if (ok) {
       setLast(action);
+      setShield((s) => ({ n: s.n + 1, mode: action }));
       (action === "unlock" ? powerUp : powerDown)();
       speakOneOf(action === "unlock"
         ? ["Door unlocked", "Access granted", "Welcome in"]
@@ -1137,6 +1156,7 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
       <Corners tone={unlocked ? "emerald" : "cyan"} />
       <CommandFX trigger={fx} tone={unlocked ? "emerald" : "cyan"} />
       <HudRings unlocked={unlocked} busy={!!busy} />
+      <LockShield trigger={shield.n} mode={shield.mode} />
 
       {/* 波紋 + スパーク (操作時) */}
       <AnimatePresence>

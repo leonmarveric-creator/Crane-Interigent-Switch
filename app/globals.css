@@ -336,3 +336,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @keyframes tp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 .tp-blink { animation: tp-blink 0.9s steps(2, end) infinite; }
 @media (prefers-reduced-motion: reduce) { .tp-root * { animation: none !important; } }
+
+/* ===== ハイテクUI: 追加エフェクト 2 (components/tech/TechFX.tsx) ===== */
+@keyframes floorMove { from { background-position: 0 0; } to { background-position: 0 44px; } }
+.anim-floor { animation: floorMove 1.6s linear infinite; }
+@keyframes streak { 0% { transform: translateX(0); opacity: 0; } 4% { opacity: 1; } 14% { transform: translateX(160vw); opacity: 0; } 100% { transform: translateX(160vw); opacity: 0; } }
+.anim-streak { animation: streak 9s ease-in infinite; }
+@keyframes tlBlip { 0% { opacity: 1; transform: scale(1.7); } 30% { opacity: 0.25; transform: scale(1); } 100% { opacity: 0.25; transform: scale(1); } }
+.tl-blip { animation: tlBlip 4s linear infinite; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 3px #34d399); }
+@media (prefers-reduced-motion: reduce) {
+  .anim-floor, .anim-streak, .tl-blip { animation: none; }
+}

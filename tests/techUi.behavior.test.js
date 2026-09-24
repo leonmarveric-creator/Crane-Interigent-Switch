@@ -27,3 +27,15 @@ test("reactor parts rotate around the reactor center (no wobble) and percent use
   assert.match(read("components", "HudLoader.tsx"), /<TechPercent /);
   assert.match(read("components", "ControlPanel.tsx"), /<TechPercent value=\{charged\}/);
 });
+
+test("tech UI extra effects: command beam, lock shield, network, 3D floor, telemetry HUD", () => {
+  const fx = read("components", "tech", "TechFX.tsx");
+  for (const k of ["export function CommandBeamLayer", "export function LockShield", "export function NetworkField", "export function PerspectiveFloor", "export function LightStreaks", "export function TelemetryHud"]) {
+    assert.ok(fx.includes(k), k);
+  }
+  assert.match(fx, /document\.hidden/); // 裏では描画しない
+  const cp = read("components", "ControlPanel.tsx");
+  assert.match(cp, /<CommandBeamLayer sourceRef=\{reactorRef\} containerRef=\{mainRef\} \/>/);
+  assert.match(cp, /<LockShield trigger=\{shield\.n\} mode=\{shield\.mode\} \/>/);
+  assert.match(cp, /<TelemetryHud /);
+});
