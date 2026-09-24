@@ -12,9 +12,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mic } from "lucide-react";
-import { parseVoiceCommand, speechLangCode, type VoiceAction, type VoiceRoomCaps } from "@/lib/voiceCommand";
-import { primeVoice } from "@/lib/sfx";
+import { Mic, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock } from "lucide-react";
+import { parseVoiceCommand, parseVoiceQuestion, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps } from "@/lib/voiceCommand";
+import { primeVoice, speak } from "@/lib/sfx";
 
 export const VOICE_EVENT = "crane-voice-command";
 const TIP_KEY = "voiceTipSeen";
@@ -33,6 +33,18 @@ export function useVoiceAction(handler: (a: VoiceAction) => void) {
 type Texts = {
   fab: string; tipTitle: string; tipBody: string; listening: string; retry: string; denied: string; why: string; examples: string[];
   label: (a: VoiceAction) => string;
+  /** 質問への答えの表示 */
+  q: { wifi: string; checkout: string; entrance: string; room: string; ssid: string; password: string; none: string; copy: string; copied: string; loading: string };
+};
+
+type Answer = { q: VoiceQuestion; loading: boolean; rows: { label?: string; value: string }[] };
+
+/** 返事の声 (アンドロイドの声の録音。答えそのものは画面に大きく出す) */
+const ANSWER_VOICE: Record<VoiceQuestion, string> = {
+  wifi: "Here is your Wi-Fi information.",
+  checkout: "Here is your check-out time.",
+  entrance_code: "Here is the entrance code.",
+  room_code: "Here is your room code.",
 };
 
 type Phase = "idle" | "listening" | "done" | "error";
@@ -43,7 +55,43 @@ function getRecognition(): any {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export default function VoiceMic({ lang, caps, texts }: { lang: string; caps: VoiceRoomCaps; texts: Texts }) {
+export default function VoiceMic({ lang, caps, texts, roomSlug }: { lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string }) {
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  const answerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeAnswer = () => { setAnswer(null); setCopied(null); if (answerTimer.current) clearTimeout(answerTimer.current); };
+
+  // 質問に答える: 情報はページに埋め込まず、聞かれたときだけ取りに行く
+  const ask = async (q: VoiceQuestion) => {
+    setAnswer({ q, loading: true, rows: [] });
+    if (answerTimer.current) clearTimeout(answerTimer.current);
+    answerTimer.current = setTimeout(() => setAnswer(null), 60000);
+    let rows: Answer["rows"] = [];
+    try {
+      const r = await fetch(`/api/room-info/${roomSlug}`, { cache: "no-store" });
+      const j = r.ok ? await r.json() : null;
+      if (q === "wifi" && j?.wifi) {
+        if (j.wifi.ssid) rows.push({ label: texts.q.ssid, value: j.wifi.ssid });
+        if (j.wifi.password) rows.push({ label: texts.q.password, value: j.wifi.password });
+      } else if (q === "checkout" && j?.checkOut) {
+        const d = new Date(j.checkOut);
+        const day = d.toLocaleDateString(lang === "en" ? "en-US" : lang, { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short" });
+        const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+        rows = [{ label: day, value: time }];
+      } else if (q === "entrance_code" && j?.entranceCode) {
+        rows = [{ value: String(j.entranceCode) }];
+      } else if (q === "room_code" && j?.roomCode) {
+        rows = [{ value: String(j.roomCode) }];
+      }
+    } catch { /* ignore */ }
+    setAnswer({ q, loading: false, rows });
+    speak(rows.length ? ANSWER_VOICE[q] : "Sorry, that information is not available.");
+    if (navigator.vibrate) navigator.vibrate(18);
+  };
+  const copy = async (i: number, v: string) => {
+    try { await navigator.clipboard.writeText(v); setCopied(i); setTimeout(() => setCopied(null), 1500); } catch { /* ignore */ }
+  };
+
   const [supported, setSupported] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [heard, setHeard] = useState("");
@@ -64,6 +112,13 @@ export default function VoiceMic({ lang, caps, texts }: { lang: string; caps: Vo
 
   const finish = () => {
     const cands = finals.current.length ? finals.current : heardRef.current ? [heardRef.current] : [];
+    // 質問 (Wi-Fi / チェックアウト / 暗証番号) を先に判定
+    const question = parseVoiceQuestion(cands);
+    if (question) {
+      setPhase("idle");
+      void ask(question);
+      return;
+    }
     const action = parseVoiceCommand(cands, caps);
     if (action) {
       setMsg(texts.label(action));
@@ -172,6 +227,47 @@ export default function VoiceMic({ lang, caps, texts }: { lang: string; caps: Vo
             <p className="mt-1 text-[12px] leading-relaxed text-cyan-50/75">{texts.tipBody}</p>
             <button type="button" onClick={closeTip} className="mt-1.5 block w-full text-right text-[13px] font-semibold text-cyan-300">OK</button>
             <span className="absolute -bottom-[7px] right-[26px] h-3 w-3 rotate-45 border-b border-r border-cyan-300/55 bg-[#06101b]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 質問の答え: 画面の中央に大きく表示 (コピーできる) */}
+      <AnimatePresence>
+        {answer && (
+          <motion.div key="voice-answer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[66] flex items-center justify-center bg-black/55 px-5 font-sans tracking-normal backdrop-blur-sm" onClick={closeAnswer}>
+            <motion.div initial={{ scale: 0.92, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm rounded-2xl border border-cyan-300/45 bg-[#050b14] px-5 pb-5 pt-4 shadow-[0_0_40px_rgba(34,211,238,0.3)]">
+              <button type="button" onClick={closeAnswer} aria-label="close" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/50 active:bg-white/10"><X className="h-4 w-4" /></button>
+              <p className="flex items-center gap-2 text-[14px] font-semibold text-cyan-200">
+                {answer.q === "wifi" ? <Wifi className="h-4 w-4" /> : answer.q === "checkout" ? <Clock className="h-4 w-4" /> : answer.q === "entrance_code" ? <DoorOpen className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                {answer.q === "wifi" ? texts.q.wifi : answer.q === "checkout" ? texts.q.checkout : answer.q === "entrance_code" ? texts.q.entrance : texts.q.room}
+              </p>
+              {answer.loading ? (
+                <p className="mt-5 text-center text-white/60">{texts.q.loading}</p>
+              ) : answer.rows.length === 0 ? (
+                <p className="mt-5 text-center text-[15px] text-amber-200">{texts.q.none}</p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {answer.rows.map((r, i) => (
+                    <div key={i} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                      {r.label && <p className="text-[11px] text-white/50">{r.label}</p>}
+                      <div className="mt-0.5 flex items-center gap-3">
+                        <p className={`min-w-0 flex-1 break-all font-mono font-semibold leading-tight text-white ${r.value.length > 10 ? "text-[20px] tracking-wide" : "text-[28px] tracking-wider"}`}>{r.value}</p>
+                        {answer.q !== "checkout" && (
+                          <button type="button" onClick={() => copy(i, r.value)}
+                            className="flex shrink-0 items-center gap-1 rounded-lg border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-2 text-[12px] text-cyan-100 active:scale-95">
+                            {copied === i ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copied === i ? texts.q.copied : texts.q.copy}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

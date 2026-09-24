@@ -80,3 +80,32 @@ test("voice UI: floating round mic with a one-time tip in 4 languages", () => {
   const i18n = fs.readFileSync(path.join(__dirname, "../lib/i18n.ts"), "utf8");
   for (const w of ["話して操作", "Voice control", "语音控制", "음성 조작"]) assert.ok(i18n.includes(w), w);
 });
+
+test("voice questions: Wi-Fi / check-out / entrance code / room code in 4 languages, without stealing commands", () => {
+  const { parseVoiceQuestion: q, parseVoiceCommand: p } = require("../lib/voiceCommand.ts");
+  for (const s of ["Wi-Fiのパスワードは？", "ワイファイ教えて", "What's the wifi password?", "wifi密码是什么", "와이파이 비밀번호", "パスワードは？"]) assert.equal(q(s), "wifi", s);
+  for (const s of ["チェックアウト何時？", "何時までいられる？", "What time is check out?", "退房时间", "체크아웃 몇 시예요"]) assert.equal(q(s), "checkout", s);
+  for (const s of ["エントランスの暗証番号は？", "玄関の番号教えて", "What is the entrance code?", "大门密码", "현관 비밀번호"]) assert.equal(q(s), "entrance_code", s);
+  for (const s of ["部屋の暗証番号は？", "room code please", "房间密码", "방 비밀번호"]) assert.equal(q(s), "room_code", s);
+  for (const s of ["ギャラクシーオン", "部屋の電気消して", "エアコンつけて", "おやすみ", "外出"]) assert.equal(q(s), null, s);
+  assert.equal(p("部屋の電気消して", { hasWafu: true }), "light_off");
+});
+
+test("voice answers: shown big on screen with copy, android voice line, secrets fetched only when asked", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const vm = fs.readFileSync(path.join(__dirname, "../components/tech/VoiceMic.tsx"), "utf8");
+  assert.match(vm, /parseVoiceQuestion\(cands\)/);
+  assert.match(vm, /fetch\(`\/api\/room-info\/\$\{roomSlug\}`/);
+  assert.match(vm, /text-\[28px\]/);
+  assert.match(vm, /navigator\.clipboard\.writeText/);
+  const route = fs.readFileSync(path.join(__dirname, "../app/api/room-info/[room_id]/route.ts"), "utf8");
+  assert.match(route, /authorizeRoomRequest/);
+  assert.match(route, /show_keypad_code/);
+  const sfx = fs.readFileSync(path.join(__dirname, "../lib/sfx.ts"), "utf8");
+  for (const f of ["57-here-is-your-wifi-information", "58-here-is-your-check-out-time", "59-here-is-the-entrance-code", "60-here-is-your-room-code", "61-that-information-is-not-available"]) {
+    assert.ok(sfx.includes(`current-natural-voice-${f}.mp3`), f);
+    assert.ok(fs.existsSync(path.join(__dirname, "../public/audio/voice/current", `current-natural-voice-${f}.mp3`)), f);
+  }
+  const cp = fs.readFileSync(path.join(__dirname, "../components/ControlPanel.tsx"), "utf8");
+  assert.doesNotMatch(cp, /wifi_password|keypad_code/, "secrets are not embedded in the page");
+});

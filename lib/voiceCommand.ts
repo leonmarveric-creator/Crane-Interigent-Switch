@@ -144,3 +144,42 @@ function parseOne(raw: string, caps: VoiceRoomCaps): VoiceAction | null {
 export function speechLangCode(lang: string): string {
   return lang === "en" ? "en-US" : lang === "zh" ? "zh-CN" : lang === "ko" ? "ko-KR" : "ja-JP";
 }
+
+/* ---------------- 質問 (答えを画面に大きく表示する) ---------------- */
+export type VoiceQuestion = "wifi" | "checkout" | "entrance_code" | "room_code";
+
+// 暗証番号・パスワードを表す言葉
+const CODE_WORDS = ["暗証", "番号", "パスワード", "ぱすわーど", "コード", "密码", "密碼", "비밀번호", "번호", "코드"];
+const CODE_EN = /\b(code|codes|password|passcode|pin|number)\b/i;
+
+const Q_ENTRANCE = ["エントランス", "えんとらんす", "入口", "いりぐち", "玄関", "げんかん", "建物", "大门", "大門", "入口", "현관", "입구", "건물"];
+const Q_ENTRANCE_EN = /\b(entrance|front door|main door|building door|lobby)\b/i;
+const Q_ROOM = ["部屋", "へや", "お部屋", "房间", "房間", "방", "객실"];
+const Q_ROOM_EN = /\b(room|door)\b/i;
+const Q_WIFI = ["ワイファイ", "わいふぁい", "wifi", "インターネット", "ネット", "无线", "無線", "网络", "網路", "와이파이", "인터넷"];
+const Q_WIFI_EN = /\b(wi-?fi|wireless|internet|network|ssid)\b/i;
+const Q_CHECKOUT = ["チェックアウト", "ちぇっくあうと", "何時まで", "なんじまで", "いつまで", "退房", "退房时间", "체크아웃", "몇 시까지"];
+const Q_CHECKOUT_EN = /\b(check[- ]?out|checkout|leave by|what time.*leave)\b/i;
+
+/**
+ * 質問を読み取る (「Wi-Fi のパスワードは？」「チェックアウト何時？」「エントランスの暗証番号は？」など)。
+ * 操作のコマンドより先に判定する。質問でなければ null。
+ */
+export function parseVoiceQuestion(input: string | string[]): VoiceQuestion | null {
+  const list = Array.isArray(input) ? input : [input];
+  for (const raw of list) {
+    const text = norm(raw);
+    if (!text) continue;
+    const c = text.replace(/\s+/g, "");
+    const has = (words: string[]) => words.some((w) => c.includes(norm(w).replace(/\s+/g, "")));
+    const code = has(CODE_WORDS) || CODE_EN.test(text);
+    if (has(Q_WIFI) || Q_WIFI_EN.test(text)) return "wifi";
+    if (has(Q_CHECKOUT) || Q_CHECKOUT_EN.test(text)) return "checkout";
+    if (has(Q_ENTRANCE) || Q_ENTRANCE_EN.test(text)) {
+      if (code || /[?？]|は$|何|なに|教え|知り/.test(text)) return "entrance_code";
+    }
+    if (code && (has(Q_ROOM) || Q_ROOM_EN.test(text))) return "room_code";
+    if (code) return "wifi"; // 「パスワードは？」だけなら Wi-Fi が一番多い
+  }
+  return null;
+}

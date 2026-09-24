@@ -66,6 +66,12 @@ const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
   // 光目覚ましのモード名 (女性アンドロイド音声)
   "Flame On": "current-natural-voice-55-flame-on.mp3",
   "Horizon Rise": "current-natural-voice-56-horizon-rise.mp3",
+  // 音声で質問したときの返事 (答えは画面に大きく表示)
+  "Here is your Wi-Fi information.": "current-natural-voice-57-here-is-your-wifi-information.mp3",
+  "Here is your check-out time.": "current-natural-voice-58-here-is-your-check-out-time.mp3",
+  "Here is the entrance code.": "current-natural-voice-59-here-is-the-entrance-code.mp3",
+  "Here is your room code.": "current-natural-voice-60-here-is-your-room-code.mp3",
+  "Sorry, that information is not available.": "current-natural-voice-61-that-information-is-not-available.mp3",
 };
 
 const VOICE_LABEL_ALIASES: Array<[string, string]> = [

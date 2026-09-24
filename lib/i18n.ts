@@ -46,6 +46,7 @@ type Dict = {
   goodNightMode: string;
   galaxy: string;
   dreamMode: string; dreamDesc: string; dreamInfoTitle: string; dreamSteps: string[]; dreamNote: string; dreamStarted: string;
+  qWifi: string; qCheckout: string; qEntrance: string; qRoom: string; qSsid: string; qPassword: string; qNone: string; qCopy: string; qCopied: string; qLoading: string;
   voiceFab: string; voiceTipTitle: string; voiceTipBody: string;
   voiceListening: string; voiceRetry: string; voiceDenied: string; voiceWhy: string; voiceExamples: string[];
   modeSuffix: string;
@@ -91,8 +92,9 @@ export const T: Record<Lang, Dict> = {
     dreamMode: "Dream Fade", dreamDesc: "30分で消灯", dreamInfoTitle: "Dream Fade で起こること",
     dreamSteps: ["メインライト・ギャラクシー・ネストを消して、和風ライトだけのやさしい灯りにします", "30分かけて少しずつ暗くし、色も夕焼けのような暖かい赤みへ変えていきます", "30分後に和風ライトも自動で消えます。眠りを妨げにくい、ゆるやかな暗さの変化です"],
     dreamNote: "途中で照明やモードを操作するとフェードは止まります。エアコンはそのままです", dreamStarted: "Dream Fade を開始しました。おやすみなさい 🌙",
+    qWifi: "Wi-Fi", qCheckout: "チェックアウト", qEntrance: "エントランスの暗証番号", qRoom: "お部屋の暗証番号", qSsid: "ネットワーク名", qPassword: "パスワード", qNone: "この情報は登録されていません", qCopy: "コピー", qCopied: "コピー済み", qLoading: "確認しています…",
     voiceFab: "話して操作", voiceTipTitle: "声でも操作できます", voiceTipBody: "マイクを押しながら「ギャラクシーオン」のように話してください", 
-    voiceListening: "聞き取り中", voiceRetry: "聞き取れませんでした。もう一度どうぞ", voiceDenied: "マイクが許可されていません。ブラウザの設定で許可してください", voiceWhy: "ボタンを押している間だけ聞き取ります（録音は保存しません）", voiceExamples: ["ギャラクシーオン", "照明オフ", "おやすみ"],
+    voiceListening: "聞き取り中", voiceRetry: "聞き取れませんでした。もう一度どうぞ", voiceDenied: "マイクが許可されていません。ブラウザの設定で許可してください", voiceWhy: "ボタンを押している間だけ聞き取ります（録音は保存しません）", voiceExamples: ["ギャラクシーオン", "照明オフ", "Wi-Fiのパスワードは？"],
     modeSuffix: "モード",
     modeSelect: "モード", normalMode: "ノーマル", normalDesc: "メインライトだけ点灯", comfortDesc: "エアコン＋照明", galaxyShort: "満天の星・60分", nestShort: "藤の灯りだけ", cozyDesc: "行灯の灯りだけ",
     galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影", galaxyAutoOff: "オン後60分で自動OFF",
@@ -122,8 +124,9 @@ export const T: Record<Lang, Dict> = {
     dreamMode: "Dream Fade", dreamDesc: "Off in 30 min", dreamInfoTitle: "What Dream Fade does",
     dreamSteps: ["Turns off the main light, Galaxy and Nest, leaving only the soft Japanese lamp", "Over 30 minutes the lamp slowly dims and shifts to a warm, sunset-like glow", "After 30 minutes the lamp turns off by itself — a gentle change of light that is kind to your sleep"],
     dreamNote: "Using any light or mode stops the fade. The air-con stays as it is", dreamStarted: "Dream Fade started. Good night 🌙",
+    qWifi: "Wi-Fi", qCheckout: "Check-out", qEntrance: "Entrance code", qRoom: "Room code", qSsid: "Network name", qPassword: "Password", qNone: "This information is not available", qCopy: "Copy", qCopied: "Copied", qLoading: "Checking…",
     voiceFab: "Voice control", voiceTipTitle: "You can also use your voice", voiceTipBody: "Hold the mic and say something like \"Galaxy on\"", 
-    voiceListening: "LISTENING", voiceRetry: "Sorry, I didn't catch that. Please try again", voiceDenied: "Microphone is blocked. Please allow it in your browser settings", voiceWhy: "Listens only while you hold the button (nothing is recorded)", voiceExamples: ["Galaxy on", "Lights off", "Good night"],
+    voiceListening: "LISTENING", voiceRetry: "Sorry, I didn't catch that. Please try again", voiceDenied: "Microphone is blocked. Please allow it in your browser settings", voiceWhy: "Listens only while you hold the button (nothing is recorded)", voiceExamples: ["Galaxy on", "Lights off", "What's the Wi-Fi password?"],
     modeSuffix: " Mode",
     modeSelect: "Modes", normalMode: "Normal", normalDesc: "Main light only", comfortDesc: "Air-con + light", galaxyShort: "Stars · 60 min", nestShort: "Woven lamp only", cozyDesc: "Lantern light only",
     galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room", galaxyAutoOff: "Auto-off 60 min after on",
@@ -153,8 +156,9 @@ export const T: Record<Lang, Dict> = {
     dreamMode: "Dream Fade", dreamDesc: "30分钟熄灯", dreamInfoTitle: "Dream Fade 会做什么",
     dreamSteps: ["关闭主灯、银河和鸟巢灯，只留下柔和的和风灯", "在30分钟内慢慢变暗，灯光颜色也逐渐变成晚霞般温暖的红色调", "30分钟后和风灯自动熄灭，柔和的明暗变化，不易打扰睡眠"],
     dreamNote: "中途操作灯光或模式时，渐暗会停止。空调保持不变", dreamStarted: "Dream Fade 已开始。晚安 🌙",
+    qWifi: "Wi-Fi", qCheckout: "退房时间", qEntrance: "大门密码", qRoom: "房间密码", qSsid: "网络名称", qPassword: "密码", qNone: "暂未登记此信息", qCopy: "复制", qCopied: "已复制", qLoading: "正在确认…",
     voiceFab: "语音控制", voiceTipTitle: "也可以用语音操作", voiceTipBody: "按住麦克风，说“打开星空”等指令", 
-    voiceListening: "正在聆听", voiceRetry: "没有听清，请再说一次", voiceDenied: "麦克风未被允许，请在浏览器设置中允许", voiceWhy: "仅在按住按钮时聆听（不会保存录音）", voiceExamples: ["打开星空", "关灯", "晚安"],
+    voiceListening: "正在聆听", voiceRetry: "没有听清，请再说一次", voiceDenied: "麦克风未被允许，请在浏览器设置中允许", voiceWhy: "仅在按住按钮时聆听（不会保存录音）", voiceExamples: ["打开星空", "关灯", "Wi-Fi密码是什么？"],
     modeSuffix: "模式",
     modeSelect: "模式", normalMode: "普通", normalDesc: "只开主灯", comfortDesc: "空调＋照明", galaxyShort: "星空・60分钟", nestShort: "只开藤编灯", cozyDesc: "只开行灯",
     galaxy: "银河模式", galaxyDesc: "在房间投影满天星空", galaxyAutoOff: "开启60分钟后自动关闭",
@@ -184,8 +188,9 @@ export const T: Record<Lang, Dict> = {
     dreamMode: "Dream Fade", dreamDesc: "30분 후 소등", dreamInfoTitle: "Dream Fade 동작",
     dreamSteps: ["메인 조명・갤럭시・네스트를 끄고, 부드러운 일본풍 조명만 남깁니다", "30분에 걸쳐 조금씩 어두워지고, 색도 노을처럼 따뜻한 붉은빛으로 바뀝니다", "30분 후 일본풍 조명도 자동으로 꺼집니다. 수면을 방해하지 않는 완만한 변화입니다"],
     dreamNote: "도중에 조명이나 모드를 조작하면 페이드가 멈춥니다. 에어컨은 그대로입니다", dreamStarted: "Dream Fade를 시작했습니다. 안녕히 주무세요 🌙",
+    qWifi: "Wi-Fi", qCheckout: "체크아웃", qEntrance: "현관 비밀번호", qRoom: "객실 비밀번호", qSsid: "네트워크 이름", qPassword: "비밀번호", qNone: "등록된 정보가 없습니다", qCopy: "복사", qCopied: "복사됨", qLoading: "확인 중…",
     voiceFab: "음성 조작", voiceTipTitle: "음성으로도 조작할 수 있어요", voiceTipBody: "마이크를 누른 채 \"갤럭시 켜줘\"처럼 말해 주세요", 
-    voiceListening: "듣는 중", voiceRetry: "잘 못 들었어요. 다시 말씀해 주세요", voiceDenied: "마이크가 허용되지 않았습니다. 브라우저 설정에서 허용해 주세요", voiceWhy: "버튼을 누르는 동안만 듣습니다 (녹음은 저장하지 않습니다)", voiceExamples: ["갤럭시 켜줘", "조명 꺼줘", "잘 자"],
+    voiceListening: "듣는 중", voiceRetry: "잘 못 들었어요. 다시 말씀해 주세요", voiceDenied: "마이크가 허용되지 않았습니다. 브라우저 설정에서 허용해 주세요", voiceWhy: "버튼을 누르는 동안만 듣습니다 (녹음은 저장하지 않습니다)", voiceExamples: ["갤럭시 켜줘", "조명 꺼줘", "와이파이 비밀번호는?"],
     modeSuffix: " 모드",
     modeSelect: "모드", normalMode: "노멀", normalDesc: "메인 조명만 켜기", comfortDesc: "에어컨＋조명", galaxyShort: "별빛・60분", nestShort: "라탄 조명만", cozyDesc: "행등 조명만",
     galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영", galaxyAutoOff: "켜진 뒤 60분 후 자동 꺼짐",

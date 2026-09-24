@@ -214,10 +214,11 @@ export default function ControlPanel({
       {/* ギャラクシーモード起動の特別演出 */}
       <GalaxyLaunch trigger={galaxyLaunch} />
       {/* 音声コントロール: 右下に浮かぶマイクボタン + 初回だけの案内 */}
-      <VoiceMic lang={lang} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
+      <VoiceMic lang={lang} roomSlug={roomSlug} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
         fab: t.voiceFab, tipTitle: t.voiceTipTitle, tipBody: t.voiceTipBody,
         listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
         label: (a) => voiceLabel(a, t),
+        q: { wifi: t.qWifi, checkout: t.qCheckout, entrance: t.qEntrance, room: t.qRoom, ssid: t.qSsid, password: t.qPassword, none: t.qNone, copy: t.qCopy, copied: t.qCopied, loading: t.qLoading },
       }} />
 
       {/* 触れた位置にミニマルな照準 */}
