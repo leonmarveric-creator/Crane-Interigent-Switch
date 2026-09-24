@@ -13,6 +13,8 @@ import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
+import ArcReactorX from "@/components/tech/ArcReactorX";
+import TechPercent from "@/components/tech/TechPercent";
 
 interface Props {
   guestName?: string | null;
@@ -79,6 +81,41 @@ function HeroMedia({ url, alt }: { url: string; alt: string }) {
   );
 }
 
+/** 六角形グリッドの背景タイル */
+const HEX_BG =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'><path d='M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z M28 64 L28 97' fill='none' stroke='%2322d3ee' stroke-width='0.6'/></svg>\")";
+
+/**
+ * 奥行き (パララックス): スマホの傾き (Android など許可不要な端末) / 指やマウスの位置で
+ * main 要素に CSS 変数 --px / --py (-1〜1) をセットする。再描画なしで軽い。
+ */
+function useParallax(ref: React.RefObject<HTMLElement>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const set = (x: number, y: number) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.setProperty("--px", Math.max(-1, Math.min(1, x)).toFixed(3));
+        el.style.setProperty("--py", Math.max(-1, Math.min(1, y)).toFixed(3));
+      });
+    };
+    const onMove = (e: PointerEvent) => set((e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1);
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null || e.beta == null) return;
+      set(e.gamma / 30, (e.beta - 45) / 30);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("deviceorientation", onTilt, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("deviceorientation", onTilt);
+    };
+  }, [ref]);
+}
+
 function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
   const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
@@ -101,6 +138,8 @@ export default function ControlPanel({
   const [ambientOn, setAmbientOn] = useState(false); // アークリアクターのハム (opt-in)
   const weather = useWeather(lat, lng);
   const t = T[lang];
+  const mainRef = useRef<HTMLElement | null>(null);
+  useParallax(mainRef);
 
   // アンビエントハムのON/OFF (ミュート時は自動停止)。
   const toggleAmbient = () => setAmbientOn((v) => {
@@ -163,7 +202,7 @@ export default function ControlPanel({
   });
 
   return (
-    <main onPointerDown={onTap} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
+    <main ref={mainRef} onPointerDown={onTap} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
       {/* タップ照準リング */}
       <div className="pointer-events-none fixed inset-0 z-40">
         <AnimatePresence>
@@ -183,8 +222,11 @@ export default function ControlPanel({
         {booting && <BootSequence onDone={() => setBooting(false)} roomName={roomName} />}
       </AnimatePresence>
 
-      {/* 背景: 動くオーロラ + 走査線 + グリッド */}
-      <div className="pointer-events-none absolute inset-0">
+      {/* 背景: 動くオーロラ + 走査線 + グリッド (スマホの傾き / 指の位置で少し動く = 奥行き) */}
+      <div className="pointer-events-none absolute inset-0"
+        style={{ transform: "translate3d(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -14px), 0)", transition: "transform 0.25s ease-out" }}>
+        {/* 六角形グリッド (ゆっくり流れる) */}
+        <div className="anim-hexdrift absolute inset-[-40px] opacity-[0.07]" style={{ backgroundImage: HEX_BG }} />
         <div className="anim-drift absolute -top-32 -left-24 h-96 w-96 rounded-full bg-cyan-400/30 blur-[110px]" />
         <div className="anim-drift2 absolute top-1/4 -right-24 h-96 w-96 rounded-full bg-fuchsia-500/30 blur-[110px]" />
         <div className="anim-drift absolute bottom-0 left-1/4 h-80 w-80 rounded-full bg-emerald-400/25 blur-[110px]" />
@@ -197,7 +239,8 @@ export default function ControlPanel({
         <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/15 to-transparent" />
         <div className="anim-scanx absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-transparent via-cyan-300/10 to-transparent" />
         {/* 巨大HUDレティクル (薄め) */}
-        <svg viewBox="0 0 400 400" className="absolute left-1/2 top-1/2 h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 opacity-[0.06]">
+        <svg viewBox="0 0 400 400" className="absolute left-1/2 top-1/2 h-[120vmin] w-[120vmin] opacity-[0.07]"
+          style={{ transform: "translate(-50%, -50%) translate3d(calc(var(--px, 0) * 22px), calc(var(--py, 0) * 22px), 0)" }}>
           <g className="anim-spin-slow" style={SPIN}>
             <circle cx="200" cy="200" r="190" fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="2 10" />
             <circle cx="200" cy="200" r="150" fill="none" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="40 30" />
@@ -281,7 +324,7 @@ export default function ControlPanel({
           transition={{ delay: 0.1 }}
           className="mb-5 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <ArcReactor active={ambientOn} />
+            <ArcReactorX size={52} active={ambientOn} className="-ml-1 -mt-1" />
             <div>
             {guestName ? (
               <p className="text-[13px] font-semibold tracking-wide text-cyan-200/90">{GX[lang].welcomeName(guestName)}</p>
@@ -542,6 +585,19 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* 起動シーケンス (JARVIS ブート)                                       */
 /* ------------------------------------------------------------------ */
 function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
+  // 充電ゲージ 0 → 1 (2.4 秒)
+  const [charged, setCharged] = useState(0);
+  useEffect(() => {
+    const t0 = performance.now();
+    let raf = 0;
+    const loop = (now: number) => {
+      const x = Math.min(1, (now - t0) / 2400);
+      setCharged(1 - Math.pow(1 - x, 3));
+      if (x < 1) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
   useEffect(() => {
     charge(); // 起動チャージ音
     speakOneOf(["All systems online", "Good evening. Systems online", "J.A.R.V.I.S online"]); // iOSではジェスチャー外のため鳴らない場合あり
@@ -575,27 +631,9 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
       exit={{ opacity: 0, filter: "blur(6px)" }} transition={{ duration: 0.5 }}
       onClick={onDone}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#04060c] px-8">
-      {/* アークリアクター */}
-      <div className="relative mb-9 h-40 w-40">
-        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full">
-          <g className="anim-spin-slow" style={SPIN}>
-            <circle cx="100" cy="100" r="92" fill="none" stroke="#22d3ee" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 7" />
-          </g>
-          <g className="anim-spin-rev" style={SPIN}>
-            <circle cx="100" cy="100" r="74" fill="none" stroke="#22d3ee" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="50 250" strokeLinecap="round" />
-            <circle cx="100" cy="100" r="74" fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="2" strokeDasharray="20 300" strokeDashoffset="-150" strokeLinecap="round" />
-          </g>
-          {/* 充電リング: 0→全周へ満ちる */}
-          <circle cx="100" cy="100" r="75" fill="none" stroke="#67e8f9" strokeWidth="3" strokeLinecap="round"
-            strokeDasharray="471" className="anim-charge" style={{ ...SPIN, transform: "rotate(-90deg)" }} />
-        </svg>
-        <motion.div
-          animate={{ scale: [1, 1.18, 1], opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 1.3 }}
-          className="absolute inset-0 m-auto h-16 w-16 rounded-full bg-cyan-400/40 blur-md" />
-        <div className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300/60 bg-cyan-400/10">
-          <span className="h-3 w-3 rounded-full bg-cyan-100 shadow-[0_0_22px_5px_rgba(34,211,238,0.85)]" />
-        </div>
+      {/* アークリアクター (充電ゲージが満ちていく) */}
+      <div className="mb-6">
+        <ArcReactorX size={190} active progress={charged} />
       </div>
 
       {/* ターミナル行 */}
@@ -609,12 +647,8 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
         ))}
       </div>
 
-      {/* プログレスバー */}
-      <div className="mt-7 h-0.5 w-56 overflow-hidden rounded-full bg-white/10">
-        <motion.div initial={{ width: 0 }} animate={{ width: "100%" }}
-          transition={{ duration: 2.4, ease: "easeInOut" }}
-          className="h-full bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400" />
-      </div>
+      {/* 充電率 (HUD 表示) */}
+      <TechPercent value={charged} label="SYSTEM CHARGE" status={charged >= 1 ? "ONLINE" : "SYNC"} className="mt-5 w-60" />
       <p className="mt-3 font-mono text-[9px] tracking-[0.3em] text-white/30">TAP TO SKIP</p>
 
       {/* 起動完了の白フラッシュ */}
@@ -892,36 +926,6 @@ function AmbientFX() {
 }
 
 /** アイアンマン風 角カットパネル (エッジを光が周回)。 */
-/* ------------------------------------------------------------------ */
-/* アークリアクター: アイアンマン風の脈動コア (ヘッダー)               */
-/* ------------------------------------------------------------------ */
-function ArcReactor({ active = false }: { active?: boolean }) {
-  const glow = active ? "#7dd3fc" : "#22d3ee";
-  return (
-    <div className="relative h-11 w-11 shrink-0"
-      style={{ filter: `drop-shadow(0 0 ${active ? 10 : 5}px ${glow})` }}
-      aria-hidden>
-      <svg viewBox="0 0 100 100" className="absolute inset-0">
-        <circle cx="50" cy="50" r="46" fill="none" stroke={glow} strokeOpacity="0.3" strokeWidth="2" />
-        <g className="anim-spin-slow" style={SPIN}>
-          <circle cx="50" cy="50" r="38" fill="none" stroke={glow} strokeOpacity="0.7" strokeWidth="3" strokeDasharray="6 6" />
-        </g>
-        <g className="anim-spin-rev" style={SPIN}>
-          <circle cx="50" cy="50" r="30" fill="none" stroke={glow} strokeOpacity="0.5" strokeWidth="2" strokeDasharray="14 8" />
-        </g>
-        {/* 放射状コイル */}
-        {[...Array(9)].map((_, i) => (
-          <line key={i} x1="50" y1="23" x2="50" y2="33" stroke={glow} strokeOpacity="0.6" strokeWidth="2"
-            transform={`rotate(${(i / 9) * 360} 50 50)`} />
-        ))}
-        {/* 三角コア + 中心 */}
-        <polygon points="50,37 61,57 39,57" fill={glow} fillOpacity={active ? 0.9 : 0.55} />
-        <circle cx="50" cy="50" r="9" className="anim-core" style={SPIN} fill="#eaffff" fillOpacity={active ? 0.95 : 0.7} />
-      </svg>
-    </div>
-  );
-}
-
 function HudPanel({
   tone = "cyan", active = false, onClick, contentClassName = "", small = false, children,
 }: {
@@ -930,6 +934,8 @@ function HudPanel({
 }) {
   const c = TONES[tone];
   const clip = small ? "clip-bevel-sm" : "clip-bevel";
+  const reduce = useReducedMotion();
+  const scanDelay = useMemo(() => 0.05 + Math.random() * 0.3, []);
   return (
     <motion.div
       onClick={onClick} whileTap={onClick ? { scale: 0.97 } : undefined}
@@ -944,7 +950,19 @@ function HudPanel({
         style={{ background: `conic-gradient(from 0deg, transparent 0deg, ${active ? c.light : "rgba(160,180,230,0.5)"} 16deg, transparent 72deg)` }} />
       {/* 内側パネル */}
       <span className={`${clip} pointer-events-none absolute inset-[1.5px] bg-[#070a12]/95 backdrop-blur-2xl`} />
-      <span className={`relative flex ${contentClassName}`}>{children}</span>
+      {/* 出現時: レーザーが上から走って中身を描き出す (ホログラム投影風) */}
+      {!reduce && (
+        <motion.span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 z-10 h-[2px] rounded-full"
+          style={{ background: `linear-gradient(90deg, transparent, ${c.light}, transparent)`, boxShadow: `0 0 12px ${c.light}` }}
+          initial={{ top: "0%", opacity: 0 }} animate={{ top: ["0%", "100%"], opacity: [0, 1, 1, 0] }}
+          transition={{ duration: 0.7, delay: scanDelay, ease: "easeInOut" }} />
+      )}
+      <motion.span className={`relative flex ${contentClassName}`}
+        initial={reduce ? false : { clipPath: "inset(0 0 100% 0)", opacity: 0.4 }}
+        animate={{ clipPath: "inset(0 0 0% 0)", opacity: 1 }}
+        transition={{ duration: 0.7, delay: scanDelay, ease: "easeInOut" }}>
+        {children}
+      </motion.span>
     </motion.div>
   );
 }

@@ -293,3 +293,46 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @media (prefers-reduced-motion: reduce) {
   .anim-datafall, .anim-sheen, .anim-reticleping, .anim-hscan { animation: none; }
 }
+
+/* ===== 高精細アークリアクター (components/tech/ArcReactorX.tsx) ===== */
+@keyframes rx-rot { to { transform: rotate(360deg); } }
+@keyframes rx-rot-rev { to { transform: rotate(-360deg); } }
+@keyframes rx-coil { 0%, 100% { opacity: 0.35; } 12% { opacity: 1; } 40% { opacity: 0.5; } }
+@keyframes rx-pulse { 0%, 100% { transform: scale(0.92); opacity: 0.85; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes rx-wave { 0% { transform: scale(0.55); opacity: 0.7; } 100% { transform: scale(1.35); opacity: 0; } }
+@keyframes rx-flare { 0%, 100% { transform: scaleX(0.55); opacity: 0.25; } 50% { transform: scaleX(1); opacity: 0.8; } }
+@keyframes rx-glow { 0%, 100% { transform: scale(0.95); opacity: 0.7; } 50% { transform: scale(1.12); opacity: 1; } }
+.rx-coil { animation: rx-coil 1.3s ease-in-out infinite; }
+.rx-pulse { animation: rx-pulse 1.8s ease-in-out infinite; }
+.rx-wave { animation: rx-wave 2.8s ease-out infinite; }
+.rx-flare { animation: rx-flare 3.2s ease-in-out infinite; }
+.rx-glow { animation: rx-glow 2.2s ease-in-out infinite; filter: blur(10px); }
+@media (prefers-reduced-motion: reduce) {
+  .rx-root * { animation: none !important; }
+}
+
+/* ===== ハイテクUI: 追加エフェクト ===== */
+/* 六角形グリッド (ゆっくり流れる) */
+@keyframes hexdrift { from { background-position: 0 0; } to { background-position: 56px 97px; } }
+.anim-hexdrift { animation: hexdrift 30s linear infinite; }
+/* パネルの「スキャンして出現」 */
+@keyframes scanin-line { 0% { transform: translateY(-4px); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(var(--scan-h, 200px)); opacity: 0; } }
+/* 読み込み画面のグリッチ帯 */
+@keyframes glitchband { 0%, 86%, 100% { transform: translateY(-10vh); opacity: 0; } 87% { opacity: 0.9; } 88% { transform: translateY(35vh); } 89% { transform: translateY(62vh); opacity: 0.6; } 90% { opacity: 0; } }
+.anim-glitchband { animation: glitchband 5.5s steps(1, end) infinite; }
+/* レーダースイープ */
+@keyframes radar { to { transform: rotate(360deg); } }
+.anim-radar { animation: radar 6s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-hexdrift, .anim-glitchband, .anim-radar { animation: none; }
+}
+
+/* ===== ハイテクなパーセント表示 (components/tech/TechPercent.tsx) ===== */
+.tp-root .tp-digit {
+  text-shadow: -1.5px 0 rgba(255, 40, 120, 0.55), 1.5px 0 rgba(0, 255, 255, 0.55), 0 0 14px rgba(34, 211, 238, 0.9);
+  animation: tp-drop 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes tp-drop { from { transform: translateY(-60%); opacity: 0; filter: blur(3px); } to { transform: none; opacity: 1; filter: none; } }
+@keyframes tp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.tp-blink { animation: tp-blink 0.9s steps(2, end) infinite; }
+@media (prefers-reduced-motion: reduce) { .tp-root * { animation: none !important; } }
