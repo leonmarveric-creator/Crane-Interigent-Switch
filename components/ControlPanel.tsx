@@ -204,6 +204,12 @@ export default function ControlPanel({
 
       {/* ギャラクシーモード起動の特別演出 */}
       <GalaxyLaunch trigger={galaxyLaunch} />
+      {/* 音声コントロール: 右下に浮かぶマイクボタン + 初回だけの案内 */}
+      <VoiceMic lang={lang} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
+        fab: t.voiceFab, tipTitle: t.voiceTipTitle, tipBody: t.voiceTipBody,
+        listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
+        label: (a) => voiceLabel(a, t),
+      }} />
 
       {/* 触れた位置にミニマルな照準 */}
       <TouchReticle containerRef={mainRef} />
@@ -283,7 +289,7 @@ export default function ControlPanel({
       {/* アンビエント: ビネット・漂うレティクル・グリッチ */}
       <AmbientFX />
 
-      <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-12 pt-8">
+      <div className="relative z-10 mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-8">
         {/* HUDステータスバー */}
         <HudStatusBar />
 
@@ -391,10 +397,7 @@ export default function ControlPanel({
           <ModeGrid roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
             hasGalaxy={hasGalaxy} hasNest={hasNest} hasWafu={hasWafu} onGalaxyState={setGalaxyActive}
             onGalaxyLaunch={() => setGalaxyLaunch((n) => n + 1)}
-            voiceSlot={<VoiceMic lang={lang} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
-              hold: "", listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
-              label: (a) => voiceLabel(a, t),
-            }} />} />
+            />
         </motion.div>
 
         {/* 位置制限の常設案内 (有効な部屋のみ) */}
@@ -1030,10 +1033,8 @@ function voiceLabel(a: VoiceAction, t: typeof T["en"]): string {
 type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy";
 type BusyKey = ModeKey | "galaxyOff" | "nestOff";
 function ModeGrid({
-  roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch, voiceSlot,
+  roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
 }: {
-  /** 見出しの右に置く音声コントロールボタン */
-  voiceSlot?: React.ReactNode;
   roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"];
   hasGalaxy?: boolean; hasNest?: boolean; hasWafu?: boolean; onGalaxyState?: (on: boolean) => void;
   onGalaxyLaunch?: () => void;
@@ -1106,7 +1107,6 @@ function ModeGrid({
       <div className="mb-2 flex items-center gap-2 px-1 font-mono text-[9px] tracking-[0.3em] text-cyan-300/60">
         <span className="h-px w-4 bg-cyan-300/40" /> MODE · {t.modeSelect}
         <span className="h-px flex-1 bg-gradient-to-r from-cyan-300/30 to-transparent" />
-        {voiceSlot}
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         {list.map((m, i) => {

@@ -361,3 +361,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   0%, 100% { height: 5px; opacity: 0.55; }
   50% { height: 22px; opacity: 1; }
 }
+
+/* 音声ボタン: ゆっくり脈打つ光 */
+@keyframes vmPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.55), 0 0 22px rgba(34, 211, 238, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0), 0 0 30px rgba(34, 211, 238, 0.7); }
+}
+.vm-fab { animation: vmPulse 2.2s ease-in-out infinite; }
+.vm-fab-on { animation: none; box-shadow: 0 0 36px rgba(103, 232, 249, 0.9); }
+@media (prefers-reduced-motion: reduce) { .vm-fab { animation: none; } }

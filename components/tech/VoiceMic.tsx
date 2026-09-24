@@ -6,6 +6,7 @@
  *   短くタップした場合は、話し終わると自動で止まる。
  *   聞き取った言葉を parseVoiceCommand で既存ボタンの操作に変換し、
  *   window イベント (VOICE_EVENT) で各ボタンに伝える → 各ボタンが自分の処理 (効果音・音声も同じ) を実行する。
+ *   ボタンは画面右下に浮かぶ丸いマイク。初回だけ使い方の吹き出しを出す (OK で以後は出さない)。
  *   鍵は対象外。ブラウザが音声認識に対応していなければボタン自体を出さない。
  */
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +17,7 @@ import { parseVoiceCommand, speechLangCode, type VoiceAction, type VoiceRoomCaps
 import { primeVoice } from "@/lib/sfx";
 
 export const VOICE_EVENT = "crane-voice-command";
+const TIP_KEY = "voiceTipSeen";
 
 /** 各ボタン側で使う: 音声コマンドを受け取る */
 export function useVoiceAction(handler: (a: VoiceAction) => void) {
@@ -29,7 +31,7 @@ export function useVoiceAction(handler: (a: VoiceAction) => void) {
 }
 
 type Texts = {
-  hold: string; listening: string; retry: string; denied: string; why: string; examples: string[];
+  fab: string; tipTitle: string; tipBody: string; listening: string; retry: string; denied: string; why: string; examples: string[];
   label: (a: VoiceAction) => string;
 };
 
@@ -123,27 +125,64 @@ export default function VoiceMic({ lang, caps, texts }: { lang: string; caps: Vo
     if (Date.now() - pressAt.current > 450) { try { rec.current.stop(); } catch { /* ignore */ } }
   };
 
-  if (!supported) return null;
+  // 初回だけの案内 (この端末で一度 OK を押したら二度と出さない)
+  const [tip, setTip] = useState(false);
+  useEffect(() => {
+    if (!supported) return;
+    let seen = false;
+    try { seen = localStorage.getItem(TIP_KEY) === "1"; } catch { /* ignore */ }
+    if (seen) return;
+    const id = setTimeout(() => setTip(true), 2500);
+    return () => clearTimeout(id);
+  }, [supported]);
+  const closeTip = () => {
+    setTip(false);
+    try { localStorage.setItem(TIP_KEY, "1"); } catch { /* ignore */ }
+  };
+
+  if (!supported || typeof document === "undefined") return null;
 
   const listening = phase === "listening";
-  return (
+  return createPortal(
     <>
-      <button type="button" aria-label="voice control"
-        onPointerDown={(e) => { e.preventDefault(); start(); }}
-        onPointerUp={release} onPointerLeave={release} onPointerCancel={release}
-        onContextMenu={(e) => e.preventDefault()}
-        className={`relative flex h-7 shrink-0 select-none items-center gap-1 rounded-full border px-2.5 font-mono text-[9px] tracking-[0.15em] [touch-action:none] [-webkit-touch-callout:none] ${listening ? "border-cyan-200/80 bg-cyan-400/25 text-cyan-50" : "border-cyan-300/35 bg-cyan-400/[0.07] text-cyan-200/85"}`}>
-        {listening && <span className="absolute inset-0 animate-ping rounded-full border border-cyan-300/60" />}
-        <Mic className="h-3.5 w-3.5" strokeWidth={1.8} />
-        VOICE
-      </button>
+      {/* 右下に浮かぶマイクボタン (スクロールしても同じ位置) */}
+      <div className="fixed bottom-5 right-4 z-[65] flex items-center gap-2 font-sans tracking-normal"
+        style={{ bottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
+        <span className={`pointer-events-none rounded-full border px-3 py-1.5 text-[12.5px] font-semibold backdrop-blur-md ${listening ? "border-cyan-200/70 bg-cyan-500/30 text-white" : "border-cyan-300/40 bg-[#050a12]/90 text-cyan-50"}`}>
+          {listening ? texts.listening : texts.fab}
+        </span>
+        <button type="button" aria-label={texts.fab}
+          onPointerDown={(e) => { e.preventDefault(); if (tip) closeTip(); start(); }}
+          onPointerUp={release} onPointerLeave={release} onPointerCancel={release}
+          onContextMenu={(e) => e.preventDefault()}
+          className={`vm-fab relative flex h-[62px] w-[62px] shrink-0 select-none items-center justify-center rounded-full border-[1.5px] border-cyan-50/80 text-white [touch-action:none] [-webkit-touch-callout:none] ${listening ? "vm-fab-on scale-110" : ""}`}
+          style={{ background: "radial-gradient(circle at 35% 30%, #67e8f9, #0891b2 55%, #083344)", transition: "transform 0.15s" }}>
+          {listening && <span className="absolute inset-[-6px] animate-ping rounded-full border-2 border-cyan-200/70" />}
+          <Mic className="relative h-7 w-7" strokeWidth={1.9} />
+        </button>
+      </div>
 
-      {/* 表示は body 直下に出す (親の文字スタイルや transform の影響を受けないように) */}
-      {typeof document !== "undefined" && createPortal(<AnimatePresence>
+      {/* 初回だけの案内の吹き出し */}
+      <AnimatePresence>
+        {tip && phase === "idle" && (
+          <motion.div key="voice-tip" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+            className="fixed right-4 z-[65] w-[264px] rounded-2xl border border-cyan-300/55 bg-[#06101b] px-4 py-3 font-sans tracking-normal shadow-[0_0_24px_rgba(34,211,238,0.3)]"
+            style={{ bottom: "calc(max(1.25rem, env(safe-area-inset-bottom)) + 78px)" }}>
+            <p className="text-[14px] font-bold text-cyan-50">{texts.tipTitle}</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-cyan-50/75">{texts.tipBody}</p>
+            <button type="button" onClick={closeTip} className="mt-1.5 block w-full text-right text-[13px] font-semibold text-cyan-300">OK</button>
+            <span className="absolute -bottom-[7px] right-[26px] h-3 w-3 rotate-45 border-b border-r border-cyan-300/55 bg-[#06101b]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 聞き取りパネル (body 直下なので親の文字スタイルや transform の影響を受けない) */}
+      <AnimatePresence>
         {phase !== "idle" && (
           <motion.div key="voice-panel"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
-            className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+            className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4"
+            style={{ bottom: "calc(max(1.25rem, env(safe-area-inset-bottom)) + 80px)" }}>
             <div className="w-full max-w-sm rounded-2xl font-sans tracking-normal border border-cyan-300/30 bg-[#050a12]/95 px-4 py-3 text-center shadow-[0_0_30px_rgba(34,211,238,0.25)] backdrop-blur-xl">
               {listening ? (
                 <>
@@ -171,7 +210,8 @@ export default function VoiceMic({ lang, caps, texts }: { lang: string; caps: Vo
             </div>
           </motion.div>
         )}
-      </AnimatePresence>, document.body)}
-    </>
+      </AnimatePresence>
+    </>,
+    document.body,
   );
 }

@@ -59,7 +59,8 @@ test("voice: no false hits, nothing for locks, missing devices ignored", () => {
 test("voice UI: mic sits in the mode header and every target button listens; locks never listen", () => {
   const fs = require("node:fs"); const path = require("node:path");
   const cp = fs.readFileSync(path.join(__dirname, "../components/ControlPanel.tsx"), "utf8");
-  assert.match(cp, /voiceSlot=\{<VoiceMic/);
+  assert.match(cp, /<VoiceMic lang=\{lang\}/);
+  assert.match(cp, /pb-28/, "room at the bottom so the floating mic does not cover buttons");
   const count = (cp.match(/useVoiceAction\(/g) || []).length;
   assert.ok(count >= 4, "ModeGrid, SceneButtons, ToggleCard, WafuCard");
   const lock = cp.slice(cp.indexOf("function LockCard"), cp.indexOf("function ToggleCard"));
@@ -67,4 +68,15 @@ test("voice UI: mic sits in the mode header and every target button listens; loc
   const vm = fs.readFileSync(path.join(__dirname, "../components/tech/VoiceMic.tsx"), "utf8");
   assert.match(vm, /webkitSpeechRecognition/);
   assert.doesNotMatch(vm, /\b(blip|sweep|powerUp|powerDown|galaxyOn|toggleServo)\(/, "mic adds no new sound effects");
+});
+
+test("voice UI: floating round mic with a one-time tip in 4 languages", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const vm = fs.readFileSync(path.join(__dirname, "../components/tech/VoiceMic.tsx"), "utf8");
+  assert.match(vm, /fixed bottom-5 right-4/);
+  assert.match(vm, /h-\[62px\] w-\[62px\]/);
+  assert.match(vm, /TIP_KEY = "voiceTipSeen"/);
+  assert.match(vm, /localStorage\.setItem\(TIP_KEY, "1"\)/);
+  const i18n = fs.readFileSync(path.join(__dirname, "../lib/i18n.ts"), "utf8");
+  for (const w of ["話して操作", "Voice control", "语音控制", "음성 조작"]) assert.ok(i18n.includes(w), w);
 });
