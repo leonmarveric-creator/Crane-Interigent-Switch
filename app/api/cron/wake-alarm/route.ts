@@ -10,6 +10,7 @@ import {
 } from "@/lib/switchbot";
 import { logDevice } from "@/lib/deviceControl";
 import { getWafuPrewakeStep, PREWAKE_WINDOW_MS } from "@/lib/wakePrewake";
+import { runDreamFade } from "@/lib/dreamFadeRunner";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ export const runtime = "nodejs";
  *  該当部屋の照明をONして triggered_at を記録 (二重点灯防止)。
  *  Horizon Rise は10分前から和風ライトを段階的に明るくし、
  *  メインライト点灯5分後に和風ライトだけを消灯する。
+ *  Dream Fade (30分で和風ライトをゆっくり消灯) の段階もここで進める。
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -202,5 +204,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, ranAt: nowIso });
+  // Dream Fade (眠りにつく 30 分フェード) もこの Cron で進める
+  const dreamFade = await runDreamFade(nowMs).catch((e) => { console.error("dream fade failed", e); return null; });
+
+  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, ranAt: nowIso });
 }

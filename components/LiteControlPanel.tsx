@@ -10,9 +10,9 @@
 //   ハイテクUIとの切り替えは onSwitchMode（RoomModeSwitch が制御）。
 // =========================================================
 import { rememberLang } from "@/lib/langCookie";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb, Sparkles, Moon,
+  LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb, Sparkles, Moon, MoonStar,
   Home, Power, Loader2, Globe, PanelsTopLeft, Lamp, AlarmClock, Check, Flame, Sunrise, type LucideIcon,
 } from "lucide-react";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
@@ -82,8 +82,10 @@ const THEME_RGB: Record<string, string> = {
 const getRgb = (slug: string): string => THEME_RGB[slug] || "63,93,120"; // 既定=藍
 
 function ActionBtn({
-  roomSlug, admin, action, value, label, Icon, tone,
+  roomSlug, admin, action, value, label, Icon, tone, onDone,
 }: {
+  /** 成功したときに呼ぶ (Dream Fade の説明を出すため) */
+  onDone?: () => void;
   roomSlug: string;
   admin?: boolean;
   action: DeviceAction;
@@ -108,6 +110,7 @@ function ActionBtn({
     const ok = await callDevice(roomSlug, action, admin, value);
     setBusy(false);
     setRes(ok);
+    if (ok) onDone?.();
     setTimeout(() => setRes(null), 1600);
   };
   return (
@@ -258,6 +261,13 @@ export default function LiteControlPanel({
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
   const e = EXTRA[lang];
+  // Dream Fade の説明: 押したあとにだけ表示し、しばらくすると自動で閉じる
+  const [dreamInfo, setDreamInfo] = useState(false);
+  useEffect(() => {
+    if (!dreamInfo) return;
+    const id = setTimeout(() => setDreamInfo(false), 20000);
+    return () => clearTimeout(id);
+  }, [dreamInfo]);
   const wafuOn: DeviceAction = admin ? "wafu_on_warm" : "wafu_on";
   const rgb = getRgb(roomSlug);
   const accent = `rgb(${rgb})`;
@@ -403,7 +413,19 @@ export default function LiteControlPanel({
           <ActionBtn roomSlug={roomSlug} admin={admin} action="welcome" label={t.comfortMode} Icon={Home} tone="matcha" />
           <ActionBtn roomSlug={roomSlug} admin={admin} action="good_night" label={t.goodNightMode} Icon={Moon} tone="ai" />
           <ActionBtn roomSlug={roomSlug} admin={admin} action="away" label={t.awayMode} Icon={Power} tone="neutral" />
+          {hasWafu && <ActionBtn roomSlug={roomSlug} admin={admin} action="dream_fade" label={t.dreamMode} Icon={MoonStar} tone="fuji" onDone={() => setDreamInfo(true)} />}
         </div>
+        {/* Dream Fade の説明 */}
+        {hasWafu && dreamInfo && (
+          <div className="relative mt-2 rounded-lg border border-[#ded6c7] bg-white/80 px-3 py-2 text-[12px] leading-relaxed text-[#585077]">
+            <p className="pr-6 font-semibold">{t.dreamStarted}</p>
+            <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[#655f54]">
+              {t.dreamSteps.map((x, i) => <li key={i}>{x}</li>)}
+            </ol>
+            <p className="mt-1 text-[11px] text-[#8a8274]">{t.dreamNote}</p>
+            <button type="button" onClick={() => setDreamInfo(false)} aria-label="close" className="absolute right-2 top-1.5 text-[16px] text-[#a39a8a]">×</button>
+          </div>
+        )}
 
         {/* 光目覚まし */}
         <div className="mt-5">

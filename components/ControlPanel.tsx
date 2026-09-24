@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LockKeyhole, LockKeyholeOpen, Snowflake, Lightbulb, LampFloor, Sliders, RotateCcw, ChevronRight,
-  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, PowerOff, Sparkles, Radio, Moon,
+  AlarmClock, Check, Loader2, Globe, Volume2, VolumeX, Home, LogOut, PowerOff, Sparkles, Radio, Moon, MoonStar,
   Sun, Sunrise, Flame, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
@@ -1027,10 +1027,11 @@ function voiceLabel(a: VoiceAction, t: typeof T["en"]): string {
     case "light_off": return `${t.light} ${t.off}`;
     case "good_night": return t.goodNightMode;
     case "away": return t.awayMode;
+    case "dream_fade": return t.dreamMode;
   }
 }
 
-type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy";
+type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy" | "dream";
 type BusyKey = ModeKey | "galaxyOff" | "nestOff";
 function ModeGrid({
   roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
@@ -1042,6 +1043,13 @@ function ModeGrid({
   const [active, setActive] = useState<ModeKey | null>(null);
   const [busy, setBusy] = useState<BusyKey | null>(null);
   const [fx, setFx] = useState<{ n: number; k: ModeKey } | null>(null);
+  // Dream Fade の説明: 押したあとにだけ表示し、しばらくすると自動で閉じる (場所を取らない)
+  const [dreamInfo, setDreamInfo] = useState(false);
+  useEffect(() => {
+    if (!dreamInfo) return;
+    const id = setTimeout(() => setDreamInfo(false), 20000);
+    return () => clearTimeout(id);
+  }, [dreamInfo]);
 
   const modes: { k: ModeKey; action: DeviceAction; tone: keyof typeof TONES; icon: typeof Lightbulb; label: string; desc: string; show: boolean; voice: string[] }[] = [
     { k: "normal", action: "normal", tone: "cyan", icon: Lightbulb, label: t.normalMode, desc: t.normalDesc, show: true, voice: ["Welcome home", "Systems set for your return"] },
@@ -1049,6 +1057,7 @@ function ModeGrid({
     { k: "galaxy", action: "galaxy_on", tone: "violet", icon: Sparkles, label: t.galaxy.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.galaxyShort, show: !!hasGalaxy, voice: ["Galaxy mode engaged", "Opening the cosmos", "Enjoy the stars"] },
     { k: "nest", action: "nest_on", tone: "amber", icon: LampFloor, label: t.nest.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.nestShort, show: !!hasNest, voice: ["Nest mode engaged", "Warm light online", "Cozy glow, activated"] },
     { k: "cozy", action: "welcome_cozy", tone: "rose", icon: LampFloor, label: t.cozyMode, desc: t.cozyDesc, show: !!hasWafu, voice: ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"] },
+    { k: "dream", action: "dream_fade", tone: "violet", icon: MoonStar, label: t.dreamMode, desc: t.dreamDesc, show: !!hasWafu, voice: ["Good night", "Lights dimmed", "Rest mode engaged"] },
   ];
   const list = modes.filter((m) => m.show);
 
@@ -1062,7 +1071,8 @@ function ModeGrid({
     if (ok) {
       setActive(m.k);
       onGalaxyState?.(m.k === "galaxy");
-      if (m.k === "galaxy") { galaxyOn(); onGalaxyLaunch?.(); } else if (m.k === "nest") toggleServo(true); else powerUp();
+      if (m.k === "galaxy") { galaxyOn(); onGalaxyLaunch?.(); } else if (m.k === "nest") toggleServo(true); else if (m.k === "dream") powerDown(); else powerUp();
+      if (m.k === "dream") setDreamInfo(true);
       speakOneOf(m.voice);
     } else sfxError();
     setBusy(null);
@@ -1153,6 +1163,31 @@ function ModeGrid({
           );
         })}
       </div>
+      {/* Dream Fade の説明: 何が起こるか */}
+      <AnimatePresence initial={false}>
+        {dreamInfo && hasWafu && (
+          <motion.div key="dream-info" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden">
+            <div className="clip-bevel-sm relative mt-2.5 border border-violet-300/30 bg-violet-500/[0.07] px-3.5 py-3">
+              <p className="mb-1.5 text-[12px] font-semibold text-violet-100">{t.dreamStarted}</p>
+              <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-violet-200">
+                <MoonStar className="h-3.5 w-3.5" strokeWidth={1.8} /> {t.dreamInfoTitle}
+              </p>
+              <ol className="mt-1.5 space-y-1">
+                {t.dreamSteps.map((x, i) => (
+                  <li key={i} className="flex gap-2 text-[11.5px] leading-snug text-white/75">
+                    <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-violet-300/50 font-mono text-[9px] text-violet-200">{i + 1}</span>
+                    <span>{x}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-1.5 text-[10.5px] leading-snug text-white/45">{t.dreamNote}</p>
+              <button type="button" onClick={() => setDreamInfo(false)} aria-label="close"
+                className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-white/40 active:bg-white/10">×</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

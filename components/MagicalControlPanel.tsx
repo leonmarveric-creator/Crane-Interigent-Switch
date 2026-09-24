@@ -117,6 +117,7 @@ const SPELL_INCANTATIONS: Partial<Record<DeviceAction | "alarm", string[]>> = {
   nest_off: ["Nox"],
   welcome: ["Revelio"],
   good_night: ["Muffliato", "Nox"],
+  dream_fade: ["Muffliato", "Nox"],
   away: ["Finite Incantatem"],
   alarm: ["Rennervate"],
 };
@@ -371,7 +372,7 @@ const ACTION_SIGILS: Partial<Record<DeviceAction, string>> = {
   unlock: "◇", lock: "✦", ac_on: "❄", ac_off: "✧",
   light_on: "☼", light_off: "☾", wafu_on: "✺", wafu_on_warm: "✺", wafu_off: "☾",
   galaxy_on: "✶", galaxy_off: "◈", nest_on: "✿", nest_off: "✧",
-  welcome: "✧", good_night: "☾", away: "◇",
+  welcome: "✧", good_night: "☾", away: "◇", dream_fade: "☾",
 };
 
 const ACTION_EMBLEM: Partial<Record<DeviceAction, "ward" | "frost" | "radiance" | "lantern" | "nest" | "cosmos" | "hearth" | "dream" | "passage">> = {
@@ -381,7 +382,7 @@ const ACTION_EMBLEM: Partial<Record<DeviceAction, "ward" | "frost" | "radiance" 
   wafu_on: "lantern", wafu_on_warm: "lantern", wafu_off: "lantern",
   nest_on: "nest", nest_off: "nest",
   galaxy_on: "cosmos", galaxy_off: "cosmos",
-  welcome: "hearth", good_night: "dream", away: "passage",
+  welcome: "hearth", good_night: "dream", away: "passage", dream_fade: "dream",
 };
 
 function seasonFromRoomName(roomName: string): MagicSeasonKey | null {
@@ -921,6 +922,13 @@ export default function MagicalControlPanel({
   const [castPulse, setCastPulse] = useState(0);
   const [castTone, setCastTone] = useState<keyof typeof TONE>("gold");
   const [galaxyCast, setGalaxyCast] = useState<"on" | "off" | null>(null);
+  // Dream Fade の説明: 押したあとにだけ表示し、しばらくすると自動で閉じる
+  const [dreamInfo, setDreamInfo] = useState(false);
+  useEffect(() => {
+    if (!dreamInfo) return;
+    const id = setTimeout(() => setDreamInfo(false), 20000);
+    return () => clearTimeout(id);
+  }, [dreamInfo]);
   const t = T[lang];
   const copy = MAGIC_COPY[lang];
   const roomSeason = seasonFromRoomName(roomName);
@@ -966,6 +974,7 @@ export default function MagicalControlPanel({
     setCastTone(tone);
     setCastPulse((next) => next + 1);
     setGalaxyCast(action === "galaxy_on" ? "on" : action === "galaxy_off" ? "off" : null);
+    if (action === "dream_fade") setDreamInfo(true);
   };
 
   return (
@@ -1242,6 +1251,20 @@ export default function MagicalControlPanel({
           <MagicAction roomSlug={roomSlug} roomSeason={roomConcept.key} muted={muted} admin={admin} action="good_night" label={t.goodNightMode} Icon={Moon} tone="blue" onCast={onCast} />
           <MagicAction roomSlug={roomSlug} roomSeason={roomConcept.key} muted={muted} admin={admin} action="away" label={t.awayMode} Icon={DoorOpen} tone="rose" onCast={onCast} />
         </div>
+        {/* Dream Fade: 和風ライトだけにして 30 分でゆっくり消灯 */}
+        {hasWafu && (
+          <div className="mt-1.5">
+            <MagicAction roomSlug={roomSlug} roomSeason={roomConcept.key} muted={muted} admin={admin} action="dream_fade" label={`${t.dreamMode} · ${t.dreamDesc}`} Icon={Moon} tone="blue" onCast={onCast} />
+            {dreamInfo && (
+              <div className="relative mt-1 rounded-md border border-[#f5c26b]/25 bg-black/20 px-2.5 py-2 text-[11px] leading-relaxed">
+                <p className="pr-5 font-semibold">{t.dreamStarted}</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 opacity-85">{t.dreamSteps.map((x, i) => <li key={i}>{x}</li>)}</ol>
+                <p className="mt-1 opacity-60">{t.dreamNote}</p>
+                <button type="button" onClick={() => setDreamInfo(false)} aria-label="close" className="absolute right-1.5 top-1 text-[15px] opacity-60">×</button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-2.5">
           <WakeMagic roomSlug={roomSlug} roomSeason={roomConcept.key} muted={muted} admin={admin} t={t} hasWafu={hasWafu} onCast={onCast} />

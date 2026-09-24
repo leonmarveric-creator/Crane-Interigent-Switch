@@ -45,6 +45,7 @@ type Dict = {
   awayMode: string;
   goodNightMode: string;
   galaxy: string;
+  dreamMode: string; dreamDesc: string; dreamInfoTitle: string; dreamSteps: string[]; dreamNote: string; dreamStarted: string;
   voiceFab: string; voiceTipTitle: string; voiceTipBody: string;
   voiceListening: string; voiceRetry: string; voiceDenied: string; voiceWhy: string; voiceExamples: string[];
   modeSelect: string; normalMode: string; normalDesc: string; comfortDesc: string; galaxyShort: string; nestShort: string; cozyDesc: string;
@@ -86,6 +87,9 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PINが違います", pinLocked: "試行回数が多すぎます。しばらくしてからお試しください", verify: "認証",
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
     comfortMode: "快適モード", awayMode: "外出（全部OFF）", goodNightMode: "おやすみモード",
+    dreamMode: "Dream Fade", dreamDesc: "30分で消灯", dreamInfoTitle: "Dream Fade で起こること",
+    dreamSteps: ["メインライト・ギャラクシー・ネストを消して、和風ライトだけのやさしい灯りにします", "30分かけて少しずつ暗くし、色も夕焼けのような暖かい赤みへ変えていきます", "30分後に和風ライトも自動で消えます。眠りを妨げにくい、ゆるやかな暗さの変化です"],
+    dreamNote: "途中で照明やモードを操作するとフェードは止まります。エアコンはそのままです", dreamStarted: "Dream Fade を開始しました。おやすみなさい 🌙",
     voiceFab: "話して操作", voiceTipTitle: "声でも操作できます", voiceTipBody: "マイクを押しながら「ギャラクシーオン」のように話してください", 
     voiceListening: "聞き取り中", voiceRetry: "聞き取れませんでした。もう一度どうぞ", voiceDenied: "マイクが許可されていません。ブラウザの設定で許可してください", voiceWhy: "ボタンを押している間だけ聞き取ります（録音は保存しません）", voiceExamples: ["ギャラクシーオン", "照明オフ", "おやすみ"],
     modeSelect: "モード", normalMode: "ノーマル", normalDesc: "メインライトだけ点灯", comfortDesc: "エアコン＋照明", galaxyShort: "満天の星・60分", nestShort: "藤の灯りだけ", cozyDesc: "行灯の灯りだけ",
@@ -113,6 +117,9 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "Incorrect PIN", pinLocked: "Too many attempts. Please try again later", verify: "Verify",
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
     comfortMode: "Comfort", awayMode: "Away (all off)", goodNightMode: "Good Night",
+    dreamMode: "Dream Fade", dreamDesc: "Off in 30 min", dreamInfoTitle: "What Dream Fade does",
+    dreamSteps: ["Turns off the main light, Galaxy and Nest, leaving only the soft Japanese lamp", "Over 30 minutes the lamp slowly dims and shifts to a warm, sunset-like glow", "After 30 minutes the lamp turns off by itself — a gentle change of light that is kind to your sleep"],
+    dreamNote: "Using any light or mode stops the fade. The air-con stays as it is", dreamStarted: "Dream Fade started. Good night 🌙",
     voiceFab: "Voice control", voiceTipTitle: "You can also use your voice", voiceTipBody: "Hold the mic and say something like \"Galaxy on\"", 
     voiceListening: "LISTENING", voiceRetry: "Sorry, I didn't catch that. Please try again", voiceDenied: "Microphone is blocked. Please allow it in your browser settings", voiceWhy: "Listens only while you hold the button (nothing is recorded)", voiceExamples: ["Galaxy on", "Lights off", "Good night"],
     modeSelect: "Modes", normalMode: "Normal", normalDesc: "Main light only", comfortDesc: "Air-con + light", galaxyShort: "Stars · 60 min", nestShort: "Woven lamp only", cozyDesc: "Lantern light only",
@@ -140,6 +147,9 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN码错误", pinLocked: "尝试次数过多，请稍后再试", verify: "验证",
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
     comfortMode: "舒适模式", awayMode: "外出（全关）", goodNightMode: "晚安模式",
+    dreamMode: "Dream Fade", dreamDesc: "30分钟熄灯", dreamInfoTitle: "Dream Fade 会做什么",
+    dreamSteps: ["关闭主灯、银河和鸟巢灯，只留下柔和的和风灯", "在30分钟内慢慢变暗，灯光颜色也逐渐变成晚霞般温暖的红色调", "30分钟后和风灯自动熄灭，柔和的明暗变化，不易打扰睡眠"],
+    dreamNote: "中途操作灯光或模式时，渐暗会停止。空调保持不变", dreamStarted: "Dream Fade 已开始。晚安 🌙",
     voiceFab: "语音控制", voiceTipTitle: "也可以用语音操作", voiceTipBody: "按住麦克风，说“打开星空”等指令", 
     voiceListening: "正在聆听", voiceRetry: "没有听清，请再说一次", voiceDenied: "麦克风未被允许，请在浏览器设置中允许", voiceWhy: "仅在按住按钮时聆听（不会保存录音）", voiceExamples: ["打开星空", "关灯", "晚安"],
     modeSelect: "模式", normalMode: "普通", normalDesc: "只开主灯", comfortDesc: "空调＋照明", galaxyShort: "星空・60分钟", nestShort: "只开藤编灯", cozyDesc: "只开行灯",
@@ -167,6 +177,9 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN이 올바르지 않습니다", pinLocked: "시도 횟수가 많습니다. 잠시 후 다시 시도하세요", verify: "확인",
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)", goodNightMode: "취침 모드",
+    dreamMode: "Dream Fade", dreamDesc: "30분 후 소등", dreamInfoTitle: "Dream Fade 동작",
+    dreamSteps: ["메인 조명・갤럭시・네스트를 끄고, 부드러운 일본풍 조명만 남깁니다", "30분에 걸쳐 조금씩 어두워지고, 색도 노을처럼 따뜻한 붉은빛으로 바뀝니다", "30분 후 일본풍 조명도 자동으로 꺼집니다. 수면을 방해하지 않는 완만한 변화입니다"],
+    dreamNote: "도중에 조명이나 모드를 조작하면 페이드가 멈춥니다. 에어컨은 그대로입니다", dreamStarted: "Dream Fade를 시작했습니다. 안녕히 주무세요 🌙",
     voiceFab: "음성 조작", voiceTipTitle: "음성으로도 조작할 수 있어요", voiceTipBody: "마이크를 누른 채 \"갤럭시 켜줘\"처럼 말해 주세요", 
     voiceListening: "듣는 중", voiceRetry: "잘 못 들었어요. 다시 말씀해 주세요", voiceDenied: "마이크가 허용되지 않았습니다. 브라우저 설정에서 허용해 주세요", voiceWhy: "버튼을 누르는 동안만 듣습니다 (녹음은 저장하지 않습니다)", voiceExamples: ["갤럭시 켜줘", "조명 꺼줘", "잘 자"],
     modeSelect: "모드", normalMode: "노멀", normalDesc: "메인 조명만 켜기", comfortDesc: "에어컨＋조명", galaxyShort: "별빛・60분", nestShort: "라탄 조명만", cozyDesc: "행등 조명만",

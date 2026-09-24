@@ -4,6 +4,7 @@ import {
   bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, type SwitchBotCreds,
 } from "./switchbot";
 import { supabaseAdmin } from "./supabaseAdmin";
+import { DREAM_FADE_START } from "./dreamFade";
 
 /** 和風ライトのデフォルト暖色: 電球色 2700K・明るさ100%。 */
 export const WAFU_DEFAULT_WARM = { kelvin: 2700, brightness: 100 } as const;
@@ -28,6 +29,34 @@ async function setGalaxyAutoOffAt(
     return false;
   }
   return true;
+}
+
+/**
+ * Dream Fade の進行状態 (rooms.dream_fade_started_at / dream_fade_step) を設定・解除する。
+ * migration_dream_fade.sql 未実行で列が無い場合は false。
+ */
+async function setDreamFade(room: any, startedAt: string | null): Promise<boolean> {
+  if (!room.id) return true;
+  const { error } = await supabaseAdmin
+    .from("rooms")
+    .update({ dream_fade_started_at: startedAt, dream_fade_step: 0 })
+    .eq("id", room.id);
+  if (error) { console.error("dream fade update failed", error); return false; }
+  return true;
+}
+
+/** 灯りを操作したら Dream Fade を止める (実行中の部屋だけ。失敗しても本処理は止めない) */
+const DREAM_FADE_CANCEL: ReadonlySet<string> = new Set([
+  "light_on", "light_off", "galaxy_on", "galaxy_off", "nest_on", "nest_off",
+  "wafu_on", "wafu_off", "wafu_on_warm", "wafu_warm", "wafu_brightness", "wafu_temp", "wafu_color",
+  "welcome", "welcome_cozy", "good_night", "away", "normal",
+]);
+async function cancelDreamFade(room: any) {
+  if (!room.id) return;
+  try {
+    await supabaseAdmin.from("rooms").update({ dream_fade_started_at: null, dream_fade_step: 0 })
+      .eq("id", room.id).not("dream_fade_started_at", "is", null);
+  } catch { /* 列が無い等は無視 */ }
 }
 
 /** 和風ライトを既定の暖色 (2700K・100%) に設定する共通処理。 */
@@ -65,7 +94,8 @@ export type DeviceAction =
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
   | "wafu_brightness" | "wafu_temp" | "wafu_color" // 詳細: 明るさ / 色温度 / フルカラー (value必須)
   | "welcome" | "welcome_cozy" | "good_night" | "away"
-  | "normal"; // シーン: 快適 / 和み / おやすみ / 外出全OFF
+  | "normal" // シーン: 快適 / 和み / おやすみ / 外出全OFF
+  | "dream_fade"; // Dream Fade: 和風ライトだけにして 30 分でゆっくり消灯
 
 /**
  * 部屋(秘密鍵込み)に対してデバイス操作を実行する共通ロジック。
@@ -82,6 +112,8 @@ export async function executeDeviceAction(
     token: room.switchbot_token ?? process.env.SWITCHBOT_TOKEN!,
     secret: room.switchbot_secret ?? process.env.SWITCHBOT_SECRET!,
   };
+
+  if (DREAM_FADE_CANCEL.has(action)) await cancelDreamFade(room);
 
   switch (action) {
     case "unlock":
@@ -242,6 +274,23 @@ export async function executeDeviceAction(
       if (room.switchbot_nest_device_id) await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
       if (room.switchbot_wafu_device_id) await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
       return { ok };
+    }
+    case "dream_fade": {
+      // Dream Fade: 和風ライト以外の灯りを消し、和風ライトだけを暖色 (2700K・60%) で点灯。
+      // 以後 30 分かけて Cron が少しずつ暗くし、最後に消灯する。エアコンはそのまま。
+      if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
+      const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
+      const t = await bulbSetColorTemperature(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.kelvin);
+      const b = await bulbSetBrightness(sbCreds, room.switchbot_wafu_device_id, DREAM_FADE_START.brightness);
+      if (room.switchbot_light_device_id) await lightTurnOff(sbCreds, room.switchbot_light_device_id);
+      if (room.switchbot_galaxy_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+        if (r.ok) await setGalaxyAutoOffAt(room, null);
+      }
+      if (room.switchbot_nest_device_id) await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
+      if (!(on.ok && t.ok && b.ok)) return { ok: false };
+      const saved = await setDreamFade(room, new Date().toISOString());
+      return saved ? { ok: true } : { ok: false, error: "DREAM_FADE_SQL_NEEDED" };
     }
     case "good_night": {
       // おやすみ: エアコンは維持し、部屋のライト系だけをまとめて消灯する。

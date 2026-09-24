@@ -13,7 +13,8 @@ export type VoiceAction =
   | "wafu_on" | "wafu_off"
   | "ac_on" | "ac_off"
   | "light_on" | "light_off"
-  | "good_night" | "away";
+  | "good_night" | "away"
+  | "dream_fade";
 
 /** この部屋で使える機器 (無い機器のコマンドは null を返す) */
 export type VoiceRoomCaps = { hasGalaxy?: boolean; hasNest?: boolean; hasWafu?: boolean };
@@ -44,6 +45,12 @@ const TARGETS: Target[] = [
     words: ["外出", "いってきます", "行ってきます", "でかけ", "出かけ", "出掛け", "全部オフ", "全部消", "ぜんぶおふ", "ぜんぶけし", "出门", "出門", "全关", "全關", "외출", "다녀올", "전부 꺼", "전체 꺼"],
     en: /\b(away|going out|leaving|all off|everything off)\b/i,
     on: "away", off: "away",
+  },
+  {
+    key: "dream",
+    words: ["ドリーム", "どりーむ", "夢見", "ゆめみ", "ゆっくり消", "ゆっくりけ", "入梦", "入夢", "드림", "꿈결"],
+    en: /\b(dream|fade out|fade)\b/i,
+    on: "dream_fade", off: "dream_fade", need: "hasWafu",
   },
   {
     key: "good_night",
