@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isStaff } from "@/lib/staffAuth";
 import { isMissingColumn } from "@/lib/stayTimes";
+import { airbnbCode } from "@/lib/staffLogic";
 import type { StaffRoom, StaffRes, HistoryItem } from "@/lib/staffLogic";
 import StaffClient from "@/components/staff/StaffClient";
 
@@ -49,6 +50,25 @@ export default async function StaffPage() {
     status: r.status, check_in: r.check_in, check_out: r.check_out,
     early_checkin_at: r.early_checkin_at ?? null, late_checkout_at: r.late_checkout_at ?? null,
   }));
+
+  // 宿泊人数: Airbnb 予約確定メールの取り込み結果 (stays_ext_reservations) を、予約URLの確認コードで突き合わせる。
+  // 取り込み未設定・列やテーブルが無い場合は何もしない (リネンは既定人数の「目安」で計算)。
+  try {
+    const ids = reservations.map((r) => r.id);
+    if (ids.length) {
+      const { data: urls } = await supabaseAdmin.from("reservations").select("id, airbnb_reservation_url").in("id", ids);
+      const codeById = new Map<string, string>();
+      for (const u of (urls ?? []) as any[]) { const c = airbnbCode(u.airbnb_reservation_url); if (c) codeById.set(u.id, c); }
+      const codes = Array.from(new Set(codeById.values()));
+      if (codes.length) {
+        const { data: ext } = await supabaseAdmin.from("stays_ext_reservations")
+          .select("code, guests, status").eq("source", "airbnb").in("code", codes);
+        const guestsByCode = new Map<string, number>();
+        for (const e of (ext ?? []) as any[]) if (e.status !== "cancelled" && e.guests > 0) guestsByCode.set(String(e.code).toUpperCase(), e.guests);
+        for (const r of reservations) { const c = codeById.get(r.id); if (c && guestsByCode.has(c)) r.guests = guestsByCode.get(c)!; }
+      }
+    }
+  } catch { /* 人数が取れなくても画面は出す */ }
 
   // 棟 → エントランスの URL (ゲストへの案内文用) と、暗証番号 (密码一览)
   const { data: ents } = await supabaseAdmin.from("entrances").select("id, slug, building, display_name, keypad_code").eq("is_active", true).order("building");

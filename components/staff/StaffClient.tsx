@@ -15,7 +15,7 @@ import {
   Sunrise, Sunset, Undo2, AlertTriangle, X, KeyRound, BedDouble, ArrowRight, Lightbulb, LightbulbOff, PowerOff, RefreshCw, Heart, Award, ScanFace, Trash2, NotebookPen, MessageCircle, Pencil, ShoppingCart, Share2, ListChecks, Plus, MoonStar, ChevronDown,
 } from "lucide-react";
 import {
-  roomState, effIn, effOut, jstDay, jstTime, addDays, minutesUntil, weekPlan, guestMessage, todayCleaning, roomIcon, roomKanji, achievements,
+  roomState, effIn, effOut, jstDay, jstTime, addDays, weekPlan, guestMessage, todayCleaning, roomIcon, roomKanji, achievements, linenPlan, DEFAULT_GUESTS,
   type StaffRoom, type StaffRes, type RoomStatus, type HistoryItem, type Achievements,
 } from "@/lib/staffLogic";
 import { setEarlyCheckin, setLateCheckout, markCleaned, undoCleaned, roomDoor, roomLights, roomAllOff, setRoomCode, setEntranceCode } from "@/app/staff/actions";
@@ -69,6 +69,8 @@ const S = {
     pkNote: "脸和指纹的数据只保存在手机里，不会上传。手机丢了的话，在这里删除就好。",
     tabMemo: "工具", bigText: "大字",
     checklist: "清扫清单", checkAllDone: "全部检查完了！可以按「清扫完成」了 ✨",
+    linenTitle: "明天要准备的床品和毛巾", linenFor: (r: number, g: number) => `入住 ${r} 间・共 ${g} 人`, linenUnit: "件",
+    linenPeople: (n: number) => `${n} 人`, linenEst: "（大约）", linenEstNote: (n: number) => `“大约”是不知道人数的预订，先按 ${n} 人计算`,
     tomorrowPlan: "明天的安排", tomorrowNone: "明天没有退房和入住，可以休息一下 🌿", tmrClean: (n: number) => `清扫 ${n} 间`, tmrIn: (n: number) => `入住 ${n} 位`, tmrFirst: (tm: string) => `最早 ${tm} 退房`,
     eveningTitle: "今天辛苦了 🌙", eveningBody: (c: number, g: number) => `今天完成了 ${c} 间清扫，迎接了 ${g} 位客人。好好休息吧！`, eveningNone: "今天也谢谢你。晚上好好休息吧！",
     tapHint: "点一下照片 💕",
@@ -119,6 +121,8 @@ const S = {
     pkNote: "顔や指紋のデータはスマホの中だけに保存され、送られません。スマホをなくしたときは、ここで削除してください。",
     tabMemo: "べんり", bigText: "大きい字",
     checklist: "清掃チェックリスト", checkAllDone: "ぜんぶチェックできました！「清掃完了」を押してね ✨",
+    linenTitle: "明日そろえるリネン・タオル", linenFor: (r: number, g: number) => `入室 ${r} 部屋・合計 ${g} 人`, linenUnit: "枚",
+    linenPeople: (n: number) => `${n}人`, linenEst: "（目安）", linenEstNote: (n: number) => `「目安」は人数が分からない予約です。${n}人で計算しています`,
     tomorrowPlan: "明日の予定", tomorrowNone: "明日はチェックアウトもチェックインもありません。ゆっくりしてね 🌿", tmrClean: (n: number) => `清掃 ${n} 部屋`, tmrIn: (n: number) => `入室 ${n} 組`, tmrFirst: (tm: string) => `最初の退室 ${tm}`,
     eveningTitle: "今日もおつかれさま 🌙", eveningBody: (c: number, g: number) => `今日は ${c} 部屋をきれいにして、${g} 組のゲストをお迎えしました。ゆっくり休んでね！`, eveningNone: "今日もありがとう。夜はゆっくり休んでね！",
     tapHint: "写真をタップ 💕",
@@ -325,7 +329,7 @@ function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, ge
         </section>
       ))}
 
-      <TomorrowCard t={t} rooms={rooms} reservations={reservations} roomById={roomById} now={now} />
+      <TomorrowCard t={t} lang={lang} rooms={rooms} reservations={reservations} roomById={roomById} now={now} />
     </div>
   );
 }
@@ -372,11 +376,6 @@ function ProgressCard({ t, lang, prog, now, monthCleans }: { t: ST; lang: Lang; 
   );
 }
 
-function fmtLeft(t: ST, mins: number) {
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return h > 0 ? `${h}${t.h}${m > 0 ? `${m}${t.m}` : ""}` : `${m}${t.m}`;
-}
-
 function RoomCard({ t, lang, room, st, now }: { t: ST; lang: Lang; room: StaffRoom; st: ReturnType<typeof roomState>; now: number }) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
@@ -385,8 +384,7 @@ function RoomCard({ t, lang, room, st, now }: { t: ST; lang: Lang; room: StaffRo
   const [party, setParty] = useState(0);
   const style = STATUS_STYLE[st.status];
   const next = st.next;
-  const minsLeft = next ? minutesUntil(effIn(next), now) : null;
-  const urgent = false; // プレッシャーをかけない (残り時間は赤くしない)
+  // プレッシャーをかけないよう「あと○時間」のカウントダウンは出さない (到着時刻だけ)
   const cleanedToday = room.cleaned_at && jstDay(room.cleaned_at) === jstDay(now);
 
   const clean = async () => {
@@ -455,10 +453,9 @@ function RoomCard({ t, lang, room, st, now }: { t: ST; lang: Lang; room: StaffRo
           </p>
         )}
         {next ? (
-          <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${urgent ? "font-bold text-[#b8372d]" : ""}`}>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <ArrowRight className="h-5 w-5 shrink-0" />
             {t.nextGuest} {fmtDay(t, effIn(next), now)} {jstTime(effIn(next))} {t.arrives}
-            {minsLeft !== null && minsLeft < 24 * 60 && <span>· {t.left} {fmtLeft(t, minsLeft)}</span>}
             {next.early_checkin_at && <Badge big>{t.early} {jstTime(next.early_checkin_at)}</Badge>}
           </p>
         ) : st.status !== "staying" && <p className="text-[#a2968a]">{t.noNext}</p>}
@@ -1092,13 +1089,14 @@ function CleanChecklist({ t, lang, roomId, day }: { t: ST; lang: Lang; roomId: s
 }
 
 /* 明日の予定 (前の晩に心の準備ができるように) */
-function TomorrowCard({ t, rooms, reservations, roomById, now }: {
-  t: ST; rooms: StaffRoom[]; reservations: StaffRes[]; roomById: Map<string, StaffRoom>; now: number;
+function TomorrowCard({ t, lang, rooms, reservations, roomById, now }: {
+  t: ST; lang: Lang; rooms: StaffRoom[]; reservations: StaffRes[]; roomById: Map<string, StaffRoom>; now: number;
 }) {
   const tmr = addDays(jstDay(now), 1);
   const plan = useMemo(() => weekPlan(rooms, reservations, tmr, 1)[0], [rooms, reservations, tmr]);
   const outs = plan?.rooms.filter((x) => x.out).map((x) => effOut(x.out!)).sort() ?? [];
   const ins = plan?.rooms.filter((x) => x.in).length ?? 0;
+  const linen = useMemo(() => linenPlan(plan), [plan]);
   return (
     <section className={`${card} p-4`}>
       <h2 className="mb-2 flex items-center gap-2 text-lg font-bold"><CalendarDays className="h-5 w-5 text-[#7a6d5c]" /> {t.tomorrowPlan}</h2>
@@ -1119,6 +1117,29 @@ function TomorrowCard({ t, rooms, reservations, roomById, now }: {
               </li>
             ))}
           </ul>
+          {/* 明日そろえるリネン・タオル (予約の人数から自動計算) */}
+          {linen && (
+            <div className="mt-4 rounded-2xl bg-[#f3f7ee] p-3">
+              <p className="flex flex-wrap items-baseline gap-x-2 font-bold text-[#3f6b35]">
+                🧺 {t.linenTitle}
+                <span className="text-sm font-semibold text-[#6b8a5e]">{t.linenFor(linen.rooms.length, linen.totalGuests)}</span>
+              </p>
+              <div className="mt-2 divide-y divide-[#e4ecdc] overflow-hidden rounded-xl bg-white shadow-sm">
+                {linen.items.map((i) => (
+                  <div key={i.key} className="flex items-baseline justify-between px-3 py-1.5">
+                    <span className="text-[15px] text-[#4a4036]">{lang === "zh" ? i.zh : i.ja}</span>
+                    <span className="text-xl font-bold text-[#3f6b35]">{i.count}<span className="ml-0.5 text-sm font-semibold">{t.linenUnit}</span></span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-[#5d6b56]">
+                {linen.rooms.map((r) => (
+                  <span key={r.room.id}><RoomName room={roomById.get(r.room.id) ?? r.room} /> {t.linenPeople(r.guests)}{r.estimated ? t.linenEst : ""}</span>
+                ))}
+              </p>
+              {linen.anyEstimated && <p className="mt-1 text-xs text-[#8a8f7e]">{t.linenEstNote(DEFAULT_GUESTS)}</p>}
+            </div>
+          )}
         </>
       )}
     </section>

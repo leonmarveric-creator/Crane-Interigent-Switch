@@ -22,6 +22,8 @@ export interface StaffRes {
   check_out: string;
   early_checkin_at: string | null;
   late_checkout_at: string | null;
+  /** 宿泊人数 (Airbnb 予約確定メールから取り込んだ値。分からなければ null) */
+  guests?: number | null;
 }
 
 export const effIn = (r: StaffRes) => r.early_checkin_at || r.check_in;
@@ -314,4 +316,47 @@ export function roomKanji(room: { slug: string; name: string }): string {
   const tokens = `${room.name} ${room.slug}`.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x && x !== "room");
   for (const [re, k] of KANJI) if (tokens.some((tk) => re.test(tk))) return k;
   return room.name;
+}
+
+/* ---------------- 明日のリネン・タオルの枚数 ---------------- */
+/** 人数が分からない予約は、この人数で計算する (画面には「目安」と出す) */
+export const DEFAULT_GUESTS = 2;
+
+/** 1人あたりに使うリネン (内容を変えるときはここだけ直す) */
+export const LINEN_PER_GUEST = [
+  { key: "sheet", ja: "シーツ", zh: "床单", n: 1 },
+  { key: "duvet", ja: "掛け布団カバー", zh: "被套", n: 1 },
+  { key: "pillow", ja: "枕カバー", zh: "枕套", n: 1 },
+  { key: "bath", ja: "バスタオル", zh: "浴巾", n: 1 },
+  { key: "face", ja: "フェイスタオル", zh: "毛巾", n: 1 },
+] as const;
+
+/** Airbnb の予約詳細URL (…/reservations/details/HMXXXX) から確認コードを取り出す */
+export function airbnbCode(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/reservations?\/(?:details\/)?([A-Z0-9]{6,12})/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+export interface LinenPlan {
+  rooms: { room: StaffRoom; guests: number; estimated: boolean }[];
+  totalGuests: number;
+  anyEstimated: boolean;
+  items: { key: string; ja: string; zh: string; count: number }[];
+}
+
+/** その日にチェックインするゲストの人数から、必要なリネンの枚数を出す */
+export function linenPlan(plan: DayPlan | undefined): LinenPlan | null {
+  const arrivals = plan?.rooms.filter((x) => x.in) ?? [];
+  if (!arrivals.length) return null;
+  const rooms = arrivals.map((x) => {
+    const g = x.in!.guests;
+    const known = typeof g === "number" && g > 0;
+    return { room: x.room, guests: known ? g! : DEFAULT_GUESTS, estimated: !known };
+  });
+  const totalGuests = rooms.reduce((a, r) => a + r.guests, 0);
+  return {
+    rooms, totalGuests, anyEstimated: rooms.some((r) => r.estimated),
+    items: LINEN_PER_GUEST.map((i) => ({ key: i.key, ja: i.ja, zh: i.zh, count: i.n * totalGuests })),
+  };
 }
