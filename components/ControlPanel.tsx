@@ -360,6 +360,11 @@ export default function ControlPanel({
           </div>
         </motion.header>
 
+        {/* 外出 (全部OFF): 出かける時にすぐ押せるよう鍵の上に置く */}
+        <motion.div className="mb-3" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+          <SceneButtons part="away" roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} onGalaxyState={setGalaxyActive} />
+        </motion.div>
+
         {/* スマートロック (いちばん最初に使うので、部屋名のすぐ下) */}
         <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
@@ -398,7 +403,7 @@ export default function ControlPanel({
 
         {/* シーン: 快適モード / 外出 */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
-          <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} onGalaxyState={setGalaxyActive} />
+          <SceneButtons part="rest" roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} onGalaxyState={setGalaxyActive} />
         </motion.div>
 
         {/* 光目覚まし (スクロールせず見えるよう上部に配置) */}
@@ -1119,8 +1124,10 @@ function ModeGrid({
 /* ------------------------------------------------------------------ */
 type SceneAction = "welcome" | "welcome_cozy" | "wafu_off" | "good_night" | "away";
 function SceneButtons({
-  roomSlug, admin, guard, t, hasWafu, onGalaxyState,
+  part = "all", roomSlug, admin, guard, t, hasWafu, onGalaxyState,
 }: {
+  /** away = 外出ボタンだけ / rest = おやすみ・和風ライトオフだけ / all = 全部 */
+  part?: "all" | "away" | "rest";
   roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>;
   t: typeof T["en"]; hasWafu?: boolean; onGalaxyState?: (on: boolean) => void;
 }) {
@@ -1153,6 +1160,7 @@ function SceneButtons({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
+        {part !== "away" && (<>
         <div className={hasWafu ? "" : "col-span-2"}>
         <HudPanel tone="cyan" onClick={() => run("good_night")} small
           contentClassName="items-center justify-center gap-2 px-4 py-4">
@@ -1175,18 +1183,21 @@ function SceneButtons({
             <span className="text-sm text-rose-200/90">{t.wafu} {t.off}</span>
           </HudPanel>
         )}
-        {/* 外出ボタンは押しやすいよう、おやすみ / 和風ライトオフより上に置く */}
+        </>)}
+        {/* 外出ボタン (ハイテクUIでは鍵の上に単独で表示) */}
+        {part !== "rest" && (
         <div className="order-first col-span-2">
           <HudPanel tone="violet" onClick={() => run("away")} small
-            contentClassName="flex-col items-center gap-2 px-4 py-4">
+            contentClassName="items-center justify-center gap-2.5 px-4 py-3">
             <Corners tone="cyan" />
             <CommandFX trigger={fx?.a === "away" ? fx.n : 0} tone="violet" />
             {busy === "away"
-              ? <Loader2 className="h-6 w-6 animate-spin text-violet-300" />
-              : <LogOut className="h-6 w-6 text-violet-300" strokeWidth={1.7} />}
+              ? <Loader2 className="h-5 w-5 animate-spin text-violet-300" />
+              : <LogOut className="h-5 w-5 text-violet-300" strokeWidth={1.7} />}
             <span className="text-sm text-violet-200">{t.awayMode}</span>
           </HudPanel>
         </div>
+        )}
       </div>
     </div>
   );

@@ -248,8 +248,8 @@ function Gauge({ label, value, text, color = "#22d3ee" }: { label: string; value
   const C = 2 * Math.PI * 16;
   const v = Math.max(0, Math.min(1, value));
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative h-12 w-12">
+    <div className="flex items-center justify-center gap-1">
+      <div className="relative h-[22px] w-[22px] shrink-0">
         <svg viewBox="0 0 40 40" className="absolute inset-0 h-full w-full rotate-[135deg]">
           <circle cx="20" cy="20" r="16" fill="none" stroke={color} strokeOpacity="0.15" strokeWidth="3" strokeDasharray={`${C * 0.75} ${C}`} strokeLinecap="round" />
           <circle cx="20" cy="20" r="16" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round"
@@ -257,9 +257,11 @@ function Gauge({ label, value, text, color = "#22d3ee" }: { label: string; value
           <circle cx="20" cy="20" r="11" fill="none" stroke={color} strokeOpacity="0.3" strokeWidth="0.6" strokeDasharray="1 2.5"
             className="anim-spin-slow" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center font-mono text-[10px] text-cyan-100">{text}</span>
       </div>
-      <span className="mt-0.5 font-mono text-[7.5px] tracking-[0.2em] text-cyan-300/60">{label}</span>
+      <span className="flex flex-col leading-none">
+        <span className="font-mono text-[10px] text-cyan-100">{text}</span>
+        <span className="mt-0.5 font-mono text-[6.5px] tracking-[0.15em] text-cyan-300/60">{label}</span>
+      </span>
     </div>
   );
 }
@@ -282,9 +284,9 @@ export function TelemetryHud({ temp, checkOut, devices }: {
   });
   const SWEEP = 4; // 秒
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.03] px-3 py-2 backdrop-blur-md">
+    <div className="mb-3 flex items-center gap-2 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.03] px-2 py-1 backdrop-blur-md">
       {/* ミニレーダー */}
-      <div className="relative h-[76px] w-[76px] shrink-0">
+      <div className="relative h-[26px] w-[26px] shrink-0">
         <svg viewBox="-40 -40 80 80" className="absolute inset-0 h-full w-full">
           <circle r="36" fill="none" stroke="#22d3ee" strokeOpacity="0.35" strokeWidth="0.8" />
           <circle r="24" fill="none" stroke="#22d3ee" strokeOpacity="0.2" strokeWidth="0.6" />
@@ -320,14 +322,14 @@ export function TelemetryHud({ temp, checkOut, devices }: {
             text={new Date(now).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" })} />
         )}
         <Gauge label="STAY" value={Math.min(1, hoursLeft / 24)} text={hoursLeft >= 24 ? `${Math.floor(hoursLeft / 24)}d` : `${Math.floor(hoursLeft)}h`} color="#fbbf24" />
-        <div className="flex flex-col items-center">
-          <div className="flex h-12 items-end gap-[3px] pb-2">
+        <div className="flex items-center justify-center gap-1">
+          <div className="flex h-[16px] items-end gap-[2px]">
             {[0, 1, 2, 3, 4].map((i) => (
-              <span key={i} className={`w-1.5 rounded-sm transition-all duration-700 ${i < link ? "bg-emerald-300 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-emerald-300/15"}`}
-                style={{ height: `${8 + i * 6}px` }} />
+              <span key={i} className={`w-1 rounded-sm transition-all duration-700 ${i < link ? "bg-emerald-300 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-emerald-300/15"}`}
+                style={{ height: `${4 + i * 3}px` }} />
             ))}
           </div>
-          <span className="font-mono text-[7.5px] tracking-[0.2em] text-cyan-300/60">LINK</span>
+          <span className="font-mono text-[6.5px] tracking-[0.15em] text-cyan-300/60">LINK</span>
         </div>
       </div>
     </div>

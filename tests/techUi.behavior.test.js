@@ -56,7 +56,7 @@ test("modes are right under the entrance button; normal returns to main light on
   const cp = read("components", "ControlPanel.tsx");
   const entrance = cp.indexOf("<EntranceKeyButton");
   const modes = cp.indexOf("<ModeGrid ");
-  const scenes = cp.indexOf("<SceneButtons ");
+  const scenes = cp.indexOf("<SceneButtons part=\"rest\"");
   assert.ok(entrance > 0 && modes > entrance && scenes > modes);
   assert.match(cp, /action: "normal"/);
   assert.match(cp, /action: "galaxy_on"/);
@@ -133,4 +133,14 @@ test("away button sits above good-night / wafu-off", () => {
   const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../components/ControlPanel.tsx"), "utf8");
   const scene = src.slice(src.indexOf("function SceneButtons"));
   assert.match(scene, /order-first col-span-2">\s*<HudPanel tone="violet" onClick=\{\(\) => run\("away"\)\}/);
+});
+
+test("away button is rendered above the lock card; the rest stay below the mode grid", () => {
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../components/ControlPanel.tsx"), "utf8");
+  const away = src.indexOf('<SceneButtons part="away"');
+  const lock = src.indexOf("<LockCard ");
+  const grid = src.indexOf("<ModeGrid ");
+  const rest = src.indexOf('<SceneButtons part="rest"');
+  assert.ok(away > 0 && away < lock, "away above lock");
+  assert.ok(grid < rest, "good-night / wafu-off stay under the mode grid");
 });
