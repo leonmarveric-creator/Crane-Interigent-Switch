@@ -1175,7 +1175,8 @@ function SceneButtons({
             <span className="text-sm text-rose-200/90">{t.wafu} {t.off}</span>
           </HudPanel>
         )}
-        <div className="col-span-2">
+        {/* 外出ボタンは押しやすいよう、おやすみ / 和風ライトオフより上に置く */}
+        <div className="order-first col-span-2">
           <HudPanel tone="violet" onClick={() => run("away")} small
             contentClassName="flex-col items-center gap-2 px-4 py-4">
             <Corners tone="cyan" />

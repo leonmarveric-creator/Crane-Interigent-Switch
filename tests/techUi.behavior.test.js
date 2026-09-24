@@ -128,3 +128,9 @@ test("alarm save failure returns DB detail; combined wake SQL exists", () => {
   assert.match(sql, /wake_mode/);
   assert.match(sql, /wafu_prewake_step/);
 });
+
+test("away button sits above good-night / wafu-off", () => {
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../components/ControlPanel.tsx"), "utf8");
+  const scene = src.slice(src.indexOf("function SceneButtons"));
+  assert.match(scene, /order-first col-span-2">\s*<HudPanel tone="violet" onClick=\{\(\) => run\("away"\)\}/);
+});

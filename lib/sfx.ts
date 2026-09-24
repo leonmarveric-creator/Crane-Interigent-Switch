@@ -63,6 +63,9 @@ const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
   "Nest mode off": "current-natural-voice-52-nest-mode-off.mp3",
   "Warm light standby": "current-natural-voice-53-warm-light-standby.mp3",
   "Dimming the glow": "current-natural-voice-54-dimming-the-glow.mp3",
+  // 光目覚ましのモード名 (女性アンドロイド音声)
+  "Flame On": "current-natural-voice-55-flame-on.mp3",
+  "Horizon Rise": "current-natural-voice-56-horizon-rise.mp3",
 };
 
 const VOICE_LABEL_ALIASES: Array<[string, string]> = [
