@@ -6,24 +6,27 @@
 //   预订: 提前入住 / 延迟退房 と ゲストへの案内文コピー
 //   日历: 1週間の退房・入住・换房
 //   记录: がんばり記録 (今月のスタンプ・今年の清掃数・バッジ)
+//   工具: 暗証番号の一覧 (コピー・変更)、ゲストへの定型メッセージ、買い物リスト
 // =========================================================
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Home, ClipboardList, CalendarDays, Sparkles, DoorOpen, Lock, Loader2, Check, Copy, Clock, LogOut,
-  Sunrise, Sunset, Undo2, AlertTriangle, X, KeyRound, BedDouble, ArrowRight, Lightbulb, LightbulbOff, PowerOff, RefreshCw, Heart, Award, ScanFace, Trash2,
+  Sunrise, Sunset, Undo2, AlertTriangle, X, KeyRound, BedDouble, ArrowRight, Lightbulb, LightbulbOff, PowerOff, RefreshCw, Heart, Award, ScanFace, Trash2, NotebookPen, MessageCircle, Pencil, ShoppingCart, Share2, ListChecks, Plus, MoonStar, ChevronDown,
 } from "lucide-react";
 import {
-  roomState, effIn, effOut, jstDay, jstTime, addDays, minutesUntil, weekPlan, guestMessage, todayCleaning, roomIcon, achievements,
+  roomState, effIn, effOut, jstDay, jstTime, addDays, minutesUntil, weekPlan, guestMessage, todayCleaning, roomIcon, roomKanji, achievements,
   type StaffRoom, type StaffRes, type RoomStatus, type HistoryItem, type Achievements,
 } from "@/lib/staffLogic";
-import { setEarlyCheckin, setLateCheckout, markCleaned, undoCleaned, roomDoor, roomLights, roomAllOff } from "@/app/staff/actions";
+import { setEarlyCheckin, setLateCheckout, markCleaned, undoCleaned, roomDoor, roomLights, roomAllOff, setRoomCode, setEntranceCode } from "@/app/staff/actions";
+import { TEMPLATES, GUEST_LANGS, type GuestLang } from "@/lib/staffTemplates";
 import { passkeySupported, hasPasskeyHere, registerPasskey, forgetPasskeyHere } from "@/lib/staffPasskeyClient";
-import { dailyCheer, doneCheer, allDoneCheer, specialDay, badgeProgress, BADGES } from "@/lib/staffCheer";
+import { dailyCheer, doneCheer, allDoneCheer, specialDay, badgeProgress, praiseCheer, BADGES } from "@/lib/staffCheer";
 
 type Lang = "zh" | "ja";
+export interface EntranceCode { id: string; name: string; building: string; code: string | null }
 export interface StaffPasskey { id: string; device_name: string | null; created_at: string; last_used_at: string | null }
-type Tab = "today" | "res" | "cal" | "rec";
+type Tab = "today" | "res" | "cal" | "rec" | "memo";
 
 /* ---------------- 文言 ---------------- */
 const S = {
@@ -64,6 +67,17 @@ const S = {
     pkDone: "设置好了！下次可以用 Face ID 登录 ✓", pkFail: "没有设置成功，请再试一次", pkMissing: "还需要在 Supabase 执行 migration_staff_passkeys.sql",
     pkList: "已设置的手机", pkNone: "还没有设置", pkHere: "在这台手机上设置", pkDelete: "删除", pkDeleteConfirm: "再按一次删除", pkLast: "上次使用",
     pkNote: "脸和指纹的数据只保存在手机里，不会上传。手机丢了的话，在这里删除就好。",
+    tabMemo: "工具", bigText: "大字",
+    checklist: "清扫清单", checkAllDone: "全部检查完了！可以按「清扫完成」了 ✨",
+    tomorrowPlan: "明天的安排", tomorrowNone: "明天没有退房和入住，可以休息一下 🌿", tmrClean: (n: number) => `清扫 ${n} 间`, tmrIn: (n: number) => `入住 ${n} 位`, tmrFirst: (tm: string) => `最早 ${tm} 退房`,
+    eveningTitle: "今天辛苦了 🌙", eveningBody: (c: number, g: number) => `今天完成了 ${c} 间清扫，迎接了 ${g} 位客人。好好休息吧！`, eveningNone: "今天也谢谢你。晚上好好休息吧！",
+    tapHint: "点一下照片 💕",
+    newBadge: "拿到新徽章了！", newBadgeBody: (n: number) => `今年已经清扫了 ${n} 间，太厉害了！`, great: "太好了！",
+    shopTitle: "需要买的东西", shopPh: "其他东西…", add: "添加", shopEmpty: "现在没有要买的东西 👍", shopSend: "发给家人", shopSent: "已复制，可以粘贴发送",
+    shopMsg: (items: string) => `【需要买的东西】\n${items}`, clearBought: "删除已买的",
+    codesTitle: "密码一览", codesHint: "点「复制」就能粘贴发给客人", codesEntrance: "大门", codesRooms: "房间", codeNone: "未设置", codeEdit: "修改",
+    codeSave: "保存", codeCancel: "取消", codeSaved: "已保存 ✓", codesMissing: "还需要在 Supabase 执行 migration_room_codes.sql（才能保存房间密码）", codeNote: "修改大门密码后，客人钥匙页面上的密码也会一起改变",
+    tplTitle: "发给客人的消息", tplHint: "选客人的语言，点「复制」再粘贴到 Airbnb 或 LINE", tplLang: "客人的语言", copy: "复制", send: "发送", copiedShort: "已复制",
     weather: "今天的天气", tip: (code: number, max: number, min: number, rain: number) => weatherTip("zh", code, max, min, rain),
   },
   ja: {
@@ -103,6 +117,17 @@ const S = {
     pkDone: "設定できました！次から Face ID でログインできます ✓", pkFail: "設定できませんでした。もう一度お試しください", pkMissing: "Supabase で migration_staff_passkeys.sql の実行が必要です",
     pkList: "設定したスマホ", pkNone: "まだ設定していません", pkHere: "このスマホで設定する", pkDelete: "削除", pkDeleteConfirm: "もう一度押して削除", pkLast: "最後に使用",
     pkNote: "顔や指紋のデータはスマホの中だけに保存され、送られません。スマホをなくしたときは、ここで削除してください。",
+    tabMemo: "べんり", bigText: "大きい字",
+    checklist: "清掃チェックリスト", checkAllDone: "ぜんぶチェックできました！「清掃完了」を押してね ✨",
+    tomorrowPlan: "明日の予定", tomorrowNone: "明日はチェックアウトもチェックインもありません。ゆっくりしてね 🌿", tmrClean: (n: number) => `清掃 ${n} 部屋`, tmrIn: (n: number) => `入室 ${n} 組`, tmrFirst: (tm: string) => `最初の退室 ${tm}`,
+    eveningTitle: "今日もおつかれさま 🌙", eveningBody: (c: number, g: number) => `今日は ${c} 部屋をきれいにして、${g} 組のゲストをお迎えしました。ゆっくり休んでね！`, eveningNone: "今日もありがとう。夜はゆっくり休んでね！",
+    tapHint: "写真をタップ 💕",
+    newBadge: "新しいバッジをもらいました！", newBadgeBody: (n: number) => `今年はもう ${n} 部屋きれいにしました。すごい！`, great: "やったね！",
+    shopTitle: "買うものリスト", shopPh: "ほかのもの…", add: "追加", shopEmpty: "いま買うものはありません 👍", shopSend: "家族に送る", shopSent: "コピーしました。貼り付けて送ってね",
+    shopMsg: (items: string) => `【買うものリスト】\n${items}`, clearBought: "買ったものを消す",
+    codesTitle: "暗証番号の一覧", codesHint: "「コピー」を押して、ゲストへのメッセージに貼り付け", codesEntrance: "エントランス", codesRooms: "お部屋", codeNone: "未設定", codeEdit: "変更",
+    codeSave: "保存", codeCancel: "やめる", codeSaved: "保存しました ✓", codesMissing: "Supabase で migration_room_codes.sql の実行が必要です（お部屋の番号を保存するため）", codeNote: "エントランスの番号を変えると、ゲストの鍵画面に出る番号も変わります",
+    tplTitle: "ゲストへのメッセージ", tplHint: "ゲストの言語を選んで「コピー」→ Airbnb や LINE に貼り付け", tplLang: "ゲストの言語", copy: "コピー", send: "送る", copiedShort: "コピー済み",
     weather: "今日の天気", tip: (code: number, max: number, min: number, rain: number) => weatherTip("ja", code, max, min, rain),
   },
 };
@@ -117,13 +142,17 @@ const STATUS_STYLE: Record<RoomStatus, { dot: string; chip: string; border: stri
 const card = "rounded-3xl bg-white shadow-[0_10px_30px_-20px_rgba(59,50,40,0.45)]";
 
 export default function StaffClient({
-  rooms, reservations, baseUrl, entranceUrlByBuilding, setupMissing, history = [], geo = null, passkeys = null,
+  rooms, reservations, baseUrl, entranceUrlByBuilding, setupMissing, history = [], geo = null, passkeys = null, entranceCodes = [], roomCodes = null,
 }: {
   rooms: StaffRoom[]; reservations: StaffRes[]; baseUrl: string;
   entranceUrlByBuilding: Record<string, string>; setupMissing: boolean;
   history?: HistoryItem[]; geo?: { lat: number; lng: number } | null;
   /** 登録済みの Face ID / 指紋。null = テーブル未作成 */
   passkeys?: StaffPasskey[] | null;
+  /** エントランスの暗証番号 */
+  entranceCodes?: EntranceCode[];
+  /** お部屋の暗証番号 (room.id → 番号)。null = migration_room_codes.sql 未実行 */
+  roomCodes?: Record<string, string | null> | null;
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("zh");
@@ -143,17 +172,22 @@ export default function StaffClient({
   const states = useMemo(() => rooms.map((room) => ({ room, st: roomState(room, reservations, now) })), [rooms, reservations, now]);
   const ach = useMemo(() => achievements(history, now), [history, now]);
 
+  // 大きい字モード (端末ごとに記憶)
+  const [big, setBig] = useState(false);
+  useEffect(() => { try { setBig(localStorage.getItem("staffBig") === "1"); } catch { /* noop */ } }, []);
+  const toggleBig = () => setBig((v) => { try { localStorage.setItem("staffBig", v ? "0" : "1"); } catch { /* noop */ } return !v; });
+
   const logout = async () => { await fetch("/api/staff/logout", { method: "POST" }).catch(() => null); location.href = "/staff/login"; };
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg bg-[#f6efe2] pb-28 text-[17px] text-[#3b3228] [color-scheme:light]">
-      <Header t={t} lang={lang} now={now} onLang={changeLang} onLogout={logout} />
+      <Header t={t} lang={lang} now={now} onLang={changeLang} onLogout={logout} big={big} onBig={toggleBig} />
       {setupMissing && (
         <p className="mx-4 mt-3 flex items-start gap-2 rounded-2xl bg-[#fff3d6] p-3 text-sm text-[#7a5a12]">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t.setupMissing}
         </p>
       )}
-      <div className="px-4">
+      <div className="px-4" style={big ? { zoom: 1.15 } : undefined}>
         {tab === "today" && <TodayTab t={t} lang={lang} rooms={rooms} states={states} reservations={reservations} roomById={roomById} now={now} ach={ach} geo={geo} pkReady={passkeys !== null} />}
         {tab === "res" && (
           <ResTab t={t} reservations={reservations} roomById={roomById} states={states} now={now}
@@ -161,14 +195,21 @@ export default function StaffClient({
         )}
         {tab === "cal" && <CalTab t={t} rooms={rooms} reservations={reservations} now={now} />}
         {tab === "rec" && <RecTab t={t} lang={lang} ach={ach} now={now} passkeys={passkeys} />}
+        {tab === "memo" && <MemoTab t={t} lang={lang} rooms={rooms} entranceCodes={entranceCodes} roomCodes={roomCodes} />}
       </div>
+      <BadgeCelebration t={t} lang={lang} count={ach.yearCleans} />
       <BottomNav t={t} tab={tab} setTab={(x) => { setTab(x); window.scrollTo(0, 0); }} />
     </div>
   );
 }
 
 /* ---------------- ヘッダ (イラスト + あいさつ) ---------------- */
-function Header({ t, lang, now, onLang, onLogout }: { t: ST; lang: Lang; now: number; onLang: (l: Lang) => void; onLogout: () => void }) {
+function Header({ t, lang, now, onLang, onLogout, big, onBig }: {
+  t: ST; lang: Lang; now: number; onLang: (l: Lang) => void; onLogout: () => void; big: boolean; onBig: () => void;
+}) {
+  // 写真をタップすると、ハートがふわっと出てほめ言葉
+  const [pat, setPat] = useState<{ k: number; text: string } | null>(null);
+  const patMe = () => { setPat({ k: Date.now(), text: praiseCheer(lang) }); vibrate([15, 40, 15]); };
   const hour = Number(jstTime(new Date(now).toISOString()).slice(0, 2));
   const greet = hour < 12 ? t.morning : hour < 18 ? t.afternoon : t.evening;
   const day = jstDay(now);
@@ -179,9 +220,19 @@ function Header({ t, lang, now, onLang, onLogout }: { t: ST; lang: Lang; now: nu
   return (
     <header className="relative h-56 overflow-hidden rounded-b-[36px] shadow-[0_18px_40px_-26px_rgba(59,50,40,0.7)]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/staff/xiaobo.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_28%]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#3b3228]/75 via-[#3b3228]/10 to-transparent" />
+      <img src="/staff/xiaobo.jpg" alt="" onClick={patMe} className="absolute inset-0 h-full w-full cursor-pointer object-cover object-[50%_28%]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#3b3228]/75 via-[#3b3228]/10 to-transparent" />
+      {pat && <Hearts key={pat.k} />}
+      {pat && (
+        <p key={`t${pat.k}`} className="pointer-events-none absolute inset-x-6 top-[38%] z-10 animate-[staffPop_2.6s_ease-out_forwards] rounded-2xl bg-white/90 px-4 py-2 text-center text-base font-bold text-[#b0662f] shadow-lg">
+          {pat.text}
+        </p>
+      )}
       <div className="absolute right-3 top-3 flex gap-2">
+        <button onClick={onBig} aria-pressed={big} aria-label={t.bigText}
+          className={`rounded-full px-3 py-1.5 text-sm font-bold shadow backdrop-blur ${big ? "bg-[#3b7dd8] text-white" : "bg-white/85 text-[#3b3228]"}`}>
+          A<span className="text-base">A</span>
+        </button>
         <div className="flex overflow-hidden rounded-full bg-white/85 text-sm font-semibold shadow backdrop-blur">
           {(["zh", "ja"] as Lang[]).map((l) => (
             <button key={l} onClick={() => onLang(l)} className={`px-3 py-1.5 ${lang === l ? "bg-[#3b7dd8] text-white" : "text-[#3b3228]"}`}>
@@ -193,9 +244,10 @@ function Header({ t, lang, now, onLang, onLogout }: { t: ST; lang: Lang; now: nu
           <LogOut className="h-4 w-4" />
         </button>
       </div>
-      <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 text-white">
         <p className="text-base font-medium opacity-90">{dateText}（{jstTime(new Date(now).toISOString())}）</p>
         <h1 className="text-[28px] font-bold leading-tight drop-shadow">{greet}，{t.hello} ☀️</h1>
+        <p className="mt-0.5 text-xs opacity-75">{t.tapHint}</p>
       </div>
     </header>
   );
@@ -227,6 +279,7 @@ function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, ge
       <CheerCard t={t} lang={lang} now={now} />
       {pkReady && <PasskeyPrompt t={t} />}
       {geo && <WeatherCard t={t} geo={geo} />}
+      <EveningCard t={t} now={now} prog={prog} guests={events.filter((e) => e.kind === "in" && new Date(e.at).getTime() <= now).length} />
       <ProgressCard t={t} lang={lang} prog={prog} now={now} monthCleans={ach.monthCleans} />
       <div className="grid grid-cols-3 gap-2">
         {(["dirty", "staying", "vacant"] as RoomStatus[]).map((s) => (
@@ -252,7 +305,7 @@ function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, ge
                     {e.kind === "out" ? t.checkout : t.checkin}
                   </span>
                   {room && <RoomBubble room={room} size="sm" />}
-                  <span className="min-w-0 flex-1 truncate font-semibold">{room?.name ?? "—"}
+                  <span className="min-w-0 flex-1 truncate font-semibold">{room ? <RoomName room={room} /> : "—"}
                     <span className="ml-1.5 text-sm font-normal text-[#7a6d5c]">{e.r.guest_name ?? ""}</span>
                   </span>
                   {shifted && <span className="rounded-full bg-[#f5c542] px-2 py-0.5 text-xs font-bold text-[#5a4300]">{e.kind === "in" ? t.early : t.late}</span>}
@@ -271,6 +324,8 @@ function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, ge
           ))}
         </section>
       ))}
+
+      <TomorrowCard t={t} rooms={rooms} reservations={reservations} roomById={roomById} now={now} />
     </div>
   );
 }
@@ -371,7 +426,7 @@ function RoomCard({ t, lang, room, st, now }: { t: ST; lang: Lang; room: StaffRo
       {party > 0 && <Petals key={party} />}
       <div className="flex items-center justify-between gap-2">
         <h3 className="flex min-w-0 items-center gap-2.5 text-[24px] font-bold tracking-wide">
-          <RoomBubble room={room} /> <span className="truncate">{room.name}</span>
+          <RoomBubble room={room} /> <span className="truncate"><RoomName room={room} big /></span>
         </h3>
         <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-base font-bold ${style.chip}`}>
           <span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} /> {t[st.status]}
@@ -423,6 +478,7 @@ function RoomCard({ t, lang, room, st, now }: { t: ST; lang: Lang; room: StaffRo
             </button>
           )}
           {st.status === "dirty" && <p className="text-center text-sm text-[#8a7d6c]">{t.autoNote}</p>}
+          {st.status === "dirty" && <CleanChecklist t={t} lang={lang} roomId={room.id} day={jstDay(now)} />}
           {st.status === "vacant" && (
             <button onClick={allOff} disabled={!!busy}
               className={`flex w-full flex-col items-center justify-center rounded-2xl py-3 text-white shadow transition active:scale-[0.99] disabled:opacity-60
@@ -519,7 +575,7 @@ function ResCard({ t, r, room, all, now, roomDirty, baseUrl, entranceUrlByBuildi
     <div className={`${card} p-4`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[22px] font-bold">{room && <RoomBubble room={room} size="sm" />}{room?.name ?? "—"}
+          <p className="flex items-center gap-2 text-[22px] font-bold">{room && <RoomBubble room={room} size="sm" />}{room ? <RoomName room={room} /> : "—"}
             {staying && <span className="ml-2 rounded-full bg-[#e3eefc] px-2 py-0.5 align-middle text-sm font-bold text-[#23609f]">{t.staying}</span>}
           </p>
           <p className="truncate text-[#7a6d5c]">{r.guest_name ?? t.guestAirbnb}</p>
@@ -668,7 +724,7 @@ function CalTab({ t, rooms, reservations, now }: { t: ST; rooms: StaffRoom[]; re
               <ul className="space-y-2">
                 {d.rooms.map((x) => (
                   <li key={x.room.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-[#faf6ee] px-3 py-2">
-                    <span className="flex min-w-[5.5rem] items-center gap-1.5 text-lg font-bold"><RoomBubble room={x.room} size="sm" />{x.room.name}</span>
+                    <span className="flex min-w-[5.5rem] items-center gap-1.5 text-lg font-bold"><RoomBubble room={x.room} size="sm" /><RoomName room={x.room} /></span>
                     {x.turnover && <span className="rounded-full bg-[#ffe2c2] px-2 py-0.5 text-sm font-bold text-[#a4520b]">{t.turnover}</span>}
                     {x.out && <span className="rounded-full bg-[#fde8e5] px-2 py-0.5 text-sm font-semibold text-[#b8372d]">{t.checkout} {jstTime(effOut(x.out))}{x.out.late_checkout_at ? ` · ${t.late}` : ""}</span>}
                     {x.in && <span className="rounded-full bg-[#e3eefc] px-2 py-0.5 text-sm font-semibold text-[#23609f]">{t.checkin} {jstTime(effIn(x.in))}{x.in.early_checkin_at ? ` · ${t.early}` : ""}</span>}
@@ -691,6 +747,18 @@ function RoomBubble({ room, size = "md" }: { room: { slug: string; name: string 
     <span aria-hidden className={`inline-flex shrink-0 items-center justify-center rounded-full ${cls}`} style={{ background: ic.bg }}>
       {ic.emoji}
     </span>
+  );
+}
+
+/* 部屋名: 漢字 (春・夏…) を大きく、元の名前 (HARU) を小さく添える */
+function RoomName({ room, big }: { room: { slug: string; name: string }; big?: boolean }) {
+  const k = roomKanji(room);
+  if (k === room.name) return <>{room.name}</>;
+  return (
+    <>
+      {k}
+      <span className={`ml-1.5 font-medium text-[#a2968a] ${big ? "text-sm" : "text-xs"}`}>{room.name}</span>
+    </>
   );
 }
 
@@ -943,6 +1011,399 @@ function PasskeySettings({ t, passkeys }: { t: ST; passkeys: StaffPasskey[] | nu
   );
 }
 
+/* ---------------- 便利機能・元気が出る仕組み ---------------- */
+function readLS<T>(k: string, fallback: T): T {
+  try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+}
+function writeLS(k: string, v: unknown) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* noop */ } }
+
+/* 写真をタップしたときのハート */
+function Hearts() {
+  const items = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+    e: ["💕", "💖", "🌸", "✨", "💗"][i % 5], left: 10 + Math.random() * 80, delay: Math.random() * 0.4, size: 18 + Math.random() * 14,
+  })), []);
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+      <style>{`@keyframes staffHeart{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-200px) scale(1.2);opacity:0}}
+        @keyframes staffPop{0%{transform:scale(.8);opacity:0}12%{transform:scale(1.05);opacity:1}80%{opacity:1}100%{opacity:0}}`}</style>
+      {items.map((h, i) => (
+        <span key={i} className="absolute bottom-6" style={{ left: `${h.left}%`, fontSize: h.size, opacity: 0, animation: `staffHeart 2.2s ease-out ${h.delay}s forwards` }}>{h.e}</span>
+      ))}
+    </div>
+  );
+}
+
+/* 清掃チェックリスト (部屋ごと・日ごとに、このスマホに記憶) */
+const CHECK_ITEMS: { e: string; zh: string; ja: string }[] = [
+  { e: "🛏️", zh: "换床单、被套、枕套", ja: "シーツ・布団カバー・枕カバー交換" },
+  { e: "🧺", zh: "换毛巾、浴巾", ja: "タオル・バスタオル交換" },
+  { e: "🚽", zh: "打扫厕所", ja: "トイレ掃除" },
+  { e: "🛁", zh: "打扫浴室、洗脸台", ja: "お風呂・洗面台" },
+  { e: "🧹", zh: "吸尘、拖地", ja: "掃除機・床ふき" },
+  { e: "🗑️", zh: "倒垃圾、换垃圾袋", ja: "ゴミ回収・袋の交換" },
+  { e: "🧻", zh: "补充厕纸、洗发水、沐浴露", ja: "トイレットペーパー・シャンプー補充" },
+  { e: "☕", zh: "补充茶、咖啡、杯子", ja: "お茶・コーヒー・コップ" },
+  { e: "🧊", zh: "检查冰箱和遗留物品", ja: "冷蔵庫・忘れ物チェック" },
+  { e: "🎛️", zh: "遥控器放回原位", ja: "リモコンを元の場所へ" },
+];
+function CleanChecklist({ t, lang, roomId, day }: { t: ST; lang: Lang; roomId: string; day: string }) {
+  const key = `staffCheck:${roomId}:${day}`;
+  const [done, setDone] = useState<number[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setDone(readLS<number[]>(key, [])); }, [key]);
+  const toggle = (i: number) => setDone((d) => {
+    const next = d.includes(i) ? d.filter((x) => x !== i) : [...d, i];
+    writeLS(key, next); if (!d.includes(i)) vibrate([10]);
+    return next;
+  });
+  const all = done.length >= CHECK_ITEMS.length;
+  return (
+    <div className="rounded-2xl border-2 border-[#eadfcb] bg-[#fffdf8]">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
+        <ListChecks className="h-5 w-5 text-[#2f8a57]" />
+        <span className="flex-1 font-bold">{t.checklist}</span>
+        <span className={`rounded-full px-2 py-0.5 text-sm font-bold tabular-nums ${all ? "bg-[#e6f5ec] text-[#2f8a57]" : "bg-[#f6efe2] text-[#7a6d5c]"}`}>
+          {done.length}/{CHECK_ITEMS.length}
+        </span>
+        <ChevronDown className={`h-5 w-5 text-[#a2968a] transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul className="space-y-1 px-2 pb-2">
+          {CHECK_ITEMS.map((it, i) => {
+            const on = done.includes(i);
+            return (
+              <li key={i}>
+                <button onClick={() => toggle(i)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-[16px] ${on ? "bg-[#eef8f1] text-[#7a8f80] line-through" : "active:bg-[#f6efe2]"}`}>
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 ${on ? "border-[#2f8a57] bg-[#2f8a57] text-white" : "border-[#d8cfbf] bg-white"}`}>
+                    {on && <Check className="h-5 w-5" />}
+                  </span>
+                  <span className="text-xl" aria-hidden>{it.e}</span>
+                  <span className="flex-1">{lang === "zh" ? it.zh : it.ja}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {all && <p className="px-3 pb-3 text-center font-bold text-[#2f8a57]">{t.checkAllDone}</p>}
+    </div>
+  );
+}
+
+/* 明日の予定 (前の晩に心の準備ができるように) */
+function TomorrowCard({ t, rooms, reservations, roomById, now }: {
+  t: ST; rooms: StaffRoom[]; reservations: StaffRes[]; roomById: Map<string, StaffRoom>; now: number;
+}) {
+  const tmr = addDays(jstDay(now), 1);
+  const plan = useMemo(() => weekPlan(rooms, reservations, tmr, 1)[0], [rooms, reservations, tmr]);
+  const outs = plan?.rooms.filter((x) => x.out).map((x) => effOut(x.out!)).sort() ?? [];
+  const ins = plan?.rooms.filter((x) => x.in).length ?? 0;
+  return (
+    <section className={`${card} p-4`}>
+      <h2 className="mb-2 flex items-center gap-2 text-lg font-bold"><CalendarDays className="h-5 w-5 text-[#7a6d5c]" /> {t.tomorrowPlan}</h2>
+      {!plan || plan.rooms.length === 0 ? <p className="text-[#7a6d5c]">{t.tomorrowNone}</p> : (
+        <>
+          <p className="flex flex-wrap gap-2 text-base font-semibold">
+            {plan.cleanings > 0 && <span className="rounded-full bg-[#fde8e5] px-3 py-1 text-[#b8372d]">🧹 {t.tmrClean(plan.cleanings)}</span>}
+            {ins > 0 && <span className="rounded-full bg-[#e3eefc] px-3 py-1 text-[#23609f]">🧳 {t.tmrIn(ins)}</span>}
+            {outs[0] && <span className="rounded-full bg-[#f6efe2] px-3 py-1 text-[#6b5f52]">⏰ {t.tmrFirst(jstTime(outs[0]))}</span>}
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {plan.rooms.map((x) => (
+              <li key={x.room.id} className="flex flex-wrap items-center gap-2 text-[15px]">
+                <RoomBubble room={roomById.get(x.room.id) ?? x.room} size="sm" />
+                <span className="font-bold"><RoomName room={x.room} /></span>
+                {x.out && <span className="text-[#b8372d]">{t.checkout} {jstTime(effOut(x.out))}</span>}
+                {x.in && <span className="text-[#23609f]">{t.checkin} {jstTime(effIn(x.in))}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+/* 夕方 (17時以降) の「今日もおつかれさま」 */
+function EveningCard({ t, now, prog, guests }: { t: ST; now: number; prog: { total: number; done: number }; guests: number }) {
+  const hour = Number(jstTime(new Date(now).toISOString()).slice(0, 2));
+  if (hour < 17) return null;
+  return (
+    <section className="rounded-3xl bg-gradient-to-br from-[#2d3a66] to-[#6b5aa6] p-4 text-white shadow-[0_10px_30px_-18px_rgba(45,58,102,0.9)]">
+      <p className="flex items-center gap-2 text-lg font-bold"><MoonStar className="h-5 w-5 text-[#ffe08a]" /> {t.eveningTitle}</p>
+      <p className="mt-1 leading-relaxed text-white/90">{prog.done > 0 || guests > 0 ? t.eveningBody(prog.done, guests) : t.eveningNone}</p>
+    </section>
+  );
+}
+
+/* 新しいバッジを取ったら一度だけお祝い */
+function BadgeCelebration({ t, lang, count }: { t: ST; lang: Lang; count: number }) {
+  const [badge, setBadge] = useState<ReturnType<typeof badgeProgress>["earned"][number] | null>(null);
+  useEffect(() => {
+    const top = badgeProgress(count).earned.slice(-1)[0];
+    if (!top) return;
+    const seen = readLS<number>("staffBadgeSeen", 0);
+    if (top.at > seen) { setBadge(top); vibrate([30, 60, 30, 60, 120]); }
+  }, [count]);
+  if (!badge) return null;
+  const close = () => { writeLS("staffBadgeSeen", badge.at); setBadge(null); };
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-6" onClick={close}>
+      <div className="relative w-full max-w-sm overflow-hidden rounded-[32px] bg-gradient-to-br from-[#fff4d6] via-white to-[#fde3e8] p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <Petals />
+        <p className="text-sm font-bold text-[#b0662f]">🎉 {t.newBadge}</p>
+        <p className="mt-3 text-[72px] leading-none">{badge.emoji}</p>
+        <p className="mt-3 text-2xl font-bold text-[#7a3b2c]">{lang === "zh" ? badge.zh : badge.ja}</p>
+        <p className="mt-2 text-[#6b5f52]">{t.newBadgeBody(count)}</p>
+        <button onClick={close} className="mt-5 w-full rounded-2xl bg-[#2f8a57] py-3.5 text-lg font-bold text-white shadow">{t.great}</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 备忘 (買うものリスト + メモ帳) ---------------- */
+const SHOP_PRESETS: { zh: string; ja: string }[] = [
+  { zh: "厕纸", ja: "トイレットペーパー" }, { zh: "洗发水", ja: "シャンプー" }, { zh: "护发素", ja: "リンス" },
+  { zh: "沐浴露", ja: "ボディソープ" }, { zh: "洗手液", ja: "ハンドソープ" }, { zh: "洗洁精", ja: "食器用洗剤" },
+  { zh: "洗衣液", ja: "洗濯洗剤" }, { zh: "垃圾袋", ja: "ゴミ袋" }, { zh: "纸巾", ja: "ティッシュ" },
+  { zh: "牙刷", ja: "歯ブラシ" }, { zh: "茶包", ja: "お茶パック" }, { zh: "咖啡", ja: "コーヒー" },
+  { zh: "电池", ja: "電池" }, { zh: "海绵", ja: "スポンジ" },
+];
+interface ShopItem { id: string; text: string; bought: boolean }
+function MemoTab({ t, lang, rooms, entranceCodes, roomCodes }: {
+  t: ST; lang: Lang; rooms: StaffRoom[]; entranceCodes: EntranceCode[]; roomCodes: Record<string, string | null> | null;
+}) {
+  const [items, setItems] = useState<ShopItem[]>([]);
+  const [text, setText] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { setItems(readLS<ShopItem[]>("staffShop", [])); }, []);
+  const save = (next: ShopItem[]) => { setItems(next); writeLS("staffShop", next); };
+  const add = (v: string) => {
+    const s = v.trim(); if (!s) return;
+    if (items.some((x) => x.text === s && !x.bought)) return;
+    save([...items, { id: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`, text: s, bought: false }]);
+    setText(""); vibrate([10]);
+  };
+  const toggle = (id: string) => save(items.map((x) => (x.id === id ? { ...x, bought: !x.bought } : x)));
+  const remove = (id: string) => save(items.filter((x) => x.id !== id));
+  const need = items.filter((x) => !x.bought);
+  const send = async () => {
+    const body = t.shopMsg(need.map((x) => `・${x.text}`).join("\n"));
+    try {
+      if (navigator.share) { await navigator.share({ text: body }); return; }
+    } catch { /* キャンセル等 */ return; }
+    try { await navigator.clipboard.writeText(body); setMsg(t.shopSent); setTimeout(() => setMsg(null), 2500); } catch { /* noop */ }
+  };
+  return (
+    <div className="space-y-4 pt-5">
+      <CodesCard t={t} rooms={rooms} entranceCodes={entranceCodes} roomCodes={roomCodes} />
+      <GuestTemplates t={t} lang={lang} />
+      <section className={`${card} p-4`}>
+        <h2 className="flex items-center gap-2 text-lg font-bold"><ShoppingCart className="h-5 w-5 text-[#e0a526]" /> {t.shopTitle}</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {SHOP_PRESETS.map((p) => {
+            const label = lang === "zh" ? p.zh : p.ja;
+            const on = need.some((x) => x.text === label);
+            return (
+              <button key={p.zh} onClick={() => add(label)} disabled={on}
+                className={`rounded-full border-2 px-3 py-1.5 text-[15px] font-semibold ${on ? "border-[#2f8a57] bg-[#e6f5ec] text-[#2f8a57]" : "border-[#e2d6c2] bg-[#fbf8f2] active:bg-[#f1ece2]"}`}>
+                {on ? "✓ " : "+ "}{label}
+              </button>
+            );
+          })}
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); add(text); }} className="mt-3 flex gap-2">
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.shopPh}
+            className="min-w-0 flex-1 rounded-2xl border-2 border-[#e2d6c2] bg-white px-4 py-3 text-lg outline-none focus:border-[#3b7dd8]" />
+          <button type="submit" disabled={!text.trim()} className="flex items-center gap-1 rounded-2xl bg-[#3b3228] px-4 text-lg font-bold text-white disabled:opacity-40">
+            <Plus className="h-5 w-5" /> {t.add}
+          </button>
+        </form>
+        {items.length === 0 ? <p className="mt-3 text-center text-[#a2968a]">{t.shopEmpty}</p> : (
+          <ul className="mt-3 divide-y divide-[#f1ece2]">
+            {items.map((x) => (
+              <li key={x.id} className="flex items-center gap-3 py-2">
+                <button onClick={() => toggle(x.id)} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 ${x.bought ? "border-[#2f8a57] bg-[#2f8a57] text-white" : "border-[#d8cfbf] bg-white"}`}
+                  aria-label={x.text}>
+                  {x.bought && <Check className="h-5 w-5" />}
+                </button>
+                <span className={`flex-1 text-lg ${x.bought ? "text-[#a2968a] line-through" : ""}`}>{x.text}</span>
+                <button onClick={() => remove(x.id)} aria-label="delete" className="rounded-full p-2 text-[#a2968a]"><X className="h-5 w-5" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {items.some((x) => x.bought) && (
+          <button onClick={() => save(items.filter((x) => !x.bought))} className="mt-2 text-sm font-semibold text-[#7a6d5c] underline">{t.clearBought}</button>
+        )}
+        {need.length > 0 && (
+          <button onClick={send} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#2f8a57] py-3.5 text-lg font-bold text-white shadow active:scale-[0.99]">
+            <Share2 className="h-5 w-5" /> {t.shopSend}
+          </button>
+        )}
+        {msg && <p className="mt-2 text-center font-semibold text-[#2f8a57]">{msg}</p>}
+      </section>
+
+    </div>
+  );
+}
+
+/* 暗証番号の一覧: エントランスとお部屋の番号を大きく表示してワンタップでコピー。その場で変更もできる */
+function CodesCard({ t, rooms, entranceCodes, roomCodes }: {
+  t: ST; rooms: StaffRoom[]; entranceCodes: EntranceCode[]; roomCodes: Record<string, string | null> | null;
+}) {
+  const buildings = Array.from(new Set(rooms.map((r) => r.building)));
+  return (
+    <section className={`${card} p-4`}>
+      <h2 className="flex items-center gap-2 text-lg font-bold"><KeyRound className="h-5 w-5 text-[#e0a526]" /> {t.codesTitle}</h2>
+      <p className="mt-1 text-sm text-[#7a6d5c]">{t.codesHint}</p>
+
+      {entranceCodes.length > 0 && (
+        <>
+          <p className="mt-3 text-sm font-bold text-[#7a6d5c]">🚪 {t.codesEntrance}</p>
+          <ul className="mt-1 divide-y divide-[#f1ece2]">
+            {entranceCodes.map((e) => (
+              <CodeRow key={e.id} t={t} label={<span className="font-bold">{entranceCodes.length > 1 ? e.building : e.name}</span>} code={e.code}
+                onSave={(v) => setEntranceCode(e.id, v)} note={t.codeNote} />
+            ))}
+          </ul>
+        </>
+      )}
+
+      <p className="mt-3 text-sm font-bold text-[#7a6d5c]">🛏️ {t.codesRooms}</p>
+      {roomCodes === null ? (
+        <p className="mt-1 rounded-xl bg-[#fff3d6] p-2 text-sm text-[#7a5a12]">{t.codesMissing}</p>
+      ) : buildings.map((b) => (
+        <div key={b}>
+          {buildings.length > 1 && <p className="mt-2 text-xs font-bold text-[#a2968a]">{b}</p>}
+          <ul className="divide-y divide-[#f1ece2]">
+            {rooms.filter((r) => r.building === b).map((room) => (
+              <CodeRow key={room.id} t={t}
+                label={<span className="flex items-center gap-2 font-bold"><RoomBubble room={room} size="sm" /><RoomName room={room} /></span>}
+                code={roomCodes[room.id] ?? null} onSave={(v) => setRoomCode(room.id, v)} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function CodeRow({ t, label, code, onSave, note }: {
+  t: ST; label: React.ReactNode; code: string | null; onSave: (v: string | null) => Promise<{ ok: boolean; error?: string }>; note?: string;
+}) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(code ?? "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const copy = async () => {
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); setCopied(true); vibrate([15]); setTimeout(() => setCopied(false), 1800); } catch { /* noop */ }
+  };
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    const r = await onSave(val.trim() || null).catch(() => ({ ok: false, error: "ERR" }));
+    setBusy(false);
+    if (r.ok) { setEditing(false); setMsg({ ok: true, text: t.codeSaved }); setTimeout(() => setMsg(null), 2000); router.refresh(); }
+    else setMsg({ ok: false, text: r.error === "SETUP_MISSING" ? t.codesMissing : t.errOther });
+  };
+  return (
+    <li className="py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {!editing && (
+          <>
+            <span className={`font-mono text-[22px] font-bold tracking-[0.15em] ${code ? "" : "text-base font-normal tracking-normal text-[#b3a898]"}`}>{code ?? t.codeNone}</span>
+            {code && (
+              <button onClick={copy} className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-bold ${copied ? "bg-[#2f8a57] text-white" : "bg-[#3b7dd8] text-white"}`}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? t.copiedShort : t.copy}
+              </button>
+            )}
+            <button onClick={() => { setVal(code ?? ""); setEditing(true); }} aria-label={t.codeEdit} className="rounded-xl bg-[#f6efe2] p-2 text-[#7a6d5c]">
+              <Pencil className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+      {editing && (
+        <div className="mt-2">
+          <div className="flex gap-2">
+            <input value={val} onChange={(e) => setVal(e.target.value)} inputMode="numeric" autoFocus maxLength={32}
+              className="min-w-0 flex-1 rounded-xl border-2 border-[#e2d6c2] bg-white px-3 py-2 text-center font-mono text-xl tracking-[0.15em] outline-none focus:border-[#3b7dd8]" />
+            <button onClick={save} disabled={busy} className="rounded-xl bg-[#2f8a57] px-4 font-bold text-white disabled:opacity-60">
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : t.codeSave}
+            </button>
+            <button onClick={() => setEditing(false)} className="rounded-xl bg-[#f6efe2] px-3 font-semibold text-[#7a6d5c]">{t.codeCancel}</button>
+          </div>
+          {note && <p className="mt-1 text-xs text-[#a2968a]">{note}</p>}
+        </div>
+      )}
+      {msg && <p className={`mt-1 text-sm font-semibold ${msg.ok ? "text-[#2f8a57]" : "text-[#b8372d]"}`}>{msg.text}</p>}
+    </li>
+  );
+}
+
+/* ゲストに送る定型メッセージ (言語を選んでコピー / 共有) */
+function GuestTemplates({ t, lang }: { t: ST; lang: Lang }) {
+  const [gl, setGl] = useState<GuestLang>("en");
+  const [open, setOpen] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  useEffect(() => { const v = readLS<GuestLang | null>("staffGuestLang", null); if (v) setGl(v); }, []);
+  const pick = (v: GuestLang) => { setGl(v); writeLS("staffGuestLang", v); };
+  const copy = async (id: string, text: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(id); vibrate([15]); setTimeout(() => setCopied(null), 2000); } catch { /* noop */ }
+  };
+  const share = async (text: string) => { try { await navigator.share?.({ text }); } catch { /* キャンセル */ } };
+  return (
+    <section className={`${card} p-4`}>
+      <h2 className="flex items-center gap-2 text-lg font-bold"><MessageCircle className="h-5 w-5 text-[#3b7dd8]" /> {t.tplTitle}</h2>
+      <p className="mt-1 text-sm text-[#7a6d5c]">{t.tplHint}</p>
+      <p className="mt-3 text-sm font-bold text-[#7a6d5c]">{t.tplLang}</p>
+      <div className="mt-1 grid grid-cols-4 gap-1.5">
+        {GUEST_LANGS.map((g) => (
+          <button key={g.k} onClick={() => pick(g.k)}
+            className={`rounded-xl py-2 text-[15px] font-bold ${gl === g.k ? "bg-[#3b7dd8] text-white" : "bg-[#f6efe2] text-[#3b3228]"}`}>{g.label}</button>
+        ))}
+      </div>
+      <ul className="mt-3 space-y-2">
+        {TEMPLATES.map((tp) => {
+          const isOpen = open === tp.id;
+          const text = tp.text[gl];
+          return (
+            <li key={tp.id} className="rounded-2xl border-2 border-[#eadfcb] bg-[#fffdf8]">
+              <button onClick={() => setOpen(isOpen ? null : tp.id)} className="flex w-full items-center gap-3 px-3 py-3 text-left">
+                <span className="text-2xl" aria-hidden>{tp.emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[17px] font-bold">{tp.title[lang]}</span>
+                  <span className="block text-sm text-[#7a6d5c]">{tp.about[lang]}</span>
+                </span>
+                <ChevronDown className={`h-5 w-5 shrink-0 text-[#a2968a] transition ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isOpen && (
+                <div className="px-3 pb-3">
+                  <p className="whitespace-pre-line rounded-xl bg-white p-3 text-[15px] leading-relaxed text-[#4a3b2c] ring-1 ring-[#eadfcb]">{text}</p>
+                  <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
+                    <button onClick={() => copy(tp.id, text)}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-[#3b7dd8] py-3 text-base font-bold text-white active:scale-[0.99]">
+                      {copied === tp.id ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />} {copied === tp.id ? t.copiedShort : t.copy}
+                    </button>
+                    <button onClick={() => share(text)} className="flex items-center justify-center gap-1.5 rounded-xl bg-[#f6efe2] py-3 text-base font-semibold text-[#6b5f52]">
+                      <Share2 className="h-5 w-5" /> {t.send}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /* ---------------- 下のナビ ---------------- */
 function BottomNav({ t, tab, setTab }: { t: ST; tab: Tab; setTab: (t: Tab) => void }) {
   const items: { k: Tab; label: string; Icon: any }[] = [
@@ -950,16 +1411,17 @@ function BottomNav({ t, tab, setTab }: { t: ST; tab: Tab; setTab: (t: Tab) => vo
     { k: "res", label: t.tabRes, Icon: ClipboardList },
     { k: "cal", label: t.tabCal, Icon: CalendarDays },
     { k: "rec", label: t.tabRec, Icon: Award },
+    { k: "memo", label: t.tabMemo, Icon: NotebookPen },
   ];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8dfcf] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="mx-auto grid max-w-lg grid-cols-4">
+      <div className="mx-auto grid max-w-lg grid-cols-5">
         {items.map(({ k, label, Icon }) => {
           const on = tab === k;
           return (
             <button key={k} onClick={() => setTab(k)}
               className={`flex flex-col items-center gap-1 py-3 text-[15px] font-bold ${on ? "text-[#3b7dd8]" : "text-[#a2968a]"}`}>
-              <span className={`rounded-2xl px-4 py-1 ${on ? "bg-[#e3eefc]" : ""}`}><Icon className="h-7 w-7" /></span>
+              <span className={`rounded-2xl px-3 py-1 ${on ? "bg-[#e3eefc]" : ""}`}><Icon className="h-7 w-7" /></span>
               {label}
             </button>
           );

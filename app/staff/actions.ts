@@ -145,3 +145,28 @@ export async function roomAllOff(roomId: string): Promise<Res> {
   }
   return { ok: off.ok && lockOk, error: off.ok && lockOk ? undefined : "DEVICE_PARTIAL" };
 }
+
+/* ---------------- 暗証番号 (密码一览) ---------------- */
+const cleanCode = (v: string | null) => {
+  const s = (v ?? "").trim();
+  return s ? s.slice(0, 32) : null;
+};
+
+/** お部屋のドアの暗証番号を保存 (空欄 = 削除)。 */
+export async function setRoomCode(roomId: string, code: string | null): Promise<Res> {
+  requireStaff();
+  const { error } = await supabaseAdmin.from("rooms").update({ keypad_code: cleanCode(code) }).eq("id", roomId);
+  if (error) return { ok: false, error: /column/i.test(error.message) ? "SETUP_MISSING" : error.message };
+  revalidatePath("/staff");
+  return { ok: true };
+}
+
+/** エントランスの暗証番号を保存 (ゲストの鍵画面に出る番号も同じものが変わる)。 */
+export async function setEntranceCode(entranceId: string, code: string | null): Promise<Res> {
+  requireStaff();
+  const { error } = await supabaseAdmin.from("entrances").update({ keypad_code: cleanCode(code) }).eq("id", entranceId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/staff");
+  revalidatePath("/admin");
+  return { ok: true };
+}

@@ -50,8 +50,12 @@ export default async function StaffPage() {
     early_checkin_at: r.early_checkin_at ?? null, late_checkout_at: r.late_checkout_at ?? null,
   }));
 
-  // 棟 → エントランスの URL (ゲストへの案内文用)
-  const { data: ents } = await supabaseAdmin.from("entrances").select("slug, building").eq("is_active", true);
+  // 棟 → エントランスの URL (ゲストへの案内文用) と、暗証番号 (密码一览)
+  const { data: ents } = await supabaseAdmin.from("entrances").select("id, slug, building, display_name, keypad_code").eq("is_active", true).order("building");
+  const entranceCodes = ((ents ?? []) as any[]).map((e) => ({ id: e.id, name: e.display_name as string, building: e.building as string, code: (e.keypad_code ?? null) as string | null }));
+  // お部屋の暗証番号 (migration_room_codes.sql 未実行なら null)
+  const rc = await supabaseAdmin.from("rooms").select("id, keypad_code").eq("is_active", true);
+  const roomCodes: Record<string, string | null> | null = rc.error ? null : Object.fromEntries(((rc.data ?? []) as any[]).map((r) => [r.id, r.keypad_code ?? null]));
   const entranceUrlByBuilding: Record<string, string> = {};
   for (const e of (ents ?? []) as any[]) entranceUrlByBuilding[e.building] ??= `${baseUrl}/key/${e.slug}`;
 
@@ -81,7 +85,7 @@ export default async function StaffPage() {
   const passkeys = pk.error ? null : (pk.data ?? []);
 
   return (
-    <StaffClient history={history} geo={geo} passkeys={passkeys} rooms={rooms} reservations={reservations} baseUrl={baseUrl}
+    <StaffClient history={history} geo={geo} passkeys={passkeys} entranceCodes={entranceCodes} roomCodes={roomCodes} rooms={rooms} reservations={reservations} baseUrl={baseUrl}
       entranceUrlByBuilding={entranceUrlByBuilding} setupMissing={setupMissing || resMissing} />
   );
 }

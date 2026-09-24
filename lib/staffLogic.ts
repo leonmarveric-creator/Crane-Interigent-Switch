@@ -297,3 +297,21 @@ export function achievements(history: HistoryItem[], nowMs: number): Achievement
     firstWeekday: new Date(Date.UTC(yy, mm - 1, 1)).getUTCDay(),
   };
 }
+
+/* ---------------- お母さん用の部屋名 (漢字) ---------------- */
+const KANJI: [RegExp, string][] = [
+  [/^(haru|spring)$/, "春"], [/^(natu|natsu|summer)$/, "夏"], [/^(aki|autumn|fall)$/, "秋"], [/^(fuyu|winter)$/, "冬"],
+  [/^(matsu|pine)$/, "松"], [/^(take|bamboo)$/, "竹"], [/^(ume|plum)$/, "梅"], [/^(hayashi|forest)$/, "林"], [/^mori$/, "森"],
+  [/^(ni|hasu|lotus)$/, "荷"], [/^(tsuru|crane)$/, "鹤"], [/^sakura$/, "樱"], [/^(umi|sea)$/, "海"], [/^(sora|sky)$/, "空"],
+  [/^(tsuki|moon)$/, "月"], [/^(hoshi|star)$/, "星"], [/^art$/, "艺"],
+];
+/**
+ * スタッフ画面で使う部屋名。HARU → 春 のように漢字にする (ゲストへの案内文は元の名前のまま)。
+ * すでに漢字の名前や、当てはまらない名前 (501 など) はそのまま。
+ */
+export function roomKanji(room: { slug: string; name: string }): string {
+  if (/[㐀-鿿]/.test(room.name)) return room.name;
+  const tokens = `${room.name} ${room.slug}`.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x && x !== "room");
+  for (const [re, k] of KANJI) if (tokens.some((tk) => re.test(tk))) return k;
+  return room.name;
+}

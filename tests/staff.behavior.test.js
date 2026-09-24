@@ -219,3 +219,62 @@ test("home-screen shortcut for /staff opens /staff (own manifest + icons), not /
   assert.match(read("middleware.ts"), /webmanifest\)\$/);
   assert.ok(fs.existsSync(path.join(root, "public", "staff", "apple-touch-icon.png")));
 });
+
+test("staff has its own gentle loading screen (not the arc-reactor HUD)", () => {
+  const l = read("app", "staff", "loading.tsx");
+  assert.doesNotMatch(l, /HudLoader/);
+  assert.match(l, /\/staff\/icon\.png/);
+  assert.match(l, /今天也辛苦了/);
+});
+
+test("「换一句」 stays in the current season and never mentions another month", async () => {
+  const { dailyCheer, changePool, seasonOf } = await import(path.join(root, "lib", "staffCheer.ts"));
+  assert.equal(seasonOf(4), "spring"); assert.equal(seasonOf(9), "autumn"); assert.equal(seasonOf(1), "winter"); assert.equal(seasonOf(7), "summer");
+  const monthWord = /[0-9一二三四五六七八九十]+月|明天就是|明日から/;
+  for (const m of [1, 4, 7, 9, 12]) {
+    const pool = changePool(m);
+    assert.ok(pool.length >= 130, `pool ${m}`);
+    for (const [zh, ja] of pool) assert.doesNotMatch(zh + ja, monthWord);
+  }
+  // 9月に何回「换一句」を押しても、春の言葉 (桜など) や「4月」は出ない
+  for (let k = 1; k <= 160; k++) {
+    const zh = dailyCheer("2026-09-24", "zh", k);
+    assert.doesNotMatch(zh, /樱花|四月|4月|春天/);
+  }
+  assert.notEqual(dailyCheer("2026-09-24", "zh", 1), dailyCheer("2026-09-24", "zh", 2));
+});
+
+test("new helpers: praise on photo tap, checklist, tomorrow card, memo tab, big text", () => {
+  const c = read("components", "staff", "StaffClient.tsx");
+  for (const k of ["function CleanChecklist", "function TomorrowCard", "function EveningCard", "function BadgeCelebration", "function MemoTab", "zoom: 1.15", "praiseCheer(lang)"]) {
+    assert.ok(c.includes(k), k);
+  }
+});
+
+test("staff UI shows kanji room names (HARU → 春) but guest messages keep the original name", async () => {
+  const { roomKanji, guestMessage } = await import(logic);
+  assert.equal(roomKanji({ slug: "room-haru", name: "HARU" }), "春");
+  assert.equal(roomKanji({ slug: "room-natu", name: "NATU" }), "夏");
+  assert.equal(roomKanji({ slug: "room-take", name: "TAKE" }), "竹");
+  assert.equal(roomKanji({ slug: "room-501", name: "501" }), "501");
+  assert.equal(roomKanji({ slug: "x", name: "松の間" }), "松の間");
+  const c = read("components", "staff", "StaffClient.tsx");
+  assert.match(c, /roomName: room\?\.name \?\? ""/); // 案内文は元の名前
+});
+
+test("guest message templates exist in 4 languages", () => {
+  const src = read("lib", "staffTemplates.ts");
+  const n = (src.match(/id: "/g) || []).length;
+  assert.ok(n >= 7);
+  for (const k of ["en:", "zh:", "ja:", "ko:"]) assert.ok((src.match(new RegExp(`\\n\\s+${k} "`, "g")) || []).length >= n, k);
+});
+
+test("codes list: staff can copy / change entrance and room door codes (server actions require staff)", () => {
+  const a = read("app", "staff", "actions.ts");
+  assert.match(a, /export async function setRoomCode[\s\S]*?requireStaff\(\)/);
+  assert.match(a, /export async function setEntranceCode[\s\S]*?requireStaff\(\)/);
+  assert.match(read("supabase", "migration_room_codes.sql"), /add column if not exists keypad_code text/);
+  const c = read("components", "staff", "StaffClient.tsx");
+  assert.match(c, /function CodesCard/);
+  assert.doesNotMatch(read("lib", "staffTemplates.ts"), /id: "trash"/);
+});

@@ -566,3 +566,11 @@ create table if not exists public.staff_passkeys (
 );
 
 alter table public.staff_passkeys enable row level security;  -- service_role だけが読み書き (ポリシーなし = 拒否)
+
+-- =============================================================================
+--  お部屋のドアの暗証番号 (テンキー)。スタッフ画面の「密码一览」でコピー・変更できる。
+--  エントランスの暗証番号は entrances.keypad_code (既存) を使う。
+--  idempotent。
+-- =============================================================================
+alter table public.rooms
+  add column if not exists keypad_code text;
