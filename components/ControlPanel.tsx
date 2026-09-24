@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberLang } from "@/lib/langCookie";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -12,10 +13,10 @@ import EntranceKeyButton from "@/components/EntranceKeyButton";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
-import AddToHomePrompt from "@/components/AddToHomePrompt";
 import ArcReactorX from "@/components/tech/ArcReactorX";
 import TechPercent from "@/components/tech/TechPercent";
-import { CommandBeamLayer, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
+import TechButton from "@/components/tech/TechButton";
+import { TouchReticle, GalaxyLaunch, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
 
 interface Props {
   guestName?: string | null;
@@ -132,10 +133,10 @@ export default function ControlPanel({
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
   const [galaxyActive, setGalaxyActive] = useState(false); // 星空オーバーレイ表示
+  const [galaxyLaunch, setGalaxyLaunch] = useState(0); // ギャラクシー起動演出
   const [booting, setBooting] = useState(!admin); // ゲスト時のみ起動演出
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const geoCache = useRef<{ lat: number; lng: number; t: number } | null>(null);
-  const [taps, setTaps] = useState<{ id: number; x: number; y: number }[]>([]);
   const [ambientOn, setAmbientOn] = useState(false); // アークリアクターのハム (opt-in)
   const weather = useWeather(lat, lng);
   const t = T[lang];
@@ -155,13 +156,6 @@ export default function ControlPanel({
     document.addEventListener("visibilitychange", onVis);
     return () => { document.removeEventListener("visibilitychange", onVis); stopAmbient(); };
   }, [ambientOn, muted]);
-
-  // タップ位置に照準リング
-  const onTap = (e: React.PointerEvent) => {
-    const id = Date.now() + Math.random();
-    setTaps((r) => [...r.slice(-5), { id, x: e.clientX, y: e.clientY }]);
-    setTimeout(() => setTaps((r) => r.filter((p) => p.id !== id)), 700);
-  };
 
   // 位置制限は「座標あり かつ 半径>0」のときだけ有効。
   // 半径0でも座標は残せるので、天気(useWeather)はそのまま表示される(分離)。
@@ -204,23 +198,13 @@ export default function ControlPanel({
   });
 
   return (
-    <main ref={mainRef} onPointerDown={onTap} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
-      {/* タップ照準リング */}
-      <div className="pointer-events-none fixed inset-0 z-40">
-        <AnimatePresence>
-          {taps.map((p) => (
-            <motion.span key={p.id}
-              initial={{ opacity: 0.7, scale: 0 }} animate={{ opacity: 0, scale: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              style={{ left: p.x, top: p.y }}
-              className="absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/70
-                [box-shadow:0_0_14px_rgba(34,211,238,0.6)]" />
-          ))}
-        </AnimatePresence>
-      </div>
+    <main ref={mainRef} className="relative min-h-dvh overflow-hidden bg-[#04060c] text-white">
 
-      {/* ボタン → リアクターから光線 */}
-      <CommandBeamLayer sourceRef={reactorRef} containerRef={mainRef} />
+      {/* ギャラクシーモード起動の特別演出 */}
+      <GalaxyLaunch trigger={galaxyLaunch} />
+
+      {/* 触れた位置にミニマルな照準 */}
+      <TouchReticle containerRef={mainRef} />
 
       {/* 起動シーケンス */}
       <AnimatePresence>
@@ -376,6 +360,11 @@ export default function ControlPanel({
           </div>
         </motion.header>
 
+        {/* スマートロック (いちばん最初に使うので、部屋名のすぐ下) */}
+        <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
+        </motion.div>
+
         {/* 常に動く HUD (レーダー + ゲージ) */}
         {!admin && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.105 }}>
@@ -390,13 +379,12 @@ export default function ControlPanel({
           </motion.div>
         )}
 
-        {!admin && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
-            className="mb-4">
-            <AddToHomePrompt lang={lang} roomName={roomName} variant="tech" />
-          </motion.div>
-        )}
+        {/* モード (ノーマル / 快適 / ギャラクシー / ネスト / 和み): スクロールしなくても目に入る位置 */}
+        <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.115 }}>
+          <ModeGrid roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
+            hasGalaxy={hasGalaxy} hasNest={hasNest} hasWafu={hasWafu} onGalaxyState={setGalaxyActive}
+            onGalaxyLaunch={() => setGalaxyLaunch((n) => n + 1)} />
+        </motion.div>
 
         {/* 位置制限の常設案内 (有効な部屋のみ) */}
         {geoEnabled && (
@@ -412,26 +400,6 @@ export default function ControlPanel({
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
           <SceneButtons roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} hasWafu={hasWafu} onGalaxyState={setGalaxyActive} />
         </motion.div>
-
-        {/* スマートロック (主役) */}
-        <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
-          <LockCard roomSlug={roomSlug} t={t} admin={admin} guard={guardCommand} />
-        </motion.div>
-
-        {/* ギャラクシーモード (目玉機能。スクロールせず気づけるよう上部に配置) */}
-        {hasGalaxy && (
-          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-            <GalaxyCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
-              onState={setGalaxyActive} />
-          </motion.div>
-        )}
-
-        {/* NESTモード (藤編みボールランプ。対応部屋のみ) */}
-        {hasNest && (
-          <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>
-            <NestCard roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t} />
-          </motion.div>
-        )}
 
         {/* 光目覚まし (スクロールせず見えるよう上部に配置) */}
         <motion.div className="mt-5" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}>
@@ -538,7 +506,7 @@ function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
             {LANGS.map((l) => (
               <li key={l}>
                 <button
-                  onClick={() => { setLang(l); setOpen(false); navTick(); }}
+                  onClick={() => { setLang(l); rememberLang(l); setOpen(false); navTick(); }}
                   className={`w-full px-4 py-2.5 text-left text-sm transition
                     ${l === lang ? "text-cyan-300 bg-cyan-500/10" : "text-white/70 hover:bg-white/5"}`}
                 >
@@ -967,6 +935,13 @@ function HudPanel({
         style={{ background: `conic-gradient(from 0deg, transparent 0deg, ${active ? c.light : "rgba(160,180,230,0.5)"} 16deg, transparent 72deg)` }} />
       {/* 内側パネル */}
       <span className={`${clip} pointer-events-none absolute inset-[1.5px] bg-[#070a12]/95 backdrop-blur-2xl`} />
+      {/* ホログラム: 細い走査線 + ときどき表面を走る光 */}
+      <span className={`${clip} pointer-events-none absolute inset-[1.5px] opacity-40`}
+        style={{ background: "repeating-linear-gradient(0deg, rgba(160,230,255,0.05) 0 1px, transparent 1px 3px)" }} />
+      <span className={`${clip} pointer-events-none absolute inset-[1.5px] overflow-hidden`}>
+        <span className="tb-sheen absolute inset-y-0 -left-1/2 w-1/3"
+          style={{ background: `linear-gradient(100deg, transparent, ${c.light.replace("0.95", "0.12")}, transparent)`, animationDelay: `${scanDelay * 10}s` }} />
+      </span>
       {/* 出現時: レーザーが上から走って中身を描き出す (ホログラム投影風) */}
       {!reduce && (
         <motion.span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 z-10 h-[2px] rounded-full"
@@ -1017,6 +992,94 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* モード選択 (ノーマル / 快適 / ギャラクシー / ネスト / 和み)           */
+/*   ノーマル = ほかのモードからメインライトだけ点灯の状態に戻す          */
+/* ------------------------------------------------------------------ */
+type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy";
+function ModeGrid({
+  roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
+}: {
+  roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"];
+  hasGalaxy?: boolean; hasNest?: boolean; hasWafu?: boolean; onGalaxyState?: (on: boolean) => void;
+  onGalaxyLaunch?: () => void;
+}) {
+  const [active, setActive] = useState<ModeKey | null>(null);
+  const [busy, setBusy] = useState<ModeKey | null>(null);
+  const [fx, setFx] = useState<{ n: number; k: ModeKey } | null>(null);
+
+  const modes: { k: ModeKey; action: DeviceAction; tone: keyof typeof TONES; icon: typeof Lightbulb; label: string; desc: string; show: boolean; voice: string[] }[] = [
+    { k: "normal", action: "normal", tone: "cyan", icon: Lightbulb, label: t.normalMode, desc: t.normalDesc, show: true, voice: ["Welcome home", "Systems set for your return"] },
+    { k: "welcome", action: "welcome", tone: "emerald", icon: Home, label: t.comfortMode, desc: t.comfortDesc, show: true, voice: ["Welcome home", "Comfort mode engaged", "Systems set for your return"] },
+    { k: "galaxy", action: "galaxy_on", tone: "violet", icon: Sparkles, label: t.galaxy.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.galaxyShort, show: !!hasGalaxy, voice: ["Galaxy mode engaged", "Opening the cosmos", "Enjoy the stars"] },
+    { k: "nest", action: "nest_on", tone: "amber", icon: LampFloor, label: t.nest.replace(/\s*(モード|Mode|模式|모드)$/, ""), desc: t.nestShort, show: !!hasNest, voice: ["Nest mode engaged", "Warm light online", "Cozy glow, activated"] },
+    { k: "cozy", action: "welcome_cozy", tone: "rose", icon: LampFloor, label: t.cozyMode, desc: t.cozyDesc, show: !!hasWafu, voice: ["Cozy mode engaged", "Setting a warm mood", "Relax and unwind"] },
+  ];
+  const list = modes.filter((m) => m.show);
+
+  const run = async (m: (typeof modes)[number]) => {
+    if (busy) return;
+    primeVoice();
+    if (guard && !(await guard())) return;
+    blip(); sweep();
+    setBusy(m.k); setFx({ n: Date.now(), k: m.k });
+    const ok = await callDevice(roomSlug, m.action, admin);
+    if (ok) {
+      setActive(m.k);
+      onGalaxyState?.(m.k === "galaxy");
+      if (m.k === "galaxy") { galaxyOn(); onGalaxyLaunch?.(); } else if (m.k === "nest") toggleServo(true); else powerUp();
+      speakOneOf(m.voice);
+    } else sfxError();
+    setBusy(null);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
+  };
+
+  const ICON_COLOR: Record<string, string> = { cyan: "text-cyan-300", emerald: "text-emerald-300", violet: "text-violet-300", amber: "text-amber-300", rose: "text-rose-300" };
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-2 px-1 font-mono text-[9px] tracking-[0.3em] text-cyan-300/60">
+        <span className="h-px w-4 bg-cyan-300/40" /> MODE · {t.modeSelect}
+        <span className="h-px flex-1 bg-gradient-to-r from-cyan-300/30 to-transparent" />
+      </p>
+      <div className="grid grid-cols-2 gap-2.5">
+        {list.map((m, i) => {
+          const on = active === m.k;
+          const Icon = m.icon;
+          const wide = list.length % 2 === 1 && i === list.length - 1; // 奇数個なら最後を横長に
+          return (
+            <div key={m.k} className={wide ? "col-span-2" : ""}>
+              <HudPanel tone={m.tone} active={on} onClick={() => run(m)} small
+                contentClassName="items-center gap-2.5 px-3 py-3">
+                <CommandFX trigger={fx?.k === m.k ? fx.n : 0} tone={m.tone} />
+                {/* ギャラクシーはタイルの中にも星をまたたかせる */}
+                {m.k === "galaxy" && (
+                  <span className="pointer-events-none absolute inset-0">
+                    {[...Array(on ? 12 : 6)].map((_, j) => (
+                      <span key={j} className="absolute rounded-full bg-white"
+                        style={{ left: `${(j * 37 + 13) % 94}%`, top: `${(j * 53 + 9) % 88}%`, width: 1.5, height: 1.5,
+                          animation: `twinkle ${2 + (j % 4) * 0.7}s ease-in-out ${(j % 5) * 0.4}s infinite`, boxShadow: "0 0 5px rgba(255,255,255,0.9)" }} />
+                    ))}
+                  </span>
+                )}
+                <span className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${on ? "border-white/40 bg-white/10" : "border-white/10 bg-white/[0.03]"}`}>
+                  {busy === m.k
+                    ? <Loader2 className={`h-[18px] w-[18px] animate-spin ${ICON_COLOR[m.tone]}`} />
+                    : <Icon className={`h-[18px] w-[18px] ${ICON_COLOR[m.tone]}`} strokeWidth={1.7} />}
+                  {on && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />}
+                </span>
+                <span className="relative min-w-0 flex-1">
+                  <span className={`block text-[13px] font-semibold leading-tight ${on ? "text-white" : "text-white/85"}`}>{m.label}</span>
+                  <span className="mt-0.5 block text-[10px] leading-tight text-white/45">{m.desc}</span>
+                </span>
+              </HudPanel>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* シーンボタン: 快適モード / おやすみ / 和み / 外出OFF                   */
 /* ------------------------------------------------------------------ */
 type SceneAction = "welcome" | "welcome_cozy" | "wafu_off" | "good_night" | "away";
@@ -1055,35 +1118,17 @@ function SceneButtons({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <HudPanel tone="emerald" active onClick={() => run("welcome")} small
-          contentClassName="flex-col items-center gap-2 px-4 py-5">
-          <Corners tone="emerald" />
-          <CommandFX trigger={fx?.a === "welcome" ? fx.n : 0} tone="emerald" />
-          {busy === "welcome"
-            ? <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
-            : <Home className="h-6 w-6 text-emerald-300" strokeWidth={1.7} />}
-          <span className="text-sm text-emerald-200">{t.comfortMode}</span>
-        </HudPanel>
+        <div className={hasWafu ? "" : "col-span-2"}>
         <HudPanel tone="cyan" onClick={() => run("good_night")} small
-          contentClassName="flex-col items-center gap-2 px-4 py-5">
+          contentClassName="items-center justify-center gap-2 px-4 py-4">
           <Corners tone="cyan" />
           <CommandFX trigger={fx?.a === "good_night" ? fx.n : 0} tone="cyan" />
           {busy === "good_night"
-            ? <Loader2 className="h-6 w-6 animate-spin text-cyan-300" />
-            : <Moon className="h-6 w-6 text-cyan-300" strokeWidth={1.7} />}
+            ? <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />
+            : <Moon className="h-5 w-5 text-cyan-300" strokeWidth={1.7} />}
           <span className="text-sm text-cyan-200">{t.goodNightMode}</span>
         </HudPanel>
-        {hasWafu && (
-          <HudPanel tone="rose" onClick={() => run("welcome_cozy")} small
-            contentClassName="items-center justify-center gap-2 px-4 py-4">
-            <Corners tone="rose" />
-            <CommandFX trigger={fx?.a === "welcome_cozy" ? fx.n : 0} tone="rose" />
-            {busy === "welcome_cozy"
-              ? <Loader2 className="h-5 w-5 animate-spin text-rose-300" />
-              : <LampFloor className="h-5 w-5 text-rose-300" strokeWidth={1.7} />}
-            <span className="text-sm text-rose-200">{t.cozyMode}</span>
-          </HudPanel>
-        )}
+        </div>
         {hasWafu && (
           <HudPanel tone="rose" onClick={() => run("wafu_off")} small
             contentClassName="items-center justify-center gap-2 px-4 py-4">
@@ -1152,64 +1197,41 @@ function LockCard({ roomSlug, t, admin, guard }: { roomSlug: string; t: typeof T
 
   return (
     <HudPanel tone={unlocked ? "emerald" : "cyan"} active
-      contentClassName="flex-col items-center overflow-hidden px-6 py-10">
+      contentClassName="flex-col overflow-hidden px-4 py-3.5">
       <Corners tone={unlocked ? "emerald" : "cyan"} />
       <CommandFX trigger={fx} tone={unlocked ? "emerald" : "cyan"} />
-      <HudRings unlocked={unlocked} busy={!!busy} />
-      <LockShield trigger={shield.n} mode={shield.mode} />
+      <LockShield trigger={shield.n} mode={shield.mode} top="50%" caption={false} />
 
-      {/* 波紋 + スパーク (操作時) */}
-      <AnimatePresence>
-        <motion.span key={ripple}
-          initial={{ scale: 0, opacity: 0.5 }} animate={{ scale: 4, opacity: 0 }}
-          transition={{ duration: 0.9, ease: "easeOut" }}
-          className={`pointer-events-none absolute h-32 w-32 rounded-full ${unlocked ? "bg-emerald-400/30" : "bg-cyan-400/30"}`} />
-      </AnimatePresence>
-      <div className="pointer-events-none absolute left-1/2 top-[38%]">
-        {ripple > 0 && [...Array(12)].map((_, i) => {
-          const a = (i / 12) * Math.PI * 2;
-          return (
-            <motion.span key={`${ripple}-${i}`}
-              initial={{ opacity: 0.9, x: 0, y: 0, scale: 1 }}
-              animate={{ opacity: 0, x: Math.cos(a) * 80, y: Math.sin(a) * 80, scale: 0 }}
-              transition={{ duration: 0.55, ease: "easeOut" }}
-              className={`absolute h-1 w-1 rounded-full ${unlocked ? "bg-emerald-300" : "bg-cyan-300"}`} />
-          );
-        })}
-      </div>
-
-      {/* 中央アイコン (最後の操作を反映する目安) */}
-      <div className="relative mb-3 flex h-20 w-20 items-center justify-center">
-        <motion.div
-          animate={busy ? { rotate: [0, -8, 8, 0] } : {}} transition={{ duration: 0.5 }}
-          className={`anim-breathe relative flex h-20 w-20 items-center justify-center rounded-full border
-            ${unlocked ? "border-emerald-400/60 bg-emerald-400/10" : "border-cyan-400/50 bg-cyan-400/10"}`}>
+      {/* 上段 (コンパクト): 鍵アイコン + 状態 */}
+      <div className="relative mb-2.5 flex items-center gap-2.5">
+        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+          <svg viewBox="0 0 40 40" className="absolute inset-0 h-full w-full">
+            <circle cx="20" cy="20" r="18" fill="none" stroke={unlocked ? "#34d399" : "#22d3ee"} strokeOpacity="0.3" strokeWidth="1" />
+            <circle cx="20" cy="20" r="18" fill="none" stroke={unlocked ? "#34d399" : "#22d3ee"} strokeWidth="2" strokeDasharray="20 93" strokeLinecap="round"
+              className={busy ? "anim-spin-rev" : "anim-spin-slow"} style={{ ...SPIN, animationDuration: busy ? "0.9s" : "6s" }} />
+          </svg>
+          <AnimatePresence>
+            <motion.span key={ripple} initial={{ scale: 0.6, opacity: 0.7 }} animate={{ scale: 2.4, opacity: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className={`pointer-events-none absolute inset-1 rounded-full ${unlocked ? "bg-emerald-400/30" : "bg-cyan-400/30"}`} />
+          </AnimatePresence>
           {busy
-            ? <Loader2 className={`h-9 w-9 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
-            : <Icon className={`h-10 w-10 ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.5} />}
-        </motion.div>
+            ? <Loader2 className={`relative h-4 w-4 animate-spin ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} />
+            : <Icon className={`relative h-[18px] w-[18px] ${unlocked ? "text-emerald-300" : "text-cyan-300"}`} strokeWidth={1.7} />}
+        </span>
+        <p className="font-mono text-[9px] tracking-[0.3em] text-cyan-300/60">DOOR LOCK</p>
+        <span className={`ml-auto h-5 text-sm font-medium tracking-wide
+          ${result === false ? "text-rose-300" : unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
+          {statusText}
+        </span>
       </div>
 
-      {/* ステータス (操作結果を一時表示) */}
-      <span className={`relative h-5 text-sm font-medium tracking-wide
-        ${result === false ? "text-rose-300" : unlocked ? "text-emerald-300" : "text-cyan-200"}`}>
-        {statusText}
-      </span>
-
-      {/* 解錠 / 施錠 ボタン */}
-      <div className="relative mt-4 grid w-full grid-cols-2 gap-3">
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => run("unlock")} disabled={!!busy}
-          className="clip-bevel-sm flex items-center justify-center gap-2 border border-emerald-400/50
-            bg-emerald-500/15 py-3.5 text-sm text-emerald-200 active:bg-emerald-500/30 disabled:opacity-50">
-          {busy === "unlock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyholeOpen className="h-4 w-4" />}
-          {t.unlock}
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => run("lock")} disabled={!!busy}
-          className="clip-bevel-sm flex items-center justify-center gap-2 border border-cyan-400/50
-            bg-cyan-500/15 py-3.5 text-sm text-cyan-200 active:bg-cyan-500/30 disabled:opacity-50">
-          {busy === "lock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
-          {t.lock}
-        </motion.button>
+      {/* 解錠 / 施錠 ボタン (ホログラム調・コンパクト) */}
+      <div className="relative grid w-full grid-cols-2 gap-2.5">
+        <TechButton tone="emerald" icon={LockKeyholeOpen} label={t.unlock} sub="OPEN" size="sm"
+          busy={busy === "unlock"} disabled={!!busy && busy !== "unlock"} onClick={() => run("unlock")} />
+        <TechButton tone="cyan" icon={LockKeyhole} label={t.lock} sub="SECURE" size="sm"
+          busy={busy === "lock"} disabled={!!busy && busy !== "lock"} onClick={() => run("lock")} />
       </div>
     </HudPanel>
   );
@@ -1664,64 +1686,44 @@ function WakeCard({
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-5">
-      <HudPanel tone="violet" contentClassName="flex-col p-5">
-        <div className="flex items-center gap-2.5">
-          <AlarmClock className="h-5 w-5 text-violet-300" strokeWidth={1.6} />
-          <span className="text-sm text-violet-200">{t.wakeLight}</span>
-          <span className="anim-breathe ml-auto inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />
-        </div>
-
-        <div className="mt-3">
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.wakeLight}>
-            <button
-              type="button"
-              aria-pressed={mode === "flame_on"}
-              onClick={() => selectMode("flame_on", t.wakeFlameName)}
-              className={`clip-bevel-sm flex min-h-11 items-center justify-center gap-2 border px-2 text-[12px] font-semibold transition ${mode === "flame_on" ? "border-amber-300/55 bg-amber-300/14 text-amber-100" : "border-white/10 bg-black/25 text-white/55"}`}
-            >
-              <Flame className="h-4 w-4" strokeWidth={1.6} />
-              {t.wakeFlameName}
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+      <HudPanel tone="violet" contentClassName="flex-col px-4 py-3">
+        {/* 1 行目: タイトル + 光のタイプ (小さな切り替え) */}
+        <div className="flex items-center gap-2">
+          <AlarmClock className="h-4 w-4 shrink-0 text-violet-300" strokeWidth={1.6} />
+          <span className="text-[13px] text-violet-200">{t.wakeLight}</span>
+          <div className="ml-auto flex gap-1" role="radiogroup" aria-label={t.wakeLight}>
+            <button type="button" aria-pressed={mode === "flame_on"} onClick={() => selectMode("flame_on", t.wakeFlameName)}
+              className={`clip-bevel-sm flex items-center gap-1 border px-2 py-1 text-[10.5px] font-semibold ${mode === "flame_on" ? "border-amber-300/55 bg-amber-300/14 text-amber-100" : "border-white/10 bg-black/25 text-white/50"}`}>
+              <Flame className="h-3.5 w-3.5" strokeWidth={1.6} /> {t.wakeFlameName}
             </button>
-            <button
-              type="button"
-              aria-pressed={mode === "horizon_rise"}
-              disabled={!hasWafu}
-              onClick={() => selectMode("horizon_rise", t.wakeHorizonName)}
-              className={`clip-bevel-sm flex min-h-11 items-center justify-center gap-2 border px-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${mode === "horizon_rise" ? "border-violet-300/60 bg-violet-300/16 text-violet-100" : "border-white/10 bg-black/25 text-white/55"}`}
-            >
-              <Sunrise className="h-4 w-4" strokeWidth={1.6} />
-              {t.wakeHorizonName}
+            <button type="button" aria-pressed={mode === "horizon_rise"} disabled={!hasWafu} onClick={() => selectMode("horizon_rise", t.wakeHorizonName)}
+              className={`clip-bevel-sm flex items-center gap-1 border px-2 py-1 text-[10.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-35 ${mode === "horizon_rise" ? "border-violet-300/60 bg-violet-300/16 text-violet-100" : "border-white/10 bg-black/25 text-white/50"}`}>
+              <Sunrise className="h-3.5 w-3.5" strokeWidth={1.6} /> {t.wakeHorizonName}
             </button>
           </div>
-          <p className="mt-2 min-h-[34px] text-[11px] leading-relaxed text-violet-100/68">
-            {mode === "horizon_rise" ? t.wakeHorizonDescription : t.wakeFlameDescription}
-          </p>
-          {!hasWafu && <p className="mt-1 text-[10px] text-amber-200/58">{t.wakeHorizonUnavailable}</p>}
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
-          <input
-            type="time"
-            value={time}
+        {/* 2 行目: 時刻 + セット */}
+        <div className="mt-2.5 flex items-center gap-2">
+          <input type="time" value={time}
             onChange={(e) => { setTime(e.target.value); setState("idle"); }}
-            className="clip-bevel-sm flex-1 border border-white/10 bg-black/50 px-4 py-3
-              text-center font-mono text-3xl tracking-widest text-violet-100
-              [color-scheme:dark] focus:border-violet-400/60 focus:outline-none"
-          />
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            onClick={submit}
-            disabled={state === "busy"}
-            className="clip-bevel-sm flex h-[58px] items-center gap-1.5 border border-violet-400/50
-              bg-violet-500/15 px-5 text-sm text-violet-200 active:bg-violet-500/30"
-          >
+            className="clip-bevel-sm min-w-0 flex-1 border border-white/10 bg-black/50 px-3 py-2
+              text-center font-mono text-xl tracking-widest text-violet-100
+              [color-scheme:dark] focus:border-violet-400/60 focus:outline-none" />
+          <motion.button whileTap={{ scale: 0.94 }} onClick={submit} disabled={state === "busy"}
+            className="clip-bevel-sm flex h-11 shrink-0 items-center gap-1.5 border border-violet-400/50
+              bg-violet-500/15 px-4 text-sm text-violet-200 active:bg-violet-500/30">
             {state === "busy" && <Loader2 className="h-4 w-4 animate-spin" />}
             {state === "set" && <Check className="h-4 w-4 text-emerald-300" />}
             {state === "set" ? t.alarmSet : t.setAlarm}
           </motion.button>
         </div>
-        {err && <p className="mt-2 text-center text-[11px] text-rose-300">{err}</p>}
+        <p className="mt-1.5 text-[10px] leading-snug text-violet-100/55">
+          {mode === "horizon_rise" ? t.wakeHorizonDescription : t.wakeFlameDescription}
+          {!hasWafu && <span className="ml-1 text-amber-200/55">{t.wakeHorizonUnavailable}</span>}
+        </p>
+        {err && <p className="mt-1 text-center text-[11px] text-rose-300">{err}</p>}
       </HudPanel>
     </motion.div>
   );

@@ -1,3 +1,6 @@
+import { cookies, headers } from "next/headers";
+import { LANG_COOKIE } from "@/lib/langCookie";
+import { keyLangFromHeader } from "@/lib/acceptLang";
 import type { Metadata, Viewport } from "next";
 import { resolveGuestKey } from "@/lib/smartkey";
 import { toSkLang } from "@/lib/smartkeyI18n";
@@ -21,6 +24,10 @@ export default async function EntranceKeyPage({
   const ctx = await resolveGuestKey(params.entrance);
   if (!ctx) return <AccessDenied lang="en" />;
 
-  const lang = toSkLang(searchParams.lang ?? ctx.reservation?.guest_lang, "en");
+  // 言語: ?lang= → ゲストが前に選んだ言語 (Cookie) → スマホの言語設定 → 予約の言語 → 英語
+  const lang = toSkLang(
+    searchParams.lang ?? cookies().get(LANG_COOKIE)?.value ?? keyLangFromHeader(headers().get("accept-language")) ?? ctx.reservation?.guest_lang,
+    "en",
+  );
   return <SmartKeyGuest data={ctx.data} settings={ctx.settings} state={ctx.state} initialLang={lang} />;
 }

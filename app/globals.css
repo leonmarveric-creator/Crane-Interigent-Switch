@@ -347,3 +347,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @media (prefers-reduced-motion: reduce) {
   .anim-floor, .anim-streak, .tl-blip { animation: none; }
 }
+
+/* ===== ハイテクUI: ボタン (components/tech/TechButton.tsx) ===== */
+@keyframes tbSheen { 0%, 70% { transform: translateX(0); opacity: 0; } 72% { opacity: 1; } 100% { transform: translateX(450%); opacity: 0; } }
+.tb-sheen { animation: tbSheen 4.5s ease-in-out infinite; }
+@keyframes tbChev { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.tb-chev { animation: tbChev 1.2s ease-in-out infinite; }
+/* タッチした瞬間の照準 (TouchReticle) */
+@media (prefers-reduced-motion: reduce) { .tb-sheen, .tb-chev { animation: none; } }

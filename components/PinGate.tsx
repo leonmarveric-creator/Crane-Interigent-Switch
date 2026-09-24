@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberLang } from "@/lib/langCookie";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -126,7 +127,7 @@ export default function PinGate({
           <ul className="absolute right-0 mt-2 w-32 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0c14]/90 backdrop-blur-xl">
             {LANGS.map((l) => (
               <li key={l}>
-                <button onClick={() => { setLang(l); setLangOpen(false); keyTick(); }}
+                <button onClick={() => { setLang(l); rememberLang(l); setLangOpen(false); keyTick(); }}
                   className={`w-full px-4 py-2.5 text-left text-sm ${l === lang ? "text-cyan-300 bg-cyan-500/10" : "text-white/70"}`}>
                   {LANG_LABEL[l]}
                 </button>

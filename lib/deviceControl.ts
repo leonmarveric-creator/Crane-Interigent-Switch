@@ -7,7 +7,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 
 /** 和風ライトのデフォルト暖色: 電球色 2700K・明るさ100%。 */
 export const WAFU_DEFAULT_WARM = { kelvin: 2700, brightness: 100 } as const;
-export const GALAXY_AUTO_OFF_MS = 90 * 60 * 1000;
+export const GALAXY_AUTO_OFF_MS = 60 * 60 * 1000; // ギャラクシーモードは ON から 60 分で自動 OFF
 
 async function setGalaxyAutoOffAt(
   room: any,
@@ -64,7 +64,8 @@ export type DeviceAction =
   | "wafu_on_warm" // ON + 既定の暖色 (管理者ON用)
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
   | "wafu_brightness" | "wafu_temp" | "wafu_color" // 詳細: 明るさ / 色温度 / フルカラー (value必須)
-  | "welcome" | "welcome_cozy" | "good_night" | "away"; // シーン: 快適 / 和み / おやすみ / 外出全OFF
+  | "welcome" | "welcome_cozy" | "good_night" | "away"
+  | "normal"; // シーン: 快適 / 和み / おやすみ / 外出全OFF
 
 /**
  * 部屋(秘密鍵込み)に対してデバイス操作を実行する共通ロジック。
@@ -144,11 +145,20 @@ export async function executeDeviceAction(
     }
     case "nest_on":
     case "nest_off": {
-      // NESTモード: 藤編みボールランプを単体でON/OFF (他ライトには干渉しない)
+      // NESTモード: 藤編みボールランプを ON/OFF。
+      // ON のときは、藤の灯りを引き立てるため他のライト(通常/ギャラクシー/和風)を消灯する (ベストエフォート)。
       if (!room.switchbot_nest_device_id) return { ok: false, error: "NO_NEST" };
       const r = action === "nest_on"
         ? await deviceTurnOn(sbCreds, room.switchbot_nest_device_id)
         : await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
+      if (action === "nest_on" && r.ok) {
+        if (room.switchbot_light_device_id) await lightTurnOff(sbCreds, room.switchbot_light_device_id);
+        if (room.switchbot_galaxy_device_id) {
+          const g = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+          if (g.ok) await setGalaxyAutoOffAt(room, null);
+        }
+        if (room.switchbot_wafu_device_id) await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
+      }
       return { ok: r.ok };
     }
     case "wafu_on":
@@ -198,7 +208,7 @@ export async function executeDeviceAction(
     }
     case "welcome_cozy": {
       // 和みモード: エアコン適温ON + 和風ライトを暖色で点灯。
-      // 和みの雰囲気を出すため、和風以外のライト(通常照明/ギャラクシー)は消灯する。
+      // 和みの雰囲気を出すため、和風以外のライト(通常照明/ギャラクシー/NEST)は消灯する。
       let ok = await sceneAcComfort(sbCreds, room);
       if (room.switchbot_wafu_device_id) {
         const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id);
@@ -213,6 +223,24 @@ export async function executeDeviceAction(
         const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
         if (r.ok) await setGalaxyAutoOffAt(room, null);
       }
+      if (room.switchbot_nest_device_id) {
+        await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
+      }
+      return { ok };
+    }
+    case "normal": {
+      // ノーマル: ギャラクシー / NEST / 和み などから「メインライトだけ点灯」の状態に戻す。
+      // エアコンはそのまま。メインライトの点灯結果を返し、他ライトの消灯はベストエフォート。
+      let ok = true;
+      if (room.switchbot_light_device_id) {
+        const r = await lightTurnOn(sbCreds, room.switchbot_light_device_id); ok = r.ok;
+      }
+      if (room.switchbot_galaxy_device_id) {
+        const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);
+        if (r.ok) await setGalaxyAutoOffAt(room, null);
+      }
+      if (room.switchbot_nest_device_id) await deviceTurnOff(sbCreds, room.switchbot_nest_device_id);
+      if (room.switchbot_wafu_device_id) await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id);
       return { ok };
     }
     case "good_night": {

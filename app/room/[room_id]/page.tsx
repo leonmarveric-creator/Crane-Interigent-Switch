@@ -1,7 +1,9 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getActiveStays } from "@/lib/auth";
 import { verifySession, roomCookieName } from "@/lib/roomSession";
 import { isLang, type Lang } from "@/lib/i18n";
+import { roomLangFromHeader } from "@/lib/acceptLang";
+import { LANG_COOKIE } from "@/lib/langCookie";
 import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
@@ -31,8 +33,16 @@ export default async function RoomPage({
   ]);
   const primary = stays?.reservations[0];
 
+  // 言語: ?lang= → ゲストが前に選んだ言語 (Cookie) → スマホの言語設定 → 予約の言語 → 英語
+  const savedRaw = cookies().get(LANG_COOKIE)?.value;
+  const saved = savedRaw?.startsWith("zh") ? "zh" : savedRaw;
+  const phoneLang = roomLangFromHeader(headers().get("accept-language"));
   const lang: Lang = isLang(searchParams.lang)
     ? searchParams.lang
+    : isLang(saved)
+    ? saved
+    : phoneLang
+    ? phoneLang
     : isLang(primary?.guest_lang)
     ? (primary!.guest_lang as Lang)
     : "en";

@@ -45,6 +45,7 @@ type Dict = {
   awayMode: string;
   goodNightMode: string;
   galaxy: string;
+  modeSelect: string; normalMode: string; normalDesc: string; comfortDesc: string; galaxyShort: string; nestShort: string; cozyDesc: string;
   galaxyDesc: string;
   galaxyAutoOff: string;
   nest: string;
@@ -83,7 +84,8 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PINが違います", pinLocked: "試行回数が多すぎます。しばらくしてからお試しください", verify: "認証",
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
     comfortMode: "快適モード", awayMode: "外出（全部OFF）", goodNightMode: "おやすみモード",
-    galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影", galaxyAutoOff: "オン後90分で自動OFF",
+    modeSelect: "モード", normalMode: "ノーマル", normalDesc: "メインライトだけ点灯", comfortDesc: "エアコン＋照明", galaxyShort: "満天の星・60分", nestShort: "藤の灯りだけ", cozyDesc: "行灯の灯りだけ",
+    galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影", galaxyAutoOff: "オン後60分で自動OFF",
     nest: "ネストモード", nestDesc: "藤編みの灯りで暖かな陰影を",
     wafu: "和風ライト", wafuDesc: "行灯のやわらかな間接照明",
     cozyMode: "和みモード", wafuDetails: "詳細設定", wafuWarmReset: "暖色に戻す", wafuBack: "操作画面に戻る",
@@ -107,7 +109,8 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "Incorrect PIN", pinLocked: "Too many attempts. Please try again later", verify: "Verify",
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
     comfortMode: "Comfort", awayMode: "Away (all off)", goodNightMode: "Good Night",
-    galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room", galaxyAutoOff: "Auto-off 90 min after on",
+    modeSelect: "Modes", normalMode: "Normal", normalDesc: "Main light only", comfortDesc: "Air-con + light", galaxyShort: "Stars · 60 min", nestShort: "Woven lamp only", cozyDesc: "Lantern light only",
+    galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room", galaxyAutoOff: "Auto-off 60 min after on",
     nest: "Nest Mode", nestDesc: "Warm woven light with soft shadows",
     wafu: "Japanese Lamp", wafuDesc: "Soft andon accent lighting",
     cozyMode: "Cozy", wafuDetails: "Settings", wafuWarmReset: "Reset to warm", wafuBack: "Back to controls",
@@ -131,7 +134,8 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN码错误", pinLocked: "尝试次数过多，请稍后再试", verify: "验证",
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
     comfortMode: "舒适模式", awayMode: "外出（全关）", goodNightMode: "晚安模式",
-    galaxy: "银河模式", galaxyDesc: "在房间投影满天星空", galaxyAutoOff: "开启90分钟后自动关闭",
+    modeSelect: "模式", normalMode: "普通", normalDesc: "只开主灯", comfortDesc: "空调＋照明", galaxyShort: "星空・60分钟", nestShort: "只开藤编灯", cozyDesc: "只开行灯",
+    galaxy: "银河模式", galaxyDesc: "在房间投影满天星空", galaxyAutoOff: "开启60分钟后自动关闭",
     nest: "鸟巢模式", nestDesc: "藤编暖光，投下柔和光影",
     wafu: "和风灯", wafuDesc: "行灯柔和的间接照明",
     cozyMode: "和风模式", wafuDetails: "详细设置", wafuWarmReset: "恢复暖色", wafuBack: "返回操作画面",
@@ -155,7 +159,8 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN이 올바르지 않습니다", pinLocked: "시도 횟수가 많습니다. 잠시 후 다시 시도하세요", verify: "확인",
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)", goodNightMode: "취침 모드",
-    galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영", galaxyAutoOff: "켜진 뒤 90분 후 자동 꺼짐",
+    modeSelect: "모드", normalMode: "노멀", normalDesc: "메인 조명만 켜기", comfortDesc: "에어컨＋조명", galaxyShort: "별빛・60분", nestShort: "라탄 조명만", cozyDesc: "행등 조명만",
+    galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영", galaxyAutoOff: "켜진 뒤 60분 후 자동 꺼짐",
     nest: "네스트 모드", nestDesc: "라탄 조명으로 따뜻한 그림자를",
     wafu: "일본풍 조명", wafuDesc: "안돈의 부드러운 간접 조명",
     cozyMode: "포근 모드", wafuDetails: "상세 설정", wafuWarmReset: "따뜻한 색으로", wafuBack: "조작 화면으로",

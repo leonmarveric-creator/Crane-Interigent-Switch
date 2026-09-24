@@ -66,7 +66,7 @@ npm run dev
 
 各部屋を `rooms` に登録（slug, デバイスID, Sesame鍵, iCal URL）。Vercel へデプロイし、`vercel.json` の Cron が自動で有効化されます。`CRON_SECRET` を Vercel の環境変数とCron設定の Bearer に一致させてください。
 
-既存DBへ反映する場合は `supabase/migration_galaxy_auto_off.sql`、`supabase/migration_wake_prewake.sql`、`supabase/migration_wake_modes.sql` を追加で実行してください。ギャラクシーモードをONにすると `rooms.galaxy_auto_off_at` に90分後の時刻が入り、`/api/cron/galaxy-auto-off` が期限切れの部屋を自動OFFします。光目覚ましは、Flame Onなら設定時刻にメインライトを点灯します。Horizon Riseなら10分前から和風ライトを段階的に明るくし、設定時刻にメインライトを点灯して、5分後に和風ライトだけを自動消灯します。
+既存DBへ反映する場合は `supabase/migration_galaxy_auto_off.sql`、`supabase/migration_wake_prewake.sql`、`supabase/migration_wake_modes.sql` を追加で実行してください。ギャラクシーモードをONにすると `rooms.galaxy_auto_off_at` に60分後の時刻が入り、`/api/cron/galaxy-auto-off` が期限切れの部屋を自動OFFします。光目覚ましは、Flame Onなら設定時刻にメインライトを点灯します。Horizon Riseなら10分前から和風ライトを段階的に明るくし、設定時刻にメインライトを点灯して、5分後に和風ライトだけを自動消灯します。
 
 ---
 

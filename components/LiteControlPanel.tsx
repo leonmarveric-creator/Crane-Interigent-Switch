@@ -9,6 +9,7 @@
 //   ・多言語（ja/en/zh/ko）は既存 lib/i18n の T を流用。
 //   ハイテクUIとの切り替えは onSwitchMode（RoomModeSwitch が制御）。
 // =========================================================
+import { rememberLang } from "@/lib/langCookie";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb, Sparkles, Moon,
@@ -298,7 +299,7 @@ export default function LiteControlPanel({
             <Globe className="h-3.5 w-3.5 text-[#6d685d]" />
             <select
               value={lang}
-              onChange={(ev) => setLang(ev.target.value as Lang)}
+              onChange={(ev) => { setLang(ev.target.value as Lang); rememberLang(ev.target.value); }}
               className="bg-transparent focus:outline-none [&>option]:text-black"
             >
               {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}

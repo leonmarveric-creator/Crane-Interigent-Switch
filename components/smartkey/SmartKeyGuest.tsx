@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberLang } from "@/lib/langCookie";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import SmartKeyScreen, { type Door, type CmdResult } from "./SmartKeyScreen";
@@ -91,6 +92,7 @@ export default function SmartKeyGuest({
         onLang={(l) => {
           setLang(l);
           try { localStorage.setItem("skLang", l); } catch { /* noop */ }
+          rememberLang(l);
         }}
         doors={data.roomSlug ? 2 : 1}
         roomPanelHref={roomPanelHref}

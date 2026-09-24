@@ -30,12 +30,80 @@ test("reactor parts rotate around the reactor center (no wobble) and percent use
 
 test("tech UI extra effects: command beam, lock shield, network, 3D floor, telemetry HUD", () => {
   const fx = read("components", "tech", "TechFX.tsx");
-  for (const k of ["export function CommandBeamLayer", "export function LockShield", "export function NetworkField", "export function PerspectiveFloor", "export function LightStreaks", "export function TelemetryHud"]) {
+  for (const k of ["export function TouchReticle", "export function LockShield", "export function NetworkField", "export function PerspectiveFloor", "export function LightStreaks", "export function TelemetryHud"]) {
     assert.ok(fx.includes(k), k);
   }
   assert.match(fx, /document\.hidden/); // 裏では描画しない
   const cp = read("components", "ControlPanel.tsx");
-  assert.match(cp, /<CommandBeamLayer sourceRef=\{reactorRef\} containerRef=\{mainRef\} \/>/);
-  assert.match(cp, /<LockShield trigger=\{shield\.n\} mode=\{shield\.mode\} \/>/);
+  assert.match(cp, /<TouchReticle containerRef=\{mainRef\} \/>/);
+  assert.match(cp, /<LockShield trigger=\{shield\.n\} mode=\{shield\.mode\}/);
   assert.match(cp, /<TelemetryHud /);
+});
+
+test("layout kept (room art on top), lock card right under the header, holographic lock buttons, galaxy kept", () => {
+  const cp = read("components", "ControlPanel.tsx");
+  const hero = cp.indexOf("<HeroMedia url={imageUrl}");
+  const header = cp.indexOf("<motion.header");
+  const lock = cp.indexOf("<LockCard roomSlug");
+  const telemetry = cp.indexOf("<TelemetryHud");
+  assert.ok(hero > 0 && hero < header && header < lock && lock < telemetry, "room art → header → lock → HUD");
+  assert.match(cp, /<TechButton tone="emerald" icon=\{LockKeyholeOpen\} label=\{t\.unlock\}/);
+  assert.match(cp, /<ModeGrid /);
+  assert.doesNotMatch(cp, /CommandBeamLayer/);
+});
+
+test("modes are right under the entrance button; normal returns to main light only; nest/cozy turn other lights off", () => {
+  const cp = read("components", "ControlPanel.tsx");
+  const entrance = cp.indexOf("<EntranceKeyButton");
+  const modes = cp.indexOf("<ModeGrid ");
+  const scenes = cp.indexOf("<SceneButtons ");
+  assert.ok(entrance > 0 && modes > entrance && scenes > modes);
+  assert.match(cp, /action: "normal"/);
+  assert.match(cp, /action: "galaxy_on"/);
+  assert.match(cp, /action: "nest_on"/);
+  assert.match(cp, /action: "welcome_cozy"/);
+  const dc = read("lib", "deviceControl.ts");
+  const normal = dc.slice(dc.indexOf('case "normal"'), dc.indexOf('case "good_night"'));
+  assert.match(normal, /lightTurnOn\(sbCreds, room\.switchbot_light_device_id\)/);
+  for (const id of ["galaxy", "nest", "wafu"]) assert.match(normal, new RegExp(`deviceTurnOff\\(sbCreds, room\\.switchbot_${id}_device_id\\)`));
+  const nest = dc.slice(dc.indexOf('case "nest_on"'), dc.indexOf('case "wafu_on"'));
+  assert.match(nest, /lightTurnOff/);
+  assert.match(nest, /switchbot_wafu_device_id/);
+  const cozy = dc.slice(dc.indexOf('case "welcome_cozy"'), dc.indexOf('case "normal"'));
+  assert.match(cozy, /deviceTurnOff\(sbCreds, room\.switchbot_nest_device_id\)/);
+  assert.match(read("lib", "deviceClient.ts"), /"normal"/);
+});
+
+test("galaxy launch animation, no add-to-home card in the tech UI", () => {
+  const cp = read("components", "ControlPanel.tsx");
+  assert.match(cp, /<GalaxyLaunch trigger=\{galaxyLaunch\} \/>/);
+  assert.match(cp, /if \(m\.k === "galaxy"\) \{ galaxyOn\(\); onGalaxyLaunch\?\.\(\); \}/);
+  assert.doesNotMatch(cp, /<AddToHomePrompt/);
+  assert.match(read("components", "tech", "TechFX.tsx"), /export function GalaxyLaunch/);
+});
+
+test("first language follows the phone setting (Accept-Language), ?lang= still wins", async () => {
+  const { roomLangFromHeader, keyLangFromHeader, parseAcceptLanguage } = await import(path.join(root, "lib", "acceptLang.ts"));
+  assert.deepEqual(parseAcceptLanguage("ko-KR,ko;q=0.9,en-US;q=0.8"), ["ko-kr", "ko", "en-us"]);
+  assert.equal(roomLangFromHeader("ko-KR,ko;q=0.9,en-US;q=0.8"), "ko");
+  assert.equal(roomLangFromHeader("fr-FR,fr;q=0.9,ja;q=0.5"), "ja");
+  assert.equal(roomLangFromHeader("fr-FR"), null);
+  assert.equal(roomLangFromHeader("zh-TW,zh;q=0.9"), "zh");
+  assert.equal(keyLangFromHeader("zh-TW,zh;q=0.9"), "zh-TW");
+  assert.equal(keyLangFromHeader("zh-Hant-HK"), "zh-TW");
+  assert.equal(keyLangFromHeader("zh-CN"), "zh");
+  assert.equal(keyLangFromHeader(null), null);
+  const room = read("app", "room", "[room_id]", "page.tsx");
+  assert.match(room, /isLang\(searchParams\.lang\)\s*\? searchParams\.lang/);
+  assert.match(room, /: phoneLang/);
+  assert.match(read("app", "key", "[entrance]", "page.tsx"), /keyLangFromHeader\(headers\(\)\.get\("accept-language"\)\)/);
+});
+
+test("a language the guest picked is remembered (cookie) and used before the phone setting", () => {
+  for (const f of [["components", "ControlPanel.tsx"], ["components", "LiteControlPanel.tsx"], ["components", "MagicalControlPanel.tsx"], ["components", "PinGate.tsx"], ["components", "smartkey", "SmartKeyGuest.tsx"]]) {
+    assert.match(read(...f), /rememberLang\(/, f.join("/"));
+  }
+  const room = read("app", "room", "[room_id]", "page.tsx");
+  assert.ok(room.indexOf("isLang(saved)") < room.indexOf(": phoneLang"), "saved choice before phone language");
+  assert.match(read("app", "key", "[entrance]", "page.tsx"), /searchParams\.lang \?\? cookies\(\)\.get\(LANG_COOKIE\)\?\.value \?\? keyLangFromHeader/);
 });

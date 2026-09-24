@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberLang } from "@/lib/langCookie";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import {
@@ -1109,7 +1110,7 @@ export default function MagicalControlPanel({
             <Globe className="h-3.5 w-3.5 text-[#d8bf86]" />
             <select
               value={lang}
-              onChange={(ev) => setLang(ev.target.value as Lang)}
+              onChange={(ev) => { setLang(ev.target.value as Lang); rememberLang(ev.target.value); }}
               className="bg-transparent focus:outline-none [&>option]:text-black"
             >
               {LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}

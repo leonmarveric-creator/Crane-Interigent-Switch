@@ -2,7 +2,7 @@
 
 /**
  * ハイテクUI の追加エフェクト集。
- *  - CommandBeamLayer : ボタンを押すと、リアクターからそのボタンへ光線 → 粒子が弾ける → 「CMD ▸ SENT」
+ *  - TouchReticle     : 触れた位置に、角ブラケットが寄って合うミニマルな照準
  *  - LockShield       : 解錠 = 六角形シールドが砕けて散る / 施錠 = 六角形が集まってバリアが閉じる
  *  - NetworkField     : 粒子が漂い、近いもの同士が線でつながるネットワーク (canvas)
  *  - PerspectiveFloor : 奥へ流れていく 3D の床グリッド
@@ -14,103 +14,60 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 /* ------------------------------------------------------------------ */
-/* ボタン → 光線                                                        */
+/* タッチした瞬間: ミニマルな照準                                        */
 /* ------------------------------------------------------------------ */
-type Beam = { id: number; x1: number; y1: number; x2: number; y2: number; code: string };
+type Touch = { id: number; x: number; y: number };
 
 /**
- * main 要素内でボタンが押されたら、source (リアクター) からボタンの中心へ光線を飛ばす。
- * 画面全体に重ねる固定レイヤー。
+ * 画面に触れた位置に、4 つの角ブラケットがスッと寄って合う照準を出す (0.45 秒)。
+ * 中心の点と、短い十字線だけのミニマルな演出。
  */
-export function CommandBeamLayer({ sourceRef, containerRef }: {
-  sourceRef: React.RefObject<HTMLElement>; containerRef: React.RefObject<HTMLElement>;
-}) {
+export function TouchReticle({ containerRef }: { containerRef: React.RefObject<HTMLElement> }) {
   const reduce = useReducedMotion();
-  const [beams, setBeams] = useState<Beam[]>([]);
+  const [touches, setTouches] = useState<Touch[]>([]);
   useEffect(() => {
     const root = containerRef.current;
     if (!root || reduce) return;
     const onDown = (e: PointerEvent) => {
-      const btn = (e.target as Element | null)?.closest?.("button, [role=button], a");
-      const src = sourceRef.current;
-      if (!btn || !src || (btn as HTMLButtonElement).disabled || src.contains(btn)) return;
-      const a = src.getBoundingClientRect(), b = btn.getBoundingClientRect();
-      const x1 = a.left + a.width / 2, y1 = a.top + a.height / 2;
-      const x2 = b.left + b.width / 2, y2 = b.top + b.height / 2;
-      if (Math.hypot(x2 - x1, y2 - y1) < 90) return; // すぐ近くのボタン (ヘッダー) は省略
       const id = Date.now() + Math.random();
-      const code = "0x" + Math.floor(Math.random() * 65536).toString(16).padStart(4, "0").toUpperCase();
-      setBeams((bs) => [...bs.slice(-2), { id, x1, y1, x2, y2, code }]);
-      setTimeout(() => setBeams((bs) => bs.filter((x) => x.id !== id)), 1600);
+      setTouches((ts) => [...ts.slice(-3), { id, x: e.clientX, y: e.clientY }]);
+      setTimeout(() => setTouches((ts) => ts.filter((t) => t.id !== id)), 520);
     };
     root.addEventListener("pointerdown", onDown, { passive: true });
     return () => root.removeEventListener("pointerdown", onDown);
-  }, [sourceRef, containerRef, reduce]);
+  }, [containerRef, reduce]);
 
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
   return (
-    <div className="pointer-events-none fixed inset-0 z-[45]">
-      <svg className="absolute inset-0 h-full w-full overflow-visible">
-        <defs>
-          <linearGradient id="beamGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#e0fbff" stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <AnimatePresence>
-          {beams.map((b) => {
-            const mx = (b.x1 + b.x2) / 2 + (b.y2 - b.y1) * 0.18;
-            const my = (b.y1 + b.y2) / 2 - (b.x2 - b.x1) * 0.18;
-            const d = `M${b.x1} ${b.y1} Q${mx} ${my} ${b.x2} ${b.y2}`;
-            return (
-              <g key={b.id}>
-                {/* 太い外光 */}
-                <motion.path d={d} fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round"
-                  style={{ filter: "blur(5px)" }}
-                  initial={{ pathLength: 0, opacity: 0.6 }} animate={{ pathLength: 1, opacity: [0.6, 0.6, 0] }}
-                  transition={{ duration: 1.1, times: [0, 0.55, 1], ease: "easeOut" }} />
-                {/* 芯 */}
-                <motion.path d={d} fill="none" stroke="url(#beamGrad)" strokeWidth="2.6" strokeLinecap="round"
-                  initial={{ pathLength: 0, opacity: 1 }} animate={{ pathLength: 1, opacity: [1, 1, 0] }}
-                  transition={{ duration: 1.1, times: [0, 0.55, 1], ease: "easeOut" }} />
-                {/* 光線の先頭を走る光の玉 (曲線上の点をたどる) */}
-                {(() => {
-                  const pts = Array.from({ length: 9 }, (_, k) => {
-                    const t = k / 8, u = 1 - t;
-                    return { x: u * u * b.x1 + 2 * u * t * mx + t * t * b.x2, y: u * u * b.y1 + 2 * u * t * my + t * t * b.y2 };
-                  });
-                  return (
-                    <motion.circle r="4" fill="#ffffff" style={{ filter: "drop-shadow(0 0 6px #67e8f9)" }}
-                      initial={{ cx: b.x1, cy: b.y1, opacity: 1 }}
-                      animate={{ cx: pts.map((q) => q.x), cy: pts.map((q) => q.y), opacity: [1, 1, 1, 1, 1, 1, 1, 1, 0] }}
-                      transition={{ duration: 0.45, ease: "easeIn" }} />
-                  );
-                })()}
-                {/* 着弾リング */}
-                <motion.circle cx={b.x2} cy={b.y2} fill="none" stroke="#a5f3fc" strokeWidth="1.5"
-                  initial={{ r: 2, opacity: 0 }} animate={{ r: [2, 34], opacity: [0, 0.9, 0] }}
-                  transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }} />
-                {/* 粒子 */}
-                {Array.from({ length: 10 }, (_, i) => {
-                  const ang = (i / 10) * Math.PI * 2 + Math.random() * 0.4;
-                  const dist = 26 + Math.random() * 26;
-                  return (
-                    <motion.circle key={i} cx={b.x2} cy={b.y2} r="1.6" fill="#e0fbff"
-                      initial={{ x: 0, y: 0, opacity: 0 }}
-                      animate={{ x: Math.cos(ang) * dist, y: Math.sin(ang) * dist, opacity: [0, 1, 0] }}
-                      transition={{ duration: 0.6, delay: 0.32, ease: "easeOut" }} />
-                  );
-                })}
-                {/* ホログラムのラベル */}
-                <motion.text x={b.x2 + 14} y={b.y2 - 16} fill="#67e8f9" fontSize="9" fontFamily="ui-monospace, monospace" letterSpacing="2"
-                  initial={{ opacity: 0, x: b.x2 + 6 }} animate={{ opacity: [0, 1, 1, 0], x: b.x2 + 14 }}
-                  transition={{ duration: 1.1, delay: 0.35, times: [0, 0.15, 0.75, 1] }}>
-                  CMD {b.code} ▸ SENT
-                </motion.text>
-              </g>
-            );
-          })}
-        </AnimatePresence>
-      </svg>
+    <div className="pointer-events-none fixed inset-0 z-[45]" aria-hidden>
+      <AnimatePresence>
+        {touches.map((t) => (
+          <div key={t.id} className="absolute" style={{ left: t.x, top: t.y }}>
+            {/* 角ブラケット: 外から寄ってきて止まり、消える */}
+            {corners.map(([sx, sy], i) => (
+              <motion.span key={i} className="absolute h-2.5 w-2.5 border-cyan-200"
+                style={{
+                  borderLeftWidth: sx < 0 ? 1.5 : 0, borderRightWidth: sx > 0 ? 1.5 : 0,
+                  borderTopWidth: sy < 0 ? 1.5 : 0, borderBottomWidth: sy > 0 ? 1.5 : 0,
+                  marginLeft: sx < 0 ? -10 : 0, marginTop: sy < 0 ? -10 : 0,
+                  filter: "drop-shadow(0 0 3px rgba(34,211,238,0.9))",
+                }}
+                initial={{ x: sx * 16, y: sy * 16, opacity: 0 }}
+                animate={{ x: sx * 6, y: sy * 6, opacity: [0, 1, 1, 0] }}
+                transition={{ duration: 0.45, ease: [0.2, 0.9, 0.2, 1], opacity: { duration: 0.45, times: [0, 0.2, 0.7, 1] } }} />
+            ))}
+            {/* 十字線 */}
+            <motion.span className="absolute -ml-3.5 h-px w-7 bg-cyan-200/70"
+              initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: [0, 1, 1], opacity: [0, 0.8, 0] }} transition={{ duration: 0.4 }} />
+            <motion.span className="absolute -mt-3.5 h-7 w-px bg-cyan-200/70"
+              initial={{ scaleY: 0, opacity: 0 }} animate={{ scaleY: [0, 1, 1], opacity: [0, 0.8, 0] }} transition={{ duration: 0.4 }} />
+            {/* 中心の点 */}
+            <motion.span className="absolute -ml-[2px] -mt-[2px] h-1 w-1 rounded-full bg-white"
+              style={{ boxShadow: "0 0 6px 1px rgba(34,211,238,0.9)" }}
+              initial={{ opacity: 1, scale: 1.6 }} animate={{ opacity: 0, scale: 0.6 }} transition={{ duration: 0.45 }} />
+          </div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
@@ -143,7 +100,7 @@ function hexCells() {
  *  unlock: 光のフラッシュ → シールドが砕けて外へ散る
  *  lock  : 外から六角形が集まって閉じる → 一瞬強く光ってバリア完成
  */
-export function LockShield({ trigger, mode }: { trigger: number; mode: "unlock" | "lock" }) {
+export function LockShield({ trigger, mode, top = "34%", caption = true }: { trigger: number; mode: "unlock" | "lock"; top?: string; caption?: boolean }) {
   const reduce = useReducedMotion();
   const cells = useMemo(hexCells, []);
   const [show, setShow] = useState(false);
@@ -157,7 +114,7 @@ export function LockShield({ trigger, mode }: { trigger: number; mode: "unlock" 
   const c = mode === "unlock" ? "#34d399" : "#22d3ee";
   const d = hexPath(HEX_R - 1.2);
   return (
-    <svg key={trigger} viewBox="-90 -90 180 180" className="pointer-events-none absolute left-1/2 top-[34%] z-20 h-56 w-56 -translate-x-1/2 -translate-y-1/2 overflow-visible">
+    <svg key={trigger} viewBox="-90 -90 180 180" className="pointer-events-none absolute left-1/2 z-20 h-56 w-56 -translate-x-1/2 -translate-y-1/2 overflow-visible" style={{ top }}>
       {/* フラッシュ */}
       <motion.circle r="60" fill={c} initial={{ opacity: 0.55, scale: 0.4 }} animate={{ opacity: 0, scale: 1.6 }}
         transition={{ duration: 0.7, ease: "easeOut", delay: mode === "lock" ? 0.55 : 0 }} style={{ filter: "blur(10px)" }} />
@@ -188,10 +145,12 @@ export function LockShield({ trigger, mode }: { trigger: number; mode: "unlock" 
           transition={{ duration: 0.9, delay: 0.5 }} />
       )}
       {/* 解錠: ACCESS GRANTED / 施錠: SECURED */}
+      {caption && (
       <motion.text x="0" y="-82" textAnchor="middle" fill={c} fontSize="9" letterSpacing="3" fontFamily="ui-monospace, monospace"
         initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 1, 0] }} transition={{ duration: 1.3, delay: 0.25, times: [0, 0.2, 0.8, 1] }}>
         {mode === "unlock" ? "ACCESS GRANTED" : "PERIMETER SECURED"}
       </motion.text>
+      )}
     </svg>
   );
 }
@@ -371,6 +330,133 @@ export function TelemetryHud({ temp, checkOut, devices }: {
           <span className="font-mono text-[7.5px] tracking-[0.2em] text-cyan-300/60">LINK</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* ギャラクシーモード起動: ワープ → 銀河が渦を巻いて現れる (約 3 秒)       */
+/* ------------------------------------------------------------------ */
+/**
+ * trigger が変わるたびに再生する全画面演出。
+ *  0.0s 画面が暗転し中心が光る → 0.2〜1.7s 星が中心から放射状に流れるワープ →
+ *  1.2〜2.8s 渦巻き銀河が回転しながら広がり「GALAXY MODE · ONLINE」→ フェードして星空へ。
+ */
+export function GalaxyLaunch({ trigger }: { trigger: number }) {
+  const reduce = useReducedMotion();
+  const [show, setShow] = useState(false);
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!trigger || reduce) return;
+    setShow(true);
+    const id = setTimeout(() => setShow(false), 3700);
+    return () => clearTimeout(id);
+  }, [trigger, reduce]);
+
+  // ワープ (canvas)
+  useEffect(() => {
+    if (!show) return;
+    const cv = canvas.current;
+    const ctx = cv?.getContext("2d");
+    if (!cv || !ctx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cx = w / 2, cy = h / 2;
+    const stars = Array.from({ length: 240 }, () => ({
+      a: Math.random() * Math.PI * 2, r: Math.random() * 40, v: 0.6 + Math.random() * 2.2,
+      c: Math.random() > 0.75 ? "240,171,252" : Math.random() > 0.5 ? "165,180,252" : "255,255,255",
+    }));
+    const t0 = performance.now();
+    let raf = 0;
+    const draw = (now: number) => {
+      const t = (now - t0) / 1000;
+      ctx.clearRect(0, 0, w, h);
+      if (t > 2.1) return;
+      const speed = t < 0.2 ? 0 : Math.min(1, (t - 0.2) / 0.6) * (t > 1.5 ? Math.max(0, 1 - (t - 1.5) / 0.6) : 1);
+      const fade = t > 1.5 ? Math.max(0, 1 - (t - 1.5) / 0.6) : 1;
+      for (const s of stars) {
+        const prev = s.r;
+        s.r += s.v * (1 + s.r * 0.045) * speed * 6;
+        const x1 = cx + Math.cos(s.a) * prev, y1 = cy + Math.sin(s.a) * prev;
+        const x2 = cx + Math.cos(s.a) * s.r, y2 = cy + Math.sin(s.a) * s.r;
+        ctx.strokeStyle = `rgba(${s.c},${0.85 * fade})`;
+        ctx.lineWidth = Math.min(2.4, 0.6 + s.r / 220);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        if (s.r > Math.hypot(w, h)) { s.r = Math.random() * 30; }
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [show]);
+
+  // 渦巻き銀河の粒 (対数らせん 3 本)
+  const arms = useMemo(() => {
+    const pts: { x: number; y: number; r: number; c: string }[] = [];
+    for (let arm = 0; arm < 3; arm++) {
+      for (let i = 0; i < 70; i++) {
+        const t = i / 70;
+        const ang = arm * ((Math.PI * 2) / 3) + t * Math.PI * 3.2;
+        const rad = 6 + t * 88;
+        const jitter = (Math.sin(i * 12.9898 + arm * 78.233) * 43758.5453) % 1;
+        pts.push({
+          x: Math.cos(ang) * rad + jitter * 6, y: Math.sin(ang) * rad * 0.62 + jitter * 4,
+          r: 0.6 + (1 - t) * 1.6, c: t < 0.3 ? "#fdf4ff" : arm === 1 ? "#f0abfc" : arm === 2 ? "#a5b4fc" : "#c4b5fd",
+        });
+      }
+    }
+    return pts;
+  }, []);
+
+  if (!show) return null;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden" aria-hidden>
+      {/* 暗転 */}
+      <motion.div className="absolute inset-0 bg-[#05020f]"
+        initial={{ opacity: 0 }} animate={{ opacity: [0, 0.94, 0.94, 0] }} transition={{ duration: 3.6, times: [0, 0.07, 0.82, 1] }} />
+      {/* 中心のフラッシュ */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <motion.div className="h-40 w-40 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.95), rgba(192,132,252,0.6) 35%, transparent 70%)" }}
+          initial={{ scale: 0.2, opacity: 0 }} animate={{ scale: [0.2, 1.4, 0.6], opacity: [0, 1, 0] }} transition={{ duration: 0.8 }} />
+      </div>
+      {/* ワープ */}
+      <canvas ref={canvas} className="absolute inset-0 h-full w-full" />
+      {/* 渦巻き銀河 */}
+      <div className="absolute inset-0 flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.25, rotate: -120 }}
+        animate={{ opacity: [0, 1, 1, 0], scale: [0.25, 1, 1.12, 1.6], rotate: [-120, 0, 35, 60] }}
+        transition={{ duration: 2.5, delay: 1.0, times: [0, 0.35, 0.8, 1], ease: "easeOut" }}>
+        <svg viewBox="-110 -80 220 160" className="h-[46vh] w-[92vw] max-w-[520px] overflow-visible">
+          <defs>
+            <radialGradient id="glxCore">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="40%" stopColor="#f5d0fe" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <ellipse cx="0" cy="0" rx="70" ry="44" fill="#7c3aed" opacity="0.18" style={{ filter: "blur(12px)" }} />
+          {arms.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={p.r} fill={p.c} style={{ filter: `drop-shadow(0 0 2px ${p.c})` }} />
+          ))}
+          <circle r="16" fill="url(#glxCore)" />
+          {/* HUD リング */}
+          <ellipse cx="0" cy="0" rx="100" ry="64" fill="none" stroke="#c4b5fd" strokeOpacity="0.5" strokeWidth="0.6" strokeDasharray="2 5" />
+          <ellipse cx="0" cy="0" rx="92" ry="58" fill="none" stroke="#f0abfc" strokeOpacity="0.35" strokeWidth="0.6" strokeDasharray="30 12" />
+        </svg>
+      </motion.div>
+      </div>
+      {/* ホログラム文字 */}
+      <motion.div className="absolute inset-x-0 top-[68%] text-center font-mono"
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: [0, 1, 1, 0], y: 0 }}
+        transition={{ duration: 2.3, delay: 1.2, times: [0, 0.18, 0.82, 1] }}>
+        <p className="text-[15px] tracking-[0.55em] text-violet-100 drop-shadow-[0_0_10px_rgba(192,132,252,0.95)]">GALAXY MODE</p>
+        <p className="mt-2 text-[9px] tracking-[0.4em] text-fuchsia-200/80">STARFIELD PROJECTION · ONLINE</p>
+        <div className="mx-auto mt-3 h-px w-40 bg-gradient-to-r from-transparent via-violet-300 to-transparent" />
+      </motion.div>
     </div>
   );
 }

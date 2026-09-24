@@ -11,7 +11,8 @@ export type DeviceAction =
   | "wafu_on" | "wafu_off"
   | "wafu_on_warm" | "wafu_warm"
   | "wafu_brightness" | "wafu_temp" | "wafu_color"
-  | "welcome" | "welcome_cozy" | "good_night" | "away";
+  | "welcome" | "welcome_cozy" | "good_night" | "away"
+  | "normal";
 
 /**
  * デバイス操作を送信。
