@@ -16,6 +16,8 @@ import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVo
 import ArcReactorX from "@/components/tech/ArcReactorX";
 import TechPercent from "@/components/tech/TechPercent";
 import TechButton from "@/components/tech/TechButton";
+import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
+import type { VoiceAction } from "@/lib/voiceCommand";
 import { TouchReticle, GalaxyLaunch, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
 
 interface Props {
@@ -388,7 +390,11 @@ export default function ControlPanel({
         <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.115 }}>
           <ModeGrid roomSlug={roomSlug} admin={admin} guard={guardCommand} t={t}
             hasGalaxy={hasGalaxy} hasNest={hasNest} hasWafu={hasWafu} onGalaxyState={setGalaxyActive}
-            onGalaxyLaunch={() => setGalaxyLaunch((n) => n + 1)} />
+            onGalaxyLaunch={() => setGalaxyLaunch((n) => n + 1)}
+            voiceSlot={<VoiceMic lang={lang} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
+              hold: "", listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
+              label: (a) => voiceLabel(a, t),
+            }} />} />
         </motion.div>
 
         {/* 位置制限の常設案内 (有効な部屋のみ) */}
@@ -1000,11 +1006,34 @@ function HudRings({ unlocked, busy }: { unlocked: boolean; busy: boolean }) {
 /* モード選択 (ノーマル / 快適 / ギャラクシー / ネスト / 和み)           */
 /*   ノーマル = ほかのモードからメインライトだけ点灯の状態に戻す          */
 /* ------------------------------------------------------------------ */
+/** 音声コマンドの確認表示 (例: 「ギャラクシーモード オン」) */
+function voiceLabel(a: VoiceAction, t: typeof T["en"]): string {
+  switch (a) {
+    case "normal": return t.normalMode;
+    case "welcome": return t.comfortMode;
+    case "welcome_cozy": return t.cozyMode;
+    case "galaxy_on": return `${t.galaxy} ${t.on}`;
+    case "galaxy_off": return `${t.galaxy} ${t.off}`;
+    case "nest_on": return `${t.nest} ${t.on}`;
+    case "nest_off": return `${t.nest} ${t.off}`;
+    case "wafu_on": return `${t.wafu} ${t.on}`;
+    case "wafu_off": return `${t.wafu} ${t.off}`;
+    case "ac_on": return `${t.ac} ${t.on}`;
+    case "ac_off": return `${t.ac} ${t.off}`;
+    case "light_on": return `${t.light} ${t.on}`;
+    case "light_off": return `${t.light} ${t.off}`;
+    case "good_night": return t.goodNightMode;
+    case "away": return t.awayMode;
+  }
+}
+
 type ModeKey = "normal" | "welcome" | "galaxy" | "nest" | "cozy";
 type BusyKey = ModeKey | "galaxyOff" | "nestOff";
 function ModeGrid({
-  roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch,
+  roomSlug, admin, guard, t, hasGalaxy, hasNest, hasWafu, onGalaxyState, onGalaxyLaunch, voiceSlot,
 }: {
+  /** 見出しの右に置く音声コントロールボタン */
+  voiceSlot?: React.ReactNode;
   roomSlug: string; admin?: boolean; guard?: () => Promise<boolean>; t: typeof T["en"];
   hasGalaxy?: boolean; hasNest?: boolean; hasWafu?: boolean; onGalaxyState?: (on: boolean) => void;
   onGalaxyLaunch?: () => void;
@@ -1063,13 +1092,22 @@ function ModeGrid({
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? [15, 25, 40] : [20, 40, 20]);
   };
 
+  // 音声コマンド: ボタンを押したときと同じ処理を呼ぶ
+  useVoiceAction((a) => {
+    if (a === "galaxy_off" && hasGalaxy) return void stop("galaxy");
+    if (a === "nest_off" && hasNest) return void stop("nest");
+    const m = list.find((x) => x.action === a);
+    if (m) void run(m);
+  });
+
   const ICON_COLOR: Record<string, string> = { cyan: "text-cyan-300", emerald: "text-emerald-300", violet: "text-violet-300", amber: "text-amber-300", rose: "text-rose-300" };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 px-1 font-mono text-[9px] tracking-[0.3em] text-cyan-300/60">
+      <div className="mb-2 flex items-center gap-2 px-1 font-mono text-[9px] tracking-[0.3em] text-cyan-300/60">
         <span className="h-px w-4 bg-cyan-300/40" /> MODE · {t.modeSelect}
         <span className="h-px flex-1 bg-gradient-to-r from-cyan-300/30 to-transparent" />
-      </p>
+        {voiceSlot}
+      </div>
       <div className="grid grid-cols-2 gap-2.5">
         {list.map((m, i) => {
           const on = active === m.k;
@@ -1156,6 +1194,12 @@ function SceneButtons({
     setBusy(null);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 25 : [20, 40, 20]);
   };
+
+  // 音声コマンド (このブロックに表示中のボタンだけ反応)
+  useVoiceAction((a) => {
+    if (a === "away" && part !== "rest") void run("away");
+    if (a === "good_night" && part !== "away") void run("good_night");
+  });
 
   return (
     <div className="space-y-4">
@@ -1323,6 +1367,11 @@ function ToggleCard({
     if (navigator.vibrate) navigator.vibrate(which === "on" ? 22 : 16);
   };
 
+  useVoiceAction((a) => {
+    if (a === onAction) void send("on");
+    else if (a === offAction) void send("off");
+  });
+
   return (
     <HudPanel tone={accent} active={on} small
       contentClassName="flex-col items-center gap-3 px-4 py-6">
@@ -1396,6 +1445,11 @@ function WafuCard({
     setBusy(null);
     if (navigator.vibrate) navigator.vibrate(which === "off" ? 16 : 22);
   };
+
+  useVoiceAction((a) => {
+    if (a === "wafu_on") void send("on");
+    else if (a === "wafu_off") void send("off");
+  });
 
   return (
     <HudPanel tone="rose" active={on} small

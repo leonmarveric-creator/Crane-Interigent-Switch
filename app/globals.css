@@ -355,3 +355,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .tb-chev { animation: tbChev 1.2s ease-in-out infinite; }
 /* タッチした瞬間の照準 (TouchReticle) */
 @media (prefers-reduced-motion: reduce) { .tb-sheen, .tb-chev { animation: none; } }
+
+/* 音声コントロール: 聞き取り中の波形 */
+@keyframes voiceBar {
+  0%, 100% { height: 5px; opacity: 0.55; }
+  50% { height: 22px; opacity: 1; }
+}

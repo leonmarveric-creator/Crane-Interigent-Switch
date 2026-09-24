@@ -45,6 +45,7 @@ type Dict = {
   awayMode: string;
   goodNightMode: string;
   galaxy: string;
+  voiceListening: string; voiceRetry: string; voiceDenied: string; voiceWhy: string; voiceExamples: string[];
   modeSelect: string; normalMode: string; normalDesc: string; comfortDesc: string; galaxyShort: string; nestShort: string; cozyDesc: string;
   galaxyDesc: string;
   galaxyAutoOff: string;
@@ -84,6 +85,7 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PINが違います", pinLocked: "試行回数が多すぎます。しばらくしてからお試しください", verify: "認証",
     locTooFar: "操作はお部屋の近くでのみ可能です", locPermission: "位置情報を許可してください", locUnavailable: "位置情報を取得できません",
     comfortMode: "快適モード", awayMode: "外出（全部OFF）", goodNightMode: "おやすみモード",
+    voiceListening: "聞き取り中", voiceRetry: "聞き取れませんでした。もう一度どうぞ", voiceDenied: "マイクが許可されていません。ブラウザの設定で許可してください", voiceWhy: "ボタンを押している間だけ聞き取ります（録音は保存しません）", voiceExamples: ["ギャラクシーオン", "照明オフ", "おやすみ"],
     modeSelect: "モード", normalMode: "ノーマル", normalDesc: "メインライトだけ点灯", comfortDesc: "エアコン＋照明", galaxyShort: "満天の星・60分", nestShort: "藤の灯りだけ", cozyDesc: "行灯の灯りだけ",
     galaxy: "ギャラクシーモード", galaxyDesc: "満天の星をお部屋に投影", galaxyAutoOff: "オン後60分で自動OFF",
     nest: "ネストモード", nestDesc: "藤編みの灯りで暖かな陰影を",
@@ -109,6 +111,7 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "Incorrect PIN", pinLocked: "Too many attempts. Please try again later", verify: "Verify",
     locTooFar: "You must be near the room to operate", locPermission: "Please allow location access", locUnavailable: "Location unavailable",
     comfortMode: "Comfort", awayMode: "Away (all off)", goodNightMode: "Good Night",
+    voiceListening: "LISTENING", voiceRetry: "Sorry, I didn't catch that. Please try again", voiceDenied: "Microphone is blocked. Please allow it in your browser settings", voiceWhy: "Listens only while you hold the button (nothing is recorded)", voiceExamples: ["Galaxy on", "Lights off", "Good night"],
     modeSelect: "Modes", normalMode: "Normal", normalDesc: "Main light only", comfortDesc: "Air-con + light", galaxyShort: "Stars · 60 min", nestShort: "Woven lamp only", cozyDesc: "Lantern light only",
     galaxy: "Galaxy Mode", galaxyDesc: "Project a starry sky in your room", galaxyAutoOff: "Auto-off 60 min after on",
     nest: "Nest Mode", nestDesc: "Warm woven light with soft shadows",
@@ -134,6 +137,7 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN码错误", pinLocked: "尝试次数过多，请稍后再试", verify: "验证",
     locTooFar: "请在房间附近操作", locPermission: "请允许定位权限", locUnavailable: "无法获取定位",
     comfortMode: "舒适模式", awayMode: "外出（全关）", goodNightMode: "晚安模式",
+    voiceListening: "正在聆听", voiceRetry: "没有听清，请再说一次", voiceDenied: "麦克风未被允许，请在浏览器设置中允许", voiceWhy: "仅在按住按钮时聆听（不会保存录音）", voiceExamples: ["打开星空", "关灯", "晚安"],
     modeSelect: "模式", normalMode: "普通", normalDesc: "只开主灯", comfortDesc: "空调＋照明", galaxyShort: "星空・60分钟", nestShort: "只开藤编灯", cozyDesc: "只开行灯",
     galaxy: "银河模式", galaxyDesc: "在房间投影满天星空", galaxyAutoOff: "开启60分钟后自动关闭",
     nest: "鸟巢模式", nestDesc: "藤编暖光，投下柔和光影",
@@ -159,6 +163,7 @@ export const T: Record<Lang, Dict> = {
     wrongPin: "PIN이 올바르지 않습니다", pinLocked: "시도 횟수가 많습니다. 잠시 후 다시 시도하세요", verify: "확인",
     locTooFar: "객실 근처에서만 조작할 수 있습니다", locPermission: "위치 권한을 허용해 주세요", locUnavailable: "위치를 가져올 수 없습니다",
     comfortMode: "쾌적 모드", awayMode: "외출 (전체 OFF)", goodNightMode: "취침 모드",
+    voiceListening: "듣는 중", voiceRetry: "잘 못 들었어요. 다시 말씀해 주세요", voiceDenied: "마이크가 허용되지 않았습니다. 브라우저 설정에서 허용해 주세요", voiceWhy: "버튼을 누르는 동안만 듣습니다 (녹음은 저장하지 않습니다)", voiceExamples: ["갤럭시 켜줘", "조명 꺼줘", "잘 자"],
     modeSelect: "모드", normalMode: "노멀", normalDesc: "메인 조명만 켜기", comfortDesc: "에어컨＋조명", galaxyShort: "별빛・60분", nestShort: "라탄 조명만", cozyDesc: "행등 조명만",
     galaxy: "갤럭시 모드", galaxyDesc: "방 안에 별이 가득한 하늘을 투영", galaxyAutoOff: "켜진 뒤 60분 후 자동 꺼짐",
     nest: "네스트 모드", nestDesc: "라탄 조명으로 따뜻한 그림자를",
