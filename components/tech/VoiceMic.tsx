@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mic, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock } from "lucide-react";
+import { Mic, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock, CloudSun, MapPin, Siren, Phone, ExternalLink } from "lucide-react";
 import { parseVoiceCommand, parseVoiceQuestion, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps } from "@/lib/voiceCommand";
 import { primeVoice, speak } from "@/lib/sfx";
 
@@ -34,10 +34,42 @@ type Texts = {
   fab: string; tipTitle: string; tipBody: string; listening: string; retry: string; denied: string; why: string; examples: string[];
   label: (a: VoiceAction) => string;
   /** 質問への答えの表示 */
-  q: { wifi: string; checkout: string; entrance: string; room: string; ssid: string; password: string; none: string; copy: string; copied: string; loading: string };
+  q: {
+    wifi: string; checkout: string; entrance: string; room: string; ssid: string; password: string; none: string; copy: string; copied: string; loading: string;
+    weather: string; today: string; tomorrow: string; rain: string; umbrellaYes: string; umbrellaMaybe: string; umbrellaNo: string;
+    nearby: string; store: string; station: string; laundry: string; openMap: string;
+    emergency: string; police: string; ambulance: string; host: string; emergencyNote: string;
+  };
 };
 
-type Answer = { q: VoiceQuestion; loading: boolean; rows: { label?: string; value: string }[] };
+type WeatherDay = { code: number; max: number; min: number; rain: number };
+type Answer = {
+  q: VoiceQuestion; loading: boolean;
+  rows: { label?: string; value: string }[];
+  weather?: WeatherDay[];
+  links?: { key: "store" | "station" | "laundry"; href: string }[];
+  supportUrl?: string | null;
+};
+
+/** 天気コード (Open-Meteo / WMO) → 絵文字 */
+function weatherEmoji(code: number) {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "🌤️";
+  if (code === 3) return "☁️";
+  if (code === 45 || code === 48) return "🌫️";
+  if (code >= 95) return "⛈️";
+  if (code >= 71 && code <= 77) return "❄️";
+  if (code >= 51) return "🌧️";
+  return "☁️";
+}
+
+/** 近くの場所を地図で探すリンク (部屋の位置を中心に Google マップで検索) */
+function mapLink(query: string, lat?: number | null, lng?: number | null) {
+  const q = encodeURIComponent(query);
+  return typeof lat === "number" && typeof lng === "number"
+    ? `https://www.google.com/maps/search/${q}/@${lat},${lng},16z`
+    : `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
 
 /** 返事の声 (アンドロイドの声の録音。答えそのものは画面に大きく出す) */
 const ANSWER_VOICE: Record<VoiceQuestion, string> = {
@@ -45,6 +77,12 @@ const ANSWER_VOICE: Record<VoiceQuestion, string> = {
   checkout: "Here is your check-out time.",
   entrance_code: "Here is the entrance code.",
   room_code: "Here is your room code.",
+  weather: "Here is the weather forecast.",
+  emergency: "Here are the emergency contacts.",
+  nearby: "Here are nearby places.",
+  nearby_store: "Here are nearby places.",
+  nearby_station: "Here are nearby places.",
+  nearby_laundry: "Here are nearby places.",
 };
 
 type Phase = "idle" | "listening" | "done" | "error";
@@ -55,7 +93,9 @@ function getRecognition(): any {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export default function VoiceMic({ lang, caps, texts, roomSlug }: { lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string }) {
+export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
+  lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string; lat?: number | null; lng?: number | null;
+}) {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const answerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,9 +107,47 @@ export default function VoiceMic({ lang, caps, texts, roomSlug }: { lang: string
     if (answerTimer.current) clearTimeout(answerTimer.current);
     answerTimer.current = setTimeout(() => setAnswer(null), 60000);
     let rows: Answer["rows"] = [];
+    // 天気: 画面上部と同じ Open-Meteo (キー不要) から今日と明日
+    if (q === "weather") {
+      let days: WeatherDay[] = [];
+      try {
+        if (typeof lat === "number" && typeof lng === "number") {
+          const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=2`);
+          const j = await r.json();
+          days = (j?.daily?.weather_code ?? []).map((c: number, i: number) => ({
+            code: c, max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]),
+            rain: Math.round(j.daily.precipitation_probability_max[i] ?? 0),
+          }));
+        }
+      } catch { /* ignore */ }
+      setAnswer({ q, loading: false, rows: [], weather: days });
+      speak(days.length ? ANSWER_VOICE[q] : "Sorry, that information is not available.");
+      return;
+    }
+    // 近くの場所: 部屋の位置を中心に地図で検索 (登録不要)
+    if (q.startsWith("nearby")) {
+      const all: Answer["links"] = [
+        { key: "store", href: mapLink("コンビニ", lat, lng) },
+        { key: "station", href: mapLink("駅", lat, lng) },
+        { key: "laundry", href: mapLink("コインランドリー", lat, lng) },
+      ];
+      const want = q === "nearby_store" ? "store" : q === "nearby_station" ? "station" : q === "nearby_laundry" ? "laundry" : null;
+      const links = want ? [...all.filter((l) => l.key === want), ...all.filter((l) => l.key !== want)] : all;
+      setAnswer({ q, loading: false, rows: [], links });
+      speak(ANSWER_VOICE[q]);
+      return;
+    }
+    // 緊急時は 110 / 119 をすぐに出す (ホストの連絡先はあとから追加)
+    if (q === "emergency") {
+      setAnswer({ q, loading: false, rows: [], supportUrl: null });
+      speak(ANSWER_VOICE[q]);
+      if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+    }
+    let supportUrl: string | null = null;
     try {
       const r = await fetch(`/api/room-info/${roomSlug}`, { cache: "no-store" });
       const j = r.ok ? await r.json() : null;
+      supportUrl = j?.supportUrl ?? null;
       if (q === "wifi" && j?.wifi) {
         if (j.wifi.ssid) rows.push({ label: texts.q.ssid, value: j.wifi.ssid });
         if (j.wifi.password) rows.push({ label: texts.q.password, value: j.wifi.password });
@@ -84,6 +162,11 @@ export default function VoiceMic({ lang, caps, texts, roomSlug }: { lang: string
         rows = [{ value: String(j.roomCode) }];
       }
     } catch { /* ignore */ }
+    // 緊急時: 110 / 119 はいつでも出す (ホストの連絡先は登録があれば)
+    if (q === "emergency") {
+      setAnswer((a) => (a && a.q === "emergency" ? { ...a, supportUrl } : a));
+      return;
+    }
     setAnswer({ q, loading: false, rows });
     speak(rows.length ? ANSWER_VOICE[q] : "Sorry, that information is not available.");
     if (navigator.vibrate) navigator.vibrate(18);
@@ -241,11 +324,63 @@ export default function VoiceMic({ lang, caps, texts, roomSlug }: { lang: string
               className="relative w-full max-w-sm rounded-2xl border border-cyan-300/45 bg-[#050b14] px-5 pb-5 pt-4 shadow-[0_0_40px_rgba(34,211,238,0.3)]">
               <button type="button" onClick={closeAnswer} aria-label="close" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/50 active:bg-white/10"><X className="h-4 w-4" /></button>
               <p className="flex items-center gap-2 text-[14px] font-semibold text-cyan-200">
-                {answer.q === "wifi" ? <Wifi className="h-4 w-4" /> : answer.q === "checkout" ? <Clock className="h-4 w-4" /> : answer.q === "entrance_code" ? <DoorOpen className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
-                {answer.q === "wifi" ? texts.q.wifi : answer.q === "checkout" ? texts.q.checkout : answer.q === "entrance_code" ? texts.q.entrance : texts.q.room}
+                {answer.q === "wifi" ? <Wifi className="h-4 w-4" /> : answer.q === "checkout" ? <Clock className="h-4 w-4" /> : answer.q === "entrance_code" ? <DoorOpen className="h-4 w-4" />
+                  : answer.q === "room_code" ? <KeyRound className="h-4 w-4" /> : answer.q === "weather" ? <CloudSun className="h-4 w-4" /> : answer.q === "emergency" ? <Siren className="h-4 w-4 text-rose-300" /> : <MapPin className="h-4 w-4" />}
+                {answer.q === "wifi" ? texts.q.wifi : answer.q === "checkout" ? texts.q.checkout : answer.q === "entrance_code" ? texts.q.entrance
+                  : answer.q === "room_code" ? texts.q.room : answer.q === "weather" ? texts.q.weather : answer.q === "emergency" ? texts.q.emergency : texts.q.nearby}
               </p>
               {answer.loading ? (
                 <p className="mt-5 text-center text-white/60">{texts.q.loading}</p>
+              ) : answer.q === "weather" && answer.weather?.length ? (
+                // 天気: 今日と明日 (気温・雨の確率・傘の目安)
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
+                  {answer.weather.slice(0, 2).map((d, i) => (
+                    <div key={i} className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-center">
+                      <p className="text-[12px] text-white/55">{i === 0 ? texts.q.today : texts.q.tomorrow}</p>
+                      <p className="mt-1 text-[34px] leading-none">{weatherEmoji(d.code)}</p>
+                      <p className="mt-2 font-mono text-[18px] text-white"><span className="text-rose-200">{d.max}°</span> <span className="text-white/40">/</span> <span className="text-sky-200">{d.min}°</span></p>
+                      <p className="mt-1 text-[12px] text-cyan-100">☔ {texts.q.rain} {d.rain}%</p>
+                      <p className={`mt-1.5 text-[11.5px] leading-snug ${d.rain >= 50 ? "text-amber-200" : "text-white/60"}`}>
+                        {d.rain >= 50 ? texts.q.umbrellaYes : d.rain >= 30 ? texts.q.umbrellaMaybe : texts.q.umbrellaNo}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : answer.links ? (
+                // 近くの場所: 地図で開く
+                <div className="mt-3 space-y-2.5">
+                  {answer.links.map((l) => (
+                    <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-xl border border-cyan-300/30 bg-cyan-400/[0.07] px-4 py-3.5 active:scale-[0.98]">
+                      <span className="text-[26px] leading-none">{l.key === "store" ? "🏪" : l.key === "station" ? "🚉" : "🧺"}</span>
+                      <span className="flex-1 text-[16px] font-semibold text-white">{l.key === "store" ? texts.q.store : l.key === "station" ? texts.q.station : texts.q.laundry}</span>
+                      <span className="flex items-center gap-1 text-[12px] text-cyan-200">{texts.q.openMap} <ExternalLink className="h-3.5 w-3.5" /></span>
+                    </a>
+                  ))}
+                </div>
+              ) : answer.q === "emergency" ? (
+                // 緊急時: 警察 110 / 救急・消防 119 / ホストの連絡先
+                <div className="mt-3 space-y-2.5">
+                  <a href="tel:110" className="flex items-center gap-3 rounded-xl border border-sky-300/40 bg-sky-500/15 px-4 py-3.5 active:scale-[0.98]">
+                    <Phone className="h-5 w-5 text-sky-200" />
+                    <span className="flex-1 text-[15px] font-semibold text-white">{texts.q.police}</span>
+                    <span className="font-mono text-[26px] font-bold text-sky-100">110</span>
+                  </a>
+                  <a href="tel:119" className="flex items-center gap-3 rounded-xl border border-rose-300/50 bg-rose-500/20 px-4 py-3.5 active:scale-[0.98]">
+                    <Phone className="h-5 w-5 text-rose-200" />
+                    <span className="flex-1 text-[15px] font-semibold text-white">{texts.q.ambulance}</span>
+                    <span className="font-mono text-[26px] font-bold text-rose-100">119</span>
+                  </a>
+                  {answer.supportUrl && (
+                    <a href={answer.supportUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-xl border border-emerald-300/40 bg-emerald-500/15 px-4 py-3.5 active:scale-[0.98]">
+                      <Phone className="h-5 w-5 text-emerald-200" />
+                      <span className="flex-1 text-[15px] font-semibold text-white">{texts.q.host}</span>
+                      <ExternalLink className="h-4 w-4 text-emerald-200" />
+                    </a>
+                  )}
+                  <p className="pt-1 text-[11px] leading-snug text-white/50">{texts.q.emergencyNote}</p>
+                </div>
               ) : answer.rows.length === 0 ? (
                 <p className="mt-5 text-center text-[15px] text-amber-200">{texts.q.none}</p>
               ) : (

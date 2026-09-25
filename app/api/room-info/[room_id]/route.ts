@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * 音声で質問されたときの答え (Wi-Fi / チェックアウト / エントランス・お部屋の暗証番号)。
+ * 音声で質問されたときの答え (Wi-Fi / チェックアウト / エントランス・お部屋の暗証番号 / 緊急時のホスト連絡先)。
  *   GET /api/room-info/[room_id]
  *   認証: 部屋の PIN セッション Cookie (管理画面テストは管理者 Cookie)。
  *   暗証番号・Wi-Fi はページの HTML には入れず、聞かれたときだけこの API で返す。
@@ -37,9 +37,9 @@ export async function GET(_req: NextRequest, { params }: { params: { room_id: st
   let settings: any = null;
   try {
     const [e, st] = await Promise.all([
-      supabaseAdmin.from("entrances").select("keypad_code, wifi_ssid, wifi_password")
+      supabaseAdmin.from("entrances").select("keypad_code, wifi_ssid, wifi_password, support_url")
         .eq("building", room.building || "Crane Nest").eq("is_active", true).limit(1).maybeSingle(),
-      supabaseAdmin.from("smartkey_settings").select("show_keypad_code, show_wifi").eq("id", 1).maybeSingle(),
+      supabaseAdmin.from("smartkey_settings").select("show_keypad_code, show_wifi, show_support").eq("id", 1).maybeSingle(),
     ]);
     entrance = e.data;
     settings = st.data;
@@ -54,5 +54,7 @@ export async function GET(_req: NextRequest, { params }: { params: { room_id: st
       ? { ssid: entrance.wifi_ssid ?? null, password: entrance.wifi_password ?? null } : null,
     entranceCode: showCode ? entrance?.keypad_code ?? null : null,
     roomCode: room.keypad_code ?? null,
+    // 緊急時に出すホストの連絡先 (LINE / WhatsApp / tel:)
+    supportUrl: settings?.show_support !== false ? entrance?.support_url ?? null : null,
   }, { headers: { "Cache-Control": "no-store" } });
 }

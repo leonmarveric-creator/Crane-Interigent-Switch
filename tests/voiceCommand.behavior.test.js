@@ -109,3 +109,27 @@ test("voice answers: shown big on screen with copy, android voice line, secrets 
   const cp = fs.readFileSync(path.join(__dirname, "../components/ControlPanel.tsx"), "utf8");
   assert.doesNotMatch(cp, /wifi_password|keypad_code/, "secrets are not embedded in the page");
 });
+
+test("voice questions: weather, nearby places, emergency", () => {
+  const { parseVoiceQuestion: q, parseVoiceCommand: p } = require("../lib/voiceCommand.ts");
+  for (const s of ["今日の天気は？", "傘いる？", "明日雨降る？", "What's the weather?", "Do I need an umbrella?", "今天天气怎么样", "要带伞吗", "오늘 날씨", "우산 필요해?"]) assert.equal(q(s), "weather", s);
+  for (const s of ["近くのコンビニは？", "Where is the nearest convenience store?", "附近的便利店", "편의점 어디"]) assert.equal(q(s), "nearby_store", s);
+  for (const s of ["駅はどこ？", "Where is the station?", "地铁站在哪", "역 어디예요"]) assert.equal(q(s), "nearby_station", s);
+  for (const s of ["コインランドリーある？", "laundromat nearby", "洗衣店", "세탁소"]) assert.equal(q(s), "nearby_laundry", s);
+  for (const s of ["近くに何がある？", "What's nearby?", "附近有什么", "근처에 뭐 있어"]) assert.equal(q(s), "nearby", s);
+  for (const s of ["緊急です", "救急車を呼びたい", "警察", "Emergency!", "Call the police", "急救", "报警", "응급 상황", "경찰"]) assert.equal(q(s), "emergency", s);
+  for (const s of ["ギャラクシーオン", "エアコンつけて", "おやすみ", "Dream fade"]) assert.equal(q(s), null, s);
+  assert.equal(p("エアコンつけて", {}), "ac_on");
+});
+
+test("voice answers: weather (today/tomorrow + umbrella), nearby map links, emergency 110/119 + host", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const vm = fs.readFileSync(path.join(__dirname, "../components/tech/VoiceMic.tsx"), "utf8");
+  assert.match(vm, /api\.open-meteo\.com\/v1\/forecast[^`]*precipitation_probability_max/);
+  assert.match(vm, /d\.rain >= 50 \? texts\.q\.umbrellaYes : d\.rain >= 30 \? texts\.q\.umbrellaMaybe : texts\.q\.umbrellaNo/);
+  assert.match(vm, /google\.com\/maps\/search\/\$\{q\}\/@\$\{lat\},\$\{lng\},16z/);
+  assert.match(vm, /href="tel:110"/);
+  assert.match(vm, /href="tel:119"/);
+  assert.match(vm, /answer\.supportUrl &&/);
+  assert.match(fs.readFileSync(path.join(__dirname, "../app/api/room-info/[room_id]/route.ts"), "utf8"), /supportUrl/);
+});

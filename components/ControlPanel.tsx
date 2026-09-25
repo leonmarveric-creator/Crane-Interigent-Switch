@@ -214,11 +214,14 @@ export default function ControlPanel({
       {/* ギャラクシーモード起動の特別演出 */}
       <GalaxyLaunch trigger={galaxyLaunch} />
       {/* 音声コントロール: 右下に浮かぶマイクボタン + 初回だけの案内 */}
-      <VoiceMic lang={lang} roomSlug={roomSlug} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
+      <VoiceMic lang={lang} roomSlug={roomSlug} lat={lat} lng={lng} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
         fab: t.voiceFab, tipTitle: t.voiceTipTitle, tipBody: t.voiceTipBody,
         listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
         label: (a) => voiceLabel(a, t),
-        q: { wifi: t.qWifi, checkout: t.qCheckout, entrance: t.qEntrance, room: t.qRoom, ssid: t.qSsid, password: t.qPassword, none: t.qNone, copy: t.qCopy, copied: t.qCopied, loading: t.qLoading },
+        q: { wifi: t.qWifi, checkout: t.qCheckout, entrance: t.qEntrance, room: t.qRoom, ssid: t.qSsid, password: t.qPassword, none: t.qNone, copy: t.qCopy, copied: t.qCopied, loading: t.qLoading,
+          weather: t.qWeather, today: t.qToday, tomorrow: t.qTomorrow, rain: t.qRain, umbrellaYes: t.qUmbrellaYes, umbrellaMaybe: t.qUmbrellaMaybe, umbrellaNo: t.qUmbrellaNo,
+          nearby: t.qNearby, store: t.qStore, station: t.qStation, laundry: t.qLaundry, openMap: t.qOpenMap,
+          emergency: t.qEmergency, police: t.qPolice, ambulance: t.qAmbulance, host: t.qHost, emergencyNote: t.qEmergencyNote },
       }} />
 
       {/* 触れた位置にミニマルな照準 */}
@@ -597,11 +600,14 @@ function SideTelemetry({ side }: { side: "left" | "right" }) {
 /* ------------------------------------------------------------------ */
 /** 2回目以降の短い起動 (約0.5秒): リアクターが一瞬光って「SYSTEMS ONLINE」→ すぐ操作画面へ */
 function QuickBoot({ onDone, roomName }: { onDone: () => void; roomName: string }) {
+  // onDone は親の再描画のたびに新しくなるので ref で持ち、音は 1 回だけ鳴らす
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
   useEffect(() => {
     systemChord(); // フル演出の最後と同じ到達和音 (新しい音は足さない)
-    const id = setTimeout(onDone, 520);
+    const id = setTimeout(() => doneRef.current(), 520);
     return () => clearTimeout(id);
-  }, [onDone]);
+  }, []);
   return (
     <motion.div
       exit={{ opacity: 0, filter: "blur(6px)" }} transition={{ duration: 0.3 }}
@@ -633,6 +639,10 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
+  // onDone は親 (操作画面) の再描画のたびに新しい関数になる。
+  // これを依存にすると、天気の読み込みなどで再描画されるたびに起動音と音声がもう一度鳴って重なるので、ref で持つ。
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
   useEffect(() => {
     charge(); // 起動チャージ音
     speakOneOf(["All systems online", "Good evening. Systems online", "J.A.R.V.I.S online"]); // iOSではジェスチャー外のため鳴らない場合あり
@@ -646,12 +656,12 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
     const lock = setTimeout(() => reticleLock(), 1650);
     // 起動完了の到達和音
     const chord = setTimeout(() => systemChord(), 2300);
-    const id = setTimeout(onDone, 2600);
+    const id = setTimeout(() => doneRef.current(), 2600);
     return () => {
       clearTimeout(id); clearTimeout(chord); clearTimeout(link); clearTimeout(lock);
       beeps.forEach(clearTimeout);
     };
-  }, [onDone]);
+  }, []);
 
   const lines = [
     "INITIALIZING SYSTEM",

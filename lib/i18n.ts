@@ -47,6 +47,9 @@ type Dict = {
   galaxy: string;
   dreamMode: string; dreamDesc: string; dreamInfoTitle: string; dreamSteps: string[]; dreamNote: string; dreamStarted: string;
   qWifi: string; qCheckout: string; qEntrance: string; qRoom: string; qSsid: string; qPassword: string; qNone: string; qCopy: string; qCopied: string; qLoading: string;
+  qWeather: string; qToday: string; qTomorrow: string; qRain: string; qUmbrellaYes: string; qUmbrellaMaybe: string; qUmbrellaNo: string;
+  qNearby: string; qStore: string; qStation: string; qLaundry: string; qOpenMap: string;
+  qEmergency: string; qPolice: string; qAmbulance: string; qHost: string; qEmergencyNote: string;
   voiceFab: string; voiceTipTitle: string; voiceTipBody: string;
   voiceListening: string; voiceRetry: string; voiceDenied: string; voiceWhy: string; voiceExamples: string[];
   modeSuffix: string;
@@ -93,6 +96,9 @@ export const T: Record<Lang, Dict> = {
     dreamSteps: ["メインライト・ギャラクシー・ネストを消して、和風ライトだけのやさしい灯りにします", "30分かけて少しずつ暗くし、色も夕焼けのような暖かい赤みへ変えていきます", "30分後に和風ライトも自動で消えます。眠りを妨げにくい、ゆるやかな暗さの変化です"],
     dreamNote: "途中で照明やモードを操作するとフェードは止まります。エアコンはそのままです", dreamStarted: "Dream Fade を開始しました。おやすみなさい 🌙",
     qWifi: "Wi-Fi", qCheckout: "チェックアウト", qEntrance: "エントランスの暗証番号", qRoom: "お部屋の暗証番号", qSsid: "ネットワーク名", qPassword: "パスワード", qNone: "この情報は登録されていません", qCopy: "コピー", qCopied: "コピー済み", qLoading: "確認しています…",
+    qWeather: "天気", qToday: "今日", qTomorrow: "明日", qRain: "雨", qUmbrellaYes: "傘を持っていきましょう", qUmbrellaMaybe: "折りたたみ傘があると安心", qUmbrellaNo: "傘はいらなさそう",
+    qNearby: "近くの場所", qStore: "コンビニ", qStation: "駅", qLaundry: "コインランドリー", qOpenMap: "地図",
+    qEmergency: "緊急時の連絡先", qPolice: "警察", qAmbulance: "救急車・消防", qHost: "ホストに連絡", qEmergencyNote: "110・119 は日本国内の携帯電話から無料でかけられます。落ち着いて、場所（住所）を伝えてください。",
     voiceFab: "話して操作", voiceTipTitle: "声でも操作できます", voiceTipBody: "マイクを押しながら「ギャラクシーオン」のように話してください", 
     voiceListening: "聞き取り中", voiceRetry: "聞き取れませんでした。もう一度どうぞ", voiceDenied: "マイクが許可されていません。ブラウザの設定で許可してください", voiceWhy: "ボタンを押している間だけ聞き取ります（録音は保存しません）", voiceExamples: ["ギャラクシーオン", "照明オフ", "Wi-Fiのパスワードは？"],
     modeSuffix: "モード",
@@ -125,6 +131,9 @@ export const T: Record<Lang, Dict> = {
     dreamSteps: ["Turns off the main light, Galaxy and Nest, leaving only the soft Japanese lamp", "Over 30 minutes the lamp slowly dims and shifts to a warm, sunset-like glow", "After 30 minutes the lamp turns off by itself — a gentle change of light that is kind to your sleep"],
     dreamNote: "Using any light or mode stops the fade. The air-con stays as it is", dreamStarted: "Dream Fade started. Good night 🌙",
     qWifi: "Wi-Fi", qCheckout: "Check-out", qEntrance: "Entrance code", qRoom: "Room code", qSsid: "Network name", qPassword: "Password", qNone: "This information is not available", qCopy: "Copy", qCopied: "Copied", qLoading: "Checking…",
+    qWeather: "Weather", qToday: "Today", qTomorrow: "Tomorrow", qRain: "Rain", qUmbrellaYes: "Take an umbrella", qUmbrellaMaybe: "A folding umbrella would be handy", qUmbrellaNo: "No umbrella needed",
+    qNearby: "Nearby", qStore: "Convenience store", qStation: "Train station", qLaundry: "Coin laundry", qOpenMap: "Map",
+    qEmergency: "Emergency contacts", qPolice: "Police", qAmbulance: "Ambulance / Fire", qHost: "Contact the host", qEmergencyNote: "110 and 119 are free to call from any mobile phone in Japan. Stay calm and tell them where you are (the address).",
     voiceFab: "Voice control", voiceTipTitle: "You can also use your voice", voiceTipBody: "Hold the mic and say something like \"Galaxy on\"", 
     voiceListening: "LISTENING", voiceRetry: "Sorry, I didn't catch that. Please try again", voiceDenied: "Microphone is blocked. Please allow it in your browser settings", voiceWhy: "Listens only while you hold the button (nothing is recorded)", voiceExamples: ["Galaxy on", "Lights off", "What's the Wi-Fi password?"],
     modeSuffix: " Mode",
@@ -157,6 +166,9 @@ export const T: Record<Lang, Dict> = {
     dreamSteps: ["关闭主灯、银河和鸟巢灯，只留下柔和的和风灯", "在30分钟内慢慢变暗，灯光颜色也逐渐变成晚霞般温暖的红色调", "30分钟后和风灯自动熄灭，柔和的明暗变化，不易打扰睡眠"],
     dreamNote: "中途操作灯光或模式时，渐暗会停止。空调保持不变", dreamStarted: "Dream Fade 已开始。晚安 🌙",
     qWifi: "Wi-Fi", qCheckout: "退房时间", qEntrance: "大门密码", qRoom: "房间密码", qSsid: "网络名称", qPassword: "密码", qNone: "暂未登记此信息", qCopy: "复制", qCopied: "已复制", qLoading: "正在确认…",
+    qWeather: "天气", qToday: "今天", qTomorrow: "明天", qRain: "降雨", qUmbrellaYes: "记得带伞", qUmbrellaMaybe: "带把折叠伞比较安心", qUmbrellaNo: "应该不用带伞",
+    qNearby: "附近", qStore: "便利店", qStation: "车站", qLaundry: "自助洗衣店", qOpenMap: "地图",
+    qEmergency: "紧急联系方式", qPolice: "警察", qAmbulance: "救护车・消防", qHost: "联系房东", qEmergencyNote: "在日本用手机可免费拨打 110 和 119。请保持冷静，告知所在位置（地址）。",
     voiceFab: "语音控制", voiceTipTitle: "也可以用语音操作", voiceTipBody: "按住麦克风，说“打开星空”等指令", 
     voiceListening: "正在聆听", voiceRetry: "没有听清，请再说一次", voiceDenied: "麦克风未被允许，请在浏览器设置中允许", voiceWhy: "仅在按住按钮时聆听（不会保存录音）", voiceExamples: ["打开星空", "关灯", "Wi-Fi密码是什么？"],
     modeSuffix: "模式",
@@ -189,6 +201,9 @@ export const T: Record<Lang, Dict> = {
     dreamSteps: ["메인 조명・갤럭시・네스트를 끄고, 부드러운 일본풍 조명만 남깁니다", "30분에 걸쳐 조금씩 어두워지고, 색도 노을처럼 따뜻한 붉은빛으로 바뀝니다", "30분 후 일본풍 조명도 자동으로 꺼집니다. 수면을 방해하지 않는 완만한 변화입니다"],
     dreamNote: "도중에 조명이나 모드를 조작하면 페이드가 멈춥니다. 에어컨은 그대로입니다", dreamStarted: "Dream Fade를 시작했습니다. 안녕히 주무세요 🌙",
     qWifi: "Wi-Fi", qCheckout: "체크아웃", qEntrance: "현관 비밀번호", qRoom: "객실 비밀번호", qSsid: "네트워크 이름", qPassword: "비밀번호", qNone: "등록된 정보가 없습니다", qCopy: "복사", qCopied: "복사됨", qLoading: "확인 중…",
+    qWeather: "날씨", qToday: "오늘", qTomorrow: "내일", qRain: "강수", qUmbrellaYes: "우산을 챙기세요", qUmbrellaMaybe: "접이식 우산이 있으면 안심", qUmbrellaNo: "우산은 필요 없을 것 같아요",
+    qNearby: "근처", qStore: "편의점", qStation: "역", qLaundry: "코인 세탁소", qOpenMap: "지도",
+    qEmergency: "긴급 연락처", qPolice: "경찰", qAmbulance: "구급차・소방", qHost: "호스트에게 연락", qEmergencyNote: "110과 119는 일본 내 휴대폰으로 무료로 걸 수 있습니다. 침착하게 위치(주소)를 알려 주세요.",
     voiceFab: "음성 조작", voiceTipTitle: "음성으로도 조작할 수 있어요", voiceTipBody: "마이크를 누른 채 \"갤럭시 켜줘\"처럼 말해 주세요", 
     voiceListening: "듣는 중", voiceRetry: "잘 못 들었어요. 다시 말씀해 주세요", voiceDenied: "마이크가 허용되지 않았습니다. 브라우저 설정에서 허용해 주세요", voiceWhy: "버튼을 누르는 동안만 듣습니다 (녹음은 저장하지 않습니다)", voiceExamples: ["갤럭시 켜줘", "조명 꺼줘", "와이파이 비밀번호는?"],
     modeSuffix: " 모드",

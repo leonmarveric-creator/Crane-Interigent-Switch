@@ -72,6 +72,9 @@ const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
   "Here is the entrance code.": "current-natural-voice-59-here-is-the-entrance-code.mp3",
   "Here is your room code.": "current-natural-voice-60-here-is-your-room-code.mp3",
   "Sorry, that information is not available.": "current-natural-voice-61-that-information-is-not-available.mp3",
+  "Here is the weather forecast.": "current-natural-voice-62-here-is-the-weather-forecast.mp3",
+  "Here are nearby places.": "current-natural-voice-63-here-are-nearby-places.mp3",
+  "Here are the emergency contacts.": "current-natural-voice-64-here-are-the-emergency-contacts.mp3",
 };
 
 const VOICE_LABEL_ALIASES: Array<[string, string]> = [

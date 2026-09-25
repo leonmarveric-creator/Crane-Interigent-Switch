@@ -160,7 +160,7 @@ test("speed: quick boot on repeat visits, original geofence check, IR queue with
   const cp = read("components", "ControlPanel.tsx");
   assert.match(cp, /techBooted:\$\{roomSlug\}/);
   assert.match(cp, /function QuickBoot/);
-  assert.match(cp, /setTimeout\(onDone, 520\)/);
+  assert.match(cp, /setTimeout\(\(\) => doneRef\.current\(\), 520\)/);
   assert.match(cp, /3分キャッシュ/, "geofence check is back to the original");
   assert.doesNotMatch(cp, /geoOkUntil|enableHighAccuracy: false/);
   const sb = read("lib", "switchbot.ts");
@@ -172,4 +172,14 @@ test("speed: quick boot on repeat visits, original geofence check, IR queue with
   for (const f of ["room-take.mp4", "room-ume.mp4"]) {
     assert.ok(fs.statSync(path.join(root, "public", "rooms", f)).size < 1.5 * 1024 * 1024, f);
   }
+});
+
+test("boot sounds play once: boot effects do not re-run when the panel re-renders", () => {
+  const cp = read("components", "ControlPanel.tsx");
+  const boot = cp.slice(cp.indexOf("function BootSequence"), cp.indexOf("function BootSequence") + 2500);
+  assert.match(boot, /doneRef\.current = onDone/);
+  assert.doesNotMatch(boot, /\}, \[onDone\]\);/);
+  const quick = cp.slice(cp.indexOf("function QuickBoot"), cp.indexOf("function BootSequence"));
+  assert.match(quick, /doneRef\.current = onDone/);
+  assert.doesNotMatch(quick, /\}, \[onDone\]\);/);
 });
