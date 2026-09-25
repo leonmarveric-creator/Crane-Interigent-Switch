@@ -178,3 +178,32 @@ test("boot voice: ASTRALIS by default, J.A.R.V.I.S selectable by admin", () => {
   assert.match(read("app", "admin", "AdminClient.tsx"), /<BootVoiceCard initial=\{bootVoice\}/);
   assert.match(read("app", "room", "[room_id]", "page.tsx"), /bootVoice=\{bootVoice\}/);
 });
+
+test("voice extras: greetings, chat and hidden commands in 4 languages", () => {
+  const { parseVoiceExtra: x, parseVoiceQuestion: q } = require("../lib/voiceCommand.ts");
+  const cases = {
+    good_morning: ["おはよう", "Good morning", "早上好", "좋은 아침"],
+    welcome_home: ["ただいま", "I'm home", "我回来了", "다녀왔어"],
+    going_out: ["いってきます", "I'm going out", "我出门了", "다녀오겠습니다"],
+    good_night: ["おやすみ", "Good night", "晚安", "잘 자"],
+    tired: ["疲れた", "I'm so tired", "好累", "피곤해"],
+    who: ["あなたの名前は？", "Who are you?", "你是谁", "이름이 뭐야"],
+    help: ["何ができる？", "What can you do?", "你能做什么", "뭘 할 수 있어"],
+    party: ["パーティーモード", "party mode", "派对", "파티"],
+    shooting_star: ["流れ星", "shooting star", "流星", "별똥별"],
+    countdown: ["発射", "カウントダウン", "launch", "倒计时", "발사"],
+    aurora: ["オーロラ", "aurora", "极光", "오로라"],
+    omikuji: ["おみくじ", "fortune", "抽签", "운세"],
+    breathe: ["瞑想", "深呼吸", "meditation", "冥想", "명상"],
+    birthday: ["ハッピーバースデー", "happy birthday", "生日快乐", "생일 축하해"],
+    sakura: ["桜", "cherry blossom", "樱花", "벚꽃"],
+    fireworks: ["花火", "fireworks", "烟花", "불꽃놀이"],
+    momiji: ["紅葉", "autumn leaves", "红叶", "단풍"],
+    snow: ["雪", "snow", "下雪", "눈 와"],
+  };
+  for (const [k, list] of Object.entries(cases)) for (const s of list) assert.equal(x(s), k, s);
+  for (const s of ["ギャラクシーオン", "エアコンつけて", "照明オフ"]) assert.equal(x(s), null, s);
+  // 質問が先: 天気の質問は天気のまま
+  assert.equal(q("明日の天気は？"), "weather");
+  assert.equal(q("Help me, emergency"), "emergency");
+});
