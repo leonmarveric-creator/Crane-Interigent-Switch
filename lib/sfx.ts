@@ -137,6 +137,9 @@ const MAGIC_TONE_ROOT: Record<MagicTone, number> = {
   green: 349,
 };
 
+/** 消音中か (和風モードの音もこれに従う) */
+export function isMuted() { return muted; }
+
 export function setMuted(m: boolean) {
   muted = m;
   if (!m) return;

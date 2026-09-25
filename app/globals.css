@@ -403,3 +403,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @keyframes vmCircle { to { transform: rotate(360deg); } }
 .vm-circle { animation: vmCircle 6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .vm-fab-magic, .vm-circle { animation: none; } }
+
+/* ---- 和風モード: 押したときの波紋 / 成功の灯り・陰り / 朱印 (軽い CSS だけ) ---- */
+.wafu-ripple { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 9999px; border: 1.5px solid; opacity: 0; pointer-events: none; animation: wafuRipple 0.9s ease-out forwards; }
+.wafu-ripple2 { animation-delay: 0.16s; }
+@keyframes wafuRipple { 0% { transform: scale(0.4); opacity: 0.6; } 100% { transform: scale(11); opacity: 0; } }
+.wafu-glow::after, .wafu-dim::after { content: ""; position: absolute; inset: 0; pointer-events: none; animation: wafuGlow 1.4s ease-out forwards; }
+.wafu-glow::after { background: radial-gradient(circle at 50% 40%, rgba(255, 214, 140, 0.35), transparent 65%); }
+.wafu-dim::after { background: rgba(44, 42, 38, 0.08); }
+@keyframes wafuGlow { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+.wafu-stamp { animation: wafuStamp 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes wafuStamp { 0% { transform: scale(1.9) rotate(-18deg); opacity: 0; } 100% { transform: scale(1) rotate(-8deg); opacity: 0.95; } }
+@media (prefers-reduced-motion: reduce) { .wafu-ripple, .wafu-glow::after, .wafu-dim::after { display: none; } .wafu-stamp { animation: none; transform: rotate(-8deg); } }

@@ -10,7 +10,7 @@
 //   ハイテクUIとの切り替えは onSwitchMode（RoomModeSwitch が制御）。
 // =========================================================
 import { rememberLang } from "@/lib/langCookie";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import {
   LockKeyholeOpen, LockKeyhole, Snowflake, Lightbulb, Sparkles, Moon, MoonStar,
   Home, Power, Loader2, Globe, PanelsTopLeft, Lamp, AlarmClock, Check, Flame, Sunrise, type LucideIcon,
@@ -21,6 +21,7 @@ import EntranceKeyButton from "@/components/EntranceKeyButton";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
+import { wafuSound, wafuDone } from "@/lib/wafuSfx";
 
 export interface LiteProps {
   roomSlug: string;
@@ -102,6 +103,7 @@ function ActionBtn({
     color: toneToken.text,
     boxShadow: `inset 3px 0 0 ${toneToken.mark}, 0 10px 24px -22px rgba(44,42,38,0.45)`,
   };
+  const done = wafuDone(action);
   const run = async () => {
     if (busy) return;
     vibe();
@@ -110,20 +112,39 @@ function ActionBtn({
     const ok = await callDevice(roomSlug, action, admin, value);
     setBusy(false);
     setRes(ok);
+    wafuSound(ok ? done.sound : "fail"); // 成功: 操作に合った音 / 失敗: 低い琴
     if (ok) onDone?.();
     setTimeout(() => setRes(null), 1600);
+  };
+  // 押した瞬間: 木の音「コッ」と、指の位置から水面の波紋 (CSS だけ・1 秒で消える)
+  const tap = (ev: ReactPointerEvent<HTMLButtonElement>) => {
+    if (busy) return;
+    wafuSound("tap");
+    const el = ev.currentTarget;
+    const r = el.getBoundingClientRect();
+    for (const cls of ["wafu-ripple", "wafu-ripple wafu-ripple2"]) {
+      const sp = document.createElement("span");
+      sp.className = cls;
+      sp.style.left = `${ev.clientX - r.left}px`;
+      sp.style.top = `${ev.clientY - r.top}px`;
+      sp.style.borderColor = toneToken.mark;
+      el.appendChild(sp);
+      setTimeout(() => sp.remove(), 1300);
+    }
   };
   return (
     <button
       onClick={run}
+      onPointerDown={tap}
       disabled={busy}
       style={tileStyle}
-      className="relative flex min-h-[82px] flex-col items-center justify-center gap-2 rounded-lg border bg-[#fffdf8]/95 p-3 text-center transition active:scale-[0.99] active:bg-[#f3efe6] disabled:opacity-60"
+      className={`relative flex min-h-[82px] flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border bg-[#fffdf8]/95 p-3 text-center transition active:scale-[0.99] active:bg-[#f3efe6] disabled:opacity-60 ${res === true ? (done.lit ? "wafu-glow" : "wafu-dim") : ""}`}
     >
-      {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : <Icon className="h-6 w-6" strokeWidth={1.5} />}
-      <span className="text-[13px] font-medium leading-tight tracking-[0.02em]">{label}</span>
+      {busy ? <Loader2 className="relative h-6 w-6 animate-spin" /> : <Icon className="relative h-6 w-6" strokeWidth={1.5} />}
+      <span className="relative text-[13px] font-medium leading-tight tracking-[0.02em]">{label}</span>
       {res === true && (
-        <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#7c8b57] text-[11px] font-bold text-white">✓</span>
+        // 成功: 朱印「済」
+        <span className="wafu-stamp absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-[5px] border-[1.5px] border-[#b5533b] bg-[#fffdf8]/90 text-[13px] font-bold text-[#b5533b]" style={{ fontFamily: MINCHO }}>済</span>
       )}
       {res === false && (
         <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#b5533b] text-[11px] font-bold text-white">×</span>
@@ -360,8 +381,13 @@ export default function LiteControlPanel({
           </div>
         )}
 
+        {/* 外出 (よく使うので一番上・横いっぱい) */}
+        <div className="mt-2 grid grid-cols-1">
+          <ActionBtn roomSlug={roomSlug} admin={admin} action="away" label={t.awayMode} Icon={Power} tone="neutral" />
+        </div>
+
         {/* 施錠 */}
-        <div className="mt-2 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <ActionBtn roomSlug={roomSlug} admin={admin} action="unlock" label={t.unlock} Icon={LockKeyholeOpen} tone="matcha" />
           <ActionBtn roomSlug={roomSlug} admin={admin} action="lock" label={t.lock} Icon={LockKeyhole} tone="ai" />
         </div>
@@ -412,7 +438,6 @@ export default function LiteControlPanel({
         <div className="grid grid-cols-2 gap-3">
           <ActionBtn roomSlug={roomSlug} admin={admin} action="welcome" label={t.comfortMode} Icon={Home} tone="matcha" />
           <ActionBtn roomSlug={roomSlug} admin={admin} action="good_night" label={t.goodNightMode} Icon={Moon} tone="ai" />
-          <ActionBtn roomSlug={roomSlug} admin={admin} action="away" label={t.awayMode} Icon={Power} tone="neutral" />
           {hasWafu && <ActionBtn roomSlug={roomSlug} admin={admin} action="dream_fade" label={t.dreamMode} Icon={MoonStar} tone="fuji" onDone={() => setDreamInfo(true)} />}
         </div>
         {/* Dream Fade の説明 */}
