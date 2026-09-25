@@ -36,6 +36,8 @@ export interface RoomModeSwitchProps {
   guestName?: string | null;
   /** 同じ棟のエントランス鍵画面 (/key/[slug]) */
   entranceHref?: string | null;
+  /** ハイテクUI の起動の声 (管理画面で切り替え) */
+  bootVoice?: "astralis" | "jarvis";
 }
 
 const SEL: Record<Lang, {
@@ -200,6 +202,8 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         guestName={props.guestName}
         entranceHref={props.entranceHref}
         onSwitchTech={() => choose("normal")}
+        lat={props.lat}
+        lng={props.lng}
         onSwitchWafu={() => choose("lite")}
       />
     );
@@ -223,6 +227,7 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasWafu={props.hasWafu}
         guestName={props.guestName}
         entranceHref={props.entranceHref}
+        bootVoice={props.bootVoice}
       />
       <div className="fixed left-3 top-3 z-[60] flex items-center gap-1.5">
         <button

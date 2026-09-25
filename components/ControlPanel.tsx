@@ -35,6 +35,8 @@ interface Props {
   hasGalaxy?: boolean; // ギャラクシーモード (プラネタリウム) 対応の部屋
   hasNest?: boolean; // NESTモード (藤編みボールランプ) 対応の部屋
   hasWafu?: boolean; // 和風ライト(行灯) 対応の部屋
+  /** 起動の声: astralis = 「ASTRALIS system online」 / jarvis = 従来の J.A.R.V.I.S 系 */
+  bootVoice?: "astralis" | "jarvis";
 }
 
 // メディアURLが動画か判定 (拡張子ベース)
@@ -130,7 +132,7 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref, bootVoice = "astralis",
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -230,7 +232,7 @@ export default function ControlPanel({
       {/* 起動シーケンス */}
       <AnimatePresence>
         {booting === "pending" && <div key="boot-pending" className="fixed inset-0 z-[70] bg-[#04060c]" />}
-        {booting === "full" && <BootSequence key="boot-full" onDone={() => setBooting(null)} roomName={roomName} />}
+        {booting === "full" && <BootSequence key="boot-full" onDone={() => setBooting(null)} roomName={roomName} voice={bootVoice} />}
         {booting === "quick" && <QuickBoot key="boot-quick" onDone={() => setBooting(null)} roomName={roomName} />}
       </AnimatePresence>
 
@@ -625,7 +627,25 @@ function QuickBoot({ onDone, roomName }: { onDone: () => void; roomName: string 
   );
 }
 
-function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: string }) {
+/** 起動の声のバリエーション (毎回ランダムに 1 つ)。name は起動画面の「○○ ····· READY」に出す名前 */
+const BOOT_LINES: Record<"astralis" | "jarvis", { say: string; name: string }[]> = {
+  astralis: [
+    { say: "ASTRALIS system online", name: "ASTRALIS" },
+    { say: "CELESTIAL link established", name: "CELESTIAL" },
+    { say: "CELESTIAL core online", name: "CELESTIAL" },
+    { say: "CELESTIAL system online. Welcome back.", name: "CELESTIAL" },
+    { say: "CELESTIAL. All systems online.", name: "CELESTIAL" },
+  ],
+  jarvis: [
+    { say: "All systems online", name: "J.A.R.V.I.S" },
+    { say: "Good evening. Systems online", name: "J.A.R.V.I.S" },
+    { say: "J.A.R.V.I.S online", name: "J.A.R.V.I.S" },
+  ],
+};
+
+function BootSequence({ onDone, roomName, voice = "astralis" }: { onDone: () => void; roomName: string; voice?: "astralis" | "jarvis" }) {
+  // 起動ごとに声を 1 つ選ぶ (再描画では変わらない)
+  const [line] = useState(() => { const l = BOOT_LINES[voice]; return l[Math.floor(Math.random() * l.length)]; });
   // 充電ゲージ 0 → 1 (2.4 秒)
   const [charged, setCharged] = useState(0);
   useEffect(() => {
@@ -645,7 +665,9 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
   doneRef.current = onDone;
   useEffect(() => {
     charge(); // 起動チャージ音
-    speakOneOf(["All systems online", "Good evening. Systems online", "J.A.R.V.I.S online"]); // iOSではジェスチャー外のため鳴らない場合あり
+    // 起動の声 (管理画面で切り替え): ASTRALIS / CELESTIAL の 5 種類 か 従来の J.A.R.V.I.S 系 3 種類からランダム。
+    // iOSではジェスチャー外のため鳴らない場合あり
+    speak(line.say);
     // 各ターミナル行の出現に同期した段階ビープ (行表示は delay 0.25 + i*0.4)
     const beeps = [0, 1, 2, 3, 4].map((i) =>
       setTimeout(() => bootStage(i), 250 + i * 400)
@@ -668,7 +690,7 @@ function BootSequence({ onDone, roomName }: { onDone: () => void; roomName: stri
     "ARC REACTOR ·········· ONLINE",
     "SECURE LINK ·········· ESTABLISHED",
     `ROOM · ${roomName.toUpperCase()}`,
-    "J.A.R.V.I.S ·········· READY",
+    `${line.name} ·········· READY`,
   ];
 
   return (

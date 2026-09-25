@@ -12,8 +12,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mic, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock, CloudSun, MapPin, Siren, Phone, ExternalLink } from "lucide-react";
-import { parseVoiceCommand, parseVoiceQuestion, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps } from "@/lib/voiceCommand";
+import { Mic, WandSparkles, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock, CloudSun, MapPin, Siren, Phone, ExternalLink } from "lucide-react";
+import { parseVoiceCommand, parseSpellCommand, parseVoiceQuestion, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps } from "@/lib/voiceCommand";
 import { primeVoice, speak } from "@/lib/sfx";
 
 export const VOICE_EVENT = "crane-voice-command";
@@ -93,9 +93,15 @@ function getRecognition(): any {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
+export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, variant = "tech", allowed }: {
   lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string; lat?: number | null; lng?: number | null;
+  /** tech = ハイテクUI (マイク) / magic = マジカルUI (杖で呪文を唱えるデザイン) */
+  variant?: "tech" | "magic";
+  /** この画面にあるボタンの操作だけ受け付ける (無い操作は「もう一度」) */
+  allowed?: VoiceAction[];
 }) {
+  const magic = variant === "magic";
+  const tipKey = magic ? `${TIP_KEY}:magic` : TIP_KEY; // 案内はハイテク / マジカルそれぞれ初回だけ
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const answerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -202,7 +208,9 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
       void ask(question);
       return;
     }
-    const action = parseVoiceCommand(cands, caps);
+    // マジカルUI では、画面で使っている呪文の言葉 (ルーモス / ノックス など) もそのまま効く
+    const parsed = (magic ? parseSpellCommand(cands, caps) : null) ?? parseVoiceCommand(cands, caps);
+    const action = parsed && (!allowed || allowed.includes(parsed)) ? parsed : null;
     if (action) {
       setMsg(texts.label(action));
       setPhase("done");
@@ -268,14 +276,14 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
   useEffect(() => {
     if (!supported) return;
     let seen = false;
-    try { seen = localStorage.getItem(TIP_KEY) === "1"; } catch { /* ignore */ }
+    try { seen = localStorage.getItem(tipKey) === "1"; } catch { /* ignore */ }
     if (seen) return;
     const id = setTimeout(() => setTip(true), 2500);
     return () => clearTimeout(id);
   }, [supported]);
   const closeTip = () => {
     setTip(false);
-    try { localStorage.setItem(TIP_KEY, "1"); } catch { /* ignore */ }
+    try { localStorage.setItem(tipKey, "1"); } catch { /* ignore */ }
   };
 
   if (!supported || typeof document === "undefined") return null;
@@ -286,17 +294,20 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
       {/* 右下に浮かぶマイクボタン (スクロールしても同じ位置) */}
       <div className="fixed bottom-5 right-4 z-[65] flex items-center gap-2 font-sans tracking-normal"
         style={{ bottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
-        <span className={`pointer-events-none rounded-full border px-3 py-1.5 text-[12.5px] font-semibold backdrop-blur-md ${listening ? "border-cyan-200/70 bg-cyan-500/30 text-white" : "border-cyan-300/40 bg-[#050a12]/90 text-cyan-50"}`}>
+        <span className={`pointer-events-none rounded-full border px-3 py-1.5 text-[12.5px] font-semibold backdrop-blur-md ${magic
+          ? (listening ? "border-[#f5c26b]/80 bg-[#3b2a55]/85 text-[#ffe7b3]" : "border-[#d8bf86]/50 bg-[#15121f]/90 text-[#ffe7b3]")
+          : (listening ? "border-cyan-200/70 bg-cyan-500/30 text-white" : "border-cyan-300/40 bg-[#050a12]/90 text-cyan-50")}`}
+          style={magic ? { fontFamily: "Georgia, 'Times New Roman', serif" } : undefined}>
           {listening ? texts.listening : texts.fab}
         </span>
         <button type="button" aria-label={texts.fab}
           onPointerDown={(e) => { e.preventDefault(); if (tip) closeTip(); start(); }}
           onPointerUp={release} onPointerLeave={release} onPointerCancel={release}
           onContextMenu={(e) => e.preventDefault()}
-          className={`vm-fab relative flex h-[62px] w-[62px] shrink-0 select-none items-center justify-center rounded-full border-[1.5px] border-cyan-50/80 text-white [touch-action:none] [-webkit-touch-callout:none] ${listening ? "vm-fab-on scale-110" : ""}`}
-          style={{ background: "radial-gradient(circle at 35% 30%, #67e8f9, #0891b2 55%, #083344)", transition: "transform 0.15s" }}>
-          {listening && <span className="absolute inset-[-6px] animate-ping rounded-full border-2 border-cyan-200/70" />}
-          <Mic className="relative h-7 w-7" strokeWidth={1.9} />
+          className={`${magic ? "vm-fab-magic border-[#ffe7b3]/80 text-[#fff5dd]" : "vm-fab border-cyan-50/80 text-white"} relative flex h-[62px] w-[62px] shrink-0 select-none items-center justify-center rounded-full border-[1.5px] [touch-action:none] [-webkit-touch-callout:none] ${listening ? (magic ? "vm-fab-magic-on scale-110" : "vm-fab-on scale-110") : ""}`}
+          style={{ background: magic ? "radial-gradient(circle at 35% 30%, #f5c26b, #7c4dbd 55%, #241640)" : "radial-gradient(circle at 35% 30%, #67e8f9, #0891b2 55%, #083344)", transition: "transform 0.15s" }}>
+          {listening && <span className={`absolute inset-[-6px] animate-ping rounded-full border-2 ${magic ? "border-[#f5c26b]/70" : "border-cyan-200/70"}`} />}
+          {magic ? <WandSparkles className="relative h-7 w-7" strokeWidth={1.8} /> : <Mic className="relative h-7 w-7" strokeWidth={1.9} />}
         </button>
       </div>
 
@@ -304,12 +315,12 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
       <AnimatePresence>
         {tip && phase === "idle" && (
           <motion.div key="voice-tip" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-            className="fixed right-4 z-[65] w-[264px] rounded-2xl border border-cyan-300/55 bg-[#06101b] px-4 py-3 font-sans tracking-normal shadow-[0_0_24px_rgba(34,211,238,0.3)]"
+            className={`fixed right-4 z-[65] w-[264px] rounded-2xl border px-4 py-3 font-sans tracking-normal ${magic ? "border-[#d8bf86]/60 bg-[#15121f] shadow-[0_0_24px_rgba(245,194,107,0.3)]" : "border-cyan-300/55 bg-[#06101b] shadow-[0_0_24px_rgba(34,211,238,0.3)]"}`}
             style={{ bottom: "calc(max(1.25rem, env(safe-area-inset-bottom)) + 78px)" }}>
-            <p className="text-[14px] font-bold text-cyan-50">{texts.tipTitle}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-cyan-50/75">{texts.tipBody}</p>
-            <button type="button" onClick={closeTip} className="mt-1.5 block w-full text-right text-[13px] font-semibold text-cyan-300">OK</button>
-            <span className="absolute -bottom-[7px] right-[26px] h-3 w-3 rotate-45 border-b border-r border-cyan-300/55 bg-[#06101b]" />
+            <p className={`text-[14px] font-bold ${magic ? "text-[#ffe7b3]" : "text-cyan-50"}`}>{texts.tipTitle}</p>
+            <p className={`mt-1 text-[12px] leading-relaxed ${magic ? "text-[#f8ecd1]/75" : "text-cyan-50/75"}`}>{texts.tipBody}</p>
+            <button type="button" onClick={closeTip} className={`mt-1.5 block w-full text-right text-[13px] font-semibold ${magic ? "text-[#f5c26b]" : "text-cyan-300"}`}>OK</button>
+            <span className={`absolute -bottom-[7px] right-[26px] h-3 w-3 rotate-45 border-b border-r ${magic ? "border-[#d8bf86]/60 bg-[#15121f]" : "border-cyan-300/55 bg-[#06101b]"}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -321,7 +332,7 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
             className="fixed inset-0 z-[66] flex items-center justify-center bg-black/55 px-5 font-sans tracking-normal backdrop-blur-sm" onClick={closeAnswer}>
             <motion.div initial={{ scale: 0.92, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-sm rounded-2xl border border-cyan-300/45 bg-[#050b14] px-5 pb-5 pt-4 shadow-[0_0_40px_rgba(34,211,238,0.3)]">
+              className={`relative w-full max-w-sm rounded-2xl border px-5 pb-5 pt-4 ${magic ? "border-[#d8bf86]/55 bg-[#15121f] shadow-[0_0_40px_rgba(245,194,107,0.28)]" : "border-cyan-300/45 bg-[#050b14] shadow-[0_0_40px_rgba(34,211,238,0.3)]"}`}>
               <button type="button" onClick={closeAnswer} aria-label="close" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/50 active:bg-white/10"><X className="h-4 w-4" /></button>
               <p className="flex items-center gap-2 text-[14px] font-semibold text-cyan-200">
                 {answer.q === "wifi" ? <Wifi className="h-4 w-4" /> : answer.q === "checkout" ? <Clock className="h-4 w-4" /> : answer.q === "entrance_code" ? <DoorOpen className="h-4 w-4" />
@@ -414,17 +425,34 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
             className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4"
             style={{ bottom: "calc(max(1.25rem, env(safe-area-inset-bottom)) + 80px)" }}>
-            <div className="w-full max-w-sm rounded-2xl font-sans tracking-normal border border-cyan-300/30 bg-[#050a12]/95 px-4 py-3 text-center shadow-[0_0_30px_rgba(34,211,238,0.25)] backdrop-blur-xl">
+            <div className={`w-full max-w-sm rounded-2xl font-sans tracking-normal border px-4 py-3 text-center backdrop-blur-xl ${magic ? "border-[#d8bf86]/45 bg-[#15121f]/95 shadow-[0_0_34px_rgba(245,194,107,0.28)]" : "border-cyan-300/30 bg-[#050a12]/95 shadow-[0_0_30px_rgba(34,211,238,0.25)]"}`}>
               {listening ? (
                 <>
-                  <div className="flex h-6 items-center justify-center gap-[3px]">
-                    {Array.from({ length: 13 }, (_, i) => (
-                      <span key={i} className="w-[3px] rounded-full bg-cyan-300"
-                        style={{ height: 6, animation: `voiceBar 0.9s ease-in-out ${(i % 7) * 0.08}s infinite` }} />
-                    ))}
-                  </div>
-                  <p className="mt-1 font-mono text-[9px] tracking-[0.3em] text-cyan-300/70">{texts.listening}</p>
-                  <p className="mt-1 min-h-[20px] text-[15px] text-white">{heard || "…"}</p>
+                  {magic ? (
+                    // 詠唱中: ルーンの刻まれた魔法陣がゆっくり回る
+                    <div className="relative mx-auto h-16 w-16">
+                      <svg viewBox="0 0 100 100" className="vm-circle absolute inset-0 h-full w-full">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="#f5c26b" strokeOpacity="0.8" strokeWidth="1.2" />
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f5c26b" strokeOpacity="0.45" strokeWidth="0.8" strokeDasharray="3 4" />
+                        <polygon points="50,12 83,69 17,69" fill="none" stroke="#c4a5ff" strokeOpacity="0.8" strokeWidth="1" />
+                        <polygon points="50,88 17,31 83,31" fill="none" stroke="#c4a5ff" strokeOpacity="0.8" strokeWidth="1" />
+                        {["ᚠ", "ᚱ", "ᛟ", "ᚨ", "ᛉ", "ᛞ"].map((r, i) => (
+                          <text key={i} x={50 + 42 * Math.sin((i * Math.PI) / 3)} y={53 - 42 * Math.cos((i * Math.PI) / 3)} fontSize="8" fill="#ffe7b3" textAnchor="middle">{r}</text>
+                        ))}
+                      </svg>
+                      <span className="absolute inset-[38%] rounded-full bg-[#ffe7b3] shadow-[0_0_16px_6px_rgba(245,194,107,0.7)]" />
+                    </div>
+                  ) : (
+                    <div className="flex h-6 items-center justify-center gap-[3px]">
+                      {Array.from({ length: 13 }, (_, i) => (
+                        <span key={i} className="w-[3px] rounded-full bg-cyan-300"
+                          style={{ height: 6, animation: `voiceBar 0.9s ease-in-out ${(i % 7) * 0.08}s infinite` }} />
+                      ))}
+                    </div>
+                  )}
+                  <p className={`mt-1 font-mono text-[9px] tracking-[0.3em] ${magic ? "text-[#f5c26b]/80" : "text-cyan-300/70"}`}>{texts.listening}</p>
+                  <p className={`mt-1 min-h-[20px] text-[15px] ${magic ? "italic text-[#fff5dd]" : "text-white"}`}
+                    style={magic ? { fontFamily: "Georgia, 'Times New Roman', serif" } : undefined}>{heard || "…"}</p>
                   {!heard && (
                     <p className="mt-1 text-[10.5px] leading-snug text-white/45">
                       {texts.examples.map((x) => `「${x}」`).join(" ")}<br />{texts.why}
@@ -434,7 +462,7 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng }: {
               ) : (
                 <>
                   {heard && <p className="text-[12px] text-white/50">“{heard}”</p>}
-                  <p className={`mt-0.5 text-[15px] font-semibold ${phase === "done" ? "text-emerald-300" : "text-amber-200"}`}>{msg}</p>
+                  <p className={`mt-0.5 text-[15px] font-semibold ${phase === "done" ? (magic ? "text-[#ffe7b3]" : "text-emerald-300") : "text-amber-200"}`} style={magic ? { fontFamily: "Georgia, 'Times New Roman', serif" } : undefined}>{msg}</p>
                   {phase === "error" && <p className="mt-1 text-[10.5px] text-white/45">{texts.examples.map((x) => `「${x}」`).join(" ")}</p>}
                 </>
               )}

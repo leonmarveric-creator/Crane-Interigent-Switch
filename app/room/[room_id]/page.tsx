@@ -8,6 +8,7 @@ import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getBootVoice } from "@/lib/bootVoice";
 
 export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 
@@ -26,10 +27,11 @@ export default async function RoomPage({
   searchParams: { lang?: string };
 }) {
   // 滞在の確認と、エントランス一覧の取得を同時に (切り替えを速く)
-  const [stays, entRes] = await Promise.all([
+  const [stays, entRes, bootVoice] = await Promise.all([
     getActiveStays(params.room_id),
     supabaseAdmin.from("entrances").select("slug, building").eq("is_active", true).order("slug")
       .then((r) => r, () => ({ data: null })),
+    getBootVoice(),
   ]);
   const primary = stays?.reservations[0];
 
@@ -89,6 +91,7 @@ export default async function RoomPage({
       hasGalaxy={!!stays.room.switchbot_galaxy_device_id}
       hasNest={!!stays.room.switchbot_nest_device_id}
       hasWafu={!!stays.room.switchbot_wafu_device_id}
+      bootVoice={bootVoice}
     />
   );
 }

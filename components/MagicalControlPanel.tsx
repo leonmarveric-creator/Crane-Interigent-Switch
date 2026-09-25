@@ -32,6 +32,8 @@ import EntranceKeyButton from "@/components/EntranceKeyButton";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { magicIncantationEcho, primeMagicAudio, setMuted as sfxSetMuted, spellCast } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
+import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
+import type { VoiceAction } from "@/lib/voiceCommand";
 
 export interface MagicalProps {
   roomSlug: string;
@@ -47,6 +49,8 @@ export interface MagicalProps {
   onSwitchWafu?: () => void;
   guestName?: string | null;
   entranceHref?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 const MAGIC_COPY: Record<Lang, {
@@ -701,6 +705,11 @@ function MagicAction({
     setTimeout(() => setRes(null), 1700);
   };
 
+  // 杖ボタンで唱えた呪文 (音声) にも反応する。ボタンを押したときと同じ演出・音になる。鍵は対象外。
+  useVoiceAction((a) => {
+    if (a === action || (a === "wafu_on" && action === "wafu_on_warm")) void run();
+  });
+
   return (
     <button
       onClick={run}
@@ -915,6 +924,8 @@ export default function MagicalControlPanel({
   onSwitchWafu,
   guestName,
   entranceHref,
+  lat,
+  lng,
 }: MagicalProps) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -2508,6 +2519,27 @@ export default function MagicalControlPanel({
           }
         }
       `}</style>
+
+      {/* 右下の杖ボタンに一番下のボタンが隠れないよう余白 */}
+      <div aria-hidden className="h-24" />
+      {/* 呪文を唱える (音声操作): 杖のボタンを押しながら話す */}
+      <VoiceMic variant="magic" lang={lang} roomSlug={roomSlug} lat={lat} lng={lng}
+        caps={{ hasGalaxy, hasNest, hasWafu }}
+        allowed={[
+          "light_on", "light_off", "ac_on", "ac_off", "welcome", "good_night", "away",
+          ...(hasWafu ? (["wafu_on", "wafu_off", "dream_fade"] as VoiceAction[]) : []),
+          ...(hasGalaxy ? (["galaxy_on", "galaxy_off"] as VoiceAction[]) : []),
+          ...(hasNest ? (["nest_on", "nest_off"] as VoiceAction[]) : []),
+        ]}
+        texts={{
+          fab: t.magicFab, tipTitle: t.magicTipTitle, tipBody: t.magicTipBody,
+          listening: t.magicListening, retry: t.magicRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.magicExamples,
+          label: (a) => `✦ ${(SPELL_INCANTATIONS[a as DeviceAction] ?? ["Revelio"])[0]}`,
+          q: { wifi: t.qWifi, checkout: t.qCheckout, entrance: t.qEntrance, room: t.qRoom, ssid: t.qSsid, password: t.qPassword, none: t.qNone, copy: t.qCopy, copied: t.qCopied, loading: t.qLoading,
+            weather: t.qWeather, today: t.qToday, tomorrow: t.qTomorrow, rain: t.qRain, umbrellaYes: t.qUmbrellaYes, umbrellaMaybe: t.qUmbrellaMaybe, umbrellaNo: t.qUmbrellaNo,
+            nearby: t.qNearby, store: t.qStore, station: t.qStation, laundry: t.qLaundry, openMap: t.qOpenMap,
+            emergency: t.qEmergency, police: t.qPolice, ambulance: t.qAmbulance, host: t.qHost, emergencyNote: t.qEmergencyNote },
+        }} />
     </main>
   );
 }

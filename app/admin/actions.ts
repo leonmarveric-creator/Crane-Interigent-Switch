@@ -224,3 +224,13 @@ export async function setPin(formData: FormData) {
   await supabaseAdmin.from("reservations").update({ unlock_pin: pin }).eq("id", id);
   revalidatePath("/admin");
 }
+
+/** ハイテクUI の起動の声を切り替え (astralis / jarvis)。migration_boot_voice.sql が必要。 */
+export async function setBootVoice(voice: string): Promise<{ ok: boolean; error?: string }> {
+  requireAdmin();
+  const v = voice === "jarvis" ? "jarvis" : "astralis";
+  const { error } = await supabaseAdmin.from("app_settings").upsert({ id: 1, boot_voice: v, updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: "SQL_NEEDED" };
+  revalidatePath("/admin");
+  return { ok: true };
+}

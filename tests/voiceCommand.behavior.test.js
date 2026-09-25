@@ -76,7 +76,7 @@ test("voice UI: floating round mic with a one-time tip in 4 languages", () => {
   assert.match(vm, /fixed bottom-5 right-4/);
   assert.match(vm, /h-\[62px\] w-\[62px\]/);
   assert.match(vm, /TIP_KEY = "voiceTipSeen"/);
-  assert.match(vm, /localStorage\.setItem\(TIP_KEY, "1"\)/);
+  assert.match(vm, /localStorage\.setItem\(tipKey, "1"\)/);
   const i18n = fs.readFileSync(path.join(__dirname, "../lib/i18n.ts"), "utf8");
   for (const w of ["話して操作", "Voice control", "语音控制", "음성 조작"]) assert.ok(i18n.includes(w), w);
 });
@@ -132,4 +132,49 @@ test("voice answers: weather (today/tomorrow + umbrella), nearby map links, emer
   assert.match(vm, /href="tel:119"/);
   assert.match(vm, /answer\.supportUrl &&/);
   assert.match(fs.readFileSync(path.join(__dirname, "../app/api/room-info/[room_id]/route.ts"), "utf8"), /supportUrl/);
+});
+
+test("magic UI: wand voice button with spell words, only actions shown on screen, same cast effects", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const { parseSpellCommand: sp } = require("../lib/voiceCommand.ts");
+  const all = { hasGalaxy: true, hasNest: true, hasWafu: true };
+  assert.equal(sp("ルーモス", all), "light_on");
+  assert.equal(sp("Lumos", all), "light_on");
+  assert.equal(sp("ルーモス・マキシマ", all), "galaxy_on");
+  assert.equal(sp("Lumos maxima", all), "galaxy_on");
+  assert.equal(sp("ルーモス ソレム", all), "wafu_on");
+  assert.equal(sp("ノックス", all), "light_off");
+  assert.equal(sp("グレイシアス", all), "ac_on");
+  assert.equal(sp("マフリアート", all), "good_night");
+  assert.equal(sp("Lumos maxima", {}), null);
+  assert.equal(sp("エアコンつけて", all), null);
+  const mp = fs.readFileSync(path.join(__dirname, "../components/MagicalControlPanel.tsx"), "utf8");
+  assert.match(mp, /<VoiceMic variant="magic"/);
+  assert.match(mp, /useVoiceAction\(\(a\) => \{\s*if \(a === action/);
+  assert.doesNotMatch(mp, /allowed=\{\[[^\]]*"unlock"/);
+  const vm = fs.readFileSync(path.join(__dirname, "../components/tech/VoiceMic.tsx"), "utf8");
+  assert.match(vm, /WandSparkles/);
+  assert.match(vm, /vm-circle/);
+});
+
+test("boot voice: ASTRALIS by default, J.A.R.V.I.S selectable by admin", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const read = (...p) => fs.readFileSync(path.join(__dirname, "..", ...p), "utf8");
+  const cp = read("components", "ControlPanel.tsx");
+  for (const line of ["ASTRALIS system online", "CELESTIAL link established", "CELESTIAL core online", "CELESTIAL system online. Welcome back.", "CELESTIAL. All systems online.", "J.A.R.V.I.S online"]) {
+    assert.ok(cp.includes(`say: "${line}"`), line);
+  }
+  assert.match(cp, /speak\(line\.say\)/);
+  const sfx = read("lib", "sfx.ts");
+  for (const n of ["66-celestial-link-established", "67-celestial-core-online", "68-celestial-system-online-welcome-back", "69-celestial-all-systems-online"]) {
+    assert.ok(sfx.includes(`current-natural-voice-${n}.mp3`), n);
+    assert.ok(fs.existsSync(path.join(__dirname, "../public/audio/voice/current", `current-natural-voice-${n}.mp3`)), n);
+  }
+  assert.match(cp, /bootVoice = "astralis"/);
+  assert.match(read("lib", "sfx.ts"), /"ASTRALIS system online": "current-natural-voice-65-astralis-system-online\.mp3"/);
+  assert.ok(fs.existsSync(path.join(__dirname, "../public/audio/voice/current/current-natural-voice-65-astralis-system-online.mp3")));
+  assert.match(read("supabase", "migration_boot_voice.sql"), /boot_voice\s+text not null default 'astralis'/);
+  assert.match(read("app", "admin", "actions.ts"), /export async function setBootVoice/);
+  assert.match(read("app", "admin", "AdminClient.tsx"), /<BootVoiceCard initial=\{bootVoice\}/);
+  assert.match(read("app", "room", "[room_id]", "page.tsx"), /bootVoice=\{bootVoice\}/);
 });

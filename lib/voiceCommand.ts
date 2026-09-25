@@ -205,3 +205,31 @@ export function parseVoiceQuestion(input: string | string[]): VoiceQuestion | nu
   }
   return null;
 }
+
+/* ---------------- マジカルUI の呪文 (画面で使っている呪文の言葉) ---------------- */
+const SPELLS: { words: string[]; en: RegExp; action: VoiceAction; need?: keyof VoiceRoomCaps }[] = [
+  { words: ["ルーモスマキシマ", "るーもすまきしま"], en: /\blumos\s*maxima\b/i, action: "galaxy_on", need: "hasGalaxy" },
+  { words: ["ルーモスソレム", "るーもすそれむ"], en: /\blumos\s*solem\b/i, action: "wafu_on", need: "hasWafu" },
+  { words: ["ルーモス", "るーもす"], en: /\blumos\b/i, action: "light_on" },
+  { words: ["ノックス", "のっくす"], en: /\bnox\b/i, action: "light_off" },
+  { words: ["グレイシアス", "ぐれいしあす"], en: /\bglacius\b/i, action: "ac_on" },
+  { words: ["マフリアート", "まふりあーと"], en: /\bmuffliato\b/i, action: "good_night" },
+  { words: ["レベリオ", "れべりお"], en: /\brevelio\b/i, action: "welcome" },
+  { words: ["フィニートインカンターテム", "フィニート", "ふぃにーと"], en: /\bfinite(\s*incantatem)?\b/i, action: "away" },
+];
+
+/** マジカルUI: 呪文の言葉 (ルーモス / Lumos など) を操作に変換。呪文でなければ null。 */
+export function parseSpellCommand(input: string | string[], caps: VoiceRoomCaps = {}): VoiceAction | null {
+  const list = Array.isArray(input) ? input : [input];
+  for (const raw of list) {
+    const text = norm(raw);
+    const c = text.replace(/[\s・･]+/g, "");
+    for (const sp of SPELLS) {
+      if (sp.en.test(text) || sp.words.some((w) => c.includes(w))) {
+        if (sp.need && !caps[sp.need]) return null;
+        return sp.action;
+      }
+    }
+  }
+  return null;
+}

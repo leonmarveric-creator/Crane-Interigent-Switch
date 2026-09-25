@@ -392,3 +392,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @keyframes mcFlicker { 0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); } 30% { opacity: 0.95; } 55% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.04); } 80% { opacity: 1; } }
 .mc-flicker { animation: mcFlicker 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .mc-spin, .mc-shoot, .mc-breathe, .mc-dusk, .mc-moon, .mc-float, .mc-flicker { animation: none; } }
+
+/* マジカルUI の杖ボタン / 詠唱中の魔法陣 */
+@keyframes vmMagicPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 194, 107, 0.5), 0 0 22px rgba(196, 165, 255, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(245, 194, 107, 0), 0 0 30px rgba(245, 194, 107, 0.7); }
+}
+.vm-fab-magic { animation: vmMagicPulse 2.6s ease-in-out infinite; }
+.vm-fab-magic-on { animation: none; box-shadow: 0 0 38px rgba(245, 194, 107, 0.95); }
+@keyframes vmCircle { to { transform: rotate(360deg); } }
+.vm-circle { animation: vmCircle 6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .vm-fab-magic, .vm-circle { animation: none; } }
