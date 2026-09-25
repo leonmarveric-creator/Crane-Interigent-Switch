@@ -216,7 +216,7 @@ export default function ControlPanel({
       {/* ギャラクシーモード起動の特別演出 */}
       <GalaxyLaunch trigger={galaxyLaunch} />
       {/* 音声コントロール: 右下に浮かぶマイクボタン + 初回だけの案内 */}
-      <VoiceMic lang={lang} roomSlug={roomSlug} lat={lat} lng={lng} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
+      <VoiceMic lang={lang} roomSlug={roomSlug} roomName={roomName} lat={lat} lng={lng} caps={{ hasGalaxy, hasNest, hasWafu }} texts={{
         fab: t.voiceFab, tipTitle: t.voiceTipTitle, tipBody: t.voiceTipBody,
         listening: t.voiceListening, retry: t.voiceRetry, denied: t.voiceDenied, why: t.voiceWhy, examples: t.voiceExamples,
         label: (a) => voiceLabel(a, t),

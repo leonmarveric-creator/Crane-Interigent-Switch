@@ -38,7 +38,7 @@ export default function BootVoiceCard({ initial, lang }: { initial: Voice; lang:
     });
   };
   const play = (files: string[]) => {
-    try { void new Audio(BASE + files[Math.floor(Math.random() * files.length)]).play(); } catch { /* ignore */ }
+    try { void new Audio(BASE + files[Math.floor(Math.random() * files.length)] + "?v=android-2").play(); } catch { /* ignore */ }
   };
 
   return (

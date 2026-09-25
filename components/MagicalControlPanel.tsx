@@ -2523,7 +2523,7 @@ export default function MagicalControlPanel({
       {/* 右下の杖ボタンに一番下のボタンが隠れないよう余白 */}
       <div aria-hidden className="h-24" />
       {/* 呪文を唱える (音声操作): 杖のボタンを押しながら話す */}
-      <VoiceMic variant="magic" lang={lang} roomSlug={roomSlug} lat={lat} lng={lng}
+      <VoiceMic variant="magic" lang={lang} roomSlug={roomSlug} roomName={roomName} lat={lat} lng={lng}
         caps={{ hasGalaxy, hasNest, hasWafu }}
         allowed={[
           "light_on", "light_off", "ac_on", "ac_off", "welcome", "good_night", "away",

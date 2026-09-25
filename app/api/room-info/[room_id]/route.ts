@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * 音声で質問されたときの答え (Wi-Fi / チェックアウト / エントランス・お部屋の暗証番号 / 緊急時のホスト連絡先)。
+ * 音声で質問されたときの答え (Wi-Fi / チェックアウト / エントランス・お部屋の暗証番号 / 緊急時のホスト連絡先 / 目覚まし)。
  *   GET /api/room-info/[room_id]
  *   認証: 部屋の PIN セッション Cookie (管理画面テストは管理者 Cookie)。
  *   暗証番号・Wi-Fi はページの HTML には入れず、聞かれたときだけこの API で返す。
@@ -17,11 +17,13 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: NextRequest, { params }: { params: { room_id: string } }) {
   let room: any = null;
   let checkOut: string | null = null;
+  let reservationId: string | null = null;
 
   const stay = await authorizeRoomRequest(params.room_id);
   if (stay) {
     room = stay.room;
     checkOut = stay.reservation.check_out;
+    reservationId = stay.reservation.id;
   } else {
     const token = cookies().get(ADMIN_COOKIE)?.value;
     if (!token || token !== process.env.ADMIN_SESSION_TOKEN) {
@@ -45,6 +47,17 @@ export async function GET(_req: NextRequest, { params }: { params: { room_id: st
     settings = st.data;
   } catch { /* ignore */ }
   const showCode = settings?.show_keypad_code !== false;
+
+  // 「おやすみ」で見せる目覚ましの時刻 (ゲストはその滞在の分、管理者テストは部屋の分)
+  let alarm: { fireAt: string; mode: string | null } | null = null;
+  try {
+    let q = supabaseAdmin.from("alarms").select("fire_at, wake_mode")
+      .eq("is_enabled", true).is("triggered_at", null).gt("fire_at", new Date().toISOString())
+      .order("fire_at", { ascending: true }).limit(1);
+    q = reservationId ? q.eq("reservation_id", reservationId) : q.eq("room_id", room.id).is("reservation_id", null);
+    const { data } = await q.maybeSingle();
+    if (data) alarm = { fireAt: data.fire_at, mode: data.wake_mode ?? null };
+  } catch { /* ignore */ }
   const showWifi = settings?.show_wifi !== false;
 
   return NextResponse.json({
@@ -56,5 +69,6 @@ export async function GET(_req: NextRequest, { params }: { params: { room_id: st
     roomCode: room.keypad_code ?? null,
     // 緊急時に出すホストの連絡先 (LINE / WhatsApp / tel:)
     supportUrl: settings?.show_support !== false ? entrance?.support_url ?? null : null,
+    alarm,
   }, { headers: { "Cache-Control": "no-store" } });
 }

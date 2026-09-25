@@ -233,3 +233,44 @@ export function parseSpellCommand(input: string | string[], caps: VoiceRoomCaps 
   }
   return null;
 }
+
+/* ---------------- あいさつ・会話・隠しコマンド ---------------- */
+export type VoiceExtra =
+  | "good_morning" | "welcome_home" | "going_out" | "good_night" | "tired" | "who" | "help"
+  | "party" | "shooting_star" | "countdown" | "aurora" | "omikuji" | "breathe" | "birthday"
+  | "sakura" | "fireworks" | "momiji" | "snow";
+
+const EXTRAS: { k: VoiceExtra; words: string[]; en: RegExp }[] = [
+  { k: "good_morning", words: ["おはよう", "お早う", "早上好", "早安", "좋은아침", "굿모닝"], en: /\bgood\s*morning\b/i },
+  { k: "welcome_home", words: ["ただいま", "只今", "我回来了", "我回來了", "다녀왔", "왔어"], en: /\b(i'?m home|i'?m back|i am home|i am back)\b/i },
+  { k: "going_out", words: ["いってきます", "行ってきます", "いってくる", "行ってくる", "我出门了", "我出門了", "我走了", "다녀오겠", "다녀올게", "갔다올게"], en: /\b(i'?m (going out|heading out|leaving)|see you later)\b/i },
+  { k: "good_night", words: ["おやすみ", "お休み", "晚安", "잘자", "안녕히주무세요", "굿나잇"], en: /\bgood\s*night\b/i },
+  { k: "tired", words: ["疲れた", "つかれた", "疲れちゃった", "くたくた", "累了", "好累", "피곤", "힘들어"], en: /\b(i'?m (so )?tired|exhausted)\b/i },
+  { k: "who", words: ["名前は", "なまえは", "名前を教えて", "誰", "だれ", "你是谁", "你是誰", "你叫什么", "이름이뭐", "누구야", "누구세요"], en: /\b(who are you|what'?s your name|your name)\b/i },
+  { k: "help", words: ["何ができる", "なにができる", "何ができますか", "使い方", "你能做什么", "你會做什麼", "뭘할수있", "뭐할수있", "사용법"], en: /\b(what can you do|how do i use|commands)\b/i },
+  { k: "countdown", words: ["発射", "はっしゃ", "カウントダウン", "かうんとだうん", "发射", "發射", "倒计时", "倒數", "발사", "카운트다운"], en: /\b(launch|countdown|count down|blast off|lift ?off)\b/i },
+  { k: "shooting_star", words: ["流れ星", "ながれぼし", "流星", "별똥별", "유성"], en: /\bshooting stars?\b/i },
+  { k: "party", words: ["パーティー", "パーティ", "ぱーてぃー", "派对", "派對", "파티"], en: /\bpart(y|ies)\b/i },
+  { k: "aurora", words: ["オーロラ", "おーろら", "极光", "極光", "오로라"], en: /\baurora\b/i },
+  { k: "omikuji", words: ["おみくじ", "御神籤", "御籤", "抽签", "抽籤", "运势", "運勢", "운세", "오미쿠지"], en: /\b(omikuji|fortune)\b/i },
+  { k: "breathe", words: ["瞑想", "めいそう", "深呼吸", "しんこきゅう", "冥想", "명상", "심호흡"], en: /\b(meditat\w*|breathe|breathing)\b/i },
+  { k: "birthday", words: ["誕生日", "たんじょうび", "バースデー", "ばーすでー", "生日", "생일"], en: /\bbirthday\b/i },
+  { k: "sakura", words: ["桜", "さくら", "サクラ", "樱花", "櫻花", "벚꽃"], en: /\b(cherry blossoms?|sakura)\b/i },
+  { k: "fireworks", words: ["花火", "はなび", "烟花", "煙火", "焰火", "불꽃놀이"], en: /\bfireworks?\b/i },
+  { k: "momiji", words: ["紅葉", "もみじ", "こうよう", "红叶", "紅葉", "단풍"], en: /\b(autumn leaves|fall leaves|momiji|maple)\b/i },
+  { k: "snow", words: ["雪", "ゆき", "下雪", "눈이", "눈 와", "눈와"], en: /\bsnow(fall|ing)?\b/i },
+];
+
+/** あいさつ・会話・隠しコマンドを読み取る (質問の次、操作の前に判定)。該当しなければ null。 */
+export function parseVoiceExtra(input: string | string[]): VoiceExtra | null {
+  const list = Array.isArray(input) ? input : [input];
+  for (const raw of list) {
+    const text = norm(raw);
+    if (!text) continue;
+    const c = text.replace(/\s+/g, "");
+    for (const e of EXTRAS) {
+      if (e.en.test(text) || e.words.some((w) => c.includes(norm(w).replace(/\s+/g, "")))) return e.k;
+    }
+  }
+  return null;
+}

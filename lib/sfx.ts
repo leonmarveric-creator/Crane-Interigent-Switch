@@ -8,6 +8,11 @@ let activeSfxAudio: HTMLAudioElement | null = null;
 let voicePrimed = false;
 
 const VOICE_AUDIO_BASE = "/audio/voice/current/";
+/**
+ * 音声ファイルの版。同じファイル名で声を差し替えたとき、スマホに残った古い音声 (キャッシュ) を使わないよう
+ * URL の末尾に付ける。声を作り直したら、この値を変える。
+ */
+const VOICE_AUDIO_VERSION = "android-2";
 const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
   "All systems online": "current-natural-voice-01-all-systems-online.mp3",
   "Good evening. Systems online": "current-natural-voice-02-good-evening-systems-online.mp3",
@@ -17,6 +22,30 @@ const VOICE_AUDIO_BY_TEXT: Record<string, string> = {
   "CELESTIAL core online": "current-natural-voice-67-celestial-core-online.mp3",
   "CELESTIAL system online. Welcome back.": "current-natural-voice-68-celestial-system-online-welcome-back.mp3",
   "CELESTIAL. All systems online.": "current-natural-voice-69-celestial-all-systems-online.mp3",
+  // あいさつ・会話・隠しコマンド・部屋ごとのアシスタントの自己紹介
+  "Good morning.": "current-natural-voice-70-good-morning.mp3",
+  "Sweet dreams.": "current-natural-voice-71-sweet-dreams.mp3",
+  "Relax. You've done enough today.": "current-natural-voice-72-relax-youve-done-enough-today.mp3",
+  "Here is what I can do.": "current-natural-voice-73-here-is-what-i-can-do.mp3",
+  "Party mode, activated!": "current-natural-voice-74-party-mode-activated.mp3",
+  "Enjoy the aurora.": "current-natural-voice-75-enjoy-the-aurora.mp3",
+  "Make a wish.": "current-natural-voice-76-make-a-wish.mp3",
+  "Launching in three. Two. One.": "current-natural-voice-77-launching-in-three-two-one.mp3",
+  "Here is your fortune.": "current-natural-voice-78-here-is-your-fortune.mp3",
+  "Let's breathe together.": "current-natural-voice-79-lets-breathe-together.mp3",
+  "Happy birthday!": "current-natural-voice-80-happy-birthday.mp3",
+  "Enjoy the cherry blossoms.": "current-natural-voice-81-enjoy-the-cherry-blossoms.mp3",
+  "Enjoy the fireworks.": "current-natural-voice-82-enjoy-the-fireworks.mp3",
+  "Enjoy the autumn leaves.": "current-natural-voice-83-enjoy-the-autumn-leaves.mp3",
+  "Enjoy the snowfall.": "current-natural-voice-84-enjoy-the-snowfall.mp3",
+  "I am Akari, your room assistant.": "current-natural-voice-85-i-am-akari.mp3",
+  "I am Ayano, your room assistant.": "current-natural-voice-86-i-am-ayano.mp3",
+  "I am Sugetsu, your room assistant.": "current-natural-voice-87-i-am-sugetsu.mp3",
+  "I am Seirin, your room assistant.": "current-natural-voice-88-i-am-seirin.mp3",
+  "I am Kotoha, your room assistant.": "current-natural-voice-89-i-am-kotoha.mp3",
+  "I am Sakura, your room assistant.": "current-natural-voice-91-i-am-sakura.mp3",
+  "I am Mio, your room assistant.": "current-natural-voice-92-i-am-mio.mp3",
+  "I am Gekka, your room assistant.": "current-natural-voice-93-i-am-gekka.mp3",
   "Access granted. Welcome": "current-natural-voice-04-access-granted-welcome.mp3",
   "Goodbye": "current-natural-voice-05-goodbye.mp3",
   "Powering down": "current-natural-voice-06-powering-down.mp3",
@@ -254,9 +283,24 @@ export function access() {
   osc(c, "sine", 2640, 2640, t + 0.42, 0.18, 0.04);
 }
 
+/**
+ * 音声コントロールのあいさつ用: 次にボタンが喋るセリフを 1 回だけ差し替える。
+ *   例:「ただいま」→ 快適モードのボタンが動き、いつものセリフの代わりに "Welcome home" と言う。
+ *   効果音はボタンの処理のまま。数秒以内に喋らなければ差し替えは消える。
+ */
+let voiceOverride: { text: string; until: number } | null = null;
+export function overrideNextVoice(text: string, ms = 20000) {
+  voiceOverride = { text, until: Date.now() + ms };
+}
+
 /** 候補からランダムに1つ喋る (JARVISのセリフに変化をつける) */
 export function speakOneOf(lines: string[]) {
   if (!lines.length) return;
+  if (voiceOverride) {
+    const o = voiceOverride;
+    voiceOverride = null;
+    if (Date.now() < o.until) { speak(o.text); return; }
+  }
   speak(lines[Math.floor(Math.random() * lines.length)]);
 }
 
@@ -272,7 +316,7 @@ function canonicalVoiceText(text: string): string {
 
 function naturalVoiceUrl(text: string): string | null {
   const filename = VOICE_AUDIO_BY_TEXT[canonicalVoiceText(text)];
-  return filename ? `${VOICE_AUDIO_BASE}${filename}` : null;
+  return filename ? `${VOICE_AUDIO_BASE}${filename}?v=${VOICE_AUDIO_VERSION}` : null;
 }
 
 function stopVoiceAudio() {
@@ -289,22 +333,40 @@ function stopSfxAudio() {
   activeSfxAudio = null;
 }
 
+/**
+ * 声を鳴らす audio 要素は 1 つを使い回す。
+ *   iPhone では「タップの中で一度鳴らした要素」でないと、あとから (通信を待ったあと・音声操作のあと) 鳴らせない。
+ *   毎回新しい要素を作ると再生を断られ、ブラウザの機械音声 (古い声) に切り替わってしまうため。
+ */
+let voiceEl: HTMLAudioElement | null = null;
+function getVoiceEl(): HTMLAudioElement | null {
+  if (typeof Audio === "undefined") return null;
+  if (!voiceEl) { voiceEl = new Audio(); voiceEl.preload = "auto"; }
+  return voiceEl;
+}
+
 function playNaturalVoice(text: string): boolean {
   const url = naturalVoiceUrl(text);
   if (!url || typeof Audio === "undefined") return false;
   try {
     stopVoiceAudio();
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
-    const a = new Audio(url);
+    const a = (voicePrimed && getVoiceEl()) || new Audio();
+    a.src = url;
     a.preload = "auto";
+    a.muted = false;
     a.volume = 1;
     activeVoiceAudio = a;
     a.onended = () => {
       if (activeVoiceAudio === a) activeVoiceAudio = null;
     };
+    // 再生を断られたら少し待って 1 回だけやり直す。それでもだめなら鳴らさない
+    // (録音の声があるセリフは、ブラウザの機械音声=古い声には切り替えない)
     void a.play().catch(() => {
-      if (activeVoiceAudio === a) activeVoiceAudio = null;
-      if (!muted) speakWithBrowser(text);
+      setTimeout(() => {
+        if (activeVoiceAudio !== a || muted) return;
+        void a.play().catch(() => { if (activeVoiceAudio === a) activeVoiceAudio = null; });
+      }, 300);
     });
     return true;
   } catch {
@@ -317,14 +379,16 @@ function primeNaturalVoice() {
   const url = naturalVoiceUrl("Access granted");
   if (!url) return;
   try {
-    const a = new Audio(url);
-    a.preload = "auto";
-    a.volume = 0.01;
+    // タップの中で共用の要素を無音で一度鳴らしておく (以後この要素なら後からでも鳴らせる)
+    const a = getVoiceEl();
+    if (!a) return;
+    a.src = url;
+    a.muted = true;
     void a.play().then(() => {
-      a.pause();
-      a.currentTime = 0;
+      if (activeVoiceAudio !== a) { a.pause(); a.currentTime = 0; }
+      a.muted = false;
       voicePrimed = true;
-    }).catch(() => { /* user gesture may still be required */ });
+    }).catch(() => { a.muted = false; /* user gesture may still be required */ });
   } catch { /* ignore */ }
 }
 

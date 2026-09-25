@@ -12,9 +12,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mic, WandSparkles, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock, CloudSun, MapPin, Siren, Phone, ExternalLink } from "lucide-react";
-import { parseVoiceCommand, parseSpellCommand, parseVoiceQuestion, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps } from "@/lib/voiceCommand";
-import { primeVoice, speak } from "@/lib/sfx";
+import { Mic, WandSparkles, Copy, Check, X, Wifi, KeyRound, DoorOpen, Clock, CloudSun, MapPin, Siren, Phone, ExternalLink, Sun, Moon, Sparkles, MessageCircle, AlarmClock } from "lucide-react";
+import { parseVoiceCommand, parseSpellCommand, parseVoiceQuestion, parseVoiceExtra, speechLangCode, type VoiceAction, type VoiceQuestion, type VoiceRoomCaps, type VoiceExtra } from "@/lib/voiceCommand";
+import { primeVoice, speak, overrideNextVoice } from "@/lib/sfx";
+import { roomAssistant } from "@/lib/roomAssistant";
+import { fxPlan, drawFortune, jstDayKey, type LightFx, type Fortune } from "@/lib/lightEffects";
+import { extrasText } from "@/lib/voiceExtrasText";
+import FxOverlay, { type ScreenFx } from "@/components/tech/FxOverlay";
 
 export const VOICE_EVENT = "crane-voice-command";
 const TIP_KEY = "voiceTipSeen";
@@ -87,14 +91,46 @@ const ANSWER_VOICE: Record<VoiceQuestion, string> = {
 
 type Phase = "idle" | "listening" | "done" | "error";
 
+/** あいさつ・会話・おみくじのカード */
+type ExtraCard = {
+  kind: "morning" | "night" | "out" | "who" | "help" | "omikuji";
+  loading?: boolean;
+  weather?: WeatherDay | null;
+  checkoutToday?: string | null;
+  alarm?: string | null;
+  fortune?: Fortune;
+};
+
+/** 季節の演出と、その季節の部屋 */
+const SEASON_FX: Partial<Record<VoiceExtra, "spring" | "summer" | "autumn" | "winter">> = { sakura: "spring", fireworks: "summer", momiji: "autumn", snow: "winter" };
+const EXTRA_VOICE: Partial<Record<VoiceExtra, string>> = {
+  party: "Party mode, activated!", aurora: "Enjoy the aurora.", shooting_star: "Make a wish.", countdown: "Launching in three. Two. One.",
+  omikuji: "Here is your fortune.", breathe: "Let's breathe together.", birthday: "Happy birthday!",
+  sakura: "Enjoy the cherry blossoms.", fireworks: "Enjoy the fireworks.", momiji: "Enjoy the autumn leaves.", snow: "Enjoy the snowfall.",
+};
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** 天気 (Open-Meteo / キー不要)。今日から days 日分 */
+async function fetchWeather(lat?: number | null, lng?: number | null, days = 2): Promise<WeatherDay[]> {
+  if (typeof lat !== "number" || typeof lng !== "number") return [];
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=${days}`);
+    const j = await r.json();
+    return (j?.daily?.weather_code ?? []).map((c: number, i: number) => ({
+      code: c, max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]),
+      rain: Math.round(j.daily.precipitation_probability_max[i] ?? 0),
+    }));
+  } catch { return []; }
+}
+
 function getRecognition(): any {
   if (typeof window === "undefined") return null;
   const w = window as any;
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, variant = "tech", allowed }: {
-  lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string; lat?: number | null; lng?: number | null;
+export default function VoiceMic({ lang, caps, texts, roomSlug, roomName = "", lat, lng, variant = "tech", allowed }: {
+  lang: string; caps: VoiceRoomCaps; texts: Texts; roomSlug: string; roomName?: string; lat?: number | null; lng?: number | null;
   /** tech = ハイテクUI (マイク) / magic = マジカルUI (杖で呪文を唱えるデザイン) */
   variant?: "tech" | "magic";
   /** この画面にあるボタンの操作だけ受け付ける (無い操作は「もう一度」) */
@@ -115,17 +151,7 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, varian
     let rows: Answer["rows"] = [];
     // 天気: 画面上部と同じ Open-Meteo (キー不要) から今日と明日
     if (q === "weather") {
-      let days: WeatherDay[] = [];
-      try {
-        if (typeof lat === "number" && typeof lng === "number") {
-          const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=2`);
-          const j = await r.json();
-          days = (j?.daily?.weather_code ?? []).map((c: number, i: number) => ({
-            code: c, max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]),
-            rain: Math.round(j.daily.precipitation_probability_max[i] ?? 0),
-          }));
-        }
-      } catch { /* ignore */ }
+      const days = await fetchWeather(lat, lng, 2);
       setAnswer({ q, loading: false, rows: [], weather: days });
       speak(days.length ? ANSWER_VOICE[q] : "Sorry, that information is not available.");
       return;
@@ -177,6 +203,137 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, varian
     speak(rows.length ? ANSWER_VOICE[q] : "Sorry, that information is not available.");
     if (navigator.vibrate) navigator.vibrate(18);
   };
+  /* ---------------- あいさつ・会話・隠しコマンド ---------------- */
+  const x = extrasText(lang);
+  const assistant = roomAssistant(roomSlug, roomName);
+  const [card, setCard] = useState<ExtraCard | null>(null);
+  const cardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeCard = () => { setCard(null); if (cardTimer.current) clearTimeout(cardTimer.current); };
+  const openCard = (c: ExtraCard) => {
+    setCard(c);
+    if (cardTimer.current) clearTimeout(cardTimer.current);
+    cardTimer.current = setTimeout(() => setCard(null), 45000);
+  };
+  const [screenFx, setScreenFx] = useState<{ fx: ScreenFx; n: number } | null>(null);
+  const lightRun = useRef(0);
+  const can = (a: VoiceAction) => !allowed || allowed.includes(a);
+  const toast = (text: string, ok = true, ms = 3200) => { setMsg(text); setPhase(ok ? "done" : "error"); hideLater(ms); };
+
+  /** 和風ライトの光の演出。ブラウザが 1 コマずつサーバーに送る (途中で別の操作をしたら止まる) */
+  const playLight = async (fx: LightFx) => {
+    if (!caps.hasWafu) return;
+    const id = ++lightRun.current;
+    const plan = fxPlan(fx);
+    let startedAt: string | undefined;
+    const post = async (frame: number | "restore") => {
+      try {
+        const r = await fetch(`/api/effects/${roomSlug}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fx, frame, startedAt }) });
+        return r.ok ? await r.json() : null;
+      } catch { return null; }
+    };
+    const first = await post(0);
+    if (!first || first.noLight || first.stop) return;
+    if (first.limited) { toast(x.limited, false, 4500); return; }
+    startedAt = first.startedAt;
+    for (let i = 1; i < plan.frames.length; i++) {
+      await sleep(plan.intervalMs);
+      if (lightRun.current !== id) return;
+      const r = await post(i);
+      if (!r || r.stop) return;
+    }
+    if (plan.restoreWarm) {
+      await sleep(plan.intervalMs || 4000);
+      if (lightRun.current !== id) return;
+      await post("restore");
+    }
+  };
+  const showFx = (fx: ScreenFx) => setScreenFx({ fx, n: Date.now() % 100000 });
+
+  /** ボタンの操作をして、そのボタンのいつものセリフの代わりにあいさつを言わせる (効果音はボタンのまま) */
+  const actWith = (a: VoiceAction, line: string) => {
+    lightRun.current++; // 光の演出中なら止める
+    if (!magic) overrideNextVoice(line); // マジカルUIは呪文の声のまま
+    window.dispatchEvent(new CustomEvent<VoiceAction>(VOICE_EVENT, { detail: a }));
+  };
+
+  const runExtra = async (k: VoiceExtra) => {
+    if (navigator.vibrate) navigator.vibrate(18);
+    switch (k) {
+      case "good_morning": {
+        speak("Good morning.");
+        openCard({ kind: "morning", loading: true });
+        const [days, info] = await Promise.all([fetchWeather(lat, lng, 1), fetch(`/api/room-info/${roomSlug}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+        let checkoutToday: string | null = null;
+        if (info?.checkOut && jstDayKey(new Date(info.checkOut).getTime()) === jstDayKey()) {
+          checkoutToday = new Date(info.checkOut).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+        }
+        setCard((c) => (c?.kind === "morning" ? { kind: "morning", weather: days[0] ?? null, checkoutToday } : c));
+        return;
+      }
+      case "welcome_home":
+        if (can("welcome")) { actWith("welcome", "Welcome home"); toast(x.home); } else { speak("Welcome home"); toast(x.home); }
+        return;
+      case "going_out": {
+        if (can("away")) actWith("away", "Have a safe trip"); else speak("Have a safe trip");
+        openCard({ kind: "out", loading: true });
+        const days = await fetchWeather(lat, lng, 1);
+        setCard((c) => (c?.kind === "out" ? { kind: "out", weather: days[0] ?? null } : c));
+        return;
+      }
+      case "good_night": {
+        if (can("good_night")) actWith("good_night", "Sweet dreams."); else speak("Sweet dreams.");
+        openCard({ kind: "night", loading: true });
+        const [days, info] = await Promise.all([fetchWeather(lat, lng, 2), fetch(`/api/room-info/${roomSlug}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+        const alarm = info?.alarm?.fireAt ? new Date(info.alarm.fireAt).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }) : null;
+        setCard((c) => (c?.kind === "night" ? { kind: "night", weather: days[1] ?? null, alarm } : c));
+        return;
+      }
+      case "tired":
+        if (caps.hasWafu && can("welcome_cozy")) actWith("welcome_cozy", "Relax. You've done enough today.");
+        else speak("Relax. You've done enough today.");
+        toast(x.tired, true, 3800);
+        return;
+      case "who":
+        speak(assistant?.voice ?? "ASTRALIS system online");
+        openCard({ kind: "who" });
+        return;
+      case "help":
+        speak("Here is what I can do.");
+        openCard({ kind: "help" });
+        return;
+      case "omikuji": {
+        speak(EXTRA_VOICE.omikuji!);
+        openCard({ kind: "omikuji", fortune: drawFortune(roomSlug, jstDayKey()) });
+        void playLight("omikuji");
+        return;
+      }
+      case "countdown": {
+        speak(EXTRA_VOICE.countdown!);
+        showFx("countdown");
+        const galaxy = caps.hasGalaxy && can("galaxy_on");
+        await sleep(3300);
+        if (galaxy) window.dispatchEvent(new CustomEvent<VoiceAction>(VOICE_EVENT, { detail: "galaxy_on" }));
+        else showFx("shooting_star");
+        return;
+      }
+      case "shooting_star":
+        speak(EXTRA_VOICE.shooting_star!);
+        showFx("shooting_star");
+        return;
+      default: {
+        // 季節の演出は、その季節の部屋だけ
+        const season = SEASON_FX[k];
+        if (season && assistant?.season !== season) {
+          toast(x.seasonOnly(x.seasons[season], x.seasonRooms[season]), false, 4500);
+          return;
+        }
+        speak(EXTRA_VOICE[k] ?? "");
+        showFx(k as ScreenFx);
+        void playLight(k as LightFx);
+      }
+    }
+  };
+
   const copy = async (i: number, v: string) => {
     try { await navigator.clipboard.writeText(v); setCopied(i); setTimeout(() => setCopied(null), 1500); } catch { /* ignore */ }
   };
@@ -208,10 +365,18 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, varian
       void ask(question);
       return;
     }
+    // あいさつ・会話・隠しコマンド (おはよう / ただいま / おみくじ / 流れ星 など)
+    const extra = parseVoiceExtra(cands);
+    if (extra) {
+      setPhase("idle");
+      void runExtra(extra);
+      return;
+    }
     // マジカルUI では、画面で使っている呪文の言葉 (ルーモス / ノックス など) もそのまま効く
     const parsed = (magic ? parseSpellCommand(cands, caps) : null) ?? parseVoiceCommand(cands, caps);
     const action = parsed && (!allowed || allowed.includes(parsed)) ? parsed : null;
     if (action) {
+      lightRun.current++; // 光の演出中なら止める (ゲストの操作を優先)
       setMsg(texts.label(action));
       setPhase("done");
       window.dispatchEvent(new CustomEvent<VoiceAction>(VOICE_EVENT, { detail: action }));
@@ -411,6 +576,98 @@ export default function VoiceMic({ lang, caps, texts, roomSlug, lat, lng, varian
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 隠しコマンドの画面演出 (タッチは下のボタンに通す) */}
+      {screenFx && (
+        <FxOverlay key={screenFx.n} fx={screenFx.fx} n={screenFx.n} onDone={() => setScreenFx(null)}
+          texts={{ inhale: x.inhale, exhale: x.exhale, breatheDone: x.breatheDone, party: x.party, aurora: x.aurora, wish: x.wish, birthday: x.birthday }} />
+      )}
+
+      {/* あいさつ・会話・おみくじのカード */}
+      <AnimatePresence>
+        {card && (
+          <motion.div key="voice-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[66] flex items-center justify-center bg-black/55 px-5 font-sans tracking-normal backdrop-blur-sm" onClick={closeCard}>
+            <motion.div initial={{ scale: 0.92, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-sm rounded-2xl border px-5 pb-5 pt-4 ${magic ? "border-[#d8bf86]/55 bg-[#15121f] shadow-[0_0_40px_rgba(245,194,107,0.28)]" : "border-cyan-300/45 bg-[#050b14] shadow-[0_0_40px_rgba(34,211,238,0.3)]"}`}>
+              <button type="button" onClick={closeCard} aria-label="close" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/50 active:bg-white/10"><X className="h-4 w-4" /></button>
+              <p className={`flex items-center gap-2 text-[14px] font-semibold ${magic ? "text-[#ffe7b3]" : "text-cyan-200"}`}>
+                {card.kind === "morning" ? <Sun className="h-4 w-4" /> : card.kind === "night" ? <Moon className="h-4 w-4" /> : card.kind === "out" ? <DoorOpen className="h-4 w-4" />
+                  : card.kind === "help" ? <MessageCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                {card.kind === "morning" ? x.morning : card.kind === "night" ? x.night : card.kind === "out" ? x.out
+                  : card.kind === "who" ? x.whoTitle : card.kind === "help" ? x.helpTitle : x.fortuneTitle}
+              </p>
+
+              {card.loading ? (
+                <p className="mt-5 text-center text-white/60">{texts.q.loading}</p>
+              ) : card.kind === "who" ? (
+                // 自己紹介: この部屋のアシスタント (画面はフルネーム)
+                <div className="mt-4 text-center">
+                  <p className={`font-mono text-[11px] tracking-[0.35em] ${magic ? "text-[#f5c26b]/80" : "text-cyan-300/80"}`}>{assistant?.room ?? roomName}</p>
+                  <p className="mt-1.5 text-[26px] font-bold tracking-[0.08em] text-white [text-shadow:0_0_18px_rgba(125,211,252,0.6)]">{assistant?.name ?? "ASTRALIS"}</p>
+                  <p className="mt-2 text-[13px] text-white/75">{x.whoBody}</p>
+                  <p className="mt-3 text-[10.5px] text-white/45">{x.poweredBy}</p>
+                </div>
+              ) : card.kind === "help" ? (
+                // 使える言葉の一覧
+                <div className="mt-3 space-y-2.5">
+                  {x.helpGroups.map((g) => (
+                    <div key={g.title}>
+                      <p className="text-[11px] text-white/50">{g.title}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {g.items.map((it) => (
+                          <span key={it} className={`rounded-full border px-2.5 py-1 text-[12px] text-white ${magic ? "border-[#d8bf86]/35 bg-[#d8bf86]/10" : "border-cyan-300/30 bg-cyan-400/[0.07]"}`}>「{it}」</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : card.kind === "omikuji" && card.fortune ? (
+                // おみくじ: 1 日 1 回の運勢とラッキーカラー
+                <div className="mt-4 text-center">
+                  <p className="text-[40px] font-bold leading-none text-white" style={{ fontFamily: "'Hiragino Mincho ProN', 'Yu Mincho', serif" }}>{x.ranks[card.fortune.rank]}</p>
+                  <div className="mt-4 flex items-center justify-center gap-2.5">
+                    <span className="h-6 w-6 rounded-full border border-white/40" style={{ background: `rgb(${card.fortune.rgb.split(":").join(",")})`, boxShadow: `0 0 14px rgb(${card.fortune.rgb.split(":").join(",")})` }} />
+                    <p className="text-[14px] text-white/85">{x.luckyColor}: <b>{x.colors[card.fortune.color]}</b></p>
+                  </div>
+                  {caps.hasWafu && <p className="mt-2 text-[11px] text-white/50">{x.fortuneNote}</p>}
+                </div>
+              ) : (
+                // おはよう / いってきます / おやすみ: 天気 (+ チェックアウト / 目覚まし)
+                <div className="mt-3 space-y-2.5">
+                  {card.weather ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                      <span className="text-[34px] leading-none">{weatherEmoji(card.weather.code)}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-white/50">{card.kind === "night" ? x.tomorrowWeather : x.todayWeather}</p>
+                        <p className="font-mono text-[17px] text-white"><span className="text-rose-200">{card.weather.max}°</span> <span className="text-white/40">/</span> <span className="text-sky-200">{card.weather.min}°</span> <span className="ml-1 text-[12px] text-cyan-100">☔ {card.weather.rain}%</span></p>
+                        <p className={`text-[11.5px] leading-snug ${card.weather.rain >= 50 ? "text-amber-200" : "text-white/60"}`}>
+                          {card.weather.rain >= 50 ? texts.q.umbrellaYes : card.weather.rain >= 30 ? texts.q.umbrellaMaybe : texts.q.umbrellaNo}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {card.kind === "morning" && card.checkoutToday && (
+                    <div className="flex items-center gap-3 rounded-xl border border-amber-300/40 bg-amber-400/10 px-4 py-3">
+                      <Clock className="h-5 w-5 text-amber-200" />
+                      <p className="flex-1 text-[14px] text-white">{x.checkoutToday}</p>
+                      <p className="font-mono text-[22px] font-semibold text-amber-100">{card.checkoutToday}</p>
+                    </div>
+                  )}
+                  {card.kind === "night" && (
+                    <div className="flex items-center gap-3 rounded-xl border border-violet-300/35 bg-violet-400/10 px-4 py-3">
+                      <AlarmClock className="h-5 w-5 text-violet-200" />
+                      <p className="flex-1 text-[14px] text-white">{card.alarm ? x.alarmAt : x.noAlarm}</p>
+                      {card.alarm && <p className="font-mono text-[22px] font-semibold text-violet-100">{card.alarm}</p>}
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
