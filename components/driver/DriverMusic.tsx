@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DriverTrack } from "@/lib/driverData";
-import { parseLrc, toLrc, lyricIndex, type LrcLine } from "@/lib/driverLogic";
+import { parseLrc, toLrc, lyricIndex, decodeLrcBytes, type LrcLine } from "@/lib/driverLogic";
 import { sfx, vib } from "@/lib/driverSfx";
 import { driverAddTrack, driverDeleteTrack, driverReorderTracks, driverTrackUploadUrl, driverUpdateTrack } from "@/app/driver/actions";
 
@@ -278,7 +278,7 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
         <button onClick={async () => { sfx.blip(); setProg("0%"); await m.saveOffline((d, n) => setProg(`${Math.round((d / Math.max(1, n)) * 100)}%`)); setProg(""); sfx.chord(); toast(t("この端末に保存しました")); }}>{prog || t("保存する")}</button>
       </div>
       <p className="note">{t("Wi-Fi のときに押してください。保存した曲はギガを使わずに再生できます。")} <button className="linkbtn" onClick={() => { void m.clearOffline(); toast(t("保存を消しました")); }}>{t("保存を消す")}</button></p>
-      {ly && <LyricsSheet tr={ly} t={t} toast={toast} onClose={() => setLy(null)} onSave={(lrc) => { upd(ly.id, { lrc }); setLy((x) => (x ? { ...x, lrc } : x)); void driverUpdateTrack(ly.id, { lrc }); }} />}
+      {ly && <LyricsSheet tr={ly} t={t} toast={toast} onClose={() => setLy(null)} onSave={(lrc) => { upd(ly.id, { lrc }); setLy((x) => (x ? { ...x, lrc } : x)); void driverUpdateTrack(ly.id, { lrc }).then((r) => { if (!r.ok) toast(t("歌詞を保存できませんでした") + "：" + r.error.slice(0, 60)); }); }} />}
     </div>
   );
 }
@@ -309,9 +309,9 @@ function LyricsSheet({ tr, t, toast, onClose, onSave }: { tr: DriverTrack; t: T;
           {(["file", "make", "edit"] as const).map((x) => <button key={x} className={tab === x ? "on" : ""} onClick={() => { sfx.tick(); stop(); setTab(x); }}>{x === "file" ? t("LRC ファイルを選ぶ") : x === "make" ? t("曲を流して作る") : t("タイミング調整")}</button>)}
         </div>
         {tab === "file" && (
-          <label className="mfile">📄 {t("LRC ファイルを選ぶ")}<input type="file" accept=".lrc,.txt,text/plain" onChange={async (e) => {
+          <label className="mfile">📄 {t("LRC ファイルを選ぶ")}<input type="file" onChange={async (e) => {
             const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
-            const L = parseLrc(await f.text()); if (!L.length) { toast(t("時間付きの歌詞が見つかりませんでした")); return; }
+            const L = parseLrc(decodeLrcBytes(await f.arrayBuffer())); if (!L.length) { toast(t("時間付きの歌詞が見つかりませんでした")); return; }
             commit(L); sfx.chord(); toast(t("歌詞を付けました（{n} 行）", { n: L.length })); setTab("edit");
           }} /></label>
         )}

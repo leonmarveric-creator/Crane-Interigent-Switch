@@ -53,6 +53,15 @@ test("driver: LRC lyrics parse, current line and round trip", async () => {
   assert.deepEqual(lines, [{ t: 5, s: "again" }, { t: 12.5, s: "hello" }, { t: 60, s: "again" }]);
   assert.equal(L.lyricIndex(lines, 1), -1); assert.equal(L.lyricIndex(lines, 12.46), 1); assert.equal(L.lyricIndex(lines, 99), 2);
   assert.deepEqual(L.parseLrc(L.toLrc(lines)), lines);
+  // いろいろな書き方の LRC (Windows 改行・BOM・[mm:ss:xx]・3 桁ミリ秒・offset・1 語ごとのタイム)
+  const v = L.parseLrc("\uFEFF[offset:+500]\r\n[00:10:50]a\r\n[0:20.125]<00:20.20>b <00:21.00>c\r[100:00]d");
+  assert.deepEqual(v, [{ t: 10, s: "a" }, { t: 19.625, s: "b c" }, { t: 5999.5, s: "d" }]);
+  const enc = (s) => new TextEncoder().encode(s);
+  assert.equal(L.decodeLrcBytes(enc("[00:01]你好")), "[00:01]你好");
+  const u16 = Buffer.from("\ufeff[00:01]歌", "utf16le");
+  assert.equal(L.decodeLrcBytes(new Uint8Array(u16)).replace(/^\uFEFF/, ""), "[00:01]歌");
+  const gbk = new Uint8Array([0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x5d, 0xc4, 0xe3, 0xba, 0xc3]); // [00:01]你好 (GBK)
+  assert.equal(L.parseLrc(L.decodeLrcBytes(gbk))[0].s, "你好");
 });
 
 test("driver: flight summary picks the Japan arrival leg and computes delay", async () => {

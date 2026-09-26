@@ -144,12 +144,37 @@ export function batteryTargets(rooms: DRoom[], res: DRes[], lastCheck: Record<st
 export interface LrcLine { t: number; s: string }
 export function parseLrc(text: string | null | undefined): LrcLine[] {
   const out: LrcLine[] = [];
-  for (const line of String(text || "").split(/\r?\n/)) {
-    const tags = [...line.matchAll(/\[(\d{1,2}):(\d{1,2}(?:\.\d{1,3})?)\]/g)];
-    const w = line.replace(/\[[^\]]*\]/g, "").trim();
-    for (const m of tags) out.push({ t: +m[1] * 60 + +m[2], s: w });
+  let offset = 0; // [offset:+500] (ミリ秒。+ で歌詞を早める)
+  const off = /\[offset:\s*([+-]?\d+)\s*\]/i.exec(String(text || ""));
+  if (off) offset = Number(off[1]) / 1000;
+  for (const line of String(text || "").replace(/^\uFEFF/, "").split(/\r\n|\r|\n/)) {
+    // [mm:ss] [mm:ss.xx] [mm:ss.xxx] [mm:ss:xx] [m:ss,xx] (分は 3 桁まで)
+    const tags = [...line.matchAll(/\[\s*(\d{1,3}):(\d{1,2})(?:[.:,](\d{1,3}))?\s*\]/g)];
+    const w = line.replace(/\[[^\]]*\]/g, "").replace(/<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g, "").trim(); // 1 語ごとの <mm:ss.xx> は外す
+    for (const m of tags) {
+      const frac = m[3] ? Number(m[3]) / 10 ** m[3].length : 0;
+      out.push({ t: Math.max(0, +(+m[1] * 60 + +m[2] + frac - offset).toFixed(3)), s: w });
+    }
   }
   return out.filter((x) => x.s).sort((a, b) => a.t - b.t);
+}
+/** LRC ファイルの文字コードを判定して読む (UTF-8 / UTF-16 / 中国語 GBK / 日本語 Shift_JIS / 韓国語 EUC-KR) */
+export function decodeLrcBytes(buf: ArrayBuffer | Uint8Array): string {
+  const b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  const dec = (enc: string, fatal = false) => new TextDecoder(enc, { fatal }).decode(b);
+  if (b[0] === 0xff && b[1] === 0xfe) return dec("utf-16le");
+  if (b[0] === 0xfe && b[1] === 0xff) return dec("utf-16be");
+  // BOM なし UTF-16 (1 バイトおきに 0)
+  const zeros = (start: number) => { let z = 0, n = 0; for (let i = start; i < Math.min(b.length, 400); i += 2) { n++; if (b[i] === 0) z++; } return n ? z / n : 0; };
+  if (zeros(1) > 0.4) return dec("utf-16le");
+  if (zeros(0) > 0.4) return dec("utf-16be");
+  try { return dec("utf-8", true); } catch { /* UTF-8 ではない */ }
+  const score = (s: string) => (s.match(/\uFFFD/g) || []).length;
+  let best = "", bestScore = Infinity;
+  for (const enc of ["gb18030", "shift_jis", "euc-kr", "big5"]) {
+    try { const s = dec(enc); const sc = score(s); if (sc < bestScore) { best = s; bestScore = sc; } } catch { /* 未対応 */ }
+  }
+  return best || dec("utf-8");
 }
 export const lrcTag = (t: number) => `[${String(Math.floor(t / 60)).padStart(2, "0")}:${(t % 60).toFixed(2).padStart(5, "0")}]`;
 export const toLrc = (L: LrcLine[]) => L.slice().sort((a, b) => a.t - b.t).map((l) => `${lrcTag(l.t)}${l.s}`).join("\n");
