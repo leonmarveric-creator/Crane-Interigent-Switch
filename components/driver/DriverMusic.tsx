@@ -216,17 +216,32 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
 
   const add = async (files: FileList | null) => {
     if (!files?.length) return;
+    // 失敗したときは理由を出す (SQL 未実行・ファイルが大きすぎる など)
+    const why = (e: string | number) => {
+      const s = String(e);
+      if (/bucket|not.?found|does not exist|relation|driver_tracks|schema cache/i.test(s)) return t("先に Supabase の SQL（migration_driver.sql）を実行してください");
+      if (/413|too large|exceeded|maximum/i.test(s)) return t("ファイルが大きすぎます（50MB まで）");
+      if (/UNAUTHORIZED/.test(s)) return t("ログインし直してください");
+      return s.slice(0, 80);
+    };
+    let added = 0;
     for (const f of Array.from(files)) {
       setBusy(t("アップロード中…") + " " + f.name);
       const u = await driverTrackUploadUrl(f.name);
-      if (!u.ok) { toast(t("アップロードできませんでした")); continue; }
-      const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": f.type || "audio/mpeg", "x-upsert": "false" }, body: f }).catch(() => null);
-      if (!put?.ok) { toast(t("アップロードできませんでした")); continue; }
+      if (!u.ok) { toast(t("アップロードできませんでした") + "：" + why(u.error)); continue; }
+      const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": f.type || "audio/mpeg", "x-upsert": "false" }, body: f }).catch((e) => String(e));
+      if (typeof put === "string" || !put.ok) {
+        const detail = typeof put === "string" ? put : `${put.status} ${await put.text().catch(() => "")}`;
+        toast(t("アップロードできませんでした") + "：" + why(detail)); continue;
+      }
       const title = f.name.replace(/\.[^.]+$/, "");
       const r = await driverAddTrack({ purpose: p, lang: l, title, path: u.path });
-      if (r.ok) m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: l, title, artist: null, url: r.url, lrc: null, sort: L.length }]);
+      if (!r.ok) { toast(t("アップロードできませんでした") + "：" + why(r.error)); continue; }
+      m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: l, title, artist: null, url: r.url, lrc: null, sort: L.length + added }]);
+      added++;
     }
-    setBusy(""); sfx.chord(); toast(t("追加しました"));
+    setBusy("");
+    if (added) { sfx.chord(); toast(t("追加しました")); }
   };
   const move = async (i: number) => {
     if (i <= 0) return;
@@ -256,7 +271,7 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
           <button className="del" onClick={() => del(tr)}>✕</button>
         </div>
       )) : <p className="note">{t("曲がありません")}</p>}
-      <label className="mfile">＋ {t("曲を追加（スマホの音楽ファイル）")}<input type="file" accept="audio/*" multiple onChange={(e) => { void add(e.target.files); e.target.value = ""; }} /></label>
+      <label className="mfile">＋ {t("曲を追加（スマホの音楽ファイル）")}<input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple onChange={(e) => { void add(e.target.files); e.target.value = ""; }} /></label>
       {busy && <p className="note">{busy}</p>}
       <div className="offline">
         <div><b>📥 {t("この端末に保存（オフライン）")}</b><small>{t("保存済み {n} / {m} 曲", { n: m.tracks.filter((x) => m.saved.has(x.url)).length, m: m.tracks.length })}</small></div>
