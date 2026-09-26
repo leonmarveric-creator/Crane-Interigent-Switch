@@ -234,3 +234,14 @@ export async function setBootVoice(voice: string): Promise<{ ok: boolean; error?
   revalidatePath("/admin");
   return { ok: true };
 }
+
+/** お父さんの送迎画面のデザイン (hybrid / bike)。migration_driver.sql が必要 */
+export async function setDriverDesign(design: string): Promise<{ ok: boolean; error?: string }> {
+  requireAdmin();
+  const v = design === "bike" ? "bike" : "hybrid";
+  const { error } = await supabaseAdmin.from("app_settings").upsert({ id: 1, driver_design: v, updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: "SQL_NEEDED" };
+  revalidatePath("/admin");
+  revalidatePath("/driver");
+  return { ok: true };
+}

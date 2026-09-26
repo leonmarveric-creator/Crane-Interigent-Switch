@@ -11,6 +11,7 @@ import {
 import { logDevice } from "@/lib/deviceControl";
 import { getWafuPrewakeStep, PREWAKE_WINDOW_MS } from "@/lib/wakePrewake";
 import { runDreamFade } from "@/lib/dreamFadeRunner";
+import { runDriverAuto } from "@/lib/driverRunner";
 
 export const runtime = "nodejs";
 
@@ -207,5 +208,7 @@ export async function GET(req: NextRequest) {
   // Dream Fade (眠りにつく 30 分フェード) もこの Cron で進める
   const dreamFade = await runDreamFade(nowMs).catch((e) => { console.error("dream fade failed", e); return null; });
 
-  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, ranAt: nowIso });
+  // お父さんの送迎画面: 自動準備・飛行機の自動確認・鍵の電池
+  const driver = await runDriverAuto(nowMs).catch((e) => { console.error("driver auto failed", e); return null; });
+  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, driver, ranAt: nowIso });
 }

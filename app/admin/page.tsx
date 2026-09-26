@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
+import { getDriverSettings } from "@/lib/driverData";
 import { listDevices } from "@/lib/switchbot";
 import AdminClient, { type Room, type Reservation, type SwitchBotInfo, type LogEntry } from "./AdminClient";
 import type { AdminEntrance, EntranceLog, AdminSesameLock } from "./SmartKeyTab";
@@ -167,7 +168,7 @@ export default async function AdminPage() {
   }));
 
   return (
-    <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} bootVoice={await getBootVoice()}
+    <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} bootVoice={await getBootVoice()} driverDesign={(await getDriverSettings()).design}
       smartkey={{ entrances, settings: smartkeySettings, logs: entranceLogs, setupMissing: !!entranceErr, locks, locksMissing: !!lockErr }} />
   );
 }

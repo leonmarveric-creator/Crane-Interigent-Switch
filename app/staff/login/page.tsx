@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { Loader2, LogIn, ScanFace, Eye, EyeOff } from "lucide-react";
 import { hasPasskeyHere, loginWithPasskey, passkeySupported } from "@/lib/staffPasskeyClient";
 
+/** ログイン後の行き先 (お父さんの送迎画面 /driver からも同じログインを使う) */
+function nextUrl() {
+  try { const n = new URLSearchParams(location.search).get("next"); if (n === "/driver") return "/driver"; } catch { /* ignore */ }
+  return "/staff";
+}
+
 /** スタッフのログイン (中文メイン)。 */
 export default function StaffLogin() {
   const [pw, setPw] = useState("");
@@ -18,7 +24,7 @@ export default function StaffLogin() {
     setPkBusy(true); setPkErr(false);
     const r = await loginWithPasskey();
     setPkBusy(false);
-    if (r.ok) { location.href = "/staff"; return; }
+    if (r.ok) { location.href = nextUrl(); return; }
     if (r.error !== "CANCELLED") setPkErr(true);
     if (!hasPasskeyHere()) setPk(false);
   };
@@ -30,7 +36,7 @@ export default function StaffLogin() {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }),
     }).catch(() => null);
     setBusy(false);
-    if (res?.ok) { location.href = "/staff"; return; }
+    if (res?.ok) { location.href = nextUrl(); return; }
     const j = res ? await res.json().catch(() => ({})) : null;
     setErr(!res ? "network" : j?.error === "NOT_CONFIGURED" ? "notset" : "wrong");
   };

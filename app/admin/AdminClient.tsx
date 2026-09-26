@@ -18,6 +18,7 @@ import {
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
 import BootVoiceCard from "./BootVoiceCard";
+import DriverDesignCard from "./DriverDesignCard";
 import { RoomLockForm, type AdminSesameLock } from "./SesameLocks";
 
 export interface Room {
@@ -133,8 +134,8 @@ function SubmitButton({
 }
 
 export default function AdminClient({
-  rooms, reservations, switchbot, logs, smartkey, bootVoice = "astralis",
-}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[]; smartkey: SmartKeyProps; bootVoice?: "astralis" | "jarvis" }) {
+  rooms, reservations, switchbot, logs, smartkey, bootVoice = "astralis", driverDesign = "hybrid",
+}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[]; smartkey: SmartKeyProps; bootVoice?: "astralis" | "jarvis"; driverDesign?: "hybrid" | "bike" }) {
   const [lang, setLang] = useState<AdminLang>("ja");
   const [tab, setTab] = useState<Tab>("today");
   const [toolsView, setToolsView] = useState<ToolsView>("test");
@@ -209,6 +210,7 @@ export default function AdminClient({
             {toolsView === "test" && (
               <div className="space-y-10">
                 <BootVoiceCard initial={bootVoice} lang={lang} />
+                <DriverDesignCard initial={driverDesign} lang={lang} />
                 <DeviceTestSection rooms={rooms} t={t} />
                 <SmartKeyPreview entrances={smartkey.entrances} settings={smartkey.settings} rooms={rooms} lang={lang} />
               </div>
