@@ -6,7 +6,7 @@
  *   表示言語: 简体中文 (既定) / 日本語。
  *   ページ: ホーム / 送迎 (お迎え・お見送り) / 案内 (部屋を選んで QR と説明) / 設定。中央の START でお出迎え準備。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import type { DriverData, DriverPlace } from "@/lib/driverData";
 import { todayBoard, upcomingArrivals, nextArrival, pickupBase, jstTime, jstDay, roomColor, FLIGHT_MONTHLY_FREE, aboardVoice, type DRes, type DRoom, type FlightInfo } from "@/lib/driverLogic";
@@ -144,24 +144,33 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const preparedCount = board.arrivals.filter((r) => r.preparedAt).length;
   const pct = board.arrivals.length ? Math.round((preparedCount / board.arrivals.length) * 100) : 100;
   const openStart = () => { sfx.prime(); sfx.blip(); setPage("home"); setSel(next ? [next.id] : []); setRoomSheet(true); };
-  const prepare = async (ids: string[]) => {
-    if (!ids.length) return;
-    setRoomSheet(false); window.scrollTo({ top: 0, behavior: "smooth" });
+  // 送迎ページの準備: 部屋ごとの準備の種類と機器チェックの表示
+  const [prepMode, setPrepMode] = useState<Record<string, "welcome" | "wafu">>({});
+  const [devSt, setDevSt] = useState<Record<string, "wait" | "ok" | "ng">>({});
+  const prepare = async (ids: string[], mode: "welcome" | "wafu" = "welcome", stay = false) => {
+    if (!ids.length || preparing.length) return;
+    setRoomSheet(false); if (!stay) window.scrollTo({ top: 0, behavior: "smooth" });
+    setDevSt((d) => ({ ...d, ...Object.fromEntries(ids.map((id) => [id, "wait"])) }));
     const rs = ids.map((id) => data.res.find((r) => r.id === id)!).filter(Boolean);
     const names = rs.map((r) => rName(r)).join("・");
     setPreparing(ids); setEmMsg(t("{n}（{g}）を準備中…", { n: names, g: rs.map((r) => gName(r)).join("・") }));
     sfx.sweep(); vib(20);
     const rv = rs.length === 1 ? roomVoice(roomOf(rs[0].roomId)?.slug ?? "") : null;
     say(rs.length > 1 ? ["prep-many"] : [rv || "", "prep"], 250);
-    let c = Math.round((preparedCount / Math.max(1, board.arrivals.length)) * 8);
+    let c = stay ? 0 : Math.round((preparedCount / Math.max(1, board.arrivals.length)) * 8);
     const chg = setInterval(() => { c = Math.min(8, c + 1); setCharge(c); sfx.tick(); }, 420);
-    const r = await driverPrepare(ids);
+    const r = await driverPrepare(ids, mode);
     clearInterval(chg); setCharge(8); setPreparing([]);
+    setDevSt((d) => ({ ...d, ...Object.fromEntries(ids.map((id) => [id, r.ok && r.done.includes(id) ? "ok" : "ng"])) }));
+    if (r.ok) {
+      setPrepMode((m) => ({ ...m, ...Object.fromEntries(r.done.map((id) => [id, mode])) }));
+      setModes((x) => { const y = { ...x }; for (const id of r.done) { const rid = data.res.find((q) => q.id === id)?.roomId; if (rid) y[rid] = { ...y[rid], mode, ac: true, light: mode === "welcome" }; } return y; });
+    }
     if (!r.ok) { sfx.error(); setEmMsg(t("準備できませんでした。もう一度お試しください")); toast(t("準備できませんでした")); return; }
     const at = new Date().toISOString();
     setData((d) => ({ ...d, res: d.res.map((x) => (r.done.includes(x.id) ? { ...x, preparedAt: at } : x)) }));
-    setEmMsg(t("{n}（{g}）の準備が完了しました {t}", { n: names, g: rs.map((x) => gName(x)).join("・"), t: jstTime(Date.now()) }));
-    sfx.chord(); vib([15, 30, 50]); say(rs.length > 1 ? ["ready-many"] : [rv || "", "ready"], 250);
+    setEmMsg(t(mode === "wafu" ? "{n}（{g}）和風モードの準備が完了しました {t}" : "{n}（{g}）の準備が完了しました {t}", { n: names, g: rs.map((x) => gName(x)).join("・"), t: jstTime(Date.now()) }));
+    sfx.chord(); vib([15, 30, 50]); say(rs.length > 1 ? ["ready-many"] : [rv || "", "ready", mode === "wafu" ? "wafu" : ""], 250);
   };
 
   /* ---------------- 部屋の操作 (カード) ---------------- */
@@ -287,61 +296,107 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
     return t("あと {n}時間", { n: Math.round(m / 60) });
   };
   const nights = (r: DRes) => Math.max(1, Math.round((Date.parse(r.checkOut) - Date.parse(r.checkIn)) / 86400e3));
-  const flightBox = (r: DRes) => {
-    if (!r.flightNo) return (
-      <div className="flight dash">
-        {flightEdit === r.id ? (
-          <input autoFocus placeholder={t("例: CI152")} onBlur={(e) => void saveFlight(r, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
-        ) : (
-          <div className="hd">✈ <span>{t("便名：未入力")}</span><button className="linkbtn" onClick={() => setFlightEdit(r.id)}>{t("入力する")}</button></div>
-        )}
-        <div className="fnote">{t("便名がないので、飛行機の確認は使いません（回数 0）")}</div>
+  const mapUrl = (r: DRes) => { const q = data.places.find((p) => p.name === r.pickupPlace)?.mapQuery || r.pickupPlace || rName(r); return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`; };
+  /** 送迎ページのお迎えカード (1 画面に入るようにコンパクト)。open でないものはたたむ */
+  const ArrivalCard = ({ r, open, onOpen }: { r: DRes; open: boolean; onOpen: () => void }) => {
+    const room = roomOf(r.roomId); const today = jstDay(r.checkIn) === jstDay(nowMs);
+    const busy = preparing.includes(r.id), m = prepMode[r.id], st = devSt[r.id];
+    const f: FlightInfo | null = r.flightInfo; const late = (f?.delayMin ?? 0) >= 15;
+    const head = (
+      <div className="r1"><span className="time">{jstTime(pickupBase(r))}</span><span className="kind">{t("お迎え")}</span><span className="who">{gName(r)}</span>
+        <span className="eta">{today ? eta(pickupBase(r)) : jstDay(r.checkIn).slice(5).replace("-", "/")}</span></div>
+    );
+    if (!open) return (
+      <div className="card pc sub" style={{ ["--rc" as any]: roomColor(room?.slug ?? "") }}>
+        {head}
+        <div className="collapsed">{t("お部屋")} <b>{rName(r)}</b>{r.pickupPlace ? ` ・ ${r.pickupPlace}` : ""}{r.preparedAt ? <span className="okc2"> ・ ✓</span> : null}
+          <button onClick={() => { sfx.tick(); onOpen(); }}>{t("開く")}</button></div>
       </div>
     );
-    const f: FlightInfo | null = r.flightInfo;
-    const late = (f?.delayMin ?? 0) >= 15;
+    const chip = (k: string, label: string, val: string) => <span key={k} className={st === "wait" ? "wait" : st === "ok" || (r.preparedAt && !st) ? "ok" : st === "ng" ? "ng" : ""}><i>{st === "ng" ? "!" : st === "ok" || (r.preparedAt && !st) ? "✓" : ""}</i>{label}<em>{st === "wait" ? "…" : st === "ok" || (r.preparedAt && !st) ? val : "—"}</em></span>;
+    const cool = (() => { const mo = Number(new Date(nowMs + 9 * 3600e3).getUTCMonth()) + 1; return mo >= 5 && mo <= 10; })();
     return (
-      <div className="flight">
-        <div className="hd">✈ <b>{r.flightNo}</b><span>{f ? `${f.from ?? ""} → ${f.to ?? ""}` : ""}</span><button className="linkbtn" onClick={() => setFlightEdit(r.id)}>{t("変更")}</button></div>
-        {flightEdit === r.id && <input autoFocus defaultValue={r.flightNo} onBlur={(e) => void saveFlight(r, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />}
-        <button className="fbtn" disabled={flightBusy === r.id} onClick={() => void checkFlight(r)}>{flightBusy === r.id ? t("確認中…") : f ? t("もう一度確認") : t("最新の状況を確認")}</button>
-        {f && (
-          <div className="fres">
-            <div className="fgrid">
-              <div><small>{t("状況")}</small><b className={f.status === "Landed" || f.status === "Arrived" ? "okc2" : late ? "delay" : "onTime"}>{f.status === "Landed" || f.status === "Arrived" ? t("着陸") : late ? t("遅れ") : f.status === "Canceled" ? t("欠航") : t("定刻")}</b></div>
-              <div><small>{t("到着ターミナル")}</small><b>{f.terminal ? `T${f.terminal}` : t("未発表")}</b></div>
-              <div><small>{t("予定 → 見込み")}</small><b>{f.scheduled ? jstTime(f.scheduled) : "—"} → <span className={late ? "delay" : "onTime"}>{f.actual ? jstTime(f.actual) : f.expected ? jstTime(f.expected) : "—"}</span></b></div>
-              <div><small>{t("到着ゲート")}</small><b>{f.gate || t("未発表")}</b></div>
+      <div className="card pc sel" style={{ ["--rc" as any]: roomColor(room?.slug ?? "") }}>
+        {head}
+        <div className="r2">{t("お部屋")} <b>{rName(r)}</b> ・ {t("{n}泊", { n: nights(r) })} ・ {r.lang.toUpperCase()}</div>
+        <button className="line" onClick={() => openPickSheet(r)}>
+          <span className="ic">📍</span>
+          <span className={`v ${r.pickupPlace || r.pickupNone ? "" : "unset"}`}>{r.pickupNone ? t("送迎なし") : r.pickupPlace ? r.pickupPlace : t("未設定（タップで設定）")}{r.pickupAt && !r.pickupNone ? <small>{jstTime(r.pickupAt)}</small> : null}</span>
+          <span className="go">›</span>
+        </button>
+        {!r.pickupNone && (r.flightNo ? (
+          <>
+            <div className="line fl2">
+              <span className="ic">✈</span>
+              {flightEdit === r.id ? <input autoFocus defaultValue={r.flightNo} onBlur={(e) => void saveFlight(r, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                : <button className="v mono" onClick={() => setFlightEdit(r.id)}>{r.flightNo}</button>}
+              <span className="rt">{f ? `${f.from ?? ""} → ${f.to ?? ""}` : ""}</span>
+              <button className="fchk" disabled={flightBusy === r.id} onClick={() => void checkFlight(r)}>{flightBusy === r.id ? "…" : t("確認")}</button>
             </div>
-            <div className="fmeta"><span>{r.flightCheckedAt ? t("{t} に確認", { t: jstTime(r.flightCheckedAt) }) : ""}</span><span>{late ? t("{n}分遅れ", { n: f.delayMin ?? 0 }) : ""}</span></div>
+            {f && (
+              <div className="fres4">
+                <div><small>{t("状況")}</small><b className={f.status === "Landed" || f.status === "Arrived" ? "okc2" : late ? "delay" : "onTime"}>{f.status === "Landed" || f.status === "Arrived" ? t("着陸") : late ? t("遅れ") : f.status === "Canceled" ? t("欠航") : t("定刻")}</b></div>
+                <div><small>{t("ターミナル")}</small><b>{f.terminal ? `T${f.terminal}` : "—"}</b></div>
+                <div><small>{t("到着見込み")}</small><b className={late ? "delay" : "onTime"}>{f.actual ? jstTime(f.actual) : f.expected ? jstTime(f.expected) : f.scheduled ? jstTime(f.scheduled) : "—"}</b></div>
+                <div><small>{t("ゲート")}</small><b>{f.gate || "—"}</b></div>
+              </div>
+            )}
+            {f && r.flightCheckedAt ? <div className="fmeta"><span>{t("{t} に確認", { t: jstTime(r.flightCheckedAt) })}</span><span>{late ? t("{n}分遅れ", { n: f.delayMin ?? 0 }) : ""}</span></div> : null}
+          </>
+        ) : (
+          <div className="line fl2 dash">
+            <span className="ic">✈</span>
+            {flightEdit === r.id ? <input autoFocus placeholder={t("例: CI152")} onBlur={(e) => void saveFlight(r, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+              : <><span className="rt">{t("便名：未入力")}</span><button className="fchk" onClick={() => setFlightEdit(r.id)}>{t("入力する")}</button></>}
           </div>
+        ))}
+        <div className={`acts3 ${room?.hasWafu ? "" : "two"}`}>
+          <button className={`main ${busy && m !== "wafu" ? "run" : r.preparedAt && m !== "wafu" ? "done" : ""}`} disabled={busy} onClick={() => void prepare([r.id], "welcome", true)}>
+            {busy ? t("準備中…") : r.preparedAt && m !== "wafu" ? "✓ " + t("準備完了") + " ─ " + t("いつでも入室OK") : r.preparedAt && m === "wafu" ? "⚡ " + t("快適に変える") : "⚡ " + t("お出迎え準備")}
+          </button>
+          {room?.hasWafu && (
+            <button className={`wafu ${m === "wafu" && (r.preparedAt || busy) ? "on" : ""}`} disabled={busy} onClick={() => void prepare([r.id], "wafu", true)}>
+              <b>🏮</b>{m === "wafu" && r.preparedAt && !busy ? t("和風") + " ✓" : t("和風準備")}
+            </button>
+          )}
+          <button className="gd" onClick={() => openGuide(r)}><b>▦</b>{t("案内")}</button>
+        </div>
+        <div className="dev">
+          {room?.hasAc !== false && chip("ac", t("エアコン"), cool ? t("冷房") : t("暖房"))}
+          {m === "wafu" ? chip("lt", t("和風ライト"), t("暖色")) : chip("lt", t("照明"), "ON")}
+          {room?.hasLock && <span className="lock"><i>🔒</i>{t("鍵")}<em>{t("施錠のまま")}</em></span>}
+        </div>
+        {data.settings.autoPrep && !r.preparedAt && today && (
+          <div className="autoline">⏱ {t("到着 {m}分前に自動で準備する（{t}）", { m: data.settings.autoPrepMin, t: jstTime(Date.parse(pickupBase(r)) - data.settings.autoPrepMin * 60e3) })}</div>
         )}
-        {!f && <a className="linkbtn" href={`https://www.flightradar24.com/data/flights/${r.flightNo.toLowerCase()}`} target="_blank" rel="noreferrer">{t("地図で見る")} ›</a>}
       </div>
     );
   };
-  const mapUrl = (r: DRes) => { const q = data.places.find((p) => p.name === r.pickupPlace)?.mapQuery || r.pickupPlace || rName(r); return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`; };
-  const ArrivalCard = ({ r, big }: { r: DRes; big?: boolean }) => (
-    <div className={`card ${big ? "next" : ""}`} style={{ ["--rc" as any]: roomColor(roomOf(r.roomId)?.slug ?? "") }}>
-      <div className="row1"><span className="time">{jstTime(pickupBase(r))}</span><span className="kind">{t("お迎え")}</span><span className="eta">{jstDay(r.checkIn) === jstDay(nowMs) ? eta(pickupBase(r)) : jstDay(r.checkIn).slice(5).replace("-", "/")}</span></div>
-      <div className="who">{gName(r)}<small>{r.lang.toUpperCase()}</small></div>
-      <div className="meta">{t("お部屋")} <b>{rName(r)}</b>・{t("{n}泊", { n: nights(r) })}{r.preparedAt ? <span className="okc2"> ・ ✓ {t("準備完了")}</span> : null}</div>
-      <button className="field" onClick={() => openPickSheet(r)}>
-        <span className="ic">📍</span>
-        <span><span className="lb">{t("お迎え場所・時刻")}</span><span className={`vl ${r.pickupPlace || r.pickupNone ? "" : "unset"}`}>{r.pickupNone ? t("送迎なし") : r.pickupPlace ? `${r.pickupPlace}${r.pickupAt ? "　" + jstTime(r.pickupAt) : ""}` : t("未設定（タップで設定）")}</span></span>
-        <span className="go">›</span>
-      </button>
-      {!r.pickupNone && flightBox(r)}
-      <div className="btns">
-        <button className={`btn main ${r.preparedAt ? "done" : ""}`} disabled={preparing.includes(r.id)} onClick={() => void prepare([r.id])}>{preparing.includes(r.id) ? t("準備中…") : r.preparedAt ? "✓ " + t("準備完了") + " ─ " + t("もう一度") : "⚡ " + t("お出迎え準備")}</button>
-        {!r.pickupNone && <a className="btn" href={mapUrl(r)} target="_blank" rel="noreferrer">📍 {t("地図")}</a>}
-        <button className="btn cyan" onClick={() => openGuide(r)}>▦ {t("案内モード")}</button>
-      </div>
-      {data.settings.autoPrep && !r.preparedAt && jstDay(r.checkIn) === jstDay(nowMs) && (
-        <div className="autoline">⏱ {t("到着 {m}分前に自動で準備する（{t}）", { m: data.settings.autoPrepMin, t: jstTime(Date.parse(pickupBase(r)) - data.settings.autoPrepMin * 60e3) })}</div>
-      )}
-    </div>
-  );
+  /** 送迎ページ上のエネルギーモニター (開いているお迎えの部屋の準備) */
+  const PickMonitor = ({ r }: { r: DRes | null }) => {
+    const busy = !!r && preparing.includes(r.id), done = !!r?.preparedAt && !busy;
+    const n = busy ? charge : done ? 8 : 0;
+    const P = (x: number, y: number, w: number, h: number) => ({ left: `${(x / 1086) * 100}%`, top: `${((y - 960) / 255) * 100}%`, width: `${(w / 1086) * 100}%`, height: `${(h / 255) * 100}%` }) as React.CSSProperties;
+    const failed = !!r && devSt[r.id] === "ng" && !busy && !done;
+    const msg = busy || failed ? emMsg : done ? t(prepMode[r!.id] === "wafu" ? "{n}（{g}）和風モードの準備が完了しました {t}" : "{n}（{g}）の準備が完了しました {t}", { n: rName(r), g: gName(r), t: jstTime(r!.preparedAt!) }) : r ? t("「お出迎え準備」で お部屋の準備をはじめます") : t("本日のお迎えはありません");
+    return (
+      <div className="emwrap"><div className={`pem em ${busy ? "on" : ""} ${done ? "done" : ""}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="bg" src="/driver/em.jpg" alt="" />
+        <div className="eng" style={P(140, 1040, 125, 105)} /><div className="spin" style={P(345, 1062, 98, 66)} />
+        <div className="fl" style={P(262, 1090, 80, 14)} /><div className="fl" style={P(446, 1090, 92, 14)} /><div className="fl" style={P(680, 1090, 88, 14)} />
+        <div className="cells" style={P(553, 1079, 108, 37)}>{Array.from({ length: 8 }, (_, i) => <i key={i} className={i < n ? "on" : busy && i === n ? "charging" : ""} />)}</div>
+        <div className="ov c pct" style={P(540, 1040, 130, 30)}>{r ? `${Math.round((n / 8) * 100)}%` : "—"}</div>
+        <div className="house" style={P(780, 1030, 190, 120)} />
+        <div className="ov c lbl2" style={P(130, 1126, 160, 28)}>{t("エンジン")}</div>
+        <div className="ov c lbl2" style={P(318, 1126, 160, 28)}>{t("モーター")}</div>
+        <div className="ov c lbl2" style={P(530, 1126, 160, 28)}>{t("バッテリー")}</div>
+        <div className="ov c room" style={P(790, 1138, 170, 28)}>{r ? rName(r) : t("お部屋")}</div>
+        <div className="ov c st" style={P(110, 1165, 866, 40)}>{done ? <span className="okc">✓</span> : null}{msg}</div>
+      </div></div>
+    );
+  };
+  const [pickOpen, setPickOpen] = useState<string>("");
 
   /* ================================================================ */
   const bike = design === "bike";
@@ -516,14 +571,25 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
         <div className="page">
           <div className="wrap top">
             <div className="ptop"><b>{t("送迎")}</b><span>{dateText}</span></div>
-            <div className="segsw sticky">
+            <div className="segsw">
               <button className={pickTab === "in" ? "on" : ""} onClick={() => { sfx.tick(); setPickTab("in"); }}>🛬 {t("お迎え")} <em>{board.arrivals.length}</em></button>
               <button className={pickTab === "out" ? "on" : ""} onClick={() => { sfx.tick(); setPickTab("out"); }}>🛫 {t("お見送り")} <em>{board.departures.length}</em></button>
             </div>
             {pickTab === "in" ? (
               <div className="pane">
-                {board.arrivals.length ? board.arrivals.map((r, i) => <ArrivalCard key={r.id} r={r} big={i === 0} />) : <p className="note">{t("本日のお迎えはありません")}</p>}
-                {upcoming.length > 0 && <><div className="sec">{t("これからの予定")}</div>{upcoming.map((r) => <ArrivalCard key={r.id} r={r} />)}</>}
+                {(() => {
+                  const all = [...board.arrivals, ...upcoming];
+                  const openId = all.find((x) => x.id === pickOpen)?.id ?? next?.id ?? all[0]?.id ?? "";
+                  const cur = all.find((x) => x.id === openId) ?? null;
+                  const card = (x: DRes) => <Fragment key={x.id}>{ArrivalCard({ r: x, open: x.id === openId, onOpen: () => setPickOpen(x.id) })}</Fragment>;
+                  return (
+                    <>
+                      {PickMonitor({ r: cur })}
+                      {board.arrivals.length ? board.arrivals.map(card) : <p className="note">{t("本日のお迎えはありません")}</p>}
+                      {upcoming.length > 0 && <><div className="sec">{t("これからの予定")}</div>{upcoming.map(card)}</>}
+                    </>
+                  );
+                })()}
               </div>
             ) : (
               <div className="pane">
@@ -682,7 +748,10 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
         <div className="favs">{places.map((p) => <button key={p.id} className={pickPlace === p.name ? "on" : ""} onClick={() => { sfx.tick(); setPickPlace(p.name); }}>{p.name}</button>)}</div>
         <label>{t("お迎え時刻（入れなくてもOK）")}</label>
         <input type="time" value={pickTime} onChange={(e) => setPickTime(e.target.value)} />
-        <button className="linkbtn" onClick={() => { setPickSheet(null); setPage("set"); }}>{t("よく使う場所を編集")} ›</button>
+        <div className="sheetlinks">
+          {pickSheet && !pickSheet.pickupNone && <a className="linkbtn" href={mapUrl(pickSheet)} target="_blank" rel="noreferrer">📍 {t("地図で開く")} ›</a>}
+          <button className="linkbtn" onClick={() => { setPickSheet(null); setPage("set"); }}>{t("よく使う場所を編集")} ›</button>
+        </div>
         <div className="acts"><button onClick={() => void savePickup(true)}>{t("送迎なし")}</button><button className="ok" onClick={() => void savePickup(false)}>{t("保存")}</button></div>
       </div>
 

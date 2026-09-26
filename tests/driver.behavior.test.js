@@ -54,6 +54,20 @@ test("driver: music ducks under the voice through a Web Audio gain (works on iPh
   assert.match(read("components", "driver", "DriverApp.tsx"), /onVoiceChange\(\(s\) => music\.duck\(s\)\)/);
 });
 
+test("driver: pickup page on one screen — sticky energy monitor, prepare (comfort) / wafu prepare instead of map, lock untouched", () => {
+  const app = read("components", "driver", "DriverApp.tsx");
+  assert.match(app, /PickMonitor\(\{ r: cur \}\)/);
+  assert.match(app, /prepare\(\[r\.id\], "wafu", true\)/);
+  assert.match(app, /room\?\.hasWafu && \(/, "wafu button only when the room has the wafu light");
+  assert.doesNotMatch(app.slice(app.indexOf("const ArrivalCard"), app.indexOf("const PickMonitor")), /mapUrl\(/, "no map button on the card");
+  assert.match(app, /href=\{mapUrl\(pickSheet\)\}/, "map link kept in the pickup sheet");
+  const acts = read("app", "driver", "actions.ts");
+  assert.match(acts, /mode === "wafu" && room\.switchbot_wafu_device_id \? "welcome_cozy" : "welcome"/);
+  const prep = acts.slice(acts.indexOf("export async function driverPrepare"), acts.indexOf("export async function driverCheckout"));
+  assert.doesNotMatch(prep, /unlock/, "prepare never unlocks");
+  assert.ok(fs.existsSync(path.join(root, "public", "driver", "em.jpg")));
+});
+
 test("driver: lock battery only 3 days before check-in / every 60 days when idle, replace if it won't last", async () => {
   const L = await load("driverLogic.ts");
   const rooms = [{ id: "a", hasLock: true }, { id: "b", hasLock: true }, { id: "c", hasLock: false }, { id: "d", hasLock: true }];

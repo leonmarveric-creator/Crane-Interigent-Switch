@@ -34,16 +34,17 @@ export async function driverRoomAction(roomId: string, action: DeviceAction): Pr
   } catch (e) { return fail(e); }
 }
 
-/** お出迎え準備: 快適モード (エアコン + 照明)。和風ライトがあれば和みモード。準備済みを記録 */
-export async function driverPrepare(resIds: string[]): Promise<R<{ done: string[] }>> {
+/** お出迎え準備: welcome = 快適モード (エアコン + 照明) / wafu = 和みモード (エアコン + 和風ライト暖色)。鍵は触らない。準備済みを記録 */
+export async function driverPrepare(resIds: string[], mode: "welcome" | "wafu" = "welcome"): Promise<R<{ done: string[] }>> {
   const g = guard(); if (g) return g;
   const done: string[] = [];
   for (const id of resIds) {
     const { data: res } = await supabaseAdmin.from("reservations").select("id, room_id, assigned_room_id").eq("id", id).maybeSingle();
     if (!res) continue;
     const room = await roomById(res.assigned_room_id || res.room_id); if (!room) continue;
-    const r = await executeDeviceAction(room, "welcome", "Driver Prep").catch(() => ({ ok: false }));
-    await logDevice({ room_id: room.id, reservation_id: id, action: "welcome", source: "admin", success: r.ok });
+    const action = mode === "wafu" && room.switchbot_wafu_device_id ? "welcome_cozy" : "welcome";
+    const r = await executeDeviceAction(room, action, "Driver Prep").catch(() => ({ ok: false }));
+    await logDevice({ room_id: room.id, reservation_id: id, action, source: "admin", success: r.ok });
     if (r.ok) {
       done.push(id);
       await supabaseAdmin.from("reservations").update({ prepared_at: new Date().toISOString() }).eq("id", id).then(() => {}, () => {});
