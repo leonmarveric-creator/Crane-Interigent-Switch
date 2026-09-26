@@ -32,6 +32,28 @@ test("driver: today's board, next arrival and auto-prepare timing (JST)", async 
   assert.equal(L.langOf("zh-TW"), "zh"); assert.equal(L.langOf("ko-KR"), "ko"); assert.equal(L.langOf("fr"), "en"); assert.equal(L.langOf(null), "en");
 });
 
+test("driver: welcome-aboard voice — B from the airport, otherwise A/C in turn; no Kyoto; weather in Izumisano", async () => {
+  const L = await load("driverLogic.ts");
+  assert.equal(L.aboardVoice(R({ pickupPlace: "関西空港 第1ターミナル" }), 0), "aboard-b");
+  assert.equal(L.aboardVoice(R({ flightNo: "CI152" }), 1), "aboard-b");
+  assert.equal(L.aboardVoice(R({ pickupPlace: "京都駅 八条口" }), 0), "aboard-a");
+  assert.equal(L.aboardVoice(null, 1), "aboard-c");
+  for (const k of ["aboard-a", "aboard-b", "aboard-c"]) assert.ok(fs.existsSync(path.join(root, "public", "audio", "driver", `${k}.mp3`)));
+  assert.ok(!fs.existsSync(path.join(root, "public", "audio", "driver", "aboard.mp3")), "old Kyoto line removed");
+  const app = read("components", "driver", "DriverApp.tsx");
+  assert.doesNotMatch(app, /KYOTO|京都 </);
+  assert.match(app, /lat: 34\.40\d*, lng: 135\.32/);
+});
+
+test("driver: music ducks under the voice through a Web Audio gain (works on iPhone), plain element while the screen is off", () => {
+  const m = read("components", "driver", "DriverMusic.tsx");
+  assert.match(m, /createMediaElementSource\(main\(\)\)/);
+  assert.match(m, /gain\.gain\.value = level\.current/);
+  assert.match(m, /visibilitychange/);
+  assert.match(m, /vol\.current \* 0\.2/);
+  assert.match(read("components", "driver", "DriverApp.tsx"), /onVoiceChange\(\(s\) => music\.duck\(s\)\)/);
+});
+
 test("driver: lock battery only 3 days before check-in / every 60 days when idle, replace if it won't last", async () => {
   const L = await load("driverLogic.ts");
   const rooms = [{ id: "a", hasLock: true }, { id: "b", hasLock: true }, { id: "c", hasLock: false }, { id: "d", hasLock: true }];

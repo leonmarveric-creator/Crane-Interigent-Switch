@@ -34,10 +34,14 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const [dur, setDur] = useState(0);
   const [lyrOnCar, setLyrOnCar] = useState(false);
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const audio = useRef<HTMLAudioElement | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);   // 画面がついているとき (Web Audio で音量を下げられる)
+  const plain = useRef<HTMLAudioElement | null>(null);   // 画面が消えているとき (iPhone は Web Audio が止まるため)
+  const onPlain = useRef(false);
+  const graph = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
   const blobUrl = useRef<string | null>(null);
   const fade = useRef<number>(0);
   const vol = useRef(0.8);
+  const level = useRef(0.8); // 今の音量 (0〜1)
 
   useEffect(() => { setTracks(initial); }, [initial]);
   useEffect(() => { try { setLyrOnCar(localStorage.getItem("drvLyrCar") === "1"); } catch { /* ignore */ } }, []);
@@ -52,20 +56,79 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const lrc = useMemo<LrcLine[]>(() => parseLrc(track?.lrc), [track?.lrc]);
   const li = lyricIndex(lrc, pos);
 
-  const el = () => {
-    if (!audio.current) {
-      const a = new Audio(); a.preload = "auto";
-      a.addEventListener("timeupdate", () => setPos(a.currentTime));
-      a.addEventListener("loadedmetadata", () => setDur(a.duration || 0));
-      a.addEventListener("play", () => setPlaying(true));
-      a.addEventListener("pause", () => setPlaying(false));
-      audio.current = a;
-    }
-    return audio.current;
+  const listeners = useRef<{ ended?: () => void }>({});
+  const make = (routed: boolean) => {
+    const a = new Audio(); a.preload = "auto";
+    if (routed) a.crossOrigin = "anonymous"; // Web Audio に通すため (Supabase は CORS OK)
+    const mine = () => el() === a;
+    a.addEventListener("timeupdate", () => { if (mine()) setPos(a.currentTime); });
+    a.addEventListener("loadedmetadata", () => { if (mine()) setDur(a.duration || 0); });
+    a.addEventListener("play", () => { if (mine()) setPlaying(true); });
+    a.addEventListener("pause", () => { if (mine()) setPlaying(false); });
+    a.addEventListener("ended", () => { if (mine()) listeners.current.ended?.(); });
+    return a;
   };
+  const main = () => (audio.current ??= make(true));
+  const plainEl = () => (plain.current ??= make(false));
+  /** 今鳴らしている audio 要素 */
+  const el = (): HTMLAudioElement => (onPlain.current ? plainEl() : main());
+  /** 音量を変える: Web Audio に通していればゲイン (iPhone でも効く)、そうでなければ volume */
+  const setLevel = (v: number) => {
+    level.current = Math.max(0, Math.min(1, v));
+    if (!onPlain.current && graph.current) { graph.current.gain.gain.value = level.current; main().volume = 1; }
+    else el().volume = level.current;
+  };
+  /** タップの中で呼ぶ: Web Audio をつなぎ (1 回だけ)、2 つの audio 要素を後から鳴らせるようにしておく (iPhone 用) */
+  const prime = () => {
+    try {
+      if (!graph.current) {
+        const C = window.AudioContext || (window as any).webkitAudioContext;
+        if (C) {
+          const ctx: AudioContext = new C(); const gain = ctx.createGain();
+          ctx.createMediaElementSource(main()).connect(gain); gain.connect(ctx.destination);
+          graph.current = { ctx, gain }; gain.gain.value = level.current;
+        }
+      }
+      if (graph.current && graph.current.ctx.state !== "running") void graph.current.ctx.resume();
+    } catch { graph.current = null; }
+    for (const x of [main(), plainEl()]) {
+      if (x.dataset.primed || x.src) continue;
+      x.dataset.primed = "1"; x.muted = true; x.src = "/audio/driver/prep.mp3";
+      x.play().then(() => { x.pause(); x.muted = false; }).catch(() => { x.muted = false; });
+    }
+  };
+  /** 再生の前: Web Audio が止まっていたら動かす */
+  const route = () => { if (graph.current && graph.current.ctx.state !== "running") void graph.current.ctx.resume(); };
+  // 画面が消えたら普通の再生へ、ついたら Web Audio の再生へ (続きの位置から)
+  useEffect(() => {
+    const swap = () => {
+      const m = main(), p = plainEl();
+      if (!graph.current) return;
+      if (document.visibilityState === "hidden" && !onPlain.current && !m.paused) {
+        const at = m.currentTime;
+        if (p.src !== m.src) p.src = m.src;
+        p.volume = level.current;
+        const go = () => { try { p.currentTime = at; } catch { /* ignore */ } p.play().then(() => { onPlain.current = true; m.pause(); }).catch(() => { /* そのまま */ }); };
+        if (p.readyState >= 1) go(); else p.addEventListener("loadedmetadata", go, { once: true });
+      } else if (document.visibilityState === "visible" && onPlain.current) {
+        const at = p.currentTime, wasPlaying = !p.paused;
+        const back = () => {
+          try { m.currentTime = at; } catch { /* ignore */ }
+          onPlain.current = false; graph.current!.gain.gain.value = level.current;
+          if (!wasPlaying) { p.pause(); setPlaying(false); return; }
+          void graph.current!.ctx.resume();
+          m.play().then(() => { p.pause(); setPlaying(true); }).catch(() => { onPlain.current = true; });
+        };
+        if (m.src !== p.src) { m.src = p.src; m.addEventListener("loadedmetadata", back, { once: true }); } else back();
+      }
+    };
+    document.addEventListener("visibilitychange", swap);
+    return () => document.removeEventListener("visibilitychange", swap);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const fadeTo = (v: number, ms: number, done?: () => void) => {
-    const a = el(); const st = a.volume, t0 = performance.now(); const id = ++fade.current;
-    const f = (n: number) => { if (id !== fade.current) return; const p = Math.min(1, (n - t0) / ms); a.volume = Math.max(0, Math.min(1, st + (v - st) * p)); if (p < 1) requestAnimationFrame(f); else done?.(); };
+    const st = level.current, t0 = performance.now(); const id = ++fade.current;
+    const f = (n: number) => { if (id !== fade.current) return; const p = Math.min(1, (n - t0) / ms); setLevel(st + (v - st) * p); if (p < 1) requestAnimationFrame(f); else done?.(); };
     requestAnimationFrame(f);
   };
   const load = useCallback(async (tr: DriverTrack | null, play: boolean) => {
@@ -75,18 +138,12 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     const src = await cachedUrl(tr.url);
     if (src.startsWith("blob:")) blobUrl.current = src;
     a.src = src; setPos(0);
-    if (play) { a.volume = 0.05; a.play().then(() => fadeTo(vol.current, 2000)).catch(() => {}); }
+    if (play) { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 2000)).catch(() => {}); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 曲が終わったら次へ
-  useEffect(() => {
-    const a = el();
-    const onEnd = () => setCur((c) => ({ ...c, i: list.length ? (c.i + 1) % list.length : 0 }));
-    a.addEventListener("ended", onEnd);
-    return () => a.removeEventListener("ended", onEnd);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.length]);
+  listeners.current.ended = () => setCur((c) => ({ ...c, i: list.length ? (c.i + 1) % list.length : 0 }));
   const lastId = useRef<string | null>(null);
   useEffect(() => {
     if (track?.id === lastId.current) return;
@@ -109,16 +166,19 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   }, [track, li, lyrOnCar, lrc]);
   const api = {
     tracks, setTracks, cur, list, track, playing, pos, dur, lrc, li, lyrOnCar, saved,
-    play() { sfx.prime(); const a = el(); if (!track) { toast(t("この言語の曲はまだありません。設定から追加できます。")); return; } if (!a.src) void load(track, true); else { a.volume = 0.05; a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } },
+    play() { sfx.prime(); prime(); const a = el(); if (!track) { toast(t("この言語の曲はまだありません。設定から追加できます。")); return; } if (!a.src) void load(track, true); else { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } },
     pause() { el().pause(); },
     toggle() { playing ? api.pause() : api.play(); },
     next() { setCur((c) => ({ ...c, i: list.length ? (c.i + 1) % list.length : 0 })); },
     prev() { const a = el(); if (a.currentTime > 3) a.currentTime = 0; else setCur((c) => ({ ...c, i: list.length ? (c.i - 1 + list.length) % list.length : 0 })); },
-    pick(i: number) { setCur((c) => ({ ...c, i })); if (!playing) setTimeout(() => api.play(), 50); },
-    setPlaylist(p: "in" | "out", l: MLang, play = false) { lastId.current = null; setCur({ p, l, i: 0 }); if (play) setTimeout(() => el().play().catch(() => {}), 120); },
+    pick(i: number) { prime(); setCur((c) => ({ ...c, i })); if (!playing) setTimeout(() => api.play(), 50); },
+    setPlaylist(p: "in" | "out", l: MLang, play = false) { if (play) prime(); lastId.current = null; setCur({ p, l, i: 0 }); if (play) setTimeout(() => { route(); el().play().catch(() => {}); }, 120); },
     startWith(p: "in" | "out", l: MLang) { lastId.current = null; const L = tracks.filter((x) => x.purpose === p && x.lang === l); setCur({ p, l, i: 0 }); if (L.length) { const tr = L.sort((a, b) => a.sort - b.sort)[0]; lastId.current = tr.id; void load(tr, true); } },
+    /** アンドロイドの声の間は音楽を 20% に (声が終わったらゆっくり戻す) */
+    /** タップの中で呼ぶ (あとで自動で流すときのため) */
+    prime,
     duck(on: boolean) { if (!playing) return; fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900); },
-    fadeOut() { if (!playing) return; fadeTo(0, 3500, () => { el().pause(); el().volume = vol.current; }); },
+    fadeOut() { if (!playing) return; fadeTo(0, 3500, () => { el().pause(); setLevel(vol.current); }); },
     seek(s: number) { el().currentTime = Math.max(0, s); },
     setLyrOnCar(v: boolean) { setLyrOnCar(v); try { localStorage.setItem("drvLyrCar", v ? "1" : "0"); } catch { /* ignore */ } },
     /** 全部の曲をこの端末に保存 */

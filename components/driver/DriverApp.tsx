@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import type { DriverData, DriverPlace } from "@/lib/driverData";
-import { todayBoard, upcomingArrivals, nextArrival, pickupBase, jstTime, jstDay, roomColor, FLIGHT_MONTHLY_FREE, type DRes, type DRoom, type FlightInfo } from "@/lib/driverLogic";
+import { todayBoard, upcomingArrivals, nextArrival, pickupBase, jstTime, jstDay, roomColor, FLIGHT_MONTHLY_FREE, aboardVoice, type DRes, type DRoom, type FlightInfo } from "@/lib/driverLogic";
 import { sfx, say, roomVoice, vib, setDriverMute, onVoiceChange } from "@/lib/driverSfx";
 import { makeT, type UiLang } from "@/lib/driverI18n";
 import { guideSteps, type GuideLang } from "@/lib/driverGuide";
@@ -26,7 +26,8 @@ const DW = 1086, DH = 1215, BH = 1448, NH = 233;
 const pd = (x: number, y: number, w: number, h: number) => P(x, y, w, h, DW, DH);
 const pb = (x: number, y: number, w: number, h: number) => P(x, y, w, h, DW, BH);
 const pn = (x: number, y: number, w: number, h: number) => P(x, y, w, h, DW, NH);
-const KYOTO = { lat: 34.9858, lng: 135.7588 };
+/** 天気は泉佐野市 */
+const WX_PLACE = { lat: 34.4066, lng: 135.3269 };
 
 function wxInfo(code: number): { e: string; ja: string; zh: string } {
   if (code === 0) return { e: "☀", ja: "晴れ", zh: "晴" };
@@ -88,11 +89,10 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   /* ---------------- 天気 ---------------- */
   const [wx, setWx] = useState<{ temp: number; code: number } | null>(null);
   useEffect(() => {
-    const loc = data.rooms.find((r) => r.lat != null && r.lng != null) ?? null;
-    const { lat, lng } = loc ? { lat: loc.lat!, lng: loc.lng! } : KYOTO;
+    const { lat, lng } = WX_PLACE;
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&timezone=Asia%2FTokyo`)
       .then((r) => r.json()).then((j) => setWx({ temp: Math.round(j.current.temperature_2m), code: j.current.weather_code })).catch(() => {});
-  }, [data.rooms]);
+  }, []);
   const wxI = wx ? wxInfo(wx.code) : null;
   const wxText = wxI ? (lang === "zh" ? wxI.zh : wxI.ja) : "";
   const hour = new Date(nowMs + 9 * 3600e3).getUTCHours();
@@ -202,8 +202,9 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   /* ---------------- おもてなし ---------------- */
   const [omo, setOmo] = useState(false);
   const startOmotenashi = () => {
-    sfx.prime(); sfx.auth(); vib([20, 40, 20]); setOmo(true);
-    say(["aboard"], 300);
+    sfx.prime(); music.prime(); sfx.auth(); vib([20, 40, 20]); setOmo(true);
+    let turn = 0; try { turn = Number(localStorage.getItem("drvAboard") || 0); localStorage.setItem("drvAboard", String(turn + 1)); } catch { /* ignore */ }
+    say([aboardVoice(next, turn)], 300);
     setTimeout(() => music.startWith("in", autoLang.in), 4200);
   };
   const arriveSoon = () => { sfx.notify(); say(["arrive"], 200); setTimeout(() => music.fadeOut(), 2400); };
@@ -417,7 +418,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
                 <path className="route" d="M205 866 C 250 828, 320 822, 370 850 S 470 905, 578 893" pathLength="100" />
               </svg>
               <div className="ov r" style={pd(640, 18, 400, 34)}><span className="date">{dateText}</span></div>
-              <div className="ov r" style={pd(640, 70, 400, 44)}><span className="wx">{wx ? <>京都 <b>{wx.temp}°</b> {wxI?.e} {wxText}</> : ""}</span></div>
+              <div className="ov r" style={pd(640, 70, 400, 44)}><span className="wx">{wx ? <>{t("泉佐野")} <b>{wx.temp}°</b> {wxI?.e} {wxText}</> : ""}</span></div>
               <div className="ov c lbl" style={pd(200, 550, 160, 34)}>{t("お迎え")}</div>
               <div className="ov c lbl" style={pd(726, 550, 160, 34)}>{t("お見送り")}</div>
               <div className="ov c num" style={pd(200, 580, 180, 80)}>{board.arrivals.length}<small>{t("件")}</small></div>
@@ -429,7 +430,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               <div className="ov c lbl3" style={pd(400, 774, 286, 34)}>{t("本日のドライブ")}</div>
               <div className="ov stop" style={pd(196, 878, 200, 60)}>{board.arrivals[0] ? <><b>{board.arrivals[0].pickupPlace || nr(board.arrivals[0])}</b>{jstTime(pickupBase(board.arrivals[0]))} {board.arrivals[0].guest ?? ""}</> : <b>{t("本日の送迎はありません")}</b>}</div>
               <div className="ov stop" style={pd(596, 878, 210, 60)}>{board.arrivals[1] ? <><b>{board.arrivals[1].pickupPlace || nr(board.arrivals[1])}</b>{jstTime(pickupBase(board.arrivals[1]))} {board.arrivals[1].guest ?? ""}</> : null}</div>
-              <div className="ov c wxb" style={pd(848, 812, 120, 130)}><span>京都</span><b>{wx ? `${wx.temp}°` : "—"}</b><span>{wxText}</span></div>
+              <div className="ov c wxb" style={pd(848, 812, 120, 130)}><span>{t("泉佐野")}</span><b>{wx ? `${wx.temp}°` : "—"}</b><span>{wxText}</span></div>
               <div className="fl" style={pd(262, 1090, 80, 14)} /><div className="fl" style={pd(446, 1090, 92, 14)} /><div className="fl" style={pd(680, 1090, 88, 14)} />
               <div className="cells" style={pd(553, 1079, 108, 37)}>{Array.from({ length: 8 }, (_, i) => { const n = preparing.length ? charge : Math.round((pct / 100) * 8); return <i key={i} className={i < n ? "on" : preparing.length && i === n ? "charging" : ""} />; })}</div>
               <div className="ov c pct" style={pd(540, 1040, 130, 30)}>{board.arrivals.length ? `${preparing.length ? Math.round((charge / 8) * 100) : pct}%` : "—"}</div>
@@ -455,7 +456,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               <div className="gauges">
                 <div className="g"><div className="v">{board.arrivals.length}</div><div className="l">{t("お迎え")}</div></div>
                 <div className="g"><div className="v">{board.departures.length}</div><div className="l">{t("お見送り")}</div></div>
-                <div className="g"><div className="v">{wx ? `${wxI?.e} ${wx.temp}°` : "—"}</div><div className="l">京都 {wxText}</div></div>
+                <div className="g"><div className="v">{wx ? `${wxI?.e} ${wx.temp}°` : "—"}</div><div className="l">{t("泉佐野")} {wxText}</div></div>
               </div>
             )}
             <div className="chips">

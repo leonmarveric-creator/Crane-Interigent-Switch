@@ -57,6 +57,17 @@ export function roomColor(slug: string): string {
   return "#c49bff";
 }
 
+/** 空港からのお迎えか (お迎え場所に空港の名前・便名あり) */
+export function isAirportPickup(r: DRes | null | undefined): boolean {
+  if (!r) return false;
+  return !!r.flightNo || /空港|airport|機場|机场|공항|KIX|ITM|関空/i.test(r.pickupPlace || "");
+}
+/** 「おもてなし開始」の声: 空港からなら B (Welcome to Japan)、それ以外は A と C を交互に */
+export function aboardVoice(r: DRes | null | undefined, turn: number): "aboard-a" | "aboard-b" | "aboard-c" {
+  if (isAirportPickup(r)) return "aboard-b";
+  return turn % 2 === 0 ? "aboard-a" : "aboard-c";
+}
+
 /** 迎えに行く目安の時刻 (お迎え時刻 → なければチェックイン) */
 export const pickupBase = (r: DRes) => r.pickupAt || r.checkIn;
 
