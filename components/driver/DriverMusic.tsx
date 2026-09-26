@@ -345,7 +345,9 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
 
 /** 歌詞を付ける (LRC ファイル / 曲を流して作る / タイミング調整) */
 function LyricsSheet({ tr, t, toast, onClose, onSave }: { tr: DriverTrack; t: T; toast: (s: string) => void; onClose: () => void; onSave: (lrc: string | null) => void }) {
-  const [tab, setTab] = useState<"file" | "make" | "edit">(tr.lrc ? "edit" : "file");
+  const [tab, setTab] = useState<"paste" | "file" | "make" | "edit">(tr.lrc ? "edit" : "paste");
+  const [paste, setPaste] = useState("");
+  const pasted = useMemo(() => parseLrc(paste), [paste]);
   const [lines, setLines] = useState<LrcLine[]>(parseLrc(tr.lrc));
   const [text, setText] = useState("");
   const [mkI, setMkI] = useState(-1);
@@ -365,9 +367,27 @@ function LyricsSheet({ tr, t, toast, onClose, onSave }: { tr: DriverTrack; t: T;
       <div className="sheet-bg show" onClick={() => { stop(); onClose(); }} />
       <div className="sheet show">
         <h4>{t("歌詞を付ける")} ─ {tr.title}</h4>
-        <div className="segsw small three">
-          {(["file", "make", "edit"] as const).map((x) => <button key={x} className={tab === x ? "on" : ""} onClick={() => { sfx.tick(); stop(); setTab(x); }}>{x === "file" ? t("LRC ファイルを選ぶ") : x === "make" ? t("曲を流して作る") : t("タイミング調整")}</button>)}
+        <div className="segsw small four">
+          {(["paste", "file", "make", "edit"] as const).map((x) => <button key={x} className={tab === x ? "on" : ""} onClick={() => { sfx.tick(); stop(); setTab(x); }}>{x === "paste" ? t("貼り付け") : x === "file" ? t("LRC ファイル") : x === "make" ? t("曲を流して作る") : t("タイミング調整")}</button>)}
         </div>
+        {tab === "paste" && (
+          <div>
+            <textarea rows={7} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={t("時間付きの歌詞（[00:12.34]歌詞 の形）をここに貼り付けてください")} />
+            {paste.trim() ? (pasted.length ? (
+              <div className="lypv">
+                <b>✓ {t("{n} 行・{a}〜{b}", { n: pasted.length, a: fmt(pasted[0].t), b: fmt(pasted[pasted.length - 1].t) })}</b>
+                <div className="lylist mini">{pasted.slice(0, 4).map((l, i) => <div key={i} className="lyrow"><b className="tm">{fmt(l.t)}</b><span className="tx">{l.s}</span></div>)}{pasted.length > 4 ? <p className="note">… {t("ほか {n} 行", { n: pasted.length - 4 })}</p> : null}</div>
+                <button className="btn main" onClick={() => { commit(pasted); sfx.chord(); toast(t("歌詞を付けました（{n} 行）", { n: pasted.length })); setPaste(""); setTab("edit"); }}>💾 {t("この歌詞を保存")}</button>
+              </div>
+            ) : <p className="note warn">{t("時間（[00:12.34] など）が見つかりません。時間のない歌詞は「曲を流して作る」で付けてください。")}</p>) : null}
+          </div>
+        )}
+        {tab === "edit" && lines.length > 0 && (
+          <button className="linkbtn" onClick={() => {
+            const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([`[ti:${tr.title}]\n` + toLrc(lines) + "\n"], { type: "text/plain;charset=utf-8" }));
+            a.download = `${tr.title.replace(/[\\/:*?"<>|]/g, "_")}.lrc`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          }}>⬇ {t(".lrc をダウンロード")}</button>
+        )}
         {tab === "file" && (
           <label className="mfile">📄 {t("LRC ファイルを選ぶ")}<input type="file" onChange={async (e) => {
             const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;

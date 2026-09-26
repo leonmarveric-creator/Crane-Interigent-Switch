@@ -158,14 +158,20 @@ export function parseLrc(text: string | null | undefined): LrcLine[] {
   let offset = 0; // [offset:+500] (ミリ秒。+ で歌詞を早める)
   const off = /\[offset:\s*([+-]?\d+)\s*\]/i.exec(String(text || ""));
   if (off) offset = Number(off[1]) / 1000;
+  const TAG = /\[\s*(\d{1,3}):(\d{1,2})(?:[.:,](\d{1,3}))?\s*\]/g;
+  const clean = (x: string) => x.replace(/\[[a-z]+:[^\]]*\]/gi, "").replace(/<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g, "").replace(/\s+/g, " ").trim(); // 見出しタグ・1 語ごとのタイムは外す
   for (const line of String(text || "").replace(/^\uFEFF/, "").split(/\r\n|\r|\n/)) {
-    // [mm:ss] [mm:ss.xx] [mm:ss.xxx] [mm:ss:xx] [m:ss,xx] (分は 3 桁まで)
-    const tags = [...line.matchAll(/\[\s*(\d{1,3}):(\d{1,2})(?:[.:,](\d{1,3}))?\s*\]/g)];
-    const w = line.replace(/\[[^\]]*\]/g, "").replace(/<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g, "").trim(); // 1 語ごとの <mm:ss.xx> は外す
-    for (const m of tags) {
+    // 1 行に [時間]歌詞 が何個並んでいても (改行が消えて貼り付けられた場合など)、時間ごとに分ける。
+    // [00:05][01:00]歌詞 のように時間が続くときは、同じ歌詞を両方の時間に付ける
+    const tags = [...line.matchAll(TAG)];
+    let pending: number[] = [];
+    tags.forEach((m, k) => {
       const frac = m[3] ? Number(m[3]) / 10 ** m[3].length : 0;
-      out.push({ t: Math.max(0, +(+m[1] * 60 + +m[2] + frac - offset).toFixed(3)), s: w });
-    }
+      pending.push(Math.max(0, +(+m[1] * 60 + +m[2] + frac - offset).toFixed(3)));
+      const end = k + 1 < tags.length ? tags[k + 1].index! : line.length;
+      const w = clean(line.slice(m.index! + m[0].length, end));
+      if (w) { for (const t of pending) out.push({ t, s: w }); pending = []; }
+    });
   }
   return out.filter((x) => x.s).sort((a, b) => a.t - b.t);
 }

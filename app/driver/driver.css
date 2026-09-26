@@ -481,3 +481,8 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .pc .collapsed b { color:var(--text); }
 .drv .pc .collapsed button { margin-left:auto; min-height:34px; padding:0 12px; border-radius:10px; border:1px solid var(--line); background:#101a2b; color:var(--text); font-size:12px; font-weight:700; flex:none; }
 .drv .sheetlinks { display:flex; justify-content:space-between; gap:10px; }
+.drv .segsw.four { grid-template-columns:repeat(4,1fr); } .drv .segsw.four button { font-size:11.5px; padding:0 2px; }
+.drv .lypv { margin-top:8px; padding:10px; border-radius:12px; background:rgba(70,224,138,.06); border:1px solid rgba(70,224,138,.35); }
+.drv .lypv > b { color:var(--ok); font-size:13.5px; }
+.drv .lylist.mini { max-height:none; margin:8px 0 2px; } .drv .lylist.mini .lyrow { padding:6px 10px; }
+.drv .note.warn { color:#ffc27a; }

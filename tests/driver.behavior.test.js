@@ -92,6 +92,11 @@ test("driver: LRC lyrics parse, current line and round trip", async () => {
   // いろいろな書き方の LRC (Windows 改行・BOM・[mm:ss:xx]・3 桁ミリ秒・offset・1 語ごとのタイム)
   const v = L.parseLrc("\uFEFF[offset:+500]\r\n[00:10:50]a\r\n[0:20.125]<00:20.20>b <00:21.00>c\r[100:00]d");
   assert.deepEqual(v, [{ t: 10, s: "a" }, { t: 19.625, s: "b c" }, { t: 5999.5, s: "d" }]);
+  // 改行が消えて 1 行につながった貼り付け (見出しタグ付き) も時間ごとに分ける
+  const one = L.parseLrc("[ti:Song] [ar:] [al:] [by:] [00:00.00]line one [00:03.50]line two\n[00:06.80]line three [01:00.00][01:10.00]chorus");
+  assert.deepEqual(one, [{ t: 0, s: "line one" }, { t: 3.5, s: "line two" }, { t: 6.8, s: "line three" }, { t: 60, s: "chorus" }, { t: 70, s: "chorus" }]);
+  const m = read("components", "driver", "DriverMusic.tsx");
+  assert.match(m, /tab === "paste"/); assert.match(m, /\.lrc/);
   const enc = (s) => new TextEncoder().encode(s);
   assert.equal(L.decodeLrcBytes(enc("[00:01]你好")), "[00:01]你好");
   const u16 = Buffer.from("\ufeff[00:01]歌", "utf16le");
