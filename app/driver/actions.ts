@@ -8,6 +8,7 @@ import { FLIGHT_REUSE_MS, type FlightInfo } from "@/lib/driverLogic";
 import { loadDriverData, type DriverData, type DriverDesign } from "@/lib/driverData";
 import { langOf } from "@/lib/driverLogic";
 import { toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
+import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (e: any): { ok: false; error: string } => ({ ok: false, error: String(e?.message || e || "ERROR") });
@@ -223,14 +224,23 @@ export async function cabinStart(v: {
   return { ok: true, trip: toCabinTrip(data) };
 }
 /** スマホの位置を送る (3 秒ごと)。送迎が終わっていたら active = false */
-export async function cabinPos(tripId: string, lat: number, lng: number, kmh: number | null): Promise<R<{ active: boolean }>> {
+export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null }>> {
   const g = guard(); if (g) return g;
-  if (!isId(tripId) || !isFinite(lat) || !isFinite(lng)) return fail("BAD");
-  const { data, error } = await supabaseAdmin.from("cabin_trips")
-    .update({ phone_lat: lat, phone_lng: lng, phone_speed: kmh != null && isFinite(kmh) ? Math.max(0, Math.min(250, kmh)) : null, phone_at: new Date().toISOString() })
-    .eq("id", tripId).eq("status", "active").select("id");
-  if (error) return fail(error.message);
-  return { ok: true, active: !!data?.length };
+  if (!isId(tripId)) return fail("BAD");
+  const up: Record<string, unknown> = {};
+  if (lat != null && lng != null && isFinite(lat) && isFinite(lng)) Object.assign(up, { phone_lat: lat, phone_lng: lng, phone_speed: kmh != null && isFinite(kmh) ? Math.max(0, Math.min(250, kmh)) : null, phone_at: new Date().toISOString() });
+  // 再生中の曲 (iPad の歌詞用)。受け取った時刻はサーバの時計で
+  const n = cleanNowPlaying(np);
+  const withNp = { ...up, now_playing: n ? { ...n, at: Date.now() } : null };
+  let r = await supabaseAdmin.from("cabin_trips").update(withNp).eq("id", tripId).eq("status", "active").select("id, music_cmd");
+  // migration_cabin_music.sql がまだなら、位置だけ送る (今までどおり)
+  if (r.error && /now_playing|music_cmd/.test(r.error.message)) {
+    if (!Object.keys(up).length) return { ok: true, active: true, cmd: null };
+    r = await supabaseAdmin.from("cabin_trips").update(up).eq("id", tripId).eq("status", "active").select("id") as any;
+  }
+  if (r.error) return fail(r.error.message);
+  const row: any = r.data?.[0];
+  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null };
 }
 export async function cabinEnd(tripId: string): Promise<R> {
   const g = guard(); if (g) return g;

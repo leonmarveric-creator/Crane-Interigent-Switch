@@ -6,11 +6,14 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roomColor } from "@/lib/driverLogic";
 import { CRANE_NEST, type GLang, type LL } from "@/lib/cabinGeo";
 import { BUILTIN_PHOTOS as BUILTIN, DEFAULT_PHOTO, type CabinSpots, type Spot } from "@/lib/cabinPhotos";
+import { toNowPlaying, type CabinTrack, type MusicCmdRow, type NowPlaying } from "@/lib/cabinMusic";
 export type { CabinSpots, Spot } from "@/lib/cabinPhotos";
 
 export interface CabinRoom {
   id: string; slug: string; kanji: string; en: string; accent: string; fx: "petal" | "firefly" | "leaf" | "snow";
   photo: string | null; photoKey: string | null; spots: CabinSpots; home: LL; building: string;
+  /** 到着画面の QR 用: お部屋のページ (/room/[roomSlug]) と、同じ棟のエントランスの鍵 (/key/[entrance]) */
+  roomSlug: string | null; entrance: string | null;
 }
 export interface CabinDevice { id: string; name: string; hasGps: boolean | null; lastSeen: string | null }
 export interface CabinTrip {
@@ -18,6 +21,10 @@ export interface CabinTrip {
   placeKey: string; placeName: string | null; placeLL: LL | null;
   roomId: string | null; lang: GLang; ac: "cool" | "heat" | "none"; startedAt: string;
   phone: { ll: LL; kmh: number | null; at: string } | null;
+  /** お父さんのスマホで流れている曲 */
+  np: NowPlaying | null;
+  /** iPad から スマホへの再生の操作 (最後の 1 つ) */
+  cmd: MusicCmdRow | null;
 }
 
 const SEASON: [RegExp, string, string, CabinRoom["fx"]][] = [
@@ -47,6 +54,7 @@ export function toCabinRoom(r: any, nowMs = Date.now()): CabinRoom {
     en: s?.[2] ?? nm.toUpperCase(), accent: roomColor(slug), fx: s?.[3] ?? fxOfMonth(nowMs),
     photo, photoKey: photoKey ? (BUILTIN[photoKey.replace(/^builtin:/, "")] ? "builtin:" + photoKey.replace(/^builtin:/, "") : photoKey) : null,
     spots, home, building: r.building || "Crane Nest",
+    roomSlug: r.slug ? String(r.slug) : null, entrance: null,
   };
 }
 function okSpot(v: any): Spot {
@@ -61,6 +69,8 @@ export function toCabinTrip(t: any): CabinTrip {
     roomId: t.room_id ?? null, lang: (["ja", "en", "zh", "ko"].includes(t.guest_lang) ? t.guest_lang : "en") as GLang,
     ac: t.ac_mode === "heat" ? "heat" : t.ac_mode === "none" ? "none" : "cool", startedAt: t.started_at,
     phone: typeof t.phone_lat === "number" && typeof t.phone_lng === "number" && t.phone_at ? { ll: [t.phone_lat, t.phone_lng], kmh: t.phone_speed ?? null, at: t.phone_at } : null,
+    np: toNowPlaying(t.now_playing),
+    cmd: t.music_cmd && typeof t.music_cmd === "object" && typeof t.music_cmd.n === "number" ? t.music_cmd : null,
   };
 }
 export function toCabinDevice(d: any): CabinDevice {
@@ -89,5 +99,20 @@ export async function loadCabinDevices(): Promise<{ devices: CabinDevice[]; miss
 export async function cabinRoomById(id: string | null): Promise<CabinRoom | null> {
   if (!id) return null;
   const { data } = await supabaseAdmin.from("rooms").select("*").eq("id", id).maybeSingle();
-  return data ? toCabinRoom(data) : null;
+  if (!data) return null;
+  const room = toCabinRoom(data);
+  // 同じ棟のエントランス (スマートキーの SQL が未実行でも落ちないように)
+  try {
+    const { data: ents } = await supabaseAdmin.from("entrances").select("slug, building").eq("is_active", true).order("slug");
+    room.entrance = ((ents ?? []) as any[]).find((e) => (e.building || "Crane Nest") === room.building)?.slug ?? null;
+  } catch { /* ignore */ }
+  return room;
+}
+
+/** iPad に出す曲の情報 (曲名・歌手・カバー・歌詞) */
+export async function cabinTrackById(id: string): Promise<CabinTrack | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const { data } = await supabaseAdmin.from("driver_tracks").select("id, title, artist, cover_path, lrc").eq("id", id).maybeSingle();
+  if (!data) return null;
+  return { id: data.id, title: data.title, artist: data.artist ?? null, cover: data.cover_path ? cabinPublicUrl(data.cover_path) : null, lrc: data.lrc ?? null };
 }

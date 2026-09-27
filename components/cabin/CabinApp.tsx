@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TRIP_HTML } from "@/components/cabin/cabinMarkup";
 import { createEngine, tileCount, type Engine } from "@/components/cabin/cabinEngine";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
+import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL } from "@/lib/cabinGeo";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
@@ -45,6 +46,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const [saved, setSaved] = useState<number>(0);
   const [inTrip, setInTrip] = useState(false);
   const [gpsState, setGpsState] = useState<"?" | "yes" | "no">("?");
+  const [standalone, setStandalone] = useState(true);
+  useEffect(() => { setStandalone(!!(navigator as any).standalone || window.matchMedia("(display-mode: standalone)").matches); }, []);
   const toast = useCallback((s: string) => { setMsg(s); setTimeout(() => setMsg(""), 3500); }, []);
 
   // この iPad の GPS
@@ -52,6 +55,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const gps = useRef<{ has: boolean | null; since: number }>({ has: null, since: Date.now() });
   const phoneAt = useRef<string>("");
   const tripRef = useRef<CabinTrip | null>(null);
+  const trackRef = useRef<CabinTrack | null>(null); // 再生中の曲 (曲名・カバー・歌詞)。変わったときだけサーバから来る
 
   /* ---------- 起動 ---------- */
   useEffect(() => {
@@ -67,7 +71,11 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         const routes = await (await fetch("/cabin/routes.json")).json();
         if (!live || !root.current || !host.current) return;
         if (!host.current.firstChild) host.current.innerHTML = TRIP_HTML;
-        eng.current = createEngine(root.current, routes, { onEnd: (id) => void endTrip(id) });
+        eng.current = createEngine(root.current, routes, {
+          onEnd: (id) => void endTrip(id),
+          // 全画面の再生ボタン → お父さんのスマホへ
+          onCmd: (id, c, v) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "cmd", trip: id, c, v }) }).catch(() => {}),
+        });
         eng.current.resize();
         if (wxRef.current) eng.current.weather(wxRef.current);
       } catch { toast("地図の部品を読み込めませんでした（通信を確認してください）"); }
@@ -120,7 +128,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     if (!dev) return;
     const g = gps.current.has === null ? "" : gps.current.has ? "&gps=1" : "&gps=0";
     try {
-      const r = await fetch(`/api/cabin/state?d=${dev.id}${g}`, { cache: "no-store" });
+      const r = await fetch(`/api/cabin/state?d=${dev.id}${g}&np=${trackRef.current?.id ?? ""}`, { cache: "no-store" });
       if (r.status === 401) { location.href = "/staff/login?next=/cabin"; return; }
       const j = await r.json(); setOnline(true);
       if (!j.ok) { if (j.error === "SETUP") toast("Supabase の SQL（migration_cabin.sql）がまだ実行されていません"); return; }
@@ -137,6 +145,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (!ownFresh && t.phone && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
+        // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
+        if (j.track) trackRef.current = j.track;
+        e.nowPlaying(t.np ?? null, t.np && trackRef.current?.id === t.np.id ? trackRef.current : null, typeof j.now === "number" ? j.now - Date.now() : 0);
       } else if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); }
     } catch { setOnline(false); }
   }, [dev, toast]);
@@ -166,7 +177,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   async function saveAll() {
     const e = eng.current; if (!e) return;
     e.unlock();
-    const urls = [...e.audioUrls(), "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
+    const urls = [...e.audioUrls(), "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });
     const reg = await navigator.serviceWorker?.ready.catch(() => null);
@@ -191,7 +202,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     const e = eng.current; if (!e) return;
     e.unlock(); setMenu(false);
     const room = rooms.find((r) => r.photo) ?? rooms[0] ?? null;
-    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null };
+    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null };
     tripRef.current = t; setInTrip(true);
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }
@@ -231,6 +242,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <div className="setup" onClick={(ev) => ev.stopPropagation()}>
             <h2>この iPad を登録</h2>
             <p>車ごとの名前を付けてください（例：1号車・2号車）。<br />お父さんのスマホで「出発」を押すと、この iPad に表示されます。</p>
+            {!standalone && <p style={{ color: "#ffd199", fontSize: 13 }}>先に Safari の共有ボタン →「ホーム画面に追加」をして、ホーム画面の「CRANE NEST」から開いて登録してください。<br />（ホーム画面から開いた画面は Safari とログイン・登録が別々のため）</p>}
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={30} />
             <button onClick={() => void register()}>登録する</button>
             {setupErr && <p style={{ color: "#ff9b9b" }}>{setupErr}</p>}

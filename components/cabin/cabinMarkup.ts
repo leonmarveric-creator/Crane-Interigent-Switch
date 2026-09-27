@@ -1,13 +1,32 @@
-/** 車内 iPad の送迎画面の中身 (地図・高速モード・部屋・到着画面)。文字は cabinEngine が言語に合わせて入れる */
+/** 車内 iPad の送迎画面の中身 (地図・高速モード・部屋・到着画面・再生中の曲)。文字は cabinEngine が言語に合わせて入れる */
+const TICKS = Array.from({ length: 120 }, (_, i) => `<line x1="0" y1="${i % 5 ? -146 : -150}" x2="0" y2="-141" transform="rotate(${i * 3})"/>`).join("");
+/* 全画面 (歌詞がメイン + 地図・部屋は小さく) */
+const NP_FULL = `<div class="npfull" id="npfull"><div class="f2bg"></div><canvas id="f2Scene"></canvas><canvas id="f2Fx"></canvas><div class="f2vig"></div>
+ <header class="f2top"><svg class="f2deco" viewBox="0 0 1156 62" preserveAspectRatio="none"><path d="M0 61.5 H1156"/><path d="M300 50 H360 L378 6"/><path d="M778 6 L796 50 H880"/></svg><div class="f2logo"><svg class="f2crane" viewBox="0 0 64 48"><path d="M4 30 C18 22 28 8 44 4 C36 12 34 18 38 22 C44 16 52 14 60 16 C50 20 44 26 40 34 C34 30 26 30 18 36 C22 30 20 28 4 30Z"/><path d="M38 22 L30 44" /></svg><div><b>CRANE NEST</b><small>JOURNEY EXPERIENCE</small></div></div>
+  <nav class="f2seasons"><div data-s="haru"><b>春</b><small>SPRING</small></div><div data-s="natsu"><b>夏</b><small>SUMMER</small></div><div data-s="aki"><b>秋</b><small>AUTUMN</small></div><div data-s="fuyu"><b>冬</b><small>WINTER</small></div></nav>
+  <div class="f2lang"><span class="f2globe">🌐</span><div class="f2seg"><button data-fl="ja">日本語</button><button data-fl="zh">中文</button><button data-fl="en">EN</button><button data-fl="ko">한국어</button></div></div></header>
+ <section class="f2left"><div class="f2disc"><svg class="f2hud" viewBox="-160 -160 320 320"><defs><linearGradient id="f2g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5fe3ff"/><stop offset="1" stop-color="#e8fdff"/></linearGradient></defs><circle class="h0" r="152"/><g class="ht">${TICKS}</g><g class="spin"><path class="seg" d="M-139 -50 A148 148 0 0 1 -50 -139"/><path class="seg" d="M139 50 A148 148 0 0 1 50 139"/></g><path class="seg2" d="M-120 90 A150 150 0 0 1 -150 0"/><path class="seg2" d="M120 -90 A150 150 0 0 1 150 0"/><circle class="dot" cx="0" cy="-152" r="3"/><circle class="dot" cx="0" cy="152" r="3"/><circle class="dot" cx="-152" cy="0" r="2.5"/><circle class="dot" cx="152" cy="0" r="2.5"/><circle class="h1" r="132"/><circle class="h2" id="f2Arc" r="132"/><circle class="h3" r="118"/><path class="h4" d="M-152 0 h-6 M152 0 h6 M0 -152 v-6 M0 152 v6"/></svg><img class="f2cov" id="f2Cov" alt=""></div>
+  <div class="f2meta"><small id="f2Trk">NOW PLAYING</small><span class="f2badge">HOLO PROJECTION</span></div>
+  <b class="f2t" id="f2T"></b><small class="f2a" id="f2A"></small>
+  <div class="f2seek" id="f2Seek"><div class="f2bar"><i id="f2Fill"></i><b id="f2Knob"></b></div><div class="f2times"><span id="f2Cur">00:00</span><span id="f2Dur">00:00</span></div></div>
+  <div class="f2ctl"><button id="f2Back10">↺</button><button id="f2Prev">⏮</button><button id="f2Play" class="pp">❚❚</button><button id="f2Next">⏭</button><button id="f2Fwd10">↻</button></div></section>
+ <section class="f2mid"><div class="f2loc" id="f2Loc">OSAKA BAY</div><i class="f2dash"></i>
+  <div class="f2ly"><p class="f2now" id="f2Now"></p><p class="f2n1" id="f2N1"></p><p class="f2n2" id="f2N2"></p></div></section>
+ <section class="f2right">
+  <div class="f2card f2nav"><div class="f2h"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span>NAV</span><em id="f2Route"></em></div><div class="f2map"><div class="f2eta"><div><b id="f2Eta">--</b><small>min</small></div><span id="f2Km"></span></div><div class="f2comp">▲<small>N</small></div></div></div>
+  <div class="f2card f2room"><div class="f2rslot" id="f2RSlot"></div></div></section>
+ <footer class="f2bot"><button data-f2="nav"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span><b data-t="nav"></b><small>NAVIGATION</small></span></button><button data-f2="music" class="on"><svg viewBox="0 0 24 24"><path d="M3 10v4M6.5 7v10M10 4v16M13.5 8v8M17 6v12M20.5 10v4"/></svg><span><b data-t="music"></b><small>MUSIC</small></span></button><button data-f2="room"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9h-6v-6H9v6H3z"/></svg><span><b data-t="room"></b><small>ROOM</small></span></button><button data-f2="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span><b data-t="set"></b><small>SETTINGS</small></span></button>
+  <div class="f2wx"><i id="f2WxI"></i><span>IZUMISANO</span><b id="f2WxT"></b><small id="f2WxD"></small></div></footer>
+ <div class="f2toast" id="f2Toast"></div></div>`;
 export const TRIP_HTML = `<div class="scr">
   <div class="map mode-photo" id="map">
    <div id="lmap"></div>
    <div class="tint"></div><div class="scan"></div><div class="sweep" id="sweep"></div>
    <div class="hud"><div class="eta"><small id="etaL"></small><b id="etaM">--<em id="etaU"></em></b><div class="km" id="km">—</div></div><div class="gps" id="gpsT"><i></i><span>GPS · LIVE</span></div></div>
-   <div class="mbtn"><button id="mPhoto" class="on">🛰</button><button id="mDark">🌙</button></div>
+   <div class="mbtn"><button id="mPhoto" class="on">🛰</button><button id="mDark">🌙</button><button id="npFullBtn" class="npfb">🎵</button></div>
    <div class="cap" id="cap"><div class="ic" id="capI">🌉</div><div><b id="capT"></b><span id="capS"></span></div><div class="wv"><i></i><i></i><i></i></div></div>
    
-   <div class="osm2">出典：国土地理院</div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
+   <div class="osm2">出典：国土地理院</div><div class="holo" id="holo"><div class="hbeam"></div><div class="hbase"></div><div class="hcov"><img class="npcov" id="hCov" alt=""><i></i></div><div class="hly"><div class="hmeta"><span class="hdot"></span><span id="hMeta">HOLO LYRICS</span></div><div class="hline" id="hLine"></div><div class="hnext" id="hNext"></div><div class="hout" id="hOut"></div></div><div class="htime" id="hTime">00:00</div></div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
    <canvas id="warp"></canvas><div class="shock" id="shock"></div><div class="shock s2" id="shock2"></div>
    <div class="bhud" id="bhud"><div class="hex"></div><div class="floor"></div><i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i><div class="scanl"></div>
     <div class="blog" id="blog"></div>
@@ -39,4 +58,10 @@ export const TRIP_HTML = `<div class="scr">
    <div class="box" style="flex:1;min-height:0"><h3 id="h-rec"></h3><div class="rec" id="rec"></div></div>
   </div>
  </div>
- <div class="arrive" id="arrive"><div class="abg" id="abg"></div><div class="ashade"></div><canvas id="ptc"></canvas><div class="ak" id="ak"></div><div class="akEn" id="akEn"></div><div class="t1" id="arrT1">CRANE NEST</div><div class="t2" id="arrT2">WELCOME HOME</div><div class="t3" id="arrT"></div><div class="rows"><div id="arr1"></div><div id="arr2"></div><div id="arr3"></div></div></div>`;
+ ${NP_FULL}
+ <div class="arrive" id="arrive"><div class="abg" id="abg"></div><div class="ashade"></div><canvas id="ptc"></canvas><div class="ak" id="ak"></div><div class="akEn" id="akEn"></div><div class="t1" id="arrT1">CRANE NEST</div><div class="t2" id="arrT2">WELCOME HOME</div><div class="t3" id="arrT"></div><div class="rows"><div id="arr1"></div><div id="arr2"></div><div id="arr3"></div></div>
+  <div class="aq" id="aq"><button data-q="key"><i>🔑</i><span><b></b><small>ENTRANCE KEY</small></span></button><button data-q="room"><i>🚪</i><span><b></b><small>YOUR ROOM</small></span></button><p class="aqtip" id="aqTip"></p></div>
+  <div class="qrp" id="qrp"><div class="qrc"><div class="qrtabs"><button data-qt="key"></button><button data-qt="room"></button></div>
+   <div class="qrbody"><div class="qrbox"><div class="qrsvg" id="qrSvg"></div><i class="qrscan"></i><b class="qc a"></b><b class="qc b"></b><b class="qc c"></b><b class="qc d"></b></div>
+    <div class="qrside"><small class="qrk">SCAN WITH YOUR PHONE</small><h3 id="qrT"></h3><ol id="qrSteps"></ol><div class="qrphone"><span></span></div><code id="qrU"></code></div></div>
+   <button class="qrx" id="qrX"></button></div></div></div>`;

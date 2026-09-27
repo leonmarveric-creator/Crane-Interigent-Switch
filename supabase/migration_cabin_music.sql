@@ -1,0 +1,6 @@
+-- 車内 iPad: 再生中の曲 (歌詞) と、iPad からの再生の操作
+--   ・now_playing : お父さんのスマホで流れている曲 { id, pos, dur, on, at }  (3 秒ごとに更新)
+--   ・music_cmd   : iPad の再生ボタン { c: toggle|next|prev|seek, v, n }  (スマホが受け取って操作する)
+-- 何回実行しても大丈夫です。
+alter table public.cabin_trips add column if not exists now_playing jsonb;
+alter table public.cabin_trips add column if not exists music_cmd jsonb;

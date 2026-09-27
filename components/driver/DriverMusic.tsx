@@ -43,7 +43,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const fade = useRef<number>(0);
   const vol = useRef(0.8);
   const level = useRef(0.8); // 今の音量 (0〜1)
-  const boost = useRef<{ url: string | null; pos: number; wasPlaying: boolean } | null>(null); // 高速モード中 (元の曲の位置)
+  const boost = useRef<{ url: string | null; pos: number; wasPlaying: boolean; bid?: string } | null>(null); // 高速モード中 (元の曲の位置)
 
   useEffect(() => { setTracks(initial); }, [initial]);
   useEffect(() => { try { setLyrOnCar(localStorage.getItem("drvLyrCar") === "1"); } catch { /* ignore */ } }, []);
@@ -202,7 +202,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     boostIn(delayMs = 5000): boolean {
       const B = tracks.filter((x) => x.purpose === "boost"); if (!B.length || boost.current) return false;
       const tr = B[Math.floor(Math.random() * B.length)]; const a0 = el();
-      boost.current = { url: track?.url ?? null, pos: a0.currentTime, wasPlaying: playing };
+      boost.current = { url: track?.url ?? null, pos: a0.currentTime, wasPlaying: playing, bid: tr.id };
       if (playing) fadeTo(0, 900, () => a0.pause());
       setTimeout(async () => {
         if (!boost.current) return; const a = el(); const src = await cachedUrl(tr.url);
@@ -220,6 +220,17 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
         const go = () => { try { a.currentTime = b.pos; } catch { /* ignore */ } if (b.wasPlaying) { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } else setLevel(vol.current); };
         if (a.readyState >= 1) go(); else a.addEventListener("loadedmetadata", go, { once: true });
       }), 200);
+    },
+    /** 車内 iPad に送る「今流れている曲」(歌詞を合わせる用)。止まっていて曲も無ければ null */
+    nowPlaying(): { id: string; pos: number; dur: number; on: boolean } | null {
+      const a = el(), b = boost.current;
+      const id = b?.bid && !a.paused && a.loop ? b.bid : track?.id; if (!id) return null;
+      return { id, pos: a.currentTime || 0, dur: isFinite(a.duration) ? a.duration : 0, on: !a.paused };
+    },
+    /** 車内 iPad の再生ボタンから (ゲストが押す) */
+    remote(c: "toggle" | "next" | "prev" | "seek", v: number | null) {
+      if (boost.current) return; // 高速モード中は触らない
+      if (c === "toggle") api.toggle(); else if (c === "next") api.next(); else if (c === "prev") api.prev(); else if (c === "seek" && v != null) api.seek(v);
     },
     fadeOut() { if (!playing) return; fadeTo(0, 3500, () => { el().pause(); setLevel(vol.current); }); },
     seek(s: number) { const a = el(); a.currentTime = Math.max(0, Math.min((a.duration || s + 1) - 0.3, s)); setPos(a.currentTime); },

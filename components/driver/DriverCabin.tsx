@@ -41,11 +41,20 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (r.event === "start") boosting = mRef.current.boostIn(5000);
       else if (r.event === "end" && boosting) { boosting = false; mRef.current.boostOut(); }
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+    let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     const iv = setInterval(async () => {
-      if (!last || !live) return;
-      const r = await cabinPos(trip.id, last.ll[0], last.ll[1], last.kmh).catch(() => null);
       if (!live) return;
-      if (r?.ok) { setSending("ok"); if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); } } else setSending("ng");
+      const np = mRef.current.nowPlaying(); // 再生中の曲 (iPad の歌詞用)。位置がまだ取れていなくても送る
+      if (!last && !np) return;
+      const r = await cabinPos(trip.id, last?.ll[0] ?? null, last?.ll[1] ?? null, last?.kmh ?? null, np).catch(() => null);
+      if (!live) return;
+      if (r?.ok) {
+        if (last) setSending("ok");
+        if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
+        // iPad の再生ボタン (ゲストが押した) → このスマホの音楽を操作
+        if (lastCmd == null) lastCmd = r.cmd?.n ?? 0;
+        else if (r.cmd && r.cmd.n > lastCmd) { lastCmd = r.cmd.n; mRef.current.remote(r.cmd.c, r.cmd.v); }
+      } else setSending("ng");
     }, 3000);
     // 送迎中はスマホの画面を消さない (iPhone は画面が消えると位置を送れないため)
     let lock: any = null;

@@ -10,6 +10,9 @@ import {
 } from "@/lib/cabinGeo";
 import { CABIN_T, type CabinText } from "@/lib/cabinI18n";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
+import { MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
+import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
+import QRCode from "qrcode";
 
 const TILES = {
   dark: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
@@ -45,9 +48,11 @@ export interface Engine {
   saveOffline(onProgress: (done: number, total: number) => void): Promise<{ tiles: number; mb: number; fail: number }>;
   resize(): void;
   weather(w: { temp: number; code: number; max?: number; min?: number; days?: { code: number; max: number }[]; rain?: number } | null): void;
+  /** お父さんのスマホで流れている曲 (skewMs = サーバの時計 - この iPad の時計) */
+  nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void;
 }
 
-export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void }): Engine {
+export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void }): Engine {
   const L = (window as any).L;
   const $ = (id: string) => root.querySelector("#" + id) as HTMLElement;
   const stage = root.querySelector(".stage") as HTMLElement;
@@ -133,6 +138,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const rows = O ? T.outRows : T.inRows; rows.forEach((x, i) => setText("arr" + (i + 1), x));
     setText("bSub", T.bSub); setText("bFoot", T.bFoot); setText("bBr", T.bBr); setText("bTriv", T.bTriv[bTrivI % 3]);
     $("arrive").classList.toggle("out", O);
+    qrTexts(); npv.texts();
   }
 
   /* ---------- 部屋の写真カード ---------- */
@@ -260,7 +266,35 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     // 2 分たったら送迎を終わりにして、待機画面へ
     T_(120000, () => hooks.onEnd(id));
   }
-  $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); };
+  $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); qrHide(); };
+
+  /* ---------- 到着画面: エントランスの鍵 / お部屋 の QR (ゲストが自分のスマホで読む) ---------- */
+  let qrK: "key" | "room" = "key", qrTimer: ReturnType<typeof setTimeout> | null = null;
+  const qrLinks = () => qrUrls(location.origin, room, lang);
+  async function qrShow(k: "key" | "room") {
+    const u = qrLinks()[k]; if (!u) return;
+    qrK = k; const M = MUSIC_T[lang] ?? MUSIC_T.en;
+    try { $("qrSvg").innerHTML = await QRCode.toString(u, { type: "svg", errorCorrectionLevel: "M", margin: 4, color: { dark: "#0a1426", light: "#ffffff" } }); } catch { return; }
+    setText("qrU", u.replace(/^https?:\/\//, "")); setText("qrT", M.qTitle[k]);
+    $("qrSteps").innerHTML = M.qSteps[k].map((x) => `<li>${x.replace(/[<&>]/g, "")}</li>`).join("");
+    root.querySelectorAll<HTMLElement>("[data-qt]").forEach((b) => { const q = b.dataset.qt as "key" | "room"; b.classList.toggle("on", q === k); b.textContent = (q === "key" ? "🔑 " : "🚪 ") + (q === "key" ? M.qKey : M.qRoom); b.style.display = qrLinks()[q] ? "" : "none"; });
+    setText("qrX", "✕ " + M.qClose);
+    const p = $("qrp"); p.classList.remove("on"); void p.offsetWidth; p.classList.add("on");
+    const t = now(); tone(1320, 1320, t, 0.07, 0.035); tone(1760, 1760, t + 0.07, 0.12, 0.035);
+    if (qrTimer) clearTimeout(qrTimer); qrTimer = setTimeout(qrHide, 120000); // 2 分で自動で閉じる
+  }
+  function qrHide() { $("qrp").classList.remove("on"); if (qrTimer) clearTimeout(qrTimer); qrTimer = null; }
+  function qrTexts() {
+    const M = MUSIC_T[lang] ?? MUSIC_T.en, q = qrLinks();
+    root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => { const k = b.dataset.q as "key" | "room"; (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : M.qRoom; b.style.display = q[k] ? "" : "none"; });
+    setText("aqTip", M.qTip);
+    $("aq").style.display = trip?.dir === "out" || (!q.key && !q.room) ? "none" : ""; // お見送りのときは出さない
+    if ($("qrp").classList.contains("on")) void qrShow(qrK);
+  }
+  root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.q as "key" | "room"); }));
+  root.querySelectorAll<HTMLElement>("[data-qt]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.qt as "key" | "room"); }));
+  $("qrX").onclick = (e) => { e.stopPropagation(); qrHide(); };
+  $("qrp").onclick = (e) => { e.stopPropagation(); if ((e.target as HTMLElement).id === "qrp") qrHide(); };
 
   /* ---------- 季節の舞うもの ---------- */
   const pc = $("ptc") as HTMLCanvasElement, px = pc.getContext("2d")!; let ptOn = false;
@@ -416,13 +450,26 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
 
   /* ---------- 天気 ---------- */
+  let lastWx: any = null;
   function weather(w: any) {
-    if (!w) return;
+    if (!w) return; lastWx = w;
     const em = (c: number) => (c <= 1 ? "☀" : c <= 3 ? "🌤" : c <= 48 ? "☁" : c <= 67 || (c >= 80 && c <= 82) ? "🌧" : c <= 86 ? "❄" : "⛈");
     setText("wxI", em(w.code)); setText("wxT", `${Math.round(w.temp)}°`);
     $("wxD").innerHTML = `${T.wxName(w.code)}${w.max != null ? `<br>${Math.round(w.max)}° / ${Math.round(w.min)}°` : ""}`;
     $("wx2").innerHTML = (w.days ?? []).slice(1, 3).map((x: any, i: number) => `<div>${["+1", "+2"][i]} ${em(x.code)} ${Math.round(x.max)}°</div>`).join("") + (w.rain != null ? `<div>☂ ${w.rain}%</div>` : "");
   }
+
+  /* ---------- 再生中の曲 (カバーと歌詞) ---------- */
+  const SEASONS = ["haru", "natsu", "aki", "fuyu"];
+  const npv = createNowPlaying({
+    root, stage, map: MAP,
+    refit: () => MAP.fitBounds(L.latLngBounds(R.pts.concat([room?.home ?? CRANE_NEST])).pad(0.12), { animate: false }),
+    car: () => carLL, started: () => !!carLL, lang: () => lang,
+    setLang: (l) => { if (!trip || !CABIN_T[l]) return; lang = l; T = CABIN_T[l]; texts(); weather(lastWx); },
+    tripInfo: () => trip ? { dir: trip.dir, route: trip.dir === "out" ? `CRANE NEST → ${placeName()}` : `${placeName()} → CRANE NEST`, season: room && SEASONS.includes(room.en.toLowerCase()) ? room.en.toLowerCase() : null } : null,
+    cmd: (c, v) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, c, v); },
+    tick: () => { const t = now(); tone(1500, 1500, t, 0.04, 0.03); },
+  });
 
   /* ---------- 送迎の開始・終了 ---------- */
   async function start(t: CabinTrip, r: CabinRoom | null) {
@@ -446,7 +493,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const vk = known ? t.placeKey : "other";
     goKey = `en-${vk}_${t.dir}-go`; byeKey = `en-${vk}_out-arrive`;
     pois = poisFor(R, t.dir).map((k) => ({ k, d: project(R, POIS[k]).d }));
-    $("room").classList.remove("lit", "scan", "tagged"); $("arrive").classList.remove("on"); $("cap").classList.remove("show");
+    $("room").classList.remove("lit", "rscanning", "tagged"); $("arrive").classList.remove("on"); $("cap").classList.remove("show");
     if (t.dir === "out") $("room").classList.add("lit");
     texts(); draw(); meter(0);
     ($("etaM").firstChild as Text).textContent = String(baseMin); setText("km", T.km.replace("{k}", (R.total / 1000).toFixed(1)));
@@ -454,12 +501,13 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     setTimeout(() => MAP.invalidateSize(), 50);
     // 出発の演出
     linkS(); void say(goKey); $("sweep").classList.add("on");
-    if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("scan", "tagged"); void rm.offsetWidth; rm.classList.add("scan"); scanS(); setTimeout(() => { rm.classList.remove("scan"); rm.classList.add("tagged"); }, 4200); });
+    if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("rscanning", "tagged"); void rm.offsetWidth; rm.classList.add("rscanning"); scanS(); setTimeout(() => { rm.classList.remove("rscanning"); rm.classList.add("tagged"); }, 4200); });
     else T_(2000, () => { $("room").classList.remove("lit"); });
   }
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
+    qrHide(); npv.reset();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -506,5 +554,6 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     MAP.invalidateSize();
   }
 
-  return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3"), unlock, demo, saveOffline, resize, weather };
+  return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3"), unlock, demo, saveOffline, resize, weather,
+    nowPlaying: (np, track, skew) => npv.update(np, track, skew) };
 }

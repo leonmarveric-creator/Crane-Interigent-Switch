@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isStaff } from "@/lib/staffAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { activeTrip, cabinRoomById, toCabinDevice } from "@/lib/cabinData";
+import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/cabinData";
+import { cleanCmd } from "@/lib/cabinMusic";
 
 export const dynamic = "force-dynamic";
 const J = (v: any, status = 200) => NextResponse.json(v, { status, headers: { "cache-control": "no-store" } });
@@ -10,7 +11,8 @@ const isId = (s: unknown): s is string => typeof s === "string" && /^[0-9a-f-]{3
 /**
  * 車内 iPad が 3 秒ごとに聞きに来る: 「今、送迎は始まっている？」
  *   ?d=iPad の ID &gps=1|0 (この iPad に GPS があるか。分からなければ付けない)
- *   返すもの: この iPad の名前 / 送迎 (スマホの位置も) / 部屋の写真など
+ *     &np=iPad が持っている曲の ID (違う曲になったときだけ、曲名・カバー・歌詞を返す)
+ *   返すもの: この iPad の名前 / 送迎 (スマホの位置・再生中の曲も) / 部屋の写真など
  */
 export async function GET(req: NextRequest) {
   if (!isStaff()) return J({ ok: false, error: "UNAUTHORIZED" }, 401);
@@ -25,11 +27,15 @@ export async function GET(req: NextRequest) {
     if (!device) return J({ ok: true, device: null, trip: null, room: null });
   }
   const trip = await activeTrip(device?.id ?? null);
-  const room = trip ? await cabinRoomById(trip.roomId) : null;
-  return J({ ok: true, device, trip, room, now: Date.now() });
+  const have = req.nextUrl.searchParams.get("np") || "";
+  const [room, track] = await Promise.all([
+    trip ? cabinRoomById(trip.roomId) : null,
+    trip?.np && trip.np.id !== have ? cabinTrackById(trip.np.id).catch(() => null) : null,
+  ]);
+  return J({ ok: true, device, trip, room, track, now: Date.now() });
 }
 
-/** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) */
+/** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */
 export async function POST(req: NextRequest) {
   if (!isStaff()) return J({ ok: false, error: "UNAUTHORIZED" }, 401);
   const b = await req.json().catch(() => ({}));
@@ -48,6 +54,11 @@ export async function POST(req: NextRequest) {
   if (b.op === "end" && isId(b.trip)) {
     const { error } = await supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", b.trip).eq("status", "active");
     return J(error ? { ok: false, error: error.message } : { ok: true });
+  }
+  if (b.op === "cmd" && isId(b.trip)) {
+    const cmd = cleanCmd(b.c, b.v); if (!cmd) return J({ ok: false, error: "BAD_CMD" }, 400);
+    const { error } = await supabaseAdmin.from("cabin_trips").update({ music_cmd: cmd }).eq("id", b.trip).eq("status", "active");
+    return J(error ? { ok: false, error: /music_cmd/.test(error.message) ? "SETUP" : error.message } : { ok: true });
   }
   return J({ ok: false, error: "BAD_OP" }, 400);
 }
