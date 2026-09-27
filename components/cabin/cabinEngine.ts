@@ -548,10 +548,20 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     })();
   }
 
+  /** 画面の大きさに合わせる。iPad を縦にしたら縦の並び (820 x 1180)、横なら横の並び (1180 x 820) */
   function resize() {
-    const s = Math.min(window.innerWidth / 1180, window.innerHeight / 820);
+    const port = window.innerHeight > window.innerWidth * 1.05, was = stage.classList.contains("port");
+    stage.classList.toggle("port", port);
+    const W = port ? 820 : 1180, H = port ? 1180 : 820;
+    const s = Math.min(window.innerWidth / W, window.innerHeight / H);
     stage.style.transform = `translate(-50%,-50%) scale(${s})`;
     MAP.invalidateSize();
+    if (was !== port) requestAnimationFrame(() => {
+      MAP.invalidateSize();
+      if (trip) { if (carLL) MAP.panTo(carLL, { animate: false }); else MAP.fitBounds(L.latLngBounds(R.pts.concat([room?.home ?? CRANE_NEST])).pad(0.18)); }
+      if (ptOn) { stopPtc(); setTimeout(startPtc, 50); }
+      npv.relayout();
+    });
   }
 
   return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3"), unlock, demo, saveOffline, resize, weather,

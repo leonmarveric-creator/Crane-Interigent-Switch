@@ -64,3 +64,16 @@ test("cabin: full-screen lyrics borrow the live map and room card, and give them
   const css = read("app", "cabin", "cabin.css");
   assert.match(css, /\.cab \.stage\.trip\.np-on\[data-np="C"\] \.npfull\{display:block\}/);
 });
+
+test("cabin: turning the iPad switches between the landscape (1180x820) and portrait (820x1180) layouts", () => {
+  const eng = read("components", "cabin", "cabinEngine.ts");
+  assert.match(eng, /const port = window\.innerHeight > window\.innerWidth \* 1\.05/);
+  assert.match(eng, /const W = port \? 820 : 1180, H = port \? 1180 : 820/);
+  assert.match(eng, /npv\.relayout\(\)/, "full screen redraws the bay photo and refits map + room");
+  assert.match(read("components", "cabin", "CabinApp.tsx"), /orientationchange/);
+  const css = read("app", "cabin", "cabin.css");
+  for (const s of [".cab .stage.port{width:820px;height:1180px}", ".cab .stage.port .scr{grid-template-columns:1fr", ".cab .stage.port .f2right{", ".cab .stage.port .qrbody{flex-direction:column"]) assert.ok(css.includes(s), s);
+  const man = JSON.parse(read("public", "cabin", "manifest.webmanifest"));
+  assert.equal(man.orientation, "any", "home-screen app may rotate");
+  assert.ok(man.icons.every((i) => i.src.includes("?v=2")), "new icon is picked up");
+});

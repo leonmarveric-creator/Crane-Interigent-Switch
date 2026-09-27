@@ -630,3 +630,49 @@
 
 @keyframes cab-spinc{to{transform:rotate(360deg)}}
 .cab .stage.trip.np-on[data-np="H"] .holo{display:flex}
+
+/* ===== iPad を縦にしたとき (820 x 1180) ===== */
+.cab .stage.port{width:820px;height:1180px}
+.cab .stage.port .scr{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 420px;gap:14px}
+.cab .stage.port .side{display:grid!important;grid-template-columns:1.25fr 1fr;grid-template-rows:auto minmax(0,1fr);gap:12px!important}
+.cab .stage.port .side>.box:first-child{grid-column:2;grid-row:1}
+.cab .stage.port .side>.roomb{grid-column:1;grid-row:1 / span 2;min-height:0;overflow:hidden}
+.cab .stage.port .side>.box:last-child{grid-column:2;grid-row:2;min-height:0}
+.cab .stage.port .rec{grid-template-columns:1fr!important}
+.cab .stage.port .rph{max-height:250px!important}
+.cab .stage.port .stby .logo{font-size:52px}
+.cab .stage.port .arrive .t2{font-size:64px!important}
+.cab .stage.port .arrive.out .t2{font-size:58px!important}
+.cab .stage.port .arrive .ak{font-size:130px}
+.cab .stage.port .aq button{min-width:230px}
+.cab .stage.port .qrc{width:740px}
+.cab .stage.port .qrbody{flex-direction:column;gap:18px}
+.cab .stage.port .qrbox{width:320px;height:320px}
+.cab .stage.port .qrside{width:100%}
+.cab .stage.port .qrside h3{text-align:center}
+/* 全画面 (縦): 上に夕景と歌詞 → カバーと再生ボタン → 地図と部屋 */
+.cab .stage.port .f2deco path:not(:first-child),.cab .stage.port .f2globe{display:none}
+.cab .stage.port .f2top{padding:0 14px}
+.cab .stage.port .f2logo{width:auto;gap:8px}.cab .stage.port .f2crane{width:36px;height:28px}
+.cab .stage.port .f2logo b{font-size:14px;letter-spacing:.3em}.cab .stage.port .f2logo small{font-size:7px;letter-spacing:.3em}
+.cab .stage.port .f2seasons div{width:58px}.cab .stage.port .f2seasons b{font-size:16px}.cab .stage.port .f2seasons small{font-size:7px}
+.cab .stage.port .f2lang{width:auto}.cab .stage.port .f2seg button{min-width:50px;height:30px;font-size:11px}
+.cab .stage.port .f2mid{left:0;right:0;top:62px;bottom:auto;height:478px}
+.cab .stage.port .f2loc{top:52%}.cab .stage.port .f2dash{top:calc(52% + 22px)}
+.cab .stage.port .f2ly{top:calc(52% + 38px)}
+.cab .stage.port .f2ly .f2n1{font-size:20px;margin-top:12px}.cab .stage.port .f2ly .f2n2{font-size:15px;margin-top:10px}
+.cab .stage.port .f2vig{background:linear-gradient(180deg,rgba(4,11,28,.7) 4%,rgba(4,11,28,0) 10%,rgba(4,11,28,0) 40%,rgba(4,11,28,.85) 46%,#040b1c 50%)}
+.cab .stage.port .f2left{left:24px;right:24px;top:548px;bottom:auto;width:auto;height:150px;display:grid;grid-template-columns:150px 1fr;grid-template-rows:auto auto auto auto auto;column-gap:24px;align-items:start;align-content:center}
+.cab .stage.port .f2disc{grid-row:1 / span 5;width:150px;height:150px;align-self:center}
+.cab .stage.port .f2cov{width:84px;height:84px;margin:-42px 0 0 -42px}
+.cab .stage.port .f2meta{margin-top:0;padding:0}.cab .stage.port .f2t,.cab .stage.port .f2a{padding:0}.cab .stage.port .f2t{font-size:22px;margin-top:4px}.cab .stage.port .f2a{font-size:12px}
+.cab .stage.port .f2seek{margin:8px 0 0;width:100%}.cab .stage.port .f2ctl{margin-top:4px;padding:0;width:100%;justify-content:flex-start;gap:18px}
+.cab .stage.port .f2ctl .pp{width:54px;height:54px;font-size:17px}
+.cab .stage.port .f2right{left:16px;right:16px;top:708px;bottom:96px;width:auto;flex-direction:row;gap:12px}
+.cab .stage.port .f2nav,.cab .stage.port .f2room{flex:1 1 0;min-width:0}
+.cab .stage.port .f2bot{padding:0 8px}.cab .stage.port .f2bot button{padding:0 14px;gap:8px}.cab .stage.port .f2bot button svg{width:24px;height:24px}
+.cab .stage.port .f2bot button small{display:none}.cab .stage.port .f2wx span{display:none}.cab .stage.port .f2wx small{display:none}
+.cab .stage.port .f2t{display:block;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cab .stage.port .f2a{display:block;line-height:1.3;margin-top:2px}
+.cab .stage.port .qrphone{display:none}.cab .stage.port .qrside ol{max-width:560px;margin:0 auto}.cab .stage.port .qrside code,.cab .stage.port .qrk{text-align:center}
+.cab .stage.port .f2left{height:auto;min-height:150px;row-gap:2px}.cab .stage.port .qrk{display:block}
+.cab .stage.port .f2right{top:720px}

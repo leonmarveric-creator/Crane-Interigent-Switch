@@ -23,7 +23,7 @@ export interface NpCtx {
   cmd: (c: MusicCmd, v: number | null) => void;
   tick: () => void;                 // ボタンの音
 }
-export interface NpView { update(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void; texts(): void; reset(): void }
+export interface NpView { update(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void; texts(): void; reset(): void; relayout(): void }
 
 const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const ARC = 2 * Math.PI * 132;
@@ -81,8 +81,9 @@ export function createNowPlaying(c: NpCtx): NpView {
     im.onload = () => {
       const k = Math.min(2, (window.devicePixelRatio || 1) * sc); cv.width = W * k; cv.height = H * k;
       const g = cv.getContext("2d")!; g.setTransform(k, 0, 0, k, 0, 0);
-      const mx0 = (mid.left - box.left) / sc, mw = mid.width / sc, cx = mx0 + mw / 2;
-      const dw = mw + 170, dh = (dw * im.height) / im.width, left = cx - dw / 2, top = 58, yw = top + dh * 0.815;
+      const port = stage.classList.contains("port"); // 縦: 写真は高さ 300 まで (下に再生ボタン・地図・部屋)
+      const mx0 = (mid.left - box.left) / sc, mw = mid.width / sc, cx = mx0 + mw / 2, midB = (mid.bottom - box.top) / sc;
+      const dw = port ? Math.min(mw + 170, (300 * im.width) / im.height) : mw + 170, dh = (dw * im.height) / im.width, left = cx - dw / 2, top = 58, yw = top + dh * 0.815;
       let gr = g.createLinearGradient(0, 0, 0, H);
       gr.addColorStop(0, "#050d24"); gr.addColorStop(yw / H, "#0b2346"); gr.addColorStop(Math.min(0.99, (top + dh) / H), "#0a2244"); gr.addColorStop(0.8, "#061631"); gr.addColorStop(1, "#040b1c");
       g.fillStyle = gr; g.fillRect(0, 0, W, H);
@@ -103,7 +104,7 @@ export function createNowPlaying(c: NpCtx): NpView {
         for (let y = 0; y < 12; y++) { const i = (y * im.width + x) * 4, v = d[i] + d[i + 1] + d[i + 2]; if (v > best) { best = v; col = [d[i], d[i + 1], d[i + 2]]; } }
         const u = x / im.width; if (best > 330 && u > 0.08 && u < 0.92) lights.push({ x: left + u * dw, c: col, a: Math.min(1, (best - 300) / 300) });
       }
-      geo = { W, H, mx0, mw, left, dw, yw, lights, glints: null };
+      geo = { W, H, mx0, mw, left, dw, yw, lights, glints: null, base: port ? midB - 24 : H * 0.745, seaB: port ? midB - 10 : H * 0.8 };
     };
     im.src = BAY;
     return true;
@@ -129,7 +130,7 @@ export function createNowPlaying(c: NpCtx): NpView {
       }
     });
     // ② 海のきらめき
-    if (!G.glints) { G.glints = []; for (let i = 0; i < 200; i++) { const dep = Math.pow(Math.random(), 1.8); G.glints.push({ x: left + dw * 0.08 + Math.random() * dw * 0.84, y: yw + 4 + dep * (H * 0.8 - yw), w: 2 + dep * 9, sp: 0.6 + Math.random() * 1.8, p: Math.random() * 6.28, warm: Math.random() < 0.35 }); } }
+    if (!G.glints) { G.glints = []; for (let i = 0; i < 200; i++) { const dep = Math.pow(Math.random(), 1.8); G.glints.push({ x: left + dw * 0.08 + Math.random() * dw * 0.84, y: yw + 4 + dep * (G.seaB - yw), w: 2 + dep * 9, sp: 0.6 + Math.random() * 1.8, p: Math.random() * 6.28, warm: Math.random() < 0.35 }); } }
     for (const q of G.glints) {
       const s = Math.sin(t * q.sp + q.p); if (s < 0.5) continue;
       const a = Math.pow((s - 0.5) * 2, 3) * (q.warm ? 0.4 : 0.3) * (1 - ((q.y - yw) / (H - yw)) * 0.8);
@@ -140,7 +141,7 @@ export function createNowPlaying(c: NpCtx): NpView {
     gr.addColorStop(0, "rgba(90,160,255,.09)"); gr.addColorStop(1, "rgba(90,160,255,0)");
     g.save(); g.translate(0, yw + 60); g.scale(1, 0.25); g.translate(0, -(yw + 60)); g.fillStyle = gr; g.fillRect(bx - 160, yw - 600, 320, 1400); g.restore();
     // ④ 粒の波 (歌詞の下)
-    const base = H * 0.745, cols = Math.floor((x1 - x0) / 2.6), rows = 15;
+    const base = G.base, cols = Math.floor((x1 - x0) / 2.6), rows = 15;
     const wave = (u: number, r: number) => Math.sin(u * 7.5 - t * 0.9) * 0.6 + Math.sin(u * 15 + t * 1.4 + r * 0.25) * 0.28 + Math.sin(u * 3 + t * 0.4) * 0.3;
     for (let r = 0; r < rows; r++) {
       const rr = r / (rows - 1);
@@ -262,8 +263,13 @@ export function createNowPlaying(c: NpCtx): NpView {
     const k = b.dataset.f2, T = MUSIC_T[c.lang()] ?? MUSIC_T.en;
     if (k === "nav") setMode("H"); else if (k === "room") toast(T.toastRoom); else if (k === "set") toast(T.toastSet);
   }));
-  window.addEventListener("resize", () => { if (open) { fitRoom(); sceneDone = false; sceneDone = scene(); } });
 
+  /** iPad を回したとき (縦 ⇄ 横) */
+  function relayout() {
+    if (!open) return;
+    geo = null; sceneDone = false;
+    requestAnimationFrame(() => { sceneDone = scene(); fitRoom(); c.map.invalidateSize(false); const p = c.car(); if (p) c.map.panTo(p, { animate: false }); else c.refit(); });
+  }
   function reset() { np = null; tr = null; lrc = []; mode = "H"; hLi = -2; fLi = -2; $("hLine").textContent = ""; }
-  return { update, texts, reset };
+  return { update, texts, reset, relayout };
 }

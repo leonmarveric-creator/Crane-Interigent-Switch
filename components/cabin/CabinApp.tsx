@@ -82,8 +82,10 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     })();
     const onR = () => eng.current?.resize();
     window.addEventListener("resize", onR);
+    const onO = () => setTimeout(onR, 300); // iPad を回したとき (縦 ⇄ 横)
+    window.addEventListener("orientationchange", onO);
     void tileCount().then(setSaved);
-    return () => { live = false; window.removeEventListener("resize", onR); };
+    return () => { live = false; window.removeEventListener("resize", onR); window.removeEventListener("orientationchange", onO); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
