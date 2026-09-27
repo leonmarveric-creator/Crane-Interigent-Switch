@@ -230,6 +230,7 @@ export function createNowPlaying(c: NpCtx): NpView {
   function loop(now: number) {
     const isOn = on() && stage.classList.contains("trip");
     stage.classList.toggle("np-on", isOn); stage.dataset.np = mode;
+    $("npFullBtn").classList.toggle("off", !isOn);
     const want = isOn && mode === "C";
     if (want !== open) {
       open = want;
@@ -243,7 +244,12 @@ export function createNowPlaying(c: NpCtx): NpView {
 
   /* ---------- ボタン ---------- */
   const setMode = (m: "H" | "C") => { mode = m; c.tick(); };
-  $("npFullBtn").onclick = (e) => { e.stopPropagation(); setMode(mode === "C" ? "H" : "C"); };
+  $("npFullBtn").onclick = (e) => {
+    e.stopPropagation();
+    // 曲が届いていないとき: ボタンに「スマホで曲が流れていない」と少し出す
+    if (!on()) { const b = $("npFullBtn"); b.textContent = "🎵 NO MUSIC"; c.tick(); setTimeout(() => { b.textContent = "🎵"; }, 2200); return; }
+    setMode(mode === "C" ? "H" : "C");
+  };
   const send = (cm: MusicCmd, v: number | null = null) => {
     c.tick(); c.cmd(cm, v); toast((MUSIC_T[c.lang()] ?? MUSIC_T.en).toastCmd);
     // すぐ反映したように見せる (次の知らせで本当の状態に戻る)

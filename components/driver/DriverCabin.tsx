@@ -42,6 +42,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       else if (r.event === "end" && boosting) { boosting = false; mRef.current.boostOut(); }
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
+    let warned = false;
     const iv = setInterval(async () => {
       if (!live) return;
       const np = mRef.current.nowPlaying(); // 再生中の曲 (iPad の歌詞用)。位置がまだ取れていなくても送る
@@ -50,6 +51,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (!live) return;
       if (r?.ok) {
         if (last) setSending("ok");
+        if (r.np === "setup" && !warned) { warned = true; toast(t("iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください")); }
         if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
         // iPad の再生ボタン (ゲストが押した) → このスマホの音楽を操作
         if (lastCmd == null) lastCmd = r.cmd?.n ?? 0;

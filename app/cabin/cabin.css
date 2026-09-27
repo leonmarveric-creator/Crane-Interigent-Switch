@@ -382,7 +382,7 @@
 .cab .npfull{position:absolute;inset:0;z-index:1500;display:none;overflow:hidden;background:#01040b}
 .cab .stage.trip.np-on[data-np="C"] .npfull{display:block}
 .cab .stage.trip.np-on[data-np="C"] .scr{visibility:hidden}
-.cab .npfb{display:none}.cab .stage.np-on .npfb{display:block}
+.cab .npfb{display:block}.cab .npfb.off{opacity:.45}
 /* ===== ホログラムの歌詞 (地図の下の空いている所) ===== */
 .cab .holo{position:absolute;left:16px;right:16px;bottom:10px;height:128px;z-index:998;display:none;align-items:flex-end;gap:16px;padding:0 18px 16px;pointer-events:none;transition:opacity .5s,transform .5s}
 .cab .stage.trip.np-on[data-np="H"] .holo{display:flex}

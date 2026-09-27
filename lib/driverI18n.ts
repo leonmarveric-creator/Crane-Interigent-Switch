@@ -16,6 +16,7 @@ const ZH: Record<string, string> = {
   "Wi-Fi のときに押してください。保存した曲はギガを使わずに再生できます。": "请在连接 Wi-Fi 时点击。保存后的歌曲播放不消耗流量。",
   "iPad が未登録です": "还没有登记 iPad",
   "iPad に出せませんでした": "无法显示到 iPad",
+  "iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください": "要在 iPad 上显示歌词，请先执行 Supabase 的 SQL（migration_cabin_music.sql）",
   "iPad に表示中": "iPad 显示中",
   "iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。": "在 iPad 的 Safari 打开 {u} 并登录，取个名字（如 1号车）登记。添加到主屏幕后可全屏使用。",
   "iPad の部屋の写真": "iPad 的房间照片",

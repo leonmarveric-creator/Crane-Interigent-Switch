@@ -4,3 +4,5 @@
 -- 何回実行しても大丈夫です。
 alter table public.cabin_trips add column if not exists now_playing jsonb;
 alter table public.cabin_trips add column if not exists music_cmd jsonb;
+-- 追加した列をすぐ使えるように (API の表の情報を読み直す)
+notify pgrst, 'reload schema';

@@ -55,7 +55,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const gps = useRef<{ has: boolean | null; since: number }>({ has: null, since: Date.now() });
   const phoneAt = useRef<string>("");
   const tripRef = useRef<CabinTrip | null>(null);
-  const trackRef = useRef<CabinTrack | null>(null); // 再生中の曲 (曲名・カバー・歌詞)。変わったときだけサーバから来る
+  const trackRef = useRef<CabinTrack | null>(null);
+  const npWarned = useRef(false); // 再生中の曲 (曲名・カバー・歌詞)。変わったときだけサーバから来る
 
   /* ---------- 起動 ---------- */
   useEffect(() => {
@@ -148,6 +149,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
+        if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }
         if (j.track) trackRef.current = j.track;
         e.nowPlaying(t.np ?? null, t.np && trackRef.current?.id === t.np.id ? trackRef.current : null, typeof j.now === "number" ? j.now - Date.now() : 0);
       } else if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); }
@@ -204,7 +206,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     const e = eng.current; if (!e) return;
     e.unlock(); setMenu(false);
     const room = rooms.find((r) => r.photo) ?? rooms[0] ?? null;
-    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null };
+    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null, npReady: true };
     tripRef.current = t; setInTrip(true);
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }

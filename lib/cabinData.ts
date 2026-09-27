@@ -25,6 +25,8 @@ export interface CabinTrip {
   np: NowPlaying | null;
   /** iPad から スマホへの再生の操作 (最後の 1 つ) */
   cmd: MusicCmdRow | null;
+  /** migration_cabin_music.sql を実行済みか (now_playing の列があるか) */
+  npReady: boolean;
 }
 
 const SEASON: [RegExp, string, string, CabinRoom["fx"]][] = [
@@ -69,7 +71,7 @@ export function toCabinTrip(t: any): CabinTrip {
     roomId: t.room_id ?? null, lang: (["ja", "en", "zh", "ko"].includes(t.guest_lang) ? t.guest_lang : "en") as GLang,
     ac: t.ac_mode === "heat" ? "heat" : t.ac_mode === "none" ? "none" : "cool", startedAt: t.started_at,
     phone: typeof t.phone_lat === "number" && typeof t.phone_lng === "number" && t.phone_at ? { ll: [t.phone_lat, t.phone_lng], kmh: t.phone_speed ?? null, at: t.phone_at } : null,
-    np: toNowPlaying(t.now_playing),
+    np: toNowPlaying(t.now_playing), npReady: "now_playing" in t,
     cmd: t.music_cmd && typeof t.music_cmd === "object" && typeof t.music_cmd.n === "number" ? t.music_cmd : null,
   };
 }
