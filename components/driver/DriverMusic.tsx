@@ -10,7 +10,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DriverTrack } from "@/lib/driverData";
 import { parseLrc, toLrc, lyricIndex, decodeLrcBytes, type LrcLine } from "@/lib/driverLogic";
 import { sfx, vib } from "@/lib/driverSfx";
-import { driverAddTrack, driverDeleteTrack, driverReorderTracks, driverTrackUploadUrl, driverUpdateTrack } from "@/app/driver/actions";
+import { driverAddTrack, driverDeleteTrack, driverReorderTracks, driverTrackUploadUrl, driverUpdateTrack, driverCoverUploadUrl, driverSetCover } from "@/app/driver/actions";
+import { compressCover, mp3Cover } from "@/lib/driverCover";
 
 export type MLang = "ja" | "en" | "zh" | "ko";
 export const MLANGS: Record<MLang, string> = { ja: "日本語", en: "English", zh: "中文", ko: "한국어" };
@@ -160,10 +161,28 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       navigator.mediaSession.metadata = new MediaMetadata({
         title: line ? `♪ ${line}` : track.title,
         artist: line ? `${track.title} ─ ${track.artist || "Crane Nest"}` : track.artist || "Crane Nest",
-        album: "HIROSHI DRIVE", artwork: [{ src: "/driver/icon.png", sizes: "512x512", type: "image/png" }],
+        album: "HIROSHI DRIVE",
+        artwork: track.cover ? [{ src: track.cover, sizes: "800x800", type: track.cover.endsWith(".webp") ? "image/webp" : "image/jpeg" }] : [{ src: "/driver/icon.png", sizes: "512x512", type: "image/png" }],
       });
     } catch { /* ignore */ }
   }, [track, li, lyrOnCar, lrc]);
+  // ハンドル・CarPlay・ロック画面のボタン (再生・一時停止・次・前・10 秒・位置)
+  const apiRef = useRef<any>(null);
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    const set = (k: MediaSessionAction, fn: MediaSessionActionHandler | null) => { try { ms.setActionHandler(k, fn); } catch { /* 未対応 */ } };
+    set("play", () => apiRef.current?.play());
+    set("pause", () => apiRef.current?.pause());
+    set("nexttrack", () => apiRef.current?.next());
+    set("previoustrack", () => apiRef.current?.prev());
+    set("seekbackward", (d) => apiRef.current?.skip(-(d.seekOffset || 10)));
+    set("seekforward", (d) => apiRef.current?.skip(d.seekOffset || 10));
+    set("seekto", (d) => { if (typeof d.seekTime === "number") apiRef.current?.seek(d.seekTime); });
+  }, []);
+  useEffect(() => {
+    try { if ("mediaSession" in navigator && dur > 0) navigator.mediaSession.setPositionState({ duration: dur, position: Math.min(pos, dur), playbackRate: 1 }); } catch { /* ignore */ }
+  }, [pos, dur]);
   const api = {
     tracks, setTracks, cur, list, track, playing, pos, dur, lrc, li, lyrOnCar, saved,
     play() { sfx.prime(); prime(); const a = el(); if (!track) { toast(t("この言語の曲はまだありません。設定から追加できます。")); return; } if (!a.src) void load(track, true); else { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } },
@@ -179,12 +198,13 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     prime,
     duck(on: boolean) { if (!playing) return; fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900); },
     fadeOut() { if (!playing) return; fadeTo(0, 3500, () => { el().pause(); setLevel(vol.current); }); },
-    seek(s: number) { el().currentTime = Math.max(0, s); },
+    seek(s: number) { const a = el(); a.currentTime = Math.max(0, Math.min((a.duration || s + 1) - 0.3, s)); setPos(a.currentTime); },
+    skip(d: number) { api.seek(el().currentTime + d); },
     setLyrOnCar(v: boolean) { setLyrOnCar(v); try { localStorage.setItem("drvLyrCar", v ? "1" : "0"); } catch { /* ignore */ } },
     /** 全部の曲をこの端末に保存 */
     async saveOffline(onProgress: (d: number, n: number) => void) {
       if (!("caches" in window)) { toast(t("このブラウザは保存に対応していません")); return; }
-      const c = await caches.open(CACHE); const urls = tracks.map((x) => x.url); let d = 0;
+      const c = await caches.open(CACHE); const urls = tracks.flatMap((x) => [x.url, x.cover].filter(Boolean) as string[]); let d = 0;
       for (const u of urls) {
         try { if (!(await c.match(u))) { const r = await fetch(u, { mode: "cors" }); if (r.ok) await c.put(u, r); } } catch { /* 次へ */ }
         onProgress(++d, urls.length);
@@ -195,23 +215,124 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     },
     async clearOffline() { try { await caches.delete(CACHE); } catch { /* ignore */ } await refreshSaved(); },
   };
+  apiRef.current = api;
   return api;
 }
 export type Music = ReturnType<typeof useDriverMusic>;
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
+/** カバー画像 (この端末に保存してあればそこから)。なければお迎え用・お見送り用の色の絵 (画像ファイルなし) */
+export function CoverArt({ track, p, className }: { track: DriverTrack | null; p: "in" | "out"; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true, blob: string | null = null;
+    setSrc(track?.cover ?? null);
+    if (track?.cover) void cachedUrl(track.cover).then((u) => { if (!live) { if (u.startsWith("blob:")) URL.revokeObjectURL(u); return; } if (u.startsWith("blob:")) blob = u; setSrc(u); });
+    return () => { live = false; if (blob) URL.revokeObjectURL(blob); };
+  }, [track?.cover]);
+  // eslint-disable-next-line @next/next/no-img-element
+  if (src) return <div className={`cover ${className ?? ""}`}><img src={src} alt="" onError={() => setSrc(null)} /></div>;
+  const [a, b, c] = p === "in" ? ["#1c5fc4", "#6fb6ff", "#ffd199"] : ["#e0621c", "#ffb35c", "#7a3fb8"];
+  const id = `cv${p}`;
+  return (
+    <div className={`cover ${className ?? ""}`}>
+      <svg viewBox="0 0 300 300"><defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={a} /><stop offset=".6" stopColor={b} /><stop offset="1" stopColor={c} /></linearGradient></defs>
+        <rect width="300" height="300" fill={`url(#${id})`} /><circle cx="150" cy="160" r="52" fill="#fff" opacity=".85" /><rect y="170" width="300" height="130" fill="#0b1424" opacity=".85" />
+        <path d="M150 170 L60 300 L240 300 Z" fill="#1b2638" /><path d="M150 176 L150 300" stroke="#ffe7a8" strokeWidth="5" strokeDasharray="16 18" />
+        <text x="20" y="44" fill="#fff" fontSize="22" fontWeight="700" letterSpacing="3" fontFamily="Rajdhani,Helvetica,Arial">{p === "in" ? "WELCOME" : "SEE YOU"}</text>
+        <text x="20" y="66" fill="#fff" opacity=".7" fontSize="12" letterSpacing="4" fontFamily="Helvetica,Arial">HIROSHI DRIVE</text></svg>
+    </div>
+  );
+}
+
+/** 進み具合のバー (タップ・ドラッグで好きな位置へ) */
+function SeekBar({ m, className }: { m: Music; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<number | null>(null);
+  const at = (e: React.PointerEvent) => { const r = ref.current!.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+  const pc = drag ?? (m.dur ? m.pos / m.dur : 0);
+  return (
+    <div ref={ref} className={`seek ${className ?? ""}`}
+      onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture?.(e.pointerId); setDrag(at(e)); }}
+      onPointerMove={(e) => { if (drag !== null) setDrag(at(e)); }}
+      onPointerUp={(e) => { const x = at(e); setDrag(null); if (m.dur) m.seek(x * m.dur); }}
+      onPointerCancel={() => setDrag(null)}>
+      <i style={{ width: `${pc * 100}%` }} /><b style={{ left: `${pc * 100}%` }} />
+    </div>
+  );
+}
+
+/** 全画面 (アルバムカバー + 歌詞)。iPhone は音楽中に横にすると自動で開き、縦に戻すと閉じる。iPad はボタンで */
+export function useMusicFull(m: Music) {
+  const [manual, setManual] = useState(false);
+  const [phoneLand, setPhoneLand] = useState(false);
+  const [closed, setClosed] = useState(false); // 横のまま ✕ で閉じたら、縦に戻すまで出さない
+  useEffect(() => {
+    const q = window.matchMedia("(orientation: landscape) and (max-height: 520px)");
+    const f = () => { setPhoneLand(q.matches); setClosed(false); }; f();
+    q.addEventListener?.("change", f);
+    return () => q.removeEventListener?.("change", f);
+  }, []);
+  const open = manual || (phoneLand && m.playing && !closed);
+  // 開いている間は画面を消さない
+  useEffect(() => {
+    if (!open || !("wakeLock" in navigator)) return;
+    let lock: any = null, live = true;
+    const get = () => (navigator as any).wakeLock.request("screen").then((l: any) => { if (live) lock = l; else l.release(); }).catch(() => {});
+    void get();
+    const vis = () => { if (document.visibilityState === "visible") void get(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { live = false; document.removeEventListener("visibilitychange", vis); lock?.release?.().catch?.(() => {}); };
+  }, [open]);
+  return { open, phoneLand, show: () => setManual(true), hide: () => { setManual(false); setClosed(true); } };
+}
+export function MusicFull({ m, t, full }: { m: Music; t: T; full: ReturnType<typeof useMusicFull> }) {
+  const L = m.lrc, i = m.li;
+  const box = useRef<HTMLDivElement>(null), inner = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const p = inner.current?.children[Math.max(0, i)] as HTMLElement | undefined;
+    if (inner.current) inner.current.style.transform = p ? `translateY(${-(p.offsetTop + p.offsetHeight / 2)}px)` : "none";
+  }, [i, L, full.open]);
+  if (!full.open) return null;
+  return (
+    <div className="mfull" ref={box}><div className="mf-in">
+      <div className="mf-blur"><CoverArt track={m.track} p={m.cur.p} /></div>
+      <button className="mf-x" onClick={() => { sfx.blip(); full.hide(); }} aria-label="close">✕</button>
+      {full.phoneLand ? <div className="mf-tip">{t("スマホを縦にすると元の画面に戻ります")}</div> : null}
+      <CoverArt track={m.track} p={m.cur.p} className="mf-cover" />
+      <div className="mf-ly">
+        {L.length ? (
+          <div className="in" ref={inner}>{L.map((l, k) => <p key={k} className={k === i ? "now" : ""} onClick={() => { sfx.tick(); m.seek(l.t); }}>{l.s}</p>)}</div>
+        ) : <div className="none">{m.track ? t("歌詞なし") : t("曲がありません")}</div>}
+      </div>
+      <div className="mf-bot">
+        <div className="tt"><b>{m.track?.title ?? "—"}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : ""}</small></div>
+        <div className="pw"><SeekBar m={m} /><div className="mtime"><span>{fmt(m.pos)}</span><span>{fmt(m.dur)}</span></div></div>
+        <div className="ctl">
+          <button onClick={() => { sfx.blip(); m.prev(); }}>⏮</button>
+          <button onClick={() => m.skip(-10)}>↺<small>10</small></button>
+          <button className="pp" onClick={() => { sfx.blip(); m.toggle(); }}>{m.playing ? "⏸" : "▶"}</button>
+          <button onClick={() => m.skip(10)}>↻<small>10</small></button>
+          <button onClick={() => { sfx.blip(); m.next(); }}>⏭</button>
+        </div>
+      </div>
+    </div></div>
+  );
+}
+
 /** ホームのプレイヤー */
-export function MusicPlayer({ m, t, onOpen, onArrive }: { m: Music; t: T; onOpen: () => void; onArrive: () => void }) {
+export function MusicPlayer({ m, t, onOpen, onArrive, onFull }: { m: Music; t: T; onOpen: () => void; onArrive: () => void; onFull: () => void }) {
   const L = m.lrc, i = m.li;
   return (
     <div className={`mplayer ${m.playing ? "on" : ""}`}>
-      <button className="mpl-top" onClick={() => { sfx.blip(); onOpen(); }}>
-        <span className="mchip">{m.cur.p === "in" ? "🛬 " + t("お迎え") : "🛫 " + t("お見送り")}・{MLANGS[m.cur.l]}</span>
-        <span className="mhint">{t("プレイリストを変える")} ›</span>
-      </button>
+      <div className="mpl-top">
+        <button className="mchip" onClick={() => { sfx.blip(); onOpen(); }}>{m.cur.p === "in" ? "🛬 " + t("お迎え") : "🛫 " + t("お見送り")}・{MLANGS[m.cur.l]} ›</button>
+        <button className="mbtn" onClick={onArrive} title="arrive">🏁</button>
+        <button className="mbtn fs" onClick={() => { sfx.blip(); onFull(); }}>⛶ {t("全画面")}</button>
+      </div>
       <div className="mpl-row">
-        <div className={`mart ${m.cur.p}`}>{m.cur.p === "in" ? "🌆" : "🌅"}</div>
+        <CoverArt track={m.track} p={m.cur.p} className="mart" />
         <div className="nm"><b>{m.track?.title ?? t("曲がありません")}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : t("設定から曲を追加してください")}</small></div>
         <div className="eq"><i /><i /><i /></div>
       </div>
@@ -220,13 +341,14 @@ export function MusicPlayer({ m, t, onOpen, onArrive }: { m: Music; t: T; onOpen
         <p key={i} className="now">{L.length ? (L[i]?.s ?? "♪") : t("歌詞なし")}</p>
         <p>{L[i + 1]?.s ?? ""}</p>
       </div>
-      <div className="mbar"><i style={{ width: `${m.dur ? (m.pos / m.dur) * 100 : 0}%` }} /></div>
+      <SeekBar m={m} className="mbar" />
       <div className="mtime"><span>{fmt(m.pos)}</span><span>{fmt(m.dur)}</span></div>
-      <div className="mctl">
+      <div className="mctl five">
         <button onClick={() => { sfx.blip(); m.prev(); }}>⏮</button>
+        <button onClick={() => m.skip(-10)}>↺<small>10</small></button>
         <button className="pp" onClick={() => { sfx.blip(); m.toggle(); }}>{m.playing ? "⏸" : "▶"}</button>
+        <button onClick={() => m.skip(10)}>↻<small>10</small></button>
         <button onClick={() => { sfx.blip(); m.next(); }}>⏭</button>
-        <button onClick={onArrive} title="arrive">🏁</button>
       </div>
     </div>
   );
@@ -273,6 +395,19 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
   const L = m.tracks.filter((x) => x.purpose === p && x.lang === l).sort((a, b) => a.sort - b.sort);
   const count = (pp: string, ll: string) => m.tracks.filter((x) => x.purpose === pp && x.lang === ll).length;
   const upd = (id: string, patch: Partial<DriverTrack>) => m.setTracks((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const [cv, setCv] = useState<DriverTrack | null>(null);
+  const [cvBusy, setCvBusy] = useState(false);
+  /** カバーを 800×800 に縮めてアップロード (元の画像は保存しない) */
+  const saveCover = async (trackId: string, img: Blob, quiet = false): Promise<boolean> => {
+    const c = await compressCover(img); if (!c) { if (!quiet) toast(t("画像を読み込めませんでした")); return false; }
+    const u = await driverCoverUploadUrl(trackId, c.ext); if (!u.ok) { if (!quiet) toast(t("アップロードできませんでした")); return false; }
+    const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": c.blob.type, "x-upsert": "false" }, body: c.blob }).catch(() => null);
+    if (!put?.ok) { if (!quiet) toast(t("アップロードできませんでした")); return false; }
+    const r = await driverSetCover(trackId, u.path); if (!r.ok) { if (!quiet) toast(t("保存できませんでした")); return false; }
+    upd(trackId, { cover: r.url }); setCv((x) => (x && x.id === trackId ? { ...x, cover: r.url } : x));
+    if (!quiet) { sfx.chord(); toast(t("カバーを保存しました（{k}KB）", { k: Math.max(1, Math.round(c.blob.size / 1024)) })); }
+    return true;
+  };
 
   const add = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -297,8 +432,11 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
       const title = f.name.replace(/\.[^.]+$/, "");
       const r = await driverAddTrack({ purpose: p, lang: l, title, path: u.path });
       if (!r.ok) { toast(t("アップロードできませんでした") + "：" + why(r.error)); continue; }
-      m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: l, title, artist: null, url: r.url, lrc: null, sort: L.length + added }]);
+      m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: l, title, artist: null, url: r.url, cover: null, lrc: null, sort: L.length + added }]);
       added++;
+      // MP3 の中にカバー画像があれば自動で付ける
+      const art = await mp3Cover(f);
+      if (art) { setBusy(t("カバーを付けています…") + " " + f.name); await saveCover(r.id, art, true); }
     }
     setBusy("");
     if (added) { sfx.chord(); toast(t("追加しました")); }
@@ -325,6 +463,7 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
       </div>
       {L.length ? L.map((tr, i) => (
         <div className="fedit" key={tr.id}>
+          <button className="cvb" onClick={() => { sfx.blip(); setCv(tr); }} aria-label="cover"><CoverArt track={tr} p={tr.purpose} /></button>
           <input defaultValue={tr.title} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== tr.title) { upd(tr.id, { title: v }); void driverUpdateTrack(tr.id, { title: v }); } }} />
           <button className={`lyb ${tr.lrc ? "has" : ""}`} onClick={() => { sfx.blip(); setLy(tr); }}>{tr.lrc ? "✓" + t("歌詞") : "＋" + t("歌詞")}</button>
           <button onClick={() => move(i)}>↑</button>
@@ -338,6 +477,24 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
         <button onClick={async () => { sfx.blip(); setProg("0%"); await m.saveOffline((d, n) => setProg(`${Math.round((d / Math.max(1, n)) * 100)}%`)); setProg(""); sfx.chord(); toast(t("この端末に保存しました")); }}>{prog || t("保存する")}</button>
       </div>
       <p className="note">{t("Wi-Fi のときに押してください。保存した曲はギガを使わずに再生できます。")} <button className="linkbtn" onClick={() => { void m.clearOffline(); toast(t("保存を消しました")); }}>{t("保存を消す")}</button></p>
+      {cv && (
+        <>
+          <div className="sheet-bg show" onClick={() => setCv(null)} />
+          <div className="sheet show">
+            <h4>🖼 {t("アルバムカバー")} ─ {cv.title}</h4>
+            <div className="cvprev"><CoverArt track={cv} p={cv.purpose} /></div>
+            <p className="note">{t("写真を選ぶと、自動で 800×800 の正方形（真ん中を切り抜き）に縮めて保存します。元の大きい写真は保存しません。")}</p>
+            <label className="mfile">{cvBusy ? t("保存中…") : "🖼 " + t("写真を選ぶ")}<input type="file" accept="image/*" disabled={cvBusy} onChange={async (e) => {
+              const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+              setCvBusy(true); await saveCover(cv.id, f); setCvBusy(false);
+            }} /></label>
+            <div className="acts">
+              <button style={{ visibility: cv.cover ? "visible" : "hidden" }} onClick={async () => { const r = await driverSetCover(cv.id, null); if (r.ok) { upd(cv.id, { cover: null }); setCv({ ...cv, cover: null }); toast(t("カバーを外しました")); } }}>{t("カバーを外す")}</button>
+              <button className="ok" onClick={() => setCv(null)}>{t("閉じる")}</button>
+            </div>
+          </div>
+        </>
+      )}
       {ly && <LyricsSheet tr={ly} t={t} toast={toast} onClose={() => setLy(null)} onSave={(lrc) => { upd(ly.id, { lrc }); setLy((x) => (x ? { ...x, lrc } : x)); void driverUpdateTrack(ly.id, { lrc }).then((r) => { if (!r.ok) toast(t("歌詞を保存できませんでした") + "：" + r.error.slice(0, 60)); }); }} />}
     </div>
   );

@@ -53,6 +53,16 @@ export async function driverPrepare(resIds: string[], mode: "welcome" | "wafu" =
   return done.length ? { ok: true, done } : fail("DEVICE");
 }
 
+/** 部屋の設備を全部 OFF (エアコン・照明・和風ライト・ギャラクシー・NEST)。鍵はそのまま。準備済みの記録も外す */
+export async function driverAllOff(roomId: string, resId?: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  const room = await roomById(roomId); if (!room) return fail("NO_ROOM");
+  const r = await executeDeviceAction(room, "away", "Driver All Off").catch(() => ({ ok: false }));
+  await logDevice({ room_id: room.id, reservation_id: resId ?? null, action: "away", source: "admin", success: r.ok });
+  if (resId) await supabaseAdmin.from("reservations").update({ prepared_at: null }).eq("id", resId).then(() => {}, () => {});
+  return r.ok ? { ok: true } : fail("DEVICE");
+}
+
 /** チェックアウト処理: 外出モード (全部オフ) + 施錠。清掃はスタッフ画面に「清掃待ち」で出る */
 export async function driverCheckout(resId: string): Promise<R> {
   const g = guard(); if (g) return g;
@@ -138,6 +148,24 @@ export async function driverTrackUploadUrl(fileName: string): Promise<R<{ path: 
   if (error || !data) return fail(error?.message || "UPLOAD_URL");
   return { ok: true, path, token: data.token, signedUrl: data.signedUrl };
 }
+/** カバー画像のアップロード先 (ブラウザで 800×800 に縮めてから直接送る) */
+export async function driverCoverUploadUrl(trackId: string, ext: "webp" | "jpg"): Promise<R<{ path: string; signedUrl: string }>> {
+  const g = guard(); if (g) return g;
+  const path = `covers/${trackId}-${Date.now().toString(36)}.${ext === "webp" ? "webp" : "jpg"}`;
+  const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
+  if (error || !data) return fail(error?.message || "UPLOAD_URL");
+  return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** カバーを付ける / 外す (path = null)。前の画像は消して容量を残さない */
+export async function driverSetCover(trackId: string, path: string | null): Promise<R<{ url: string | null }>> {
+  const g = guard(); if (g) return g;
+  if (path && !/^covers\/[\w.-]+\.(webp|jpg)$/.test(path)) return fail("BAD_PATH");
+  const { data: old } = await supabaseAdmin.from("driver_tracks").select("cover_path").eq("id", trackId).maybeSingle();
+  const { error } = await supabaseAdmin.from("driver_tracks").update({ cover_path: path }).eq("id", trackId);
+  if (error) return fail(error.message);
+  if (old?.cover_path && old.cover_path !== path) await supabaseAdmin.storage.from("driver-music").remove([old.cover_path]).catch(() => null);
+  return { ok: true, url: path ? supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl : null };
+}
 export async function driverAddTrack(v: { purpose: "in" | "out"; lang: string; title: string; path: string }): Promise<R<{ id: string; url: string }>> {
   const g = guard(); if (g) return g;
   const { count } = await supabaseAdmin.from("driver_tracks").select("id", { count: "exact", head: true }).eq("purpose", v.purpose).eq("lang", v.lang);
@@ -161,8 +189,9 @@ export async function driverReorderTracks(ids: string[]): Promise<R> {
 }
 export async function driverDeleteTrack(id: string): Promise<R> {
   const g = guard(); if (g) return g;
-  const { data } = await supabaseAdmin.from("driver_tracks").select("file_path").eq("id", id).maybeSingle();
-  if (data?.file_path) await supabaseAdmin.storage.from("driver-music").remove([data.file_path]).catch(() => null);
+  const { data } = await supabaseAdmin.from("driver_tracks").select("*").eq("id", id).maybeSingle();
+  const files = [data?.file_path, (data as any)?.cover_path].filter(Boolean) as string[];
+  if (files.length) await supabaseAdmin.storage.from("driver-music").remove(files).catch(() => null);
   const { error } = await supabaseAdmin.from("driver_tracks").delete().eq("id", id);
   return error ? fail(error.message) : { ok: true };
 }

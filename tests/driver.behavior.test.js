@@ -68,19 +68,44 @@ test("driver: pickup page on one screen — sticky energy monitor, prepare (comf
   assert.ok(fs.existsSync(path.join(root, "public", "driver", "em.jpg")));
 });
 
-test("driver: lock battery only 3 days before check-in / every 60 days when idle, replace if it won't last", async () => {
+test("driver: album cover — read from MP3 ID3 tag, compressed to 800x800 before upload, old files removed", async () => {
+  const C = await load("driverCover.ts");
+  // ID3v2.3 に APIC (image/jpeg) を 1 つ入れた小さなタグを作る
+  const pic = new Uint8Array(300).map((_, i) => (i === 0 ? 0xff : i === 1 ? 0xd8 : i % 251));
+  const body = [...Buffer.from([0]), ...Buffer.from("image/jpeg"), 0, 3, ...Buffer.from("cover"), 0, ...pic];
+  const frame = [...Buffer.from("APIC"), (body.length >>> 24) & 255, (body.length >>> 16) & 255, (body.length >>> 8) & 255, body.length & 255, 0, 0, ...body];
+  const n = frame.length; const ss = [(n >> 21) & 127, (n >> 14) & 127, (n >> 7) & 127, n & 127];
+  const tag = new Uint8Array([...Buffer.from("ID3"), 3, 0, 0, ...ss, ...frame]);
+  assert.equal(C.id3Size(tag), tag.length);
+  const c = C.extractId3Cover(tag);
+  assert.equal(c.mime, "image/jpeg"); assert.equal(c.data.length, 300); assert.equal(c.data[0], 0xff);
+  assert.equal(C.extractId3Cover(new Uint8Array([1, 2, 3])), null);
+  assert.equal(C.COVER_SIZE, 800);
+  const src = read("lib", "driverCover.ts");
+  assert.match(src, /image\/webp", 0\.8/); assert.match(src, /image\/jpeg", 0\.82/);
+  const acts = read("app", "driver", "actions.ts");
+  assert.match(acts, /old\.cover_path !== path\) await supabaseAdmin\.storage\.from\("driver-music"\)\.remove/);
+  assert.match(read("supabase", "migration_driver.sql"), /add column if not exists cover_path text/);
+  const m = read("components", "driver", "DriverMusic.tsx");
+  assert.match(m, /setActionHandler/); assert.match(m, /"seekto"/); assert.match(m, /mp3Cover\(f\)/);
+  assert.match(m, /\(orientation: landscape\) and \(max-height: 520px\)/, "phone turned sideways → full screen");
+  assert.match(m, /wakeLock/);
+  assert.match(read("app", "driver", "driver.css"), /@media \(min-width: 900px\)/, "iPad two-column layout");
+});
+
+test("driver: lock battery checked every 15 days, alert at 10% or less (dad screen + WxPusher)", async () => {
   const L = await load("driverLogic.ts");
   const rooms = [{ id: "a", hasLock: true }, { id: "b", hasLock: true }, { id: "c", hasLock: false }, { id: "d", hasLock: true }];
-  const res = [R({ roomId: "a", checkIn: "2026-09-29T06:00:00Z" }), R({ id: "x", roomId: "d", checkIn: "2026-09-26T06:00:00Z" })];
-  const t = L.batteryTargets(rooms, res, { b: "2026-09-01T00:00:00Z" }, NOW);
-  assert.deepEqual(t.map((x) => [x.roomId, x.reason]), [["a", "checkin"]], "b checked 25 days ago, c has no lock, d is busy");
-  assert.deepEqual(L.batteryTargets(rooms, res, { a: "2026-09-24T00:00:00Z", b: "2026-07-01T00:00:00Z" }, NOW).map((x) => x.roomId), ["b"], "a checked 2 days ago, b over 60 days");
-  assert.equal(L.batteryVerdict(25, [], NOW, NOW).replace, true, "no history: below 30");
-  assert.equal(L.batteryVerdict(45, [], NOW, NOW).replace, false);
-  const logs = [{ battery: 80, checked_at: "2026-07-28T00:00:00Z" }, { battery: 50, checked_at: "2026-09-26T00:00:00Z" }]; // 0.5%/日
-  const v = L.batteryVerdict(50, logs, NOW, NOW + 50 * 86400e3);
-  assert.equal(v.predicted, 25); assert.equal(v.replace, false);
-  assert.equal(L.batteryVerdict(50, logs, NOW, NOW + 70 * 86400e3).replace, true, "would drop below 20 before check-out");
+  const last = { a: "2026-09-20T00:00:00Z", b: "2026-09-10T00:00:00Z" };
+  assert.deepEqual(L.batteryTargets(rooms, last, NOW), ["b", "d"], "a checked 6 days ago; b 16 days; c no lock; d never");
+  assert.equal(L.batteryLow(10), true); assert.equal(L.batteryLow(11), false);
+  const run = read("lib", "driverRunner.ts");
+  assert.match(run, /sendWxPusher\(/);
+  assert.match(run, /if \(!batteryLow\(s\.battery\)\) continue;/);
+  const acts = read("app", "driver", "actions.ts");
+  const off = acts.slice(acts.indexOf("export async function driverAllOff"), acts.indexOf("export async function driverCheckout"));
+  assert.match(off, /"away"/); assert.doesNotMatch(off, /"lock"|"unlock"/, "all off never touches the lock");
+  assert.ok(fs.existsSync(path.join(root, "public", "audio", "driver", "all-off.mp3")));
 });
 
 test("driver: LRC lyrics parse, current line and round trip", async () => {

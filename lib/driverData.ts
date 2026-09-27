@@ -8,7 +8,7 @@ import { langOf, monthKey, type DRoom, type DRes } from "@/lib/driverLogic";
 
 export type DriverDesign = "hybrid" | "bike";
 export interface DriverSettings { design: DriverDesign; autoPrep: boolean; autoPrepMin: number; flightAuto: boolean }
-export interface DriverTrack { id: string; purpose: "in" | "out"; lang: "ja" | "en" | "zh" | "ko"; title: string; artist: string | null; url: string; lrc: string | null; sort: number }
+export interface DriverTrack { id: string; purpose: "in" | "out"; lang: "ja" | "en" | "zh" | "ko"; title: string; artist: string | null; url: string; cover: string | null; lrc: string | null; sort: number }
 export interface DriverPlace { id: string; name: string; mapQuery: string | null; sort: number }
 export interface DriverAlert { id: number; roomId: string | null; kind: string; battery: number | null; dueAt: string | null; createdAt: string }
 export interface EntranceInfo { building: string; keypad: string | null; wifiSsid: string | null; wifiPass: string | null }
@@ -85,7 +85,7 @@ export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
   const pub = (path: string) => supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl;
   const [places, tracks, alerts, flightUsed, battery, entrances] = await Promise.all([
     safe(supabaseAdmin.from("driver_places").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((p: any) => ({ id: p.id, name: p.name, mapQuery: p.map_query ?? null, sort: p.sort })), [] as DriverPlace[]),
-    safe(supabaseAdmin.from("driver_tracks").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((t: any) => ({ id: t.id, purpose: t.purpose, lang: t.lang, title: t.title, artist: t.artist ?? null, url: pub(t.file_path), lrc: t.lrc ?? null, sort: t.sort })), [] as DriverTrack[]),
+    safe(supabaseAdmin.from("driver_tracks").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((t: any) => ({ id: t.id, purpose: t.purpose, lang: t.lang, title: t.title, artist: t.artist ?? null, url: pub(t.file_path), cover: t.cover_path ? pub(t.cover_path) : null, lrc: t.lrc ?? null, sort: t.sort })), [] as DriverTrack[]),
     safe(supabaseAdmin.from("driver_alerts").select("*").is("resolved_at", null).order("created_at", { ascending: false }).limit(20), (d) => (d ?? []).map((a: any) => ({ id: a.id, roomId: a.room_id, kind: a.kind, battery: a.battery, dueAt: a.due_at, createdAt: a.created_at })), [] as DriverAlert[]),
     safe(supabaseAdmin.from("driver_flight_usage").select("used").eq("month", monthKey(nowMs)).maybeSingle(), (d) => Number(d?.used ?? 0), 0),
     safe(supabaseAdmin.from("lock_battery_logs").select("room_id, battery, checked_at").order("checked_at", { ascending: false }).limit(200), (d) => {

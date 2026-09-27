@@ -15,9 +15,9 @@ import { makeT, type UiLang } from "@/lib/driverI18n";
 import { guideSteps, type GuideLang } from "@/lib/driverGuide";
 import {
   driverRefresh, driverRoomAction, driverPrepare, driverCheckout, driverSavePickup, driverSetFlight, driverCheckFlight,
-  driverSavePlaces, driverSaveSettings, driverResolveAlert,
+  driverSavePlaces, driverSaveSettings, driverResolveAlert, driverAllOff,
 } from "@/app/driver/actions";
-import { useDriverMusic, MusicPlayer, MusicSheet, MusicAdmin, type MLang } from "@/components/driver/DriverMusic";
+import { useDriverMusic, MusicPlayer, MusicSheet, MusicAdmin, MusicFull, useMusicFull, type MLang } from "@/components/driver/DriverMusic";
 
 type Page = "home" | "pick" | "guide" | "set";
 const P = (x: number, y: number, w: number, h: number, W: number, H: number) =>
@@ -104,6 +104,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const autoWho = { in: next ? `${gName(next)}（${rName(next)}）` : "", out: nextOut ? `${gName(nextOut)}（${rName(nextOut)}）` : "" };
   const music = useDriverMusic(data.tracks, t, toast, autoLang);
   const [musicOpen, setMusicOpen] = useState(false);
+  const full = useMusicFull(music);
   useEffect(() => { onVoiceChange((s) => music.duck(s)); });
 
   /* ---------------- 起動 ---------------- */
@@ -178,6 +179,24 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const [openCard, setOpenCard] = useState<string>("");
   const [showAll, setShowAll] = useState(false);
   const [confirmUnlock, setConfirmUnlock] = useState<DRoom | null>(null);
+  const [confirmOff, setConfirmOff] = useState<{ room: DRoom; resId?: string } | null>(null);
+  /** 設備を全部 OFF (鍵はそのまま)。確認してから */
+  const allOff = async (room: DRoom, resId?: string, confirmed = false) => {
+    if (!confirmed) { setConfirmOff({ room, resId }); sfx.notify(); return; }
+    sfx.prime(); sfx.down(); vib(30);
+    if (resId) setDevSt((d) => ({ ...d, [resId]: "wait" }));
+    const r = await driverAllOff(room.id, resId);
+    if (!r.ok) { sfx.error(); if (resId) setDevSt((d) => ({ ...d, [resId]: "ng" })); toast(`${room.name}：${t("操作できませんでした")}`); return; }
+    setModes((x) => ({ ...x, [room.id]: { ...x[room.id], mode: undefined, ac: false, light: false, galaxy: false, last: `✓ ${jstTime(Date.now())} ${room.name}：${t("全部 OFF")}` } }));
+    if (resId) {
+      setDevSt((d) => { const y = { ...d }; delete y[resId]; return y; });
+      setPrepMode((m) => { const y = { ...m }; delete y[resId]; return y; });
+      setData((d) => ({ ...d, res: d.res.map((x) => (x.id === resId ? { ...x, preparedAt: null } : x)) }));
+      setEmMsg("");
+    }
+    toast(`${room.name}：${t("全部 OFF")}`);
+    say([roomVoice(room.slug) || "", "all-off"], 200);
+  };
   const cardRooms = useMemo(() => {
     const seen = new Set<string>(); const out: { room: DRoom; res: DRes | null; tag: string }[] = [];
     const add = (r: DRes, tag: string) => { const room = roomOf(r.roomId); if (room && !seen.has(room.id)) { seen.add(room.id); out.push({ room, res: r, tag }); } };
@@ -359,6 +378,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               <b>🏮</b>{m === "wafu" && r.preparedAt && !busy ? t("和風") + " ✓" : t("和風準備")}
             </button>
           )}
+          {room && <button className="off" disabled={busy} onClick={() => void allOff(room, r.id)}><b>⏻</b>{t("全部 OFF")}</button>}
           <button className="gd" onClick={() => openGuide(r)}><b>▦</b>{t("案内")}</button>
         </div>
         <div className="dev">
@@ -445,7 +465,8 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
 
       {/* ---------------- ホーム ---------------- */}
       {page === "home" && (
-        <div className="page">
+        <div className="page home">
+          <div className="hl">
           {bike ? (
             <div className="bikehero">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -498,6 +519,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               <button className="embBtn" style={pd(480, 570, 126, 126)} aria-label="lights" onClick={toggleLights} />
             </div>
           )}
+          </div>
 
           <div className="wrap">
             {data.setupMissing && <div className="alert">⚠ {t("Supabase の SQL（migration_driver.sql）がまだ実行されていません")}</div>}
@@ -524,7 +546,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
             <div className="sec"><b>01</b>IN-CAR ・ {t("お父さんが操作")}</div>
             <div className="card omotenashi">
               <button className={`btn main ${omo ? "done" : ""}`} onClick={startOmotenashi}>{omo ? "✓ " + t("おもてなし中 ─ 音楽を流しています") : "🚗 " + t("おもてなし開始（歓迎の声 ＋ 音楽）")}</button>
-              <MusicPlayer m={music} t={t} onOpen={() => setMusicOpen(true)} onArrive={arriveSoon} />
+              <MusicPlayer m={music} t={t} onOpen={() => setMusicOpen(true)} onArrive={arriveSoon} onFull={full.show} />
             </div>
             <div className="rcards">
               {cardRooms.map(({ room, res, tag }) => {
@@ -540,10 +562,11 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
                     {open && (
                       <div className="rcb">
                         <div className="rlabel">{t("モード")}</div>
-                        <div className="rrow three">
+                        <div className="rrow modes">
                           <button className={`rb ${st.mode === "welcome" ? "on" : ""}`} onClick={() => void roomAct(room, "welcome")}><b>🏠</b>{t("快適モード")}</button>
                           {room.hasWafu && <button className={`rb ${st.mode === "wafu" ? "on" : ""}`} onClick={() => void roomAct(room, "wafu")}><b>🏮</b>{t("和風モード")}</button>}
                           {room.hasGalaxy && <button className={`rb ${st.galaxy ? "on" : ""}`} onClick={() => void roomAct(room, "galaxy")}><b>🌌</b>{st.galaxy ? t("ギャラクシー ON") : t("ギャラクシー OFF")}</button>}
+                          <button className="rb off" onClick={() => void allOff(room, res && tag === "in" ? res.id : undefined)}><b>⏻</b>{t("全部 OFF")}</button>
                         </div>
                         <div className="rlabel">{t("機器")}</div>
                         <div className="rrow four">
@@ -755,6 +778,13 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
         <div className="acts"><button onClick={() => void savePickup(true)}>{t("送迎なし")}</button><button className="ok" onClick={() => void savePickup(false)}>{t("保存")}</button></div>
       </div>
 
+      <div className={`sheet-bg ${confirmOff ? "show" : ""}`} onClick={() => setConfirmOff(null)} />
+      <div className={`sheet cf ${confirmOff ? "show" : ""}`}>
+        <h4>{t("{r} の設備を全部 OFF にしますか？", { r: confirmOff?.room.name ?? "" })}</h4>
+        <p className="note">{t("エアコン・照明・和風ライト・ギャラクシーを消します。鍵はそのままです。")}</p>
+        <div className="acts"><button onClick={() => setConfirmOff(null)}>{t("やめる")}</button><button className="ok warn" onClick={() => { const c = confirmOff; setConfirmOff(null); if (c) void allOff(c.room, c.resId, true); }}>⏻ {t("全部 OFF")}</button></div>
+      </div>
+
       <div className={`sheet-bg ${confirmUnlock ? "show" : ""}`} onClick={() => setConfirmUnlock(null)} />
       <div className={`sheet cf ${confirmUnlock ? "show" : ""}`}>
         <h4>{t("{r} を解錠しますか？", { r: confirmUnlock?.name ?? "" })}</h4>
@@ -762,6 +792,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
       </div>
 
       <MusicSheet m={music} t={t} open={musicOpen} onClose={() => setMusicOpen(false)} autoLang={autoLang} autoWho={autoWho} onAdmin={() => { setMusicOpen(false); setPage("set"); setTimeout(() => document.getElementById("musicAdmin")?.scrollIntoView({ behavior: "smooth" }), 100); }} />
+      <MusicFull m={music} t={t} full={full} />
       <div className={`toast ${toastMsg ? "show" : ""}`}>{toastMsg}</div>
     </div>
   );

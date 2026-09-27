@@ -45,6 +45,8 @@ create table if not exists public.driver_tracks (
   sort        integer not null default 0,
   created_at  timestamptz not null default now()
 );
+-- アルバムカバー (800×800 に縮めた画像。Storage driver-music の covers/ の中)
+alter table public.driver_tracks add column if not exists cover_path text;
 create index if not exists idx_driver_tracks_list on public.driver_tracks (purpose, lang, sort);
 
 -- 音楽ファイルの置き場所 (公開の読み取りのみ。書き込みはサーバから)
@@ -52,7 +54,7 @@ insert into storage.buckets (id, name, public)
 values ('driver-music', 'driver-music', true)
 on conflict (id) do update set public = true;
 
--- 鍵の電池の記録 (チェックイン3日前 / 空き部屋は2か月に1回)
+-- 鍵の電池の記録 (15 日に 1 回確認。10% 以下で通知)
 create table if not exists public.lock_battery_logs (
   id          bigserial primary key,
   room_id     uuid not null references public.rooms(id) on delete cascade,
