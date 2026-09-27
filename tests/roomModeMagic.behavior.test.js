@@ -9,7 +9,7 @@ const magicPath = path.join(root, "components", "MagicalControlPanel.tsx");
 const magicVoiceDir = path.join(root, "public", "audio", "voice", "magic");
 const magicSeasonDir = path.join(root, "public", "magic-seasons");
 const magicPortraitDir = path.join(root, "public", "magic-portraits");
-const ornateFramePath = path.join(magicPortraitDir, "ornate-frame.png");
+const ornateFramePath = path.join(magicPortraitDir, "ornate-frame.webp");
 
 function read(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -170,7 +170,7 @@ test("magical moving portrait is fixed to the current room and plays silently", 
     ["AKI", "autumn.mp4"],
     ["FUYU", "winter.mp4"],
   ]) {
-    assert.match(source, new RegExp(`title: "${room}"[\\s\\S]*?portrait: "/magic-portraits/${file}\\?v=frame-crop-1"`));
+    assert.match(source, new RegExp(`title: "${room}"[\\s\\S]*?portrait: "/magic-portraits/${file}\\?v=frame-crop-2"`));
     const videoPath = path.join(magicPortraitDir, file);
     const posterPath = videoPath.replace(/\.mp4$/, ".jpg");
     assert.equal(fs.existsSync(videoPath), true);
@@ -192,10 +192,10 @@ test("supplied ornate frame overlays the cropped moving portrait in every room",
   const source = read(magicPath);
 
   assert.equal(fs.existsSync(ornateFramePath), true);
-  assert.ok(fs.statSync(ornateFramePath).size > 100_000);
+  assert.ok(fs.statSync(ornateFramePath).size > 30_000 && fs.statSync(ornateFramePath).size < 300_000, "light frame image");
   assert.match(source, /className="portrait-window"/);
   assert.match(source, /className="portrait-frame-image"/);
-  assert.match(source, /src="\/magic-portraits\/ornate-frame\.png"/);
+  assert.match(source, /src="\/magic-portraits\/ornate-frame\.webp"/);
   assert.match(source, /\.portrait-window video\s*\{[^}]*width: 116%/);
   assert.match(source, /\.portrait-window video\s*\{[^}]*max-width: none;/);
   assert.match(source, /\.portrait-window\s*\{[^}]*left: 19%/);

@@ -80,7 +80,7 @@ test("sfx prefers bundled natural voice assets for existing spoken lines", () =>
   assert.match(source, /new Audio/);
   assert.match(source, /function speakWithBrowser/);
   assert.match(source, /GALAXY_ON_AUDIO_URL/);
-  assert.match(source, /galaxy-sfx-05-arc-reactor-ignition\.wav/);
+  assert.match(source, /galaxy-sfx-05-arc-reactor-ignition\.mp3/);
 
   for (const [line, filename] of expectedVoiceAssets) {
     assert.ok(source.includes(JSON.stringify(line)), `${line} should be mapped`);
@@ -96,9 +96,9 @@ test("all natural voice assets referenced by sfx are bundled in public", () => {
 
 test("selected galaxy ignition asset is bundled in public", () => {
   assert.equal(
-    fs.existsSync(path.join(sfxDir, "galaxy-sfx-05-arc-reactor-ignition.wav")),
+    fs.existsSync(path.join(sfxDir, "galaxy-sfx-05-arc-reactor-ignition.mp3")),
     true,
-    "galaxy-sfx-05-arc-reactor-ignition.wav should exist",
+    "galaxy-sfx-05-arc-reactor-ignition.mp3 should exist",
   );
 });
 

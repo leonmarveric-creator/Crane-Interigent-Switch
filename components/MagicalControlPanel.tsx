@@ -271,29 +271,29 @@ const SEASONAL_CONCEPTS: Array<{
   {
     key: "spring",
     title: "HARU",
-    portrait: "/magic-portraits/spring.mp4?v=frame-crop-1",
-    portraitPoster: "/magic-portraits/spring.jpg?v=frame-crop-1",
+    portrait: "/magic-portraits/spring.mp4?v=frame-crop-2",
+    portraitPoster: "/magic-portraits/spring.jpg?v=frame-crop-2",
     bg: "radial-gradient(circle at 20% 18%, rgba(255, 181, 205, 0.32), transparent 34%)",
   },
   {
     key: "summer",
     title: "NATU",
-    portrait: "/magic-portraits/summer.mp4?v=frame-crop-1",
-    portraitPoster: "/magic-portraits/summer.jpg?v=frame-crop-1",
+    portrait: "/magic-portraits/summer.mp4?v=frame-crop-2",
+    portraitPoster: "/magic-portraits/summer.jpg?v=frame-crop-2",
     bg: "radial-gradient(circle at 72% 16%, rgba(103, 218, 255, 0.32), transparent 34%)",
   },
   {
     key: "autumn",
     title: "AKI",
-    portrait: "/magic-portraits/autumn.mp4?v=frame-crop-1",
-    portraitPoster: "/magic-portraits/autumn.jpg?v=frame-crop-1",
+    portrait: "/magic-portraits/autumn.mp4?v=frame-crop-2",
+    portraitPoster: "/magic-portraits/autumn.jpg?v=frame-crop-2",
     bg: "radial-gradient(circle at 76% 26%, rgba(255, 134, 83, 0.34), transparent 36%)",
   },
   {
     key: "winter",
     title: "FUYU",
-    portrait: "/magic-portraits/winter.mp4?v=frame-crop-1",
-    portraitPoster: "/magic-portraits/winter.jpg?v=frame-crop-1",
+    portrait: "/magic-portraits/winter.mp4?v=frame-crop-2",
+    portraitPoster: "/magic-portraits/winter.jpg?v=frame-crop-2",
     bg: "radial-gradient(circle at 50% 6%, rgba(188, 215, 255, 0.34), transparent 36%)",
   },
 ];
@@ -1186,7 +1186,7 @@ export default function MagicalControlPanel({
                     aria-hidden="true"
                   />
                 </div>
-                <Image className="portrait-frame-image" src="/magic-portraits/ornate-frame.png" alt="" fill sizes="220px" unoptimized />
+                <Image className="portrait-frame-image" src="/magic-portraits/ornate-frame.webp" alt="" fill sizes="220px" unoptimized />
               </div>
             )}
             <div className="portrait-dust-field" aria-hidden="true">

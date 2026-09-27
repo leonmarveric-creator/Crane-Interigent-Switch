@@ -85,6 +85,23 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
   const { initialLang, posterUrl, imageUrl } = props;
   const [mode, setMode] = useState<Mode | null>(null); // null=読込中（ちらつき防止）
 
+  // 絵・動画・音をこのスマホに保存 (2 回目からすぐ出る)。表示が落ち着いてから裏で
+  useEffect(() => {
+    if (props.admin || !("serviceWorker" in navigator)) return;
+    const season = /haru|spring/.test(props.roomSlug) ? "spring" : /natu|natsu|summer/.test(props.roomSlug) ? "summer" : /aki|autumn/.test(props.roomSlug) ? "autumn" : /fuyu|winter/.test(props.roomSlug) ? "winter" : null;
+    const urls = [posterUrl, imageUrl, "/magic-portraits/ornate-frame.webp", "/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.mp3",
+      ...(season ? [`/magic-portraits/${season}.mp4?v=frame-crop-2`, `/magic-portraits/${season}.jpg?v=frame-crop-2`] : [])]
+      .filter((x): x is string => !!x).map((x) => new URL(x, location.href).href);
+    const t = setTimeout(() => {
+      navigator.serviceWorker.register("/room-sw.js", { scope: "/room/" })
+        .then(() => navigator.serviceWorker.ready)
+        .then((reg) => reg.active?.postMessage({ type: "precache", urls }))
+        .catch(() => {});
+    }, 2500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     let saved: string | null = null;
     try { saved = localStorage.getItem(STORE_KEY); } catch { /* noop */ }

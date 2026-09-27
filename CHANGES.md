@@ -1,3 +1,12 @@
+# ゲスト画面を速く（2 回目からほぼ待たない）
+
+- 重いファイルを軽く：額縁 2.1MB → 0.1MB（WebP）、部屋の絵 約 0.6〜0.7MB → 約 0.2MB、ポスター 約 0.3MB → 約 0.24MB、松竹梅林荷の動画 約 40% 小さく、ギャラクシーの効果音 0.4MB → 0.04MB（MP3）、アイコン 0.55MB → 0.1MB
+- 絵・動画・音は 1 週間スマホに置いたまま使う（next.config.mjs の headers）。差し替えるときは名前か ?v= を変える
+- ゲスト画面の保存の仕組み（public/room-sw.js）：部屋の絵・肖像画の動画・額縁・効果音・声をスマホに保存し、2 回目からはスマホの中から出す。ページ本体と PIN の確認はいつもサーバー
+- 古いファイル public/magic-portraits/ornate-frame.png と public/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.wav は使わなくなりました（消して大丈夫）
+
+---
+
 # 車内 iPad（CRANE NEST DRIVE /cabin）＋ お父さんのスマホから出発
 
 - 新しいページ `/cabin`（車内 iPad・お客さん用）：待機画面（ロゴ・時計・天気）→ お父さんのスマホで「出発」を押すと 3 秒以内に送迎画面へ

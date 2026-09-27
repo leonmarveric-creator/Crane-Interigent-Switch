@@ -127,7 +127,7 @@ const VOICE_LABEL_ALIASES: Array<[string, string]> = [
   ["일본풍 조명", "Japanese Lamp"],
 ];
 
-const GALAXY_ON_AUDIO_URL = "/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.wav";
+const GALAXY_ON_AUDIO_URL = "/audio/sfx/galaxy-sfx-05-arc-reactor-ignition.mp3";
 export type MagicTone = "gold" | "teal" | "rose" | "blue" | "green";
 const MAGIC_TONE_ROOT: Record<MagicTone, number> = {
   gold: 392,
