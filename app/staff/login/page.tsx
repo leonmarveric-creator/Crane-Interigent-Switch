@@ -6,7 +6,7 @@ import { hasPasskeyHere, loginWithPasskey, passkeySupported } from "@/lib/staffP
 
 /** ログイン後の行き先 (お父さんの送迎画面 /driver からも同じログインを使う) */
 function nextUrl() {
-  try { const n = new URLSearchParams(location.search).get("next"); if (n === "/driver") return "/driver"; } catch { /* ignore */ }
+  try { const n = new URLSearchParams(location.search).get("next"); if (n === "/driver" || n === "/cabin") return n; } catch { /* ignore */ }
   return "/staff";
 }
 

@@ -88,3 +88,28 @@ export async function compressCover(img: Blob): Promise<{ blob: Blob; ext: "webp
     return jpg ? { blob: jpg, ext: "jpg" } : null;
   } catch { return null; }
 }
+
+/** 部屋の写真 (車内 iPad 用) を 4:3 に切り抜いて 横 1280px まで縮める。WebP → だめなら JPEG */
+export async function compressRoomPhoto(img: Blob, maxW = 1280): Promise<{ blob: Blob; ext: "webp" | "jpg" } | null> {
+  try {
+    let src: CanvasImageSource & { width: number; height: number };
+    try { src = await createImageBitmap(img); }
+    catch {
+      const url = URL.createObjectURL(img);
+      src = await new Promise<HTMLImageElement>((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = url; });
+    }
+    const w = src.width, h = src.height; if (!w || !h) return null;
+    // 4:3 に (はみ出す方を真ん中で切る)
+    let sw = w, sh = Math.round((w * 3) / 4); if (sh > h) { sh = h; sw = Math.round((h * 4) / 3); }
+    const ow = Math.min(maxW, sw), oh = Math.round((ow * 3) / 4);
+    const c = document.createElement("canvas"); c.width = ow; c.height = oh;
+    const g = c.getContext("2d"); if (!g) return null;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(src, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, ow, oh);
+    const to = (type: string, q: number) => new Promise<Blob | null>((ok) => c.toBlob(ok, type, q));
+    const webp = await to("image/webp", 0.76);
+    if (webp && webp.type === "image/webp") return { blob: webp, ext: "webp" };
+    const jpg = await to("image/jpeg", 0.8);
+    return jpg ? { blob: jpg, ext: "jpg" } : null;
+  } catch { return null; }
+}

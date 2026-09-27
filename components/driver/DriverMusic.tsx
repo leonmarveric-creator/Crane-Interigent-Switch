@@ -43,6 +43,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const fade = useRef<number>(0);
   const vol = useRef(0.8);
   const level = useRef(0.8); // 今の音量 (0〜1)
+  const boost = useRef<{ url: string | null; pos: number; wasPlaying: boolean } | null>(null); // 高速モード中 (元の曲の位置)
 
   useEffect(() => { setTracks(initial); }, [initial]);
   useEffect(() => { try { setLyrOnCar(localStorage.getItem("drvLyrCar") === "1"); } catch { /* ignore */ } }, []);
@@ -197,6 +198,29 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     /** タップの中で呼ぶ (あとで自動で流すときのため) */
     prime,
     duck(on: boolean) { if (!playing) return; fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900); },
+    /** 高速モード (スカイゲートブリッジ): 今の曲を止めて「⚡ BOOST 用」の曲を開始位置から。iPad の点火に合わせて少し待つ */
+    boostIn(delayMs = 5000): boolean {
+      const B = tracks.filter((x) => x.purpose === "boost"); if (!B.length || boost.current) return false;
+      const tr = B[Math.floor(Math.random() * B.length)]; const a0 = el();
+      boost.current = { url: track?.url ?? null, pos: a0.currentTime, wasPlaying: playing };
+      if (playing) fadeTo(0, 900, () => a0.pause());
+      setTimeout(async () => {
+        if (!boost.current) return; const a = el(); const src = await cachedUrl(tr.url);
+        a.loop = true; a.src = src; const go = () => { try { a.currentTime = tr.startSec || 0; } catch { /* ignore */ } route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); };
+        if (a.readyState >= 1) go(); else a.addEventListener("loadedmetadata", go, { once: true });
+      }, delayMs);
+      return true;
+    },
+    /** 高速モードが終わったら、元の曲の続きへ */
+    boostOut() {
+      const b = boost.current; if (!b) return;
+      setTimeout(() => fadeTo(0, 1800, async () => {
+        const a = el(); a.pause(); a.loop = false; boost.current = null;
+        if (!b.url) return; a.src = await cachedUrl(b.url);
+        const go = () => { try { a.currentTime = b.pos; } catch { /* ignore */ } if (b.wasPlaying) { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } else setLevel(vol.current); };
+        if (a.readyState >= 1) go(); else a.addEventListener("loadedmetadata", go, { once: true });
+      }), 200);
+    },
     fadeOut() { if (!playing) return; fadeTo(0, 3500, () => { el().pause(); setLevel(vol.current); }); },
     seek(s: number) { const a = el(); a.currentTime = Math.max(0, Math.min((a.duration || s + 1) - 0.3, s)); setPos(a.currentTime); },
     skip(d: number) { api.seek(el().currentTime + d); },
@@ -387,12 +411,12 @@ export function MusicSheet({ m, t, open, onClose, autoLang, autoWho, onAdmin }: 
 
 /** 設定: 音楽の管理 */
 export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (s: string) => void; autoLang: { in: MLang; out: MLang } }) {
-  const [p, setP] = useState<"in" | "out">("in");
+  const [p, setP] = useState<"in" | "out" | "boost">("in");
   const [l, setL] = useState<MLang>(autoLang.in);
   const [busy, setBusy] = useState("");
   const [ly, setLy] = useState<DriverTrack | null>(null);
   const [prog, setProg] = useState<string>("");
-  const L = m.tracks.filter((x) => x.purpose === p && x.lang === l).sort((a, b) => a.sort - b.sort);
+  const L = m.tracks.filter((x) => x.purpose === p && (p === "boost" || x.lang === l)).sort((a, b) => a.sort - b.sort);
   const count = (pp: string, ll: string) => m.tracks.filter((x) => x.purpose === pp && x.lang === ll).length;
   const upd = (id: string, patch: Partial<DriverTrack>) => m.setTracks((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const [cv, setCv] = useState<DriverTrack | null>(null);
@@ -430,9 +454,10 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
         toast(t("アップロードできませんでした") + "：" + why(detail)); continue;
       }
       const title = f.name.replace(/\.[^.]+$/, "");
-      const r = await driverAddTrack({ purpose: p, lang: l, title, path: u.path });
-      if (!r.ok) { toast(t("アップロードできませんでした") + "：" + why(r.error)); continue; }
-      m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: l, title, artist: null, url: r.url, cover: null, lrc: null, sort: L.length + added }]);
+      const lg: MLang = p === "boost" ? "en" : l;
+      const r = await driverAddTrack({ purpose: p, lang: lg, title, path: u.path });
+      if (!r.ok) { toast(t("アップロードできませんでした") + "：" + why(p === "boost" ? r.error + " boost" : r.error)); continue; }
+      m.setTracks((ts) => [...ts, { id: r.id, purpose: p, lang: lg, title, artist: null, url: r.url, cover: null, lrc: null, sort: L.length + added, startSec: 0 }]);
       added++;
       // MP3 の中にカバー画像があれば自動で付ける
       const art = await mp3Cover(f);
@@ -455,17 +480,24 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
     <div className="card adm" id="musicAdmin">
       <div className="ctitle">🎵 {t("音楽の管理")}</div>
       <div className="cnote">{t("プレイリストは「お迎え／お見送り」×「言語」ごとにあります。ゲストの国の言語のプレイリストが自動で選ばれます。")}</div>
-      <div className="segsw small">
-        {(["in", "out"] as const).map((x) => <button key={x} className={p === x ? "on" : ""} onClick={() => { sfx.tick(); setP(x); setL(autoLang[x]); }}>{x === "in" ? "🛬 " + t("お迎え用") : "🛫 " + t("お見送り用")}</button>)}
+      <div className="segsw small three">
+        {(["in", "out", "boost"] as const).map((x) => <button key={x} className={p === x ? "on" : ""} onClick={() => { sfx.tick(); setP(x); if (x !== "boost") setL(autoLang[x]); }}>{x === "in" ? "🛬 " + t("お迎え用") : x === "out" ? "🛫 " + t("お見送り用") : "⚡ " + t("BOOST用")}</button>)}
       </div>
+      {p === "boost" ? <div className="cnote">{t("スカイゲートブリッジの高速モードの間だけ流す曲です（言語は関係なし）。曲ごとに「開始」の位置を決めると、盛り上がるところから流れます。2曲以上あれば毎回ランダムです。")}</div> : (
       <div className="mlangs">
         {(Object.keys(MLANGS) as MLang[]).map((x) => <button key={x} className={l === x ? "on" : ""} onClick={() => { sfx.tick(); setL(x); }}>{MLANGS[x]}<em>{count(p, x)}</em></button>)}
-      </div>
+      </div>)}
       {L.length ? L.map((tr, i) => (
         <div className="fedit" key={tr.id}>
-          <button className="cvb" onClick={() => { sfx.blip(); setCv(tr); }} aria-label="cover"><CoverArt track={tr} p={tr.purpose} /></button>
+          <button className="cvb" onClick={() => { sfx.blip(); setCv(tr); }} aria-label="cover"><CoverArt track={tr} p={tr.purpose === "out" ? "out" : "in"} /></button>
           <input defaultValue={tr.title} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== tr.title) { upd(tr.id, { title: v }); void driverUpdateTrack(tr.id, { title: v }); } }} />
-          <button className={`lyb ${tr.lrc ? "has" : ""}`} onClick={() => { sfx.blip(); setLy(tr); }}>{tr.lrc ? "✓" + t("歌詞") : "＋" + t("歌詞")}</button>
+          {p === "boost" ? (
+            <input className="bst" defaultValue={fmt(tr.startSec)} aria-label={t("開始")} title={t("開始")} onBlur={(e) => {
+              const mm = /^(\d+)(?::(\d{1,2}))?$/.exec(e.target.value.trim()); if (!mm) { e.target.value = fmt(tr.startSec); return; }
+              const sec = mm[2] != null ? Number(mm[1]) * 60 + Number(mm[2]) : Number(mm[1]);
+              e.target.value = fmt(sec); if (sec !== tr.startSec) { upd(tr.id, { startSec: sec }); void driverUpdateTrack(tr.id, { startSec: sec }).then((r) => { if (r.ok) toast(t("開始位置 {t} から流します", { t: fmt(sec) })); }); }
+            }} />
+          ) : <button className={`lyb ${tr.lrc ? "has" : ""}`} onClick={() => { sfx.blip(); setLy(tr); }}>{tr.lrc ? "✓" + t("歌詞") : "＋" + t("歌詞")}</button>}
           <button onClick={() => move(i)}>↑</button>
           <button className="del" onClick={() => del(tr)}>✕</button>
         </div>
@@ -482,7 +514,7 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
           <div className="sheet-bg show" onClick={() => setCv(null)} />
           <div className="sheet show">
             <h4>🖼 {t("アルバムカバー")} ─ {cv.title}</h4>
-            <div className="cvprev"><CoverArt track={cv} p={cv.purpose} /></div>
+            <div className="cvprev"><CoverArt track={cv} p={cv.purpose === "out" ? "out" : "in"} /></div>
             <p className="note">{t("写真を選ぶと、自動で 800×800 の正方形（真ん中を切り抜き）に縮めて保存します。元の大きい写真は保存しません。")}</p>
             <label className="mfile">{cvBusy ? t("保存中…") : "🖼 " + t("写真を選ぶ")}<input type="file" accept="image/*" disabled={cvBusy} onChange={async (e) => {
               const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;

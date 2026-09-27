@@ -1,0 +1,379 @@
+/* 自動生成: 車内 iPad (/cabin) の見た目 (.cab の中だけ)。元は /tmp の cabin.src.css */
+.cab{position:fixed;inset:0;background:#02050d;color:#e6eefc;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","PingFang SC","Noto Sans JP","Apple SD Gothic Neo",sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.cab *{box-sizing:border-box}
+.cab button{font-family:inherit;cursor:pointer}
+.cab .stage{position:absolute;left:50%;top:50%;width:1180px;height:820px;transform-origin:center center;overflow:hidden;border-radius:18px;background:#030611;container-type:size}
+.cab .scr{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr 1fr;gap:18px;padding:18px;opacity:0;pointer-events:none;transition:opacity .8s}
+.cab .stage.trip .scr{opacity:1;pointer-events:auto}
+/* 待機画面 */
+.cab .stby{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(ellipse at 50% 38%,#0f2446 0,#050b18 60%,#02050d 100%);transition:opacity .8s}
+.cab .stage.trip .stby{opacity:0;pointer-events:none}
+.cab .stby .rings{position:absolute;left:50%;top:40%;width:560px;height:560px;margin:-280px 0 0 -280px;border-radius:50%;border:1px solid rgba(95,176,255,.12);box-shadow:0 0 0 70px rgba(95,176,255,.03),0 0 0 140px rgba(95,176,255,.02);animation:cab-spin 40s linear infinite}
+.cab .stby .rings::before{content:"";position:absolute;inset:40px;border-radius:50%;border:1px dashed rgba(95,227,255,.2)}
+.cab .stby .logo{position:relative;font-size:64px;font-weight:200;letter-spacing:.42em;margin-right:-.42em;color:#fff;text-shadow:0 0 30px rgba(95,176,255,.6)}
+.cab .stby .sub{position:relative;font-size:14px;letter-spacing:.5em;color:#8fb2d9}
+.cab .stby .clock{position:relative;margin-top:26px;font-size:96px;font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.cab .stby .date{position:relative;font-size:16px;color:#9fb6d6;letter-spacing:.2em}
+.cab .stby .wxl{position:relative;margin-top:8px;font-size:18px;color:#cfe0f5}
+.cab .stby .dev{position:absolute;left:24px;bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;color:#8fb2d9;letter-spacing:.1em}
+.cab .stby .dev i{width:9px;height:9px;border-radius:50%;background:#46e08a;box-shadow:0 0 8px #46e08a;animation:cab-bl 2s infinite}
+.cab .stby .dev.ng i{background:#ff5b5b;box-shadow:0 0 8px #ff5b5b}
+.cab .stby .gear{position:absolute;right:18px;bottom:14px;width:52px;height:52px;border-radius:50%;border:1px solid rgba(95,176,255,.35);background:rgba(4,10,22,.6);color:#8fb2d9;font-size:22px}
+.cab .tapgo{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(2,5,13,.82);backdrop-filter:blur(4px);font-size:22px;letter-spacing:.1em;color:#fff}
+.cab .tapgo b{font-size:15px;color:#8fb2d9;font-weight:400}
+.cab .tapgo .ring{width:120px;height:120px;border-radius:50%;border:2px solid #5fe3ff;box-shadow:0 0 30px rgba(95,227,255,.5);display:flex;align-items:center;justify-content:center;font-size:44px;animation:cab-pu 2s ease-out infinite}
+.cab .menu{position:absolute;right:18px;bottom:78px;z-index:40;width:380px;padding:14px;border-radius:18px;background:rgba(8,16,32,.96);border:1px solid rgba(95,176,255,.35);display:none;flex-direction:column;gap:8px;font-size:14px}
+.cab .menu.on{display:flex}
+.cab .menu h4{margin:2px 0 4px;font-size:12px;letter-spacing:.2em;color:#8fb2d9;font-weight:600}
+.cab .menu button,.cab .menu select,.cab .menu input{min-height:44px;border-radius:12px;border:1px solid #2c3a55;background:#101a2c;color:#e6eefc;font-size:14px;padding:0 12px}
+.cab .menu .row{display:flex;gap:6px}.cab .menu .row>*{flex:1}
+.cab .menu .bar{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden}.cab .menu .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f8fff,#5fe3ff)}
+.cab .menu small{color:#8fb2d9;line-height:1.5}
+.cab .setup{position:absolute;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#02050d}
+.cab .setup h2{margin:0;font-size:26px;font-weight:600}.cab .setup p{margin:0;color:#8fb2d9;font-size:15px;text-align:center;line-height:1.6}
+.cab .setup input{width:360px;min-height:52px;border-radius:14px;border:1px solid #2c3a55;background:#0d1524;color:#fff;font-size:20px;padding:0 16px;text-align:center}
+.cab .setup button{min-width:220px;min-height:52px;border-radius:14px;border:none;background:linear-gradient(135deg,#3f9bff,#1c5fc4);color:#fff;font-size:18px;font-weight:700}
+.cab .toast2{position:absolute;left:50%;bottom:24px;z-index:60;transform:translateX(-50%);padding:10px 18px;border-radius:12px;background:rgba(8,16,32,.95);border:1px solid rgba(95,176,255,.4);font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+.cab .toast2.on{opacity:1}
+.cab .offr{position:absolute;right:14px;top:14px;z-index:1000;padding:6px 12px;border-radius:10px;background:rgba(4,10,22,.8);border:1px solid rgba(255,179,92,.5);font-size:12px;color:#ffd199;display:none}
+.cab .map.offroute .offr{display:block}
+.cab .gps.phone i{background:#ffb35c;box-shadow:0 0 8px #ffb35c}
+@keyframes cab-spin{to{transform:rotate(360deg)}}
+
+
+.cab .scr{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr 1fr;gap:18px;padding:18px}
+/* 地図 */
+.cab .map{position:relative;border-radius:22px;overflow:hidden;background:#041226;border:1px solid rgba(95,176,255,.25)}
+@keyframes cab-fw{to{stroke-dashoffset:-34}}
+@keyframes cab-pu{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(3.2)}}
+.cab .hud{position:absolute;left:16px;right:16px;top:14px;display:flex;align-items:flex-start;gap:12px}
+.cab .eta{padding:10px 16px;border-radius:16px;background:rgba(4,10,22,.8);border:1px solid rgba(95,176,255,.4);backdrop-filter:blur(6px)}
+.cab .eta small{display:block;font-size:12px;letter-spacing:.2em;color:#8fb2d9}
+.cab .eta b{font-family:Rajdhani,monospace;font-size:44px;line-height:1;color:#8fd0ff}.cab .eta b em{font-style:normal;font-size:18px;margin-left:4px;color:#cfe0f5}
+.cab .eta .km{font-size:13px;color:#cfe0f5;margin-top:2px}
+.cab .gps{margin-left:auto;padding:6px 12px;border-radius:99px;background:rgba(4,10,22,.8);border:1px solid rgba(70,224,138,.5);font-size:12px;color:#46e08a;display:flex;gap:6px;align-items:center}
+.cab .gps i{width:8px;height:8px;border-radius:50%;background:#46e08a;box-shadow:0 0 8px #46e08a;animation:cab-bl 1.6s infinite}@keyframes cab-bl{50%{opacity:.3}}
+.cab .cap{position:absolute;left:16px;right:16px;bottom:14px;padding:14px 16px;border-radius:18px;background:rgba(10,20,40,.88);border:1px solid rgba(255,190,120,.45);display:flex;gap:12px;align-items:center;transform:translateY(140%);transition:transform .5s cubic-bezier(.2,.9,.3,1)}
+.cab .cap.show{transform:none}
+.cab .cap .ic{font-size:30px}.cab .cap b{display:block;font-size:18px;color:#ffe0b8}.cab .cap span{font-size:14px;color:#e6eefb;line-height:1.5}
+.cab .cap .wv{display:flex;gap:3px;align-items:center;height:18px;margin-left:auto}.cab .cap .wv i{width:3px;height:5px;background:#ffd199;border-radius:2px;animation:cab-wv .5s ease-in-out infinite}.cab .cap .wv i:nth-child(2){animation-delay:.1s}.cab .cap .wv i:nth-child(3){animation-delay:.2s}@keyframes cab-wv{50%{height:18px}}
+/* 右側 */
+.cab .side{display:flex;flex-direction:column;gap:14px;min-height:0}
+.cab .box{border-radius:20px;background:linear-gradient(180deg,rgba(16,34,61,.9),rgba(10,19,34,.9));border:1px solid rgba(95,176,255,.22);padding:14px 16px}
+.cab .box h3{margin:0 0 8px;font-size:12px;letter-spacing:.22em;color:#8fb2d9;font-weight:600}
+.cab .wx{display:flex;align-items:center;gap:14px}.cab .wx .ic{font-size:44px}.cab .wx b{font-family:Rajdhani,monospace;font-size:42px}.cab .wx .d{font-size:13px;color:#cfe0f5;line-height:1.6}
+.cab .wx2{display:flex;gap:8px;margin-top:8px}.cab .wx2 div{flex:1;padding:6px 8px;border-radius:10px;background:rgba(0,0,0,.25);font-size:12px;color:#cfe0f5;text-align:center}
+.cab .room{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
+.cab .room svg{width:150px;height:110px;border-radius:12px;display:block}
+.cab .room .lamp{transition:opacity 1s}.cab .room .glow{opacity:0;transition:opacity 1.2s}.cab .room.lit .glow{opacity:1}
+.cab .stat{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.cab .stat div{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.25)}
+.cab .stat i{width:9px;height:9px;border-radius:50%;background:#46e08a;box-shadow:0 0 8px #46e08a;flex:none}
+.cab .stat i.w{background:#5b6678;box-shadow:none}.cab .stat i.run{background:#5fe3ff;box-shadow:0 0 8px #5fe3ff;animation:cab-bl 1.2s infinite}
+.cab .stat em{margin-left:auto;font-style:normal;color:#8fb2d9;font-size:12px}
+.cab .rec{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.cab .rec div{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(0,0,0,.25)}
+.cab .rec .e{font-size:24px}.cab .rec b{display:block;font-size:14px}.cab .rec small{color:#9fb6d6;font-size:12px}
+/* 到着 */
+.cab .arrive{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at 50% 50%,rgba(255,190,110,.35),rgba(3,6,17,.96) 60%);opacity:0;pointer-events:none;transition:opacity 1s}
+.cab .arrive.on{opacity:1;pointer-events:auto}
+.cab .arrive .t1{font-size:18px;letter-spacing:.6em;color:#ffd199}
+.cab .arrive .t2{font-size:110px;font-weight:800;letter-spacing:.06em;background:linear-gradient(180deg,#fff,#ffd6a8);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 30px rgba(255,170,90,.7))}
+.cab .arrive.on .t2{animation:cab-ho 1.4s ease-out}
+@keyframes cab-ho{0%{opacity:0;transform:scaleY(.05);filter:blur(8px)}35%{opacity:.8;transform:scaleY(1.08)}50%{opacity:.3}70%{opacity:1;transform:none}}
+.cab .arrive .t3{font-size:22px;color:#fff3e6}
+.cab .arrive .rows{display:flex;gap:14px;margin-top:10px}.cab .arrive .rows div{padding:10px 16px;border-radius:14px;border:1px solid rgba(70,224,138,.55);background:rgba(70,224,138,.1);color:#b8ffd4;font-size:15px}
+
+
+.cab .map{position:relative;isolation:isolate;border-radius:22px;overflow:hidden;background:#020611;border:1px solid rgba(95,176,255,.3)}
+.cab #lmap{position:absolute;inset:0;background:#020611}
+.cab .leaflet-container{background:#020611;font-family:inherit}
+/* ダーク: 地理院の淡色地図を反転して、暗い背景に青く光る地図に */
+.cab .mode-dark .leaflet-tile-pane{filter:invert(1) grayscale(.35) hue-rotate(190deg) brightness(.7) contrast(1.9) saturate(2.2)}
+/* 航空写真: 少し暗くして、光るルートが映えるように */
+.cab .mode-photo .leaflet-tile-pane{filter:brightness(.82) saturate(1.15) contrast(1.08)}
+.cab .tint{position:absolute;inset:0;z-index:401;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 35%,rgba(2,6,17,.55) 80%,rgba(2,6,17,.85) 100%)}
+.cab .mode-dark .tint{background:linear-gradient(180deg,rgba(20,60,140,.18),rgba(0,0,0,0) 40%),radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(2,6,17,.6) 85%)}
+.cab .scan{position:absolute;inset:0;z-index:402;pointer-events:none;background:repeating-linear-gradient(180deg,rgba(95,176,255,.035) 0 1px,transparent 1px 4px)}
+.cab .sweep{position:absolute;left:50%;top:50%;width:560px;height:560px;margin:-280px 0 0 -280px;z-index:403;pointer-events:none;border-radius:50%;background:conic-gradient(from 0deg,rgba(95,227,255,.16),rgba(95,227,255,0) 14%,transparent 100%);-webkit-mask:radial-gradient(circle,#000 0,#000 60%,transparent 70%);mask:radial-gradient(circle,#000 0,#000 60%,transparent 70%);animation:cab-rot 4s linear infinite;opacity:0;transition:opacity .6s}
+.cab .sweep.on{opacity:.8}
+@keyframes cab-rot{to{transform:rotate(360deg)}}
+.cab .rt-glow{filter:drop-shadow(0 0 6px #2f8fff) drop-shadow(0 0 14px #2f8fff)}
+.cab .rt-done{filter:drop-shadow(0 0 6px #5fe3ff) drop-shadow(0 0 16px #2f8fff)}
+.cab .rt-flow{stroke-dasharray:3 22;animation:cab-fw2 1s linear infinite}
+@keyframes cab-fw2{to{stroke-dashoffset:-25}}
+.cab .carI{position:relative}
+.cab .carI .dot{position:absolute;left:-12px;top:-12px;width:24px;height:24px;border-radius:50%;background:#5fe3ff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(95,227,255,.25),0 0 26px #2f8fff}
+.cab .carI .ring{position:absolute;left:-12px;top:-12px;width:24px;height:24px;border-radius:50%;border:2px solid #5fe3ff;animation:cab-pu 1.6s ease-out infinite}
+.cab .carI .arw{position:absolute;left:-9px;top:-34px;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid #5fe3ff;filter:drop-shadow(0 0 6px #5fe3ff);transform-origin:9px 34px}
+.cab .poiI{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:14px;font-weight:700;color:#e6f4ff;text-shadow:0 0 6px #000,0 0 12px #000;transform:translate(-8px,-50%)}
+.cab .poiI i{width:14px;height:14px;border-radius:50%;background:#0b1424;border:2px solid #8ccaff;flex:none;box-shadow:0 0 8px rgba(95,176,255,.8)}
+.cab .poiI.hit{color:#ffe0b8}.cab .poiI.hit i{background:#ffd199;border-color:#ffb35c;box-shadow:0 0 12px #ffa24a}
+.cab .homeI{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:15px;font-weight:800;color:#ffe0b8;text-shadow:0 0 8px #000;transform:translate(-10px,-50%)}
+.cab .homeI i{width:20px;height:20px;border-radius:50%;background:#ffd199;border:3px solid #fff;box-shadow:0 0 16px #ffa24a;flex:none}
+.cab .hud,.cab .cap,.cab .mbtn,.cab .osm2{z-index:1000}
+.cab .mbtn{position:absolute;right:14px;top:62px;display:flex;flex-direction:column;gap:6px}
+.cab .mbtn button{min-width:118px;min-height:40px;border-radius:12px;border:1px solid rgba(95,176,255,.45);background:rgba(4,10,22,.82);color:#cfe0f5;font-size:13px;font-weight:700;backdrop-filter:blur(6px)}
+.cab .mbtn button.on{background:linear-gradient(135deg,#3f9bff,#1c5fc4);color:#fff;border-color:transparent}
+.cab .osm2{position:absolute;right:10px;bottom:6px;font-size:10.5px;color:rgba(220,235,255,.75);text-shadow:0 0 4px #000}
+.cab .cap{bottom:70px;opacity:0;transition:transform .5s cubic-bezier(.2,.9,.3,1),opacity .4s}.cab .cap.show{opacity:1}
+.cab #lmap svg{inset:auto;width:auto;height:auto}
+/* ===== SKY GATE BOOST ===== */
+.cab #warp{position:absolute;inset:0;width:100%;height:100%;z-index:404;pointer-events:none}
+.cab .map .tint,.cab .map .leaflet-tile-pane{transition:filter 1.2s,background 1.2s}
+.cab .map.boost-charge .leaflet-tile-pane{filter:brightness(.55) saturate(.8)}
+.cab .mode-photo.boost .leaflet-tile-pane{filter:brightness(.55) saturate(1.5) contrast(1.2) hue-rotate(-25deg)}
+.cab .mode-dark.boost .leaflet-tile-pane{filter:invert(1) grayscale(.3) hue-rotate(235deg) brightness(.7) contrast(1.9) saturate(2.6)}
+.cab .map.boost .tint{background:linear-gradient(135deg,rgba(140,60,255,.30),rgba(0,210,255,.16) 55%,rgba(140,60,255,.25)),radial-gradient(ellipse at 50% 46%,transparent 30%,rgba(10,0,30,.7) 90%)}
+.cab .map.boost .rt-glow{stroke:#a45cff;filter:drop-shadow(0 0 8px #a45cff) drop-shadow(0 0 20px #7b3cff)}
+.cab .map.boost .rt-flow{animation-duration:.35s}
+.cab .map.boost .carI .dot{background:#fff;box-shadow:0 0 0 7px rgba(164,92,255,.35),0 0 30px #a45cff,0 0 60px #5fe3ff}
+.cab .map.boost .hud,.cab .map.boost .dl2,.cab .map.boost .rtchip,.cab .map.boost .cap,.cab .map.boost-charge .hud,.cab .map.boost-charge .dl2,.cab .map.boost-charge .rtchip,.cab .map.boost-charge .cap{opacity:0;transition:opacity .5s}
+.cab .shock{position:absolute;left:50%;top:46%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:3px solid rgba(160,230,255,.9);z-index:405;pointer-events:none;opacity:0}
+.cab .shock.go{animation:cab-shk 1.1s cubic-bezier(.1,.7,.3,1)}
+@keyframes cab-shk{0%{opacity:1;transform:scale(.2)}100%{opacity:0;transform:scale(28);border-width:1px}}
+.cab .boostT{position:absolute;inset:0;z-index:1001;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .4s}
+.cab .boostT.on{opacity:1}
+.cab .boostT .bs{font-size:14px;letter-spacing:.5em;color:#bfe9ff;text-shadow:0 0 10px #00c8ff;opacity:0}
+.cab .boostT .bn{font-size:54px;font-weight:900;font-style:italic;letter-spacing:.04em;white-space:nowrap;color:#fff;text-shadow:0 0 18px #7b3cff,0 0 40px #00c8ff;opacity:0;transform:scale(1.6);filter:blur(12px)}
+.cab .boostT .bn em{font-style:italic;background:linear-gradient(90deg,#5fe3ff,#c08bff,#5fe3ff);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:cab-shine 1.6s linear infinite}
+@keyframes cab-shine{to{background-position:-200% 0}}
+.cab .boostT .bf{margin-top:10px;font-size:15px;letter-spacing:.18em;color:#e2d4ff;opacity:0}
+.cab .boostT.on .bs{animation:cab-fin .5s .3s forwards}
+.cab .boostT.on .bn{animation:cab-slam .55s 1.75s cubic-bezier(.2,1.4,.4,1) forwards}
+.cab .boostT.on .bf{animation:cab-fin .5s 2.3s forwards}
+@keyframes cab-fin{to{opacity:1}}
+@keyframes cab-slam{to{opacity:1;transform:scale(1);filter:blur(0)}}
+.cab .boostT .bchip{position:absolute;left:50%;top:14px;transform:translateX(-50%);padding:7px 18px;border-radius:999px;font-size:13px;font-weight:900;letter-spacing:.12em;color:#fff;background:linear-gradient(90deg,rgba(123,60,255,.85),rgba(0,200,255,.75));box-shadow:0 0 18px rgba(123,60,255,.8);opacity:0;transition:opacity .5s}
+.cab .boostT.mini .bs,.cab .boostT.mini .bn,.cab .boostT.mini .bf{animation:none;opacity:0;transition:opacity .6s}
+.cab .boostT.mini .bchip{opacity:1;animation:cab-pulse2 1.6s ease-in-out infinite}
+@keyframes cab-pulse2{50%{box-shadow:0 0 30px rgba(0,200,255,.9)}}
+.cab .boostP{position:absolute;left:16px;right:16px;bottom:16px;z-index:1001;display:flex;gap:16px;align-items:center;padding:14px 18px;border-radius:18px;background:linear-gradient(135deg,rgba(20,6,45,.88),rgba(2,18,36,.88));border:1px solid rgba(160,110,255,.55);box-shadow:0 0 24px rgba(123,60,255,.35),inset 0 0 20px rgba(0,200,255,.08);backdrop-filter:blur(6px);opacity:0;transform:translateY(30px);transition:opacity .5s,transform .5s cubic-bezier(.2,.9,.3,1)}
+.cab .boostP.on{opacity:1;transform:none}
+.cab .boostP .spd{display:flex;align-items:baseline;gap:4px;min-width:150px}
+.cab .boostP .spd b{font-size:58px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 0 14px #00c8ff}
+.cab .boostP .spd small{font-size:15px;color:#9fdcff;letter-spacing:.1em}
+.cab .boostP .bmid{flex:1;min-width:0}
+.cab .boostP .bt{display:flex;justify-content:space-between;font-size:13px;font-weight:800;letter-spacing:.12em;color:#d9ccff}
+.cab .boostP .bt #bRem{color:#fff;font-variant-numeric:tabular-nums}
+.cab .boostP .bbar{height:8px;margin:8px 0;border-radius:8px;background:rgba(255,255,255,.1);overflow:hidden}
+.cab .boostP .bbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7b3cff,#00c8ff);box-shadow:0 0 12px #00c8ff}
+.cab .boostP .btriv{font-size:14px;color:#e8f4ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .boostP .btriv.in{animation:cab-tin .6s}
+@keyframes cab-tin{from{opacity:0;transform:translateX(12px)}}
+
+/* ---- v2: HUD ---- */
+.cab .shock{top:50%!important}.cab .shock.s2.go{animation-delay:.14s;border-color:rgba(200,150,255,.9)}
+.cab .bhud{position:absolute;inset:0;z-index:1000;pointer-events:none;opacity:0;transition:opacity .4s}
+.cab .bhud.boot,.cab .bhud.charge,.cab .bhud.lock,.cab .bhud.fire,.cab .bhud.cruise{opacity:1}
+.cab .bhud .cn{position:absolute;width:46px;height:46px;border:3px solid #5fe3ff;filter:drop-shadow(0 0 6px #00c8ff);opacity:0;transition:all .45s cubic-bezier(.2,.9,.3,1)}
+.cab .bhud .tl{left:40px;top:40px;border-right:0;border-bottom:0}.cab .bhud .tr{right:40px;top:40px;border-left:0;border-bottom:0}.cab .bhud .bl{left:40px;bottom:40px;border-right:0;border-top:0}.cab .bhud .br{right:40px;bottom:40px;border-left:0;border-top:0}
+.cab .bhud.boot .cn,.cab .bhud.charge .cn,.cab .bhud.lock .cn{opacity:1}.cab .bhud.boot .tl,.cab .bhud.charge .tl{left:14px;top:14px}.cab .bhud.boot .tr,.cab .bhud.charge .tr{right:14px;top:14px}.cab .bhud.boot .bl,.cab .bhud.charge .bl{left:14px;bottom:14px}.cab .bhud.boot .br,.cab .bhud.charge .br{right:14px;bottom:14px}
+.cab .bhud.charge .cn{border-color:#c08bff;animation:cab-cnb .25s steps(2) infinite}
+@keyframes cab-cnb{50%{opacity:.4}}
+.cab .bhud .scanl{position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,transparent,#5fe3ff,transparent);box-shadow:0 0 18px 4px rgba(0,200,255,.6);opacity:0}
+.cab .bhud.boot .scanl{animation:cab-scn 1s ease-in-out}
+@keyframes cab-scn{0%{top:0;opacity:1}100%{top:100%;opacity:.6}}
+.cab .bhud .blog{position:absolute;left:30px;top:30px;font:600 13px/1.75 ui-monospace,Menlo,Consolas,monospace;color:#8fe8ff;text-shadow:0 0 6px #00c8ff;letter-spacing:.04em;opacity:0;transition:opacity .4s}
+.cab .bhud .blog b{color:#b4ffcf;text-shadow:0 0 6px #2bff88}
+.cab .bhud .blog div{animation:cab-typ .25s steps(12)}
+@keyframes cab-typ{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.cab .bhud.boot .blog,.cab .bhud.charge .blog{opacity:1}
+.cab .bhud .hex{position:absolute;inset:0;opacity:0;transition:opacity .6s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0l28 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%235fe3ff' stroke-width='1'/%3E%3C/svg%3E");-webkit-mask:radial-gradient(circle at 50% 50%,#000 0,transparent 60%);mask:radial-gradient(circle at 50% 50%,#000 0,transparent 60%)}
+.cab .bhud.charge .hex{opacity:.28;animation:cab-hexp 1.9s ease-in}
+@keyframes cab-hexp{from{opacity:0;transform:scale(1.3)}to{opacity:.35;transform:scale(1)}}
+.cab .bhud .ring{position:absolute;left:50%;top:50%;width:230px;height:230px;margin:-115px 0 0 -115px;opacity:0;transform:scale(.6);transition:opacity .3s,transform .5s cubic-bezier(.2,1.3,.4,1)}
+.cab .bhud.charge .ring{opacity:1;transform:scale(1);animation:cab-shake 1.9s ease-in}
+@keyframes cab-shake{0%,60%{translate:0 0}70%{translate:1px -1px}75%{translate:-1px 1px}80%{translate:2px 1px}85%{translate:-2px -1px}90%{translate:2px -2px}95%{translate:-2px 2px}100%{translate:0 0}}
+.cab .bhud .ring svg{width:100%;height:100%;overflow:visible;animation:cab-spin 3s linear infinite}
+@keyframes cab-spin{to{transform:rotate(360deg)}}
+.cab .bhud .ring .tk line{stroke:#5fe3ff;stroke-width:1.5;opacity:.55}
+.cab .bhud .ring .rb{fill:none;stroke:rgba(95,227,255,.18);stroke-width:6}
+.cab .bhud .ring .rf{fill:none;stroke:url(#none);stroke:#c08bff;stroke-width:6;stroke-linecap:round;stroke-dasharray:540;stroke-dashoffset:540;transform:rotate(-90deg);transform-origin:100px 100px;filter:drop-shadow(0 0 6px #a45cff) drop-shadow(0 0 14px #00c8ff)}
+.cab .bhud .ring b{position:absolute;left:0;right:0;bottom:-30px;text-align:center;font:800 16px ui-monospace,Menlo,monospace;color:#e9dcff;letter-spacing:.15em;text-shadow:0 0 8px #a45cff}
+.cab .bhud .cd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:110px;font-weight:900;font-style:italic;color:#fff;text-shadow:0 0 20px #a45cff,0 0 50px #00c8ff;opacity:0}
+.cab .bhud .cd.pop{animation:cab-cdp .55s cubic-bezier(.2,1.4,.4,1)}
+@keyframes cab-cdp{0%{opacity:0;transform:translate(-50%,-50%) scale(2.2);filter:blur(8px)}35%{opacity:1;transform:translate(-50%,-50%) scale(1);filter:blur(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
+.cab .bhud .flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,#fff 0,rgba(190,230,255,.7) 25%,rgba(150,100,255,0) 70%);opacity:0}
+.cab .bhud.fire .flash{animation:cab-fl .5s ease-out}
+@keyframes cab-fl{0%{opacity:.6}100%{opacity:0}}
+.cab .bhud .floor{position:absolute;left:-40%;right:-40%;bottom:-8%;height:48%;opacity:0;transition:opacity 1s;transform:perspective(320px) rotateX(62deg);transform-origin:50% 100%;background-image:linear-gradient(rgba(95,227,255,.55) 2px,transparent 2px),linear-gradient(90deg,rgba(192,139,255,.5) 2px,transparent 2px);background-size:60px 60px;-webkit-mask:linear-gradient(transparent,#000 60%);mask:linear-gradient(transparent,#000 60%);animation:cab-flr .45s linear infinite}
+@keyframes cab-flr{to{background-position:0 60px}}
+.cab .bhud.fire .floor,.cab .bhud.cruise .floor{opacity:.45}
+/* タイトル: 色ずれグリッチ */
+.cab .boostT .bn{position:relative}
+.cab .boostT .bn::before,.cab .boostT .bn::after{content:attr(data-t);position:absolute;inset:0;font-style:italic;opacity:0;pointer-events:none}
+.cab .boostT.on:not(.mini) .bn::before{color:#ff2f8e;animation:cab-gl1 .9s steps(1) .25s 2}
+.cab .boostT.on:not(.mini) .bn::after{color:#00f0ff;animation:cab-gl2 .9s steps(1) .25s 2}
+@keyframes cab-gl1{0%{opacity:.8;transform:translate(-6px,0);clip-path:inset(10% 0 60% 0)}20%{transform:translate(5px,0);clip-path:inset(55% 0 20% 0)}40%{transform:translate(-3px,0);clip-path:inset(30% 0 45% 0)}60%{opacity:.6;transform:translate(4px,0);clip-path:inset(75% 0 5% 0)}80%,100%{opacity:0}}
+@keyframes cab-gl2{0%{opacity:.8;transform:translate(6px,0);clip-path:inset(60% 0 10% 0)}20%{transform:translate(-5px,0);clip-path:inset(15% 0 65% 0)}40%{transform:translate(3px,0);clip-path:inset(40% 0 35% 0)}60%{opacity:.6;transform:translate(-4px,0);clip-path:inset(5% 0 80% 0)}80%,100%{opacity:0}}
+.cab .boostT.on .bs{animation:cab-fin .4s .1s forwards}
+.cab .boostT.on .bn{animation:cab-slam .5s 0s cubic-bezier(.2,1.4,.4,1) forwards}
+.cab .boostT.on .bf{animation:cab-fin .5s .5s forwards}
+/* パネル v2: 速度メーター */
+.cab .boostP .gauge{position:relative;width:120px;height:120px;flex:none}
+.cab .boostP .gauge svg{width:100%;height:100%}
+.cab .boostP .gb,.cab .boostP .gv{fill:none;stroke-width:8;stroke-linecap:round;transform:rotate(135deg);transform-origin:60px 60px}
+.cab .boostP .gb{stroke:rgba(255,255,255,.1);stroke-dasharray:245 400}
+.cab .boostP .gv{stroke:#5fe3ff;stroke-dasharray:160 400;filter:drop-shadow(0 0 6px #00c8ff);transition:stroke-dasharray .3s}
+.cab .boostP .gauge .spd{position:absolute;inset:0;flex-direction:column;justify-content:center;align-items:center;gap:0;min-width:0}
+.cab .boostP .gauge .spd b{font-size:40px}.cab .boostP .gauge .spd small{font-size:11px}
+.cab .boostP .cells{display:flex;gap:3px;align-items:center;margin:2px 0 8px}
+.cab .boostP .cells i{width:14px;height:8px;border-radius:2px;background:linear-gradient(90deg,#7b3cff,#00c8ff);opacity:.25;animation:cab-cell 1.2s ease-in-out infinite}
+.cab .boostP .cells i:nth-child(n){animation-delay:calc(var(--i,0)*.08s)}
+.cab .boostP .cells span{margin-left:8px;font:800 11px ui-monospace,monospace;letter-spacing:.2em;color:#c9b8ff}
+@keyframes cab-cell{30%{opacity:1;box-shadow:0 0 8px #00c8ff}}
+/* 完了カード */
+.cab .bdone{position:absolute;left:50%;top:50%;z-index:1002;transform:translate(-50%,-50%) scale(.9);padding:20px 34px;border-radius:18px;text-align:center;background:rgba(4,12,26,.88);border:1px solid rgba(95,227,255,.5);box-shadow:0 0 30px rgba(0,200,255,.3);opacity:0;pointer-events:none;transition:opacity .5s,transform .5s}
+.cab .bdone.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.cab .bdone{white-space:nowrap}.cab .bdone .k{font-size:22px;font-weight:900;letter-spacing:.14em;color:#b4ffcf;text-shadow:0 0 10px #2bff88}
+.cab .bdone .s{margin-top:8px;font:600 14px ui-monospace,Menlo,monospace;color:#cfe8ff;letter-spacing:.06em}
+
+/* ---- v3: reactor / mode change ---- */
+.cab .bhud .ring,.cab .bhud .cd{display:none}
+.cab .bhud .reactor{position:absolute;left:50%;top:50%;width:270px;height:270px;margin:-135px 0 0 -135px;opacity:0;transform:scale(.5);transition:opacity .35s,transform .6s cubic-bezier(.2,1.3,.4,1)}
+.cab .bhud.charge .reactor,.cab .bhud.lock .reactor{opacity:1;transform:scale(1)}
+.cab .bhud.fire .reactor{opacity:0;transform:scale(2.4);transition:opacity .45s,transform .45s ease-out}
+.cab .reactor svg{width:100%;height:100%;overflow:visible}
+.cab .reactor .sg{fill:none;stroke:rgba(95,227,255,.14);stroke-width:9;transition:stroke .12s}
+.cab .reactor .sg.on{stroke:#5fe3ff;filter:drop-shadow(0 0 5px #00c8ff)}
+.cab .reactor .sg.on.hot{stroke:#c08bff;filter:drop-shadow(0 0 6px #a45cff)}
+.cab .reactor .rg circle{fill:none}
+.cab .reactor .r0 circle{stroke:#5fe3ff;stroke-width:2.5;stroke-dasharray:46 16;opacity:.8}
+.cab .reactor .r1 circle{stroke:#c08bff;stroke-width:1.5;stroke-dasharray:4 5;opacity:.9}.cab .reactor .r1 rect{fill:#c08bff}
+.cab .reactor .r2 circle{stroke:#e9f6ff;stroke-width:3;stroke-dasharray:80 26;opacity:.85}.cab .reactor .r2 line{stroke:#8fe8ff;stroke-width:1.5;opacity:.7}
+.cab .reactor .rg.lk{filter:drop-shadow(0 0 8px #fff) drop-shadow(0 0 18px #00c8ff)}
+.cab .reactor .rg.lk circle{stroke:#fff;opacity:1}
+.cab .reactor .rc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace}
+.cab .reactor .rc small{font-size:11px;letter-spacing:.35em;color:#9fdcff}
+.cab .reactor .rc b{font-size:34px;font-weight:800;color:#fff;text-shadow:0 0 12px #00c8ff;font-variant-numeric:tabular-nums}
+.cab .bhud.lock .reactor .rc b{color:#e9dcff;text-shadow:0 0 14px #a45cff}
+.cab .bmode{position:absolute;left:50%;top:calc(50% + 160px);transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:8px 18px;border-radius:10px;border:1px solid rgba(95,227,255,.5);background:rgba(4,12,26,.75);font-family:ui-monospace,Menlo,monospace;opacity:0;transition:opacity .3s}
+.cab .bmode span{font-size:12px;letter-spacing:.3em;color:#9fdcff}
+.cab .bmode b{min-width:90px;font-size:20px;letter-spacing:.2em;color:#fff}
+.cab .bhud.charge .bmode,.cab .bhud.lock .bmode{opacity:1}
+.cab .bmode.flip b{animation:cab-flip .22s}
+@keyframes cab-flip{0%{transform:rotateX(90deg);opacity:.2}100%{transform:none;opacity:1}}
+.cab .bmode.boost{border-color:#c08bff;box-shadow:0 0 18px rgba(164,92,255,.6)}.cab .bmode.boost b{color:#e9dcff;text-shadow:0 0 10px #a45cff}
+.cab .bhud .wipe{position:absolute;top:-10%;bottom:-10%;left:-60%;width:40%;background:linear-gradient(90deg,transparent,rgba(95,227,255,.0) 10%,rgba(95,227,255,.55) 45%,rgba(192,139,255,.7) 55%,rgba(123,60,255,.0) 90%,transparent);transform:skewX(-18deg);opacity:0}
+.cab .bhud.wiping .wipe{animation:cab-wipe .42s cubic-bezier(.5,0,.3,1)}
+@keyframes cab-wipe{0%{left:-60%;opacity:1}100%{left:120%;opacity:1}}
+.cab .map.punch #lmap{animation:cab-punch .5s cubic-bezier(.2,.9,.3,1)}
+@keyframes cab-punch{0%{transform:scale(1.06)}100%{transform:scale(1)}}
+.cab .map.boost-charge .leaflet-tile-pane{filter:brightness(.42) saturate(.7)!important}
+
+/* ---- v4: cool down ---- */
+.cab .bhud.cool{opacity:1}.cab .bhud.cool .cn{opacity:1;border-color:#8fe8ff}
+.cab .bhud.cool .reactor{opacity:1;transform:scale(1)}.cab .bhud.cool .bmode{opacity:1}
+.cab .bhud.cool .reactor .rc b{color:#bfeaff}
+@keyframes cab-wiperev{0%{left:120%;opacity:1}100%{left:-60%;opacity:1}}
+.cab .bhud.wiping.rev .wipe{animation:cab-wiperev .42s cubic-bezier(.5,0,.3,1)}
+.cab .bdone .s b{color:#fff;font-weight:800}
+.cab .bdone .n{margin-top:6px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.35em;color:#7fd6a8;opacity:0;animation:none}
+.cab .bdone.on .n{animation:cab-fin .4s .6s forwards}
+.cab .bdone.on .k{animation:cab-dk .6s cubic-bezier(.2,1.3,.4,1)}
+@keyframes cab-dk{from{letter-spacing:.6em;opacity:0;filter:blur(6px)}}
+
+/* ---- その他の場所 ---- */
+.cab .map.picking #lmap{cursor:crosshair}
+
+/* ===== 部屋の写真 ===== */
+@property --r{syntax:'<percentage>';inherits:false;initial-value:0%}
+.cab .roomb{border-color:color-mix(in srgb,var(--acc) 45%,transparent)!important;box-shadow:0 0 18px color-mix(in srgb,var(--acc) 18%,transparent)}
+.cab .roomb h3{color:color-mix(in srgb,var(--acc) 70%,#cfe0f5)!important}
+.cab .room{display:flex!important;flex-direction:column;gap:8px;align-items:stretch!important}
+.cab .rph{position:relative;width:100%;aspect-ratio:4/3;max-height:280px;border-radius:14px;overflow:hidden;background:#000}
+.cab .rph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.7) brightness(.9);transition:filter 2.4s}
+.cab .room.lit .rph img{filter:saturate(1.05) brightness(1.04)}
+.cab .room.closed:not(.lit) .rph img{filter:saturate(.25) brightness(.8)}
+.cab .rdark{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,12,32,.72),rgba(4,8,22,.78));-webkit-mask:radial-gradient(circle at var(--lx) var(--ly),transparent var(--r),#000 calc(var(--r) + 22%));mask:radial-gradient(circle at var(--lx) var(--ly),transparent var(--r),#000 calc(var(--r) + 22%));transition:--r 2.6s cubic-bezier(.3,.1,.2,1)}
+.cab .room.lit .rdark{--r:150%}
+.cab .rlight{position:absolute;inset:0;background:radial-gradient(circle at var(--lx) var(--ly),rgba(255,196,120,.75),rgba(255,170,80,.25) 18%,transparent 42%);mix-blend-mode:screen;opacity:0;transition:opacity 1.6s}
+.cab .room.lit .rlight{opacity:.8;animation:cab-lampOn 1.1s steps(1)}
+@keyframes cab-lampOn{0%{opacity:.9}12%{opacity:.2}22%{opacity:.95}30%{opacity:.4}40%{opacity:.8}}
+.cab .rair{position:absolute;width:0;height:0}
+.cab .rair i{position:absolute;left:-40px;top:14px;width:80px;height:26px;border-radius:50%;border-bottom:2px solid;opacity:0;animation:cab-air 2.8s ease-in infinite}
+.cab .rair i:nth-child(2){animation-delay:.7s;left:-50px}.cab .rair i:nth-child(3){animation-delay:1.4s;left:-34px}.cab .rair i:nth-child(4){animation-delay:2.1s;left:-46px}
+.cab .rair.cool i{border-color:rgba(140,220,255,.9);filter:drop-shadow(0 0 4px #5fe3ff)}
+.cab .rair.heat i{border-color:rgba(255,170,90,.9);filter:drop-shadow(0 0 4px #ff8a3c)}
+@keyframes cab-air{0%{opacity:0;transform:translateY(0) scaleX(.7)}25%{opacity:.9}100%{opacity:0;transform:translateY(70px) scaleX(1.3)}}
+.cab .room.closed .rair{display:none}
+.cab .rlive{position:absolute;right:8px;top:8px;padding:3px 8px;border-radius:6px;background:rgba(0,0,0,.55);font:800 10.5px ui-monospace,monospace;letter-spacing:.12em;color:#ff5b5b}
+.cab .rlive{animation:cab-bl 1.4s infinite}
+.cab .room.closed .rlive{color:#aab6c8;animation:none}
+.cab .rkanji{position:absolute;left:10px;bottom:4px;font:900 44px/1 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;color:#fff;text-shadow:0 0 14px var(--acc),0 2px 6px #000;opacity:.92}
+.cab .rscan{position:absolute;left:0;right:0;top:-10%;height:10%;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--acc) 30%,rgba(95,227,255,.35)),transparent);border-bottom:2px solid #8ff0ff;box-shadow:0 0 16px #5fe3ff;opacity:0;pointer-events:none}
+.cab .room.scan .rscan{animation:cab-rsc 1.6s ease-in-out}
+@keyframes cab-rsc{0%{top:-10%;opacity:1}100%{top:100%;opacity:.8}}
+.cab .room.scan .rph::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(95,227,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(95,227,255,.12) 1px,transparent 1px);background-size:22px 22px;animation:cab-gridf 4s ease-out forwards}
+@keyframes cab-gridf{0%,60%{opacity:1}100%{opacity:0}}
+.cab .rtag{position:absolute;width:0;height:0;z-index:2;opacity:0;transition:opacity .4s}
+.cab .rtag b{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;border:2px solid #8ff0ff;box-shadow:0 0 10px #5fe3ff;background:rgba(95,227,255,.25)}
+.cab .rtag b::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1px solid #8ff0ff;animation:cab-pu 1.6s ease-out infinite}
+.cab .rtag span{position:absolute;left:12px;top:-26px;white-space:nowrap;padding:3px 8px;border-radius:6px;background:rgba(4,12,26,.85);border:1px solid rgba(95,227,255,.6);font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#dff8ff;transform-origin:left;transform:scaleX(0);transition:transform .35s cubic-bezier(.2,.9,.3,1)}
+.cab #tagWf span,.cab #tagAc span{left:auto;right:12px;transform-origin:right}
+.cab .room.scan .rtag,.cab .room.tagged .rtag{opacity:1}
+.cab .room.scan .rtag span{transform:scaleX(1)}
+.cab .room.scan #tagAc,.cab .room.scan #tagAc span{transition-delay:1.7s}.cab .room.scan #tagLt,.cab .room.scan #tagLt span{transition-delay:2.1s}.cab .room.scan #tagWf,.cab .room.scan #tagWf span{transition-delay:2.5s}
+.cab .room.tagged .rtag span{transform:scaleX(0)}
+.cab .room.tagged .rtag b{transform:scale(.7);opacity:.8}
+.cab .room.closed .rtag{opacity:0!important}
+.cab .room .stat{flex-direction:row!important;gap:6px!important}
+.cab .room .stat div{flex:1;min-width:0;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px!important;font-size:12px;position:relative}
+.cab .room .stat div i{position:absolute;right:8px;top:9px}
+.cab .room .stat em{margin-left:0!important;font-size:11px}
+.cab .stat i.off{background:#56637a!important;box-shadow:none!important;animation:none!important}
+.cab .cmeter{padding:8px 10px;border-radius:12px;background:rgba(0,0,0,.28)}
+.cab .cmeter .cl{display:flex;align-items:baseline;gap:8px}.cab .cmeter .cl b{font-size:13.5px;color:#fff}.cab .cmeter .cl small{font-size:11px;color:#8fb2d9;margin-left:auto}
+.cab .cmeter .cb{display:flex;align-items:center;gap:8px;margin-top:6px;font:700 10.5px ui-monospace,monospace;letter-spacing:.1em}
+.cab .cmeter.cool .cb span:first-child{color:#ffb070}.cab .cmeter.cool .cb span:last-child{color:#8fe8ff}
+.cab .cmeter.heat .cb span:first-child{color:#8fc8ff}.cab .cmeter.heat .cb span:last-child{color:#ffb070}
+.cab .cbar{flex:1;height:8px;border-radius:8px;background:rgba(255,255,255,.08);overflow:hidden}
+.cab .cbar i{display:block;height:100%;width:18%;border-radius:8px;transition:width 1.2s;background-size:40px 100%;animation:cab-flow 1s linear infinite}
+.cab .cmeter.cool .cbar i{background-image:linear-gradient(90deg,#ff9b5c,#5fe3ff),repeating-linear-gradient(90deg,transparent 0 14px,rgba(255,255,255,.35) 14px 20px);background-blend-mode:overlay;background-size:100% 100%,40px 100%}
+.cab .cmeter.heat .cbar i{background-image:linear-gradient(90deg,#6fb8ff,#ff9b5c),repeating-linear-gradient(90deg,transparent 0 14px,rgba(255,255,255,.35) 14px 20px);background-blend-mode:overlay;background-size:100% 100%,40px 100%}
+@keyframes cab-flow{to{background-position:0 0,40px 0}}
+/* 到着画面 (写真・毛筆の季節文字・舞うもの) */
+.cab .arrive{overflow:hidden}
+.cab .arrive .abg{position:absolute;inset:-4%;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s}
+.cab .arrive.on .abg{opacity:1;animation:cab-kb 14s ease-out forwards}
+@keyframes cab-kb{from{transform:scale(1.02)}to{transform:scale(1.14)}}
+.cab .arrive .ashade{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,.15),rgba(3,6,17,.82) 75%),linear-gradient(180deg,rgba(3,6,17,.2),rgba(3,6,17,.75))}
+.cab .arrive.out .abg{filter:grayscale(.75) brightness(.55)}
+.cab .arrive #ptc{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cab .arrive .ak{position:relative;font:900 150px/1 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;color:#fff;text-shadow:0 0 30px var(--acc),0 0 70px color-mix(in srgb,var(--acc) 60%,transparent);opacity:0;transform:scale(1.4);filter:blur(10px)}
+.cab .arrive.on .ak{animation:cab-akIn 1.4s .3s cubic-bezier(.2,.9,.3,1) forwards}
+@keyframes cab-akIn{to{opacity:1;transform:none;filter:none}}
+.cab .arrive .akEn{position:relative;font-size:14px;letter-spacing:.6em;color:color-mix(in srgb,var(--acc) 70%,#fff);opacity:0}
+.cab .arrive.on .akEn{animation:cab-fin .6s 1.2s forwards}
+.cab .arrive .t1,.cab .arrive .t2,.cab .arrive .t3,.cab .arrive .rows{position:relative}
+.cab .arrive .t1{opacity:0}.cab .arrive.on .t1{animation:cab-fin .6s 1.5s forwards}
+.cab .arrive .t2{font-size:72px!important}
+.cab .arrive .rows div{border-color:color-mix(in srgb,var(--acc) 60%,transparent)!important;background:rgba(0,0,0,.35)!important;color:#fff!important}
+.cab .arrive.out .ak{color:#e8e8e8;text-shadow:0 0 20px rgba(255,255,255,.4)}
+
+/* ---- 右列をコンパクトに (おすすめが見えるように) ---- */
+.cab .side{gap:10px!important}
+.cab .side .box{padding:10px 12px!important}
+.cab .side .box h3{margin-bottom:6px!important}
+.cab .wx{gap:10px!important}.cab .wx .ic{font-size:30px!important}.cab .wx b{font-size:30px!important}.cab .wx .d{font-size:12px!important;line-height:1.4!important}
+.cab .wx2{margin-top:6px!important}.cab .wx2 div{padding:4px 6px!important;font-size:11px!important}
+.cab .rph{aspect-ratio:3/2!important;max-height:none!important}
+.cab .rkanji{font-size:34px!important}
+.cab .room{gap:6px!important}
+.cab .room .stat div{padding:4px 8px!important;font-size:11.5px!important}
+.cab .room .stat em{font-size:10.5px!important}
+.cab .cmeter{padding:6px 10px!important}.cab .cmeter .cb{margin-top:4px!important}
+.cab .rec{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important}
+.cab .rec div{padding:6px 8px!important;gap:8px!important;min-width:0}
+.cab .rec .e{font-size:20px!important}
+.cab .rec b{font-size:12.5px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .rec small{display:block;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#8fb2d9}
+.cab .rec span:last-child{min-width:0}
+
+.cab .rt-done.out{filter:drop-shadow(0 0 6px #ffb35c) drop-shadow(0 0 16px #ff8a2a)}
+.cab .homeI.stn{color:#bfe6ff}.cab .homeI.stn i{background:#5fe3ff;box-shadow:0 0 16px #2f8fff}
+.cab .stat i.off{background:#56637a!important;box-shadow:none!important;animation:none!important}
+.cab .room.closed svg{filter:brightness(.55) saturate(.6)}.cab .room.closed #acw{display:none}
+.cab .arrive{z-index:3000}.cab .arrive .t2{white-space:nowrap}.cab .arrive.out .t2{font-size:84px;background:linear-gradient(90deg,#ffd199,#ff9d5c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cab .rtchip{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:1000;padding:7px 16px;border-radius:999px;background:rgba(4,10,22,.82);border:1px solid rgba(95,176,255,.45);color:#e6f4ff;font-size:13px;font-weight:800;letter-spacing:.06em;white-space:nowrap;backdrop-filter:blur(6px)}

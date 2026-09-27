@@ -18,6 +18,7 @@ import {
   driverSavePlaces, driverSaveSettings, driverResolveAlert, driverAllOff,
 } from "@/app/driver/actions";
 import { useDriverMusic, MusicPlayer, MusicSheet, MusicAdmin, MusicFull, useMusicFull, type MLang } from "@/components/driver/DriverMusic";
+import { useCabin, useCabinSheet, CabinSheet, CabinBar, CabinSettings } from "@/components/driver/DriverCabin";
 
 type Page = "home" | "pick" | "guide" | "set";
 const P = (x: number, y: number, w: number, h: number, W: number, H: number) =>
@@ -103,6 +104,9 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const autoLang = { in: (next?.lang ?? "zh") as MLang, out: (nextOut?.lang ?? "en") as MLang };
   const autoWho = { in: next ? `${gName(next)}（${rName(next)}）` : "", out: nextOut ? `${gName(nextOut)}（${rName(nextOut)}）` : "" };
   const music = useDriverMusic(data.tracks, t, toast, autoLang);
+  // 車内 iPad (お客さん用の画面) と、送迎中のスマホの位置・BOOST の音楽
+  const cab = useCabin(data.cabin.trip, music, toast, t);
+  const cabS = useCabinSheet();
   const [musicOpen, setMusicOpen] = useState(false);
   const full = useMusicFull(music);
   useEffect(() => { onVoiceChange((s) => music.duck(s)); });
@@ -343,6 +347,11 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
           <span className={`v ${r.pickupPlace || r.pickupNone ? "" : "unset"}`}>{r.pickupNone ? t("送迎なし") : r.pickupPlace ? r.pickupPlace : t("未設定（タップで設定）")}{r.pickupAt && !r.pickupNone ? <small>{jstTime(r.pickupAt)}</small> : null}</span>
           <span className="go">›</span>
         </button>
+        {!r.pickupNone && (
+          <button className="line cabl" onClick={() => cabS.open(r, "in")}>
+            <span className="ic">🚗</span><span className="v">{cab.trip?.resId === r.id ? t("iPad に表示中") : t("車内 iPad に出して出発")}</span><span className="go">›</span>
+          </button>
+        )}
         {!r.pickupNone && (r.flightNo ? (
           <>
             <div className="line fl2">
@@ -623,6 +632,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
                     <div className="meta">{t("お部屋")} <b>{rName(r)}</b></div>
                     <div className="btns">
                       <button className="btn" onClick={() => { music.setPlaylist("out", r.lang as MLang, false); setTimeout(() => music.play(), 150); toast(t("お見送りの音楽を流します")); }}>🎵 {t("お見送りの音楽")}</button>
+                      <button className="btn" onClick={() => cabS.open(r, "out")}>🚗 {cab.trip?.resId === r.id ? t("iPad に表示中") : t("車内 iPad に出して出発")}</button>
                       <button className="btn main gray" onClick={async () => { sfx.down(); vib(40); const x = await driverCheckout(r.id); if (x.ok) { say(["checkout"], 600); toast(t("✓ 全部OFF・施錠しました（清掃リストに出ます）")); } else { sfx.error(); toast(t("操作できませんでした")); } }}>⏻ {t("チェックアウト処理（全部OFF＋施錠）")}</button>
                     </div>
                   </div>
@@ -704,6 +714,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               ))}
               <div className="fedit"><input value={newPlace} onChange={(e) => setNewPlace(e.target.value)} placeholder={t("新しい場所（例: 伏見稲荷 駐車場）")} /><button className="add" onClick={() => { if (!newPlace.trim()) return; sfx.chord(); void savePlaces([...places, { id: `new-${Date.now()}`, name: newPlace.trim(), mapQuery: null, sort: places.length }]); setNewPlace(""); }}>{t("追加")}</button></div>
             </div>
+            <CabinSettings data={data} t={t} toast={toast} refresh={refresh} onStart={() => cabS.open(null, "in")} />
             <MusicAdmin m={music} t={t} toast={toast} autoLang={autoLang} />
             <div className="card">
               <div className="ctitle">✈ {t("飛行機の確認")}</div>
@@ -793,6 +804,8 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
 
       <MusicSheet m={music} t={t} open={musicOpen} onClose={() => setMusicOpen(false)} autoLang={autoLang} autoWho={autoWho} onAdmin={() => { setMusicOpen(false); setPage("set"); setTimeout(() => document.getElementById("musicAdmin")?.scrollIntoView({ behavior: "smooth" }), 100); }} />
       <MusicFull m={music} t={t} full={full} />
+      <CabinSheet open={!!cabS.state} onClose={cabS.close} res={cabS.state?.res ?? null} dir0={cabS.state?.dir ?? "in"} data={data} cab={cab} t={t} roomName={(id) => roomOf(id)?.name ?? "—"} ui={lang} />
+      <CabinBar cab={cab} data={data} t={t} ui={lang} />
       <div className={`toast ${toastMsg ? "show" : ""}`}>{toastMsg}</div>
     </div>
   );

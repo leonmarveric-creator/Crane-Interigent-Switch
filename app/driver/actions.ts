@@ -6,6 +6,8 @@ import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceC
 import { fetchFlight, normFlightNo } from "@/lib/flight";
 import { FLIGHT_REUSE_MS, type FlightInfo } from "@/lib/driverLogic";
 import { loadDriverData, type DriverData, type DriverDesign } from "@/lib/driverData";
+import { langOf } from "@/lib/driverLogic";
+import { toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (e: any): { ok: false; error: string } => ({ ok: false, error: String(e?.message || e || "ERROR") });
@@ -166,19 +168,20 @@ export async function driverSetCover(trackId: string, path: string | null): Prom
   if (old?.cover_path && old.cover_path !== path) await supabaseAdmin.storage.from("driver-music").remove([old.cover_path]).catch(() => null);
   return { ok: true, url: path ? supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl : null };
 }
-export async function driverAddTrack(v: { purpose: "in" | "out"; lang: string; title: string; path: string }): Promise<R<{ id: string; url: string }>> {
+export async function driverAddTrack(v: { purpose: "in" | "out" | "boost"; lang: string; title: string; path: string }): Promise<R<{ id: string; url: string }>> {
   const g = guard(); if (g) return g;
   const { count } = await supabaseAdmin.from("driver_tracks").select("id", { count: "exact", head: true }).eq("purpose", v.purpose).eq("lang", v.lang);
   const { data, error } = await supabaseAdmin.from("driver_tracks").insert({ purpose: v.purpose, lang: v.lang, title: v.title.slice(0, 120), file_path: v.path, sort: count ?? 0 }).select("id").single();
   if (error || !data) return fail(error?.message || "INSERT");
   return { ok: true, id: data.id, url: supabaseAdmin.storage.from("driver-music").getPublicUrl(v.path).data.publicUrl };
 }
-export async function driverUpdateTrack(id: string, v: Partial<{ title: string; lrc: string | null; sort: number }>): Promise<R> {
+export async function driverUpdateTrack(id: string, v: Partial<{ title: string; lrc: string | null; sort: number; startSec: number }>): Promise<R> {
   const g = guard(); if (g) return g;
   const up: any = {};
   if (typeof v.title === "string") up.title = v.title.slice(0, 120);
   if (v.lrc !== undefined) up.lrc = v.lrc;
   if (typeof v.sort === "number") up.sort = v.sort;
+  if (typeof v.startSec === "number") up.start_sec = Math.max(0, Math.min(3600, Math.round(v.startSec)));
   const { error } = await supabaseAdmin.from("driver_tracks").update(up).eq("id", id);
   return error ? fail(error.message) : { ok: true };
 }
@@ -194,4 +197,77 @@ export async function driverDeleteTrack(id: string): Promise<R> {
   if (files.length) await supabaseAdmin.storage.from("driver-music").remove(files).catch(() => null);
   const { error } = await supabaseAdmin.from("driver_tracks").delete().eq("id", id);
   return error ? fail(error.message) : { ok: true };
+}
+
+/* ---------------- 車内 iPad (お客さん用の画面) ---------------- */
+const isId = (x: unknown): x is string => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x);
+/** 送迎を始める (iPad が 3 秒以内に切り替わる)。同じ iPad の前の送迎は終わりにする */
+export async function cabinStart(v: {
+  deviceId: string | null; resId: string | null; dir: "in" | "out"; placeKey: string; placeName: string | null;
+  placeLL: [number, number] | null; roomId: string | null; lang: string; ac: "cool" | "heat" | "none";
+}): Promise<R<{ trip: CabinTrip }>> {
+  const g = guard(); if (g) return g;
+  if (!/^(kix|kix2|rinku|r833|hineno|other)$/.test(v.placeKey)) return fail("BAD_PLACE");
+  if (v.placeKey === "other" && !v.placeLL) return fail("NO_PLACE");
+  const now = new Date().toISOString();
+  let end = supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: now }).eq("status", "active");
+  if (isId(v.deviceId)) end = end.or(`device_id.eq.${v.deviceId},device_id.is.null`);
+  const e1 = await end; if (e1.error) return fail(/cabin_trips/.test(e1.error.message) ? "SETUP" : e1.error.message);
+  const { data, error } = await supabaseAdmin.from("cabin_trips").insert({
+    device_id: isId(v.deviceId) ? v.deviceId : null, reservation_id: isId(v.resId) ? v.resId : null,
+    direction: v.dir === "out" ? "out" : "in", place_key: v.placeKey, place_name: v.placeName?.slice(0, 80) ?? null,
+    place_lat: v.placeLL?.[0] ?? null, place_lng: v.placeLL?.[1] ?? null, room_id: isId(v.roomId) ? v.roomId : null,
+    guest_lang: langOf(v.lang), ac_mode: v.ac === "heat" ? "heat" : v.ac === "none" ? "none" : "cool",
+  }).select("*").single();
+  if (error || !data) return fail(error?.message || "INSERT");
+  return { ok: true, trip: toCabinTrip(data) };
+}
+/** スマホの位置を送る (3 秒ごと)。送迎が終わっていたら active = false */
+export async function cabinPos(tripId: string, lat: number, lng: number, kmh: number | null): Promise<R<{ active: boolean }>> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId) || !isFinite(lat) || !isFinite(lng)) return fail("BAD");
+  const { data, error } = await supabaseAdmin.from("cabin_trips")
+    .update({ phone_lat: lat, phone_lng: lng, phone_speed: kmh != null && isFinite(kmh) ? Math.max(0, Math.min(250, kmh)) : null, phone_at: new Date().toISOString() })
+    .eq("id", tripId).eq("status", "active").select("id");
+  if (error) return fail(error.message);
+  return { ok: true, active: !!data?.length };
+}
+export async function cabinEnd(tripId: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId)) return fail("BAD");
+  const { error } = await supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", tripId);
+  return error ? fail(error.message) : { ok: true };
+}
+export async function cabinRenameDevice(id: string, name: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  const n = name.trim().slice(0, 30); if (!isId(id) || !n) return fail("BAD");
+  const { error } = await supabaseAdmin.from("cabin_devices").update({ name: n }).eq("id", id);
+  return error ? fail(error.message) : { ok: true };
+}
+export async function cabinDeleteDevice(id: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(id)) return fail("BAD");
+  const { error } = await supabaseAdmin.from("cabin_devices").delete().eq("id", id);
+  return error ? fail(error.message) : { ok: true };
+}
+/** 部屋の写真 (iPad 用) のアップロード先。ブラウザで 1280px の WebP に縮めてから直接送る */
+export async function cabinPhotoUploadUrl(roomId: string, ext: "webp" | "jpg"): Promise<R<{ path: string; signedUrl: string }>> {
+  const g = guard(); if (g) return g;
+  if (!isId(roomId)) return fail("BAD");
+  const path = `rooms/${roomId}-${Date.now().toString(36)}.${ext === "webp" ? "webp" : "jpg"}`;
+  const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
+  if (error || !data) return fail(error?.message || "UPLOAD_URL");
+  return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** 部屋の写真を決める (photo: 'builtin:r1'〜'r4' / アップロードした 'rooms/…' / null = 最初の写真) と 位置 */
+export async function cabinSetRoomPhoto(roomId: string, photo: string | null, spots: CabinSpots | null): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(roomId)) return fail("BAD");
+  if (photo && !/^(builtin:r[1-4]|rooms\/[\w.-]+\.(webp|jpg))$/.test(photo)) return fail("BAD_PATH");
+  const { data: old } = await supabaseAdmin.from("rooms").select("cabin_photo").eq("id", roomId).maybeSingle();
+  const { error } = await supabaseAdmin.from("rooms").update({ cabin_photo: photo, cabin_spots: spots }).eq("id", roomId);
+  if (error) return fail(/cabin_photo|cabin_spots/.test(error.message) ? "SETUP" : error.message);
+  const prev = (old as any)?.cabin_photo as string | null;
+  if (prev && prev.startsWith("rooms/") && prev !== photo) await supabaseAdmin.storage.from("driver-music").remove([prev]).catch(() => null);
+  return { ok: true };
 }

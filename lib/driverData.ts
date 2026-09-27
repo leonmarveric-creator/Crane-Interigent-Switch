@@ -5,10 +5,11 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isMissingColumn } from "@/lib/stayTimes";
 import { langOf, monthKey, type DRoom, type DRes } from "@/lib/driverLogic";
+import { activeTrip, loadCabinDevices, toCabinRoom, type CabinDevice, type CabinRoom, type CabinTrip } from "@/lib/cabinData";
 
 export type DriverDesign = "hybrid" | "bike";
 export interface DriverSettings { design: DriverDesign; autoPrep: boolean; autoPrepMin: number; flightAuto: boolean }
-export interface DriverTrack { id: string; purpose: "in" | "out"; lang: "ja" | "en" | "zh" | "ko"; title: string; artist: string | null; url: string; cover: string | null; lrc: string | null; sort: number }
+export interface DriverTrack { id: string; purpose: "in" | "out" | "boost"; startSec: number; lang: "ja" | "en" | "zh" | "ko"; title: string; artist: string | null; url: string; cover: string | null; lrc: string | null; sort: number }
 export interface DriverPlace { id: string; name: string; mapQuery: string | null; sort: number }
 export interface DriverAlert { id: number; roomId: string | null; kind: string; battery: number | null; dueAt: string | null; createdAt: string }
 export interface EntranceInfo { building: string; keypad: string | null; wifiSsid: string | null; wifiPass: string | null }
@@ -17,6 +18,8 @@ export interface DriverData {
   settings: DriverSettings; alerts: DriverAlert[]; flightUsed: number;
   battery: Record<string, { battery: number | null; checkedAt: string }>;
   entrances: EntranceInfo[]; setupMissing: boolean;
+  /** 車内 iPad (migration_cabin.sql を実行していなければ missing) */
+  cabin: { devices: CabinDevice[]; trip: CabinTrip | null; rooms: CabinRoom[]; missing: boolean };
 }
 
 export const DEFAULT_SETTINGS: DriverSettings = { design: "hybrid", autoPrep: true, autoPrepMin: 30, flightAuto: true };
@@ -79,13 +82,14 @@ export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
     getDriverSettings(),
   ]);
   const rooms = ((roomsQ.data ?? []) as any[]).map(toDRoom);
+  const cabinRooms = ((roomsQ.data ?? []) as any[]).map((r) => toCabinRoom(r, nowMs));
   const safe = async <T,>(p: PromiseLike<{ data: any; error: any }>, map: (d: any) => T, fb: T): Promise<T> => {
     try { const { data, error } = await p; return error ? fb : map(data); } catch { return fb; }
   };
   const pub = (path: string) => supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl;
-  const [places, tracks, alerts, flightUsed, battery, entrances] = await Promise.all([
+  const [places, tracks, alerts, flightUsed, battery, entrances, cabinDev, cabinTrip] = await Promise.all([
     safe(supabaseAdmin.from("driver_places").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((p: any) => ({ id: p.id, name: p.name, mapQuery: p.map_query ?? null, sort: p.sort })), [] as DriverPlace[]),
-    safe(supabaseAdmin.from("driver_tracks").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((t: any) => ({ id: t.id, purpose: t.purpose, lang: t.lang, title: t.title, artist: t.artist ?? null, url: pub(t.file_path), cover: t.cover_path ? pub(t.cover_path) : null, lrc: t.lrc ?? null, sort: t.sort })), [] as DriverTrack[]),
+    safe(supabaseAdmin.from("driver_tracks").select("*").order("sort").order("created_at"), (d) => (d ?? []).map((t: any) => ({ id: t.id, purpose: t.purpose, lang: t.lang, title: t.title, artist: t.artist ?? null, url: pub(t.file_path), cover: t.cover_path ? pub(t.cover_path) : null, lrc: t.lrc ?? null, sort: t.sort, startSec: Number(t.start_sec) || 0 })), [] as DriverTrack[]),
     safe(supabaseAdmin.from("driver_alerts").select("*").is("resolved_at", null).order("created_at", { ascending: false }).limit(20), (d) => (d ?? []).map((a: any) => ({ id: a.id, roomId: a.room_id, kind: a.kind, battery: a.battery, dueAt: a.due_at, createdAt: a.created_at })), [] as DriverAlert[]),
     safe(supabaseAdmin.from("driver_flight_usage").select("used").eq("month", monthKey(nowMs)).maybeSingle(), (d) => Number(d?.used ?? 0), 0),
     safe(supabaseAdmin.from("lock_battery_logs").select("room_id, battery, checked_at").order("checked_at", { ascending: false }).limit(200), (d) => {
@@ -94,10 +98,13 @@ export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
       return m;
     }, {} as Record<string, { battery: number | null; checkedAt: string }>),
     safe(supabaseAdmin.from("entrances").select("building, keypad_code, wifi_ssid, wifi_password").eq("is_active", true), (d) => (d ?? []).map((e: any) => ({ building: e.building || "Crane Nest", keypad: e.keypad_code ?? null, wifiSsid: e.wifi_ssid ?? null, wifiPass: e.wifi_password ?? null })), [] as EntranceInfo[]),
+    loadCabinDevices().catch(() => ({ devices: [] as CabinDevice[], missing: true })),
+    activeTrip(null).catch(() => null),
   ]);
   const roomIds = new Set(rooms.map((r) => r.id));
   return {
     rooms, res: resR.res.filter((r) => roomIds.has(r.roomId)), places, tracks, settings, alerts, flightUsed, battery, entrances,
     setupMissing: resR.missing,
+    cabin: { devices: cabinDev.devices, trip: cabinTrip, rooms: cabinRooms, missing: cabinDev.missing },
   };
 }

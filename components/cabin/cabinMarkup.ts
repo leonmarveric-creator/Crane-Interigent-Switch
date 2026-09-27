@@ -1,0 +1,42 @@
+/** 車内 iPad の送迎画面の中身 (地図・高速モード・部屋・到着画面)。文字は cabinEngine が言語に合わせて入れる */
+export const TRIP_HTML = `<div class="scr">
+  <div class="map mode-photo" id="map">
+   <div id="lmap"></div>
+   <div class="tint"></div><div class="scan"></div><div class="sweep" id="sweep"></div>
+   <div class="hud"><div class="eta"><small id="etaL"></small><b id="etaM">--<em id="etaU"></em></b><div class="km" id="km">—</div></div><div class="gps" id="gpsT"><i></i><span>GPS · LIVE</span></div></div>
+   <div class="mbtn"><button id="mPhoto" class="on">🛰</button><button id="mDark">🌙</button></div>
+   <div class="cap" id="cap"><div class="ic" id="capI">🌉</div><div><b id="capT"></b><span id="capS"></span></div><div class="wv"><i></i><i></i><i></i></div></div>
+   
+   <div class="osm2">出典：国土地理院</div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
+   <canvas id="warp"></canvas><div class="shock" id="shock"></div><div class="shock s2" id="shock2"></div>
+   <div class="bhud" id="bhud"><div class="hex"></div><div class="floor"></div><i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i><div class="scanl"></div>
+    <div class="blog" id="blog"></div>
+    <div class="reactor" id="reactor"><svg viewBox="-125 -125 250 250"><g id="segs"><path class="sg" d="M3.0 -114.0 A114 114 0 0 1 26.6 -110.9"/><path class="sg" d="M32.4 -109.3 A114 114 0 0 1 54.4 -100.2"/><path class="sg" d="M59.6 -97.2 A114 114 0 0 1 78.5 -82.7"/><path class="sg" d="M82.7 -78.5 A114 114 0 0 1 97.2 -59.6"/><path class="sg" d="M100.2 -54.4 A114 114 0 0 1 109.3 -32.4"/><path class="sg" d="M110.9 -26.6 A114 114 0 0 1 114.0 -3.0"/><path class="sg" d="M114.0 3.0 A114 114 0 0 1 110.9 26.6"/><path class="sg" d="M109.3 32.4 A114 114 0 0 1 100.2 54.4"/><path class="sg" d="M97.2 59.6 A114 114 0 0 1 82.7 78.5"/><path class="sg" d="M78.5 82.7 A114 114 0 0 1 59.6 97.2"/><path class="sg" d="M54.4 100.2 A114 114 0 0 1 32.4 109.3"/><path class="sg" d="M26.6 110.9 A114 114 0 0 1 3.0 114.0"/><path class="sg" d="M-3.0 114.0 A114 114 0 0 1 -26.6 110.9"/><path class="sg" d="M-32.4 109.3 A114 114 0 0 1 -54.4 100.2"/><path class="sg" d="M-59.6 97.2 A114 114 0 0 1 -78.5 82.7"/><path class="sg" d="M-82.7 78.5 A114 114 0 0 1 -97.2 59.6"/><path class="sg" d="M-100.2 54.4 A114 114 0 0 1 -109.3 32.4"/><path class="sg" d="M-110.9 26.6 A114 114 0 0 1 -114.0 3.0"/><path class="sg" d="M-114.0 -3.0 A114 114 0 0 1 -110.9 -26.6"/><path class="sg" d="M-109.3 -32.4 A114 114 0 0 1 -100.2 -54.4"/><path class="sg" d="M-97.2 -59.6 A114 114 0 0 1 -82.7 -78.5"/><path class="sg" d="M-78.5 -82.7 A114 114 0 0 1 -59.6 -97.2"/><path class="sg" d="M-54.4 -100.2 A114 114 0 0 1 -32.4 -109.3"/><path class="sg" d="M-26.6 -110.9 A114 114 0 0 1 -3.0 -114.0"/></g>
+     <g class="rg r0" id="rg0"><circle r="102"/></g><g class="rg r1" id="rg1"><circle r="86"/><rect x="-3" y="-92" width="6" height="12" transform="rotate(0)"/><rect x="-3" y="-92" width="6" height="12" transform="rotate(120)"/><rect x="-3" y="-92" width="6" height="12" transform="rotate(240)"/></g><g class="rg r2" id="rg2"><circle r="68"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(0)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(10)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(20)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(30)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(40)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(50)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(60)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(70)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(80)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(90)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(100)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(110)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(120)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(130)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(140)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(150)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(160)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(170)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(180)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(190)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(200)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(210)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(220)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(230)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(240)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(250)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(260)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(270)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(280)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(290)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(300)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(310)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(320)"/><line x1="0" y1="-60" x2="0" y2="-50" transform="rotate(330)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(340)"/><line x1="0" y1="-60" x2="0" y2="-54" transform="rotate(350)"/></g></svg>
+     <div class="rc"><small id="bLbl">CHARGE</small><b id="bpct">0%</b></div></div>
+    <div class="bmode" id="bmode"><span>MODE</span><b id="bmodeV">NORMAL</b></div><div class="wipe"></div>
+    <div class="cd" id="bcd"></div><div class="flash"></div></div>
+   <div class="boostT" id="boostT"><div class="bs" id="bSub">HIGH-SPEED MODE</div><div class="bn" data-t="SKY GATE BOOST"><span>SKY GATE</span> <em>BOOST</em></div><div class="bf" id="bFoot"></div><div class="bchip">⚡ SKY GATE BOOST</div></div>
+   <div class="bdone" id="bdone"><div class="k">✓ BOOST COMPLETE</div><div class="s" id="bdS"></div><div class="n">SYSTEM NORMAL · ALL CLEAR</div></div>
+   <div class="boostP" id="boostP"><div class="gauge"><svg viewBox="0 0 120 120"><circle class="gb" cx="60" cy="60" r="52"/><circle class="gv" id="gv" cx="60" cy="60" r="52"/></svg><div class="spd"><b id="bSpd">82</b><small>km/h</small></div></div><div class="bmid"><div class="bt"><span id="bBr">SKY GATE BRIDGE</span><span id="bRem">3.75 km</span></div><div class="bbar"><i id="bBar"></i></div><div class="cells"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i><span>BOOST</span></div><div class="btriv in" id="bTriv"></div></div></div>
+  </div>
+  <div class="side">
+   <div class="box"><h3 id="h-wx"></h3>
+    <div class="wx"><div class="ic" id="wxI">☀</div><div><b id="wxT">--°</b></div><div class="d" id="wxD"></div></div>
+    <div class="wx2" id="wx2"></div>
+   </div>
+   <div class="box roomb"><h3 id="h-room"></h3>
+    <div class="room" id="room">
+     <div class="rph" id="rph"><img id="rimg" alt=""><div class="rlight"></div><div class="rdark"></div>
+      <div class="rair" id="rair"><i></i><i></i><i></i><i></i></div>
+      <div class="rscan"></div>
+      <div class="rtag" id="tagAc"><b></b><span></span></div><div class="rtag" id="tagLt"><b></b><span></span></div><div class="rtag" id="tagWf"><b></b><span></span></div>
+      <span class="rlive">● LIVE</span><b class="rkanji" id="rkanji"></b></div>
+     <div class="stat"><div><i class="run" id="acI"></i><span id="acT"></span><em id="acE"></em></div><div><i class="w" id="ltI"></i><span id="ltT"></span><em id="ltE"></em></div><div><i></i><span id="wfT">Wi-Fi</span><em id="wfE"></em></div></div>
+     <div class="cmeter" id="cmeter"><div class="cl"><b id="clL"></b><small id="clS"></small></div><div class="cb"><span id="clA"></span><div class="cbar"><i id="cbar"></i></div><span id="clB"></span></div></div>
+    </div>
+   </div>
+   <div class="box" style="flex:1;min-height:0"><h3 id="h-rec"></h3><div class="rec" id="rec"></div></div>
+  </div>
+ </div>
+ <div class="arrive" id="arrive"><div class="abg" id="abg"></div><div class="ashade"></div><canvas id="ptc"></canvas><div class="ak" id="ak"></div><div class="akEn" id="akEn"></div><div class="t1" id="arrT1">CRANE NEST</div><div class="t2" id="arrT2">WELCOME HOME</div><div class="t3" id="arrT"></div><div class="rows"><div id="arr1"></div><div id="arr2"></div><div id="arr3"></div></div></div>`;
