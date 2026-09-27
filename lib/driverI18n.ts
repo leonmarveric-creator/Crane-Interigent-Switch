@@ -90,6 +90,7 @@ const ZH: Record<string, string> = {
   "エンジン": "引擎",
   "カバーを付けています…": "正在添加封面…",
   "カバーを保存しました（{k}KB）": "封面已保存（{k}KB）",
+  "カバーを保存するには、Supabase の SQL（migration_cabin_music.sql）を実行してください": "要保存封面，请先执行 Supabase 的 SQL（migration_cabin_music.sql）",
   "カバーを外しました": "已移除封面",
   "カバーを外す": "移除封面",
   "ギャラクシー OFF": "星空 关",

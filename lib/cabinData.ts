@@ -114,7 +114,8 @@ export async function cabinRoomById(id: string | null): Promise<CabinRoom | null
 /** iPad に出す曲の情報 (曲名・歌手・カバー・歌詞) */
 export async function cabinTrackById(id: string): Promise<CabinTrack | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data } = await supabaseAdmin.from("driver_tracks").select("id, title, artist, cover_path, lrc").eq("id", id).maybeSingle();
+  const { data } = await supabaseAdmin.from("driver_tracks").select("*").eq("id", id).maybeSingle();
   if (!data) return null;
+  // select("*"): カバーの列 (cover_path) がまだ無い古いデータベースでも歌詞は出す
   return { id: data.id, title: data.title, artist: data.artist ?? null, cover: data.cover_path ? cabinPublicUrl(data.cover_path) : null, lrc: data.lrc ?? null };
 }

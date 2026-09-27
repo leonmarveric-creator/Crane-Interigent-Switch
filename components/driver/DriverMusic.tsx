@@ -225,6 +225,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     nowPlaying(): { id: string; pos: number; dur: number; on: boolean } | null {
       const a = el(), b = boost.current;
       const id = b?.bid && !a.paused && a.loop ? b.bid : track?.id; if (!id) return null;
+      if (a.paused && (a.currentTime || 0) < 1) return null; // まだ流していない (止めて最初に戻した) ときは iPad に出さない
       return { id, pos: a.currentTime || 0, dur: isFinite(a.duration) ? a.duration : 0, on: !a.paused };
     },
     /** 車内 iPad の再生ボタンから (ゲストが押す) */
@@ -438,7 +439,8 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
     const u = await driverCoverUploadUrl(trackId, c.ext); if (!u.ok) { if (!quiet) toast(t("アップロードできませんでした")); return false; }
     const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": c.blob.type, "x-upsert": "false" }, body: c.blob }).catch(() => null);
     if (!put?.ok) { if (!quiet) toast(t("アップロードできませんでした")); return false; }
-    const r = await driverSetCover(trackId, u.path); if (!r.ok) { if (!quiet) toast(t("保存できませんでした")); return false; }
+    const r = await driverSetCover(trackId, u.path);
+    if (!r.ok) { if (!quiet) toast(r.error === "SETUP_COVER" ? t("カバーを保存するには、Supabase の SQL（migration_cabin_music.sql）を実行してください") : t("保存できませんでした") + "：" + r.error.slice(0, 60)); return false; }
     upd(trackId, { cover: r.url }); setCv((x) => (x && x.id === trackId ? { ...x, cover: r.url } : x));
     if (!quiet) { sfx.chord(); toast(t("カバーを保存しました（{k}KB）", { k: Math.max(1, Math.round(c.blob.size / 1024)) })); }
     return true;

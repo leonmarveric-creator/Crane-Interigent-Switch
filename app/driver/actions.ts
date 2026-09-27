@@ -165,7 +165,11 @@ export async function driverSetCover(trackId: string, path: string | null): Prom
   if (path && !/^covers\/[\w.-]+\.(webp|jpg)$/.test(path)) return fail("BAD_PATH");
   const { data: old } = await supabaseAdmin.from("driver_tracks").select("cover_path").eq("id", trackId).maybeSingle();
   const { error } = await supabaseAdmin.from("driver_tracks").update({ cover_path: path }).eq("id", trackId);
-  if (error) return fail(error.message);
+  if (error) {
+    // カバーの列が無い (migration_driver.sql の途中から先がまだ) → 上げた画像は消しておく
+    if (/cover_path/.test(error.message)) { if (path) await supabaseAdmin.storage.from("driver-music").remove([path]).catch(() => null); return fail("SETUP_COVER"); }
+    return fail(error.message);
+  }
   if (old?.cover_path && old.cover_path !== path) await supabaseAdmin.storage.from("driver-music").remove([old.cover_path]).catch(() => null);
   return { ok: true, url: path ? supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl : null };
 }
