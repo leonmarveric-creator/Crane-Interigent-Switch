@@ -100,3 +100,31 @@ test("cabin AI ASTRAEA: every line has 4 languages and its own voice file; picks
   assert.ok(!read("app", "cabin", "cabin.css").includes("ai-talk .holo"), "lyrics keep flowing while ASTRAEA talks");
   assert.match(read("components", "cabin", "cabinNowPlaying.ts"), /行全体を光らせる/, "lyrics light a whole line (no drifting karaoke fill)");
 });
+
+test("ASTRAEA talk: guest menu, captain commands by voice/buttons, check-in QR, entrance guide on demand, detour re-route", async () => {
+  const K = await load("cabinAiTalk.ts");
+  assert.equal(K.matchCaptain("阿斯特莱亚，办理入住"), "checkin");
+  assert.equal(K.matchCaptain("アストレア、状況は？"), "status");
+  assert.equal(K.matchCaptain("讲个笑话"), "joke");
+  assert.equal(K.matchCaptain("部屋の開け方を教えて"), "guide", "guide wins over room");
+  assert.equal(K.matchCaptain("准备房间"), "room");
+  assert.equal(K.matchCaptain("今日はいい天気だね"), null);
+  assert.deepEqual([K.weatherAnswer(0), K.weatherAnswer(61), K.weatherAnswer(3)], [0, 1, 2]);
+  for (const u of K.talkAudioUrls()) assert.ok(fs.existsSync(path.join(root, "public", u)), u);
+  for (const l of ["ja", "zh", "en", "ko"]) { assert.ok(K.GUIDE_T[l].t1 && K.GUIDE_T[l].snap); assert.equal(K.CHECKIN_T[l][1].length, 3); }
+  const act = read("app", "driver", "actions.ts");
+  assert.match(act, /export async function cabinAiCmd/); assert.match(act, /c === "room" && t\.room_id/, "room prep really turns devices on");
+  assert.match(act, /export async function cabinSetCheckinQr/);
+  const sql = read("supabase", "migration_cabin_ai.sql");
+  assert.match(sql, /add column if not exists ai_cmd jsonb/); assert.match(sql, /app_settings add column if not exists cabin_checkin_qr text/);
+  const drv = read("components", "driver", "DriverCabin.tsx");
+  assert.match(drv, /webkitSpeechRecognition/); assert.match(drv, /運転中は助手席の方が操作してください/);
+  assert.ok(!/moving|kmh\s*>\s*\d+.*disabled/.test(drv.slice(drv.indexOf("function AstraeaSheet"))), "no driving lock (passenger may operate)");
+  const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /if \(lastCmd == null\) \{ lastCmd = cmd\.n; if \(Date\.now\(\) - cmd\.n > 20000\) return; \}/, "old commands are not replayed");
+  const eng = read("components", "cabin", "cabinEngine.ts");
+  assert.match(eng, /if \(b\.dataset\.q === "guide"\)/, "guide button on the arrival screen");
+  assert.ok(!/guide\.start\(\)[^\n]*arrive\(\)/.test(eng), "guide never auto-plays");
+  assert.match(eng, /async function reroute\(from: LL\)/); assert.match(eng, /backN >= 3 \? pr\.d : prevD/, "turning back is followed");
+  assert.match(read("app", "api", "cabin", "state", "route.ts"), /op === "lights"/);
+});

@@ -13,6 +13,8 @@ import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import { MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
+import { createGuide } from "@/components/cabin/cabinGuide";
+import { CHECKIN_T } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
 
 const TILES = {
@@ -53,9 +55,13 @@ export interface Engine {
   nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void;
   /** AI (ASTRAEA) の静かモード */
   setQuiet(q: boolean): void;
+  /** お父さんから ASTRAEA への指示 */
+  aiCommand(cmd: { c: string; n: number } | null): void;
+  /** チェックイン QR の画像 (全員共通) */
+  setCheckin(url: string | null): void;
 }
 
-export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void }): Engine {
+export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void }): Engine {
   const L = (window as any).L;
   const $ = (id: string) => root.querySelector("#" + id) as HTMLElement;
   const stage = root.querySelector(".stage") as HTMLElement;
@@ -116,8 +122,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let trip: CabinTrip | null = null, room: CabinRoom | null = null, lang: GLang = "en", T: CabinText = CABIN_T.en;
   let R: Route = makeRoute([[CRANE_NEST[1], CRANE_NEST[0]], [CRANE_NEST[1] + 0.001, CRANE_NEST[0]]]);
   let baseMin = 10, dest: LL = CRANE_NEST, goKey = "", byeKey = "", pois: { k: PoiKey; d: number }[] = [];
+  let rerouteBase = 0, origin: LL = CRANE_NEST; // origin = お迎えの場所 (道を引き直しても印はそのまま)
   let d = 0, prevD: number | undefined, carLL: LL | null = null, lastFeed: { ll: LL; t: number } | null = null, kmhNow: number | null = null;
-  let hit = new Set<PoiKey>(), arrived = false, offroute = false;
+  let hit = new Set<PoiKey>(), arrived = false, offroute = false, backN = 0, offT = 0, rerouteAt = 0;
   let bs: BoostState = { ...BOOST_INIT }, bMax = 0, bTrivI = 0, bTrivT = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
   const T_ = (ms: number, f: () => void) => { timers.push(setTimeout(f, ms)); };
@@ -200,11 +207,21 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     L.circle(dest, { radius: 200, color: "#ffb35c", weight: 1.5, dashArray: "6 6", fillColor: "#ffa24a", fillOpacity: 0.08, interactive: false }).addTo(layer);
     const home = room?.home ?? CRANE_NEST;
     L.marker(home, { icon: L.divIcon({ className: "", html: `<div class="homeI"><i></i>${room?.building?.toUpperCase?.() || "CRANE NEST"}</div>`, iconSize: [0, 0] }), interactive: false }).addTo(layer);
-    const pll = trip?.dir === "out" ? dest : R.pts[0];
+    const pll = trip?.dir === "out" ? dest : origin;
     L.marker(pll, { icon: L.divIcon({ className: "", html: `<div class="homeI stn"><i></i><span>${placeName()}</span></div>`, iconSize: [0, 0] }), interactive: false }).addTo(layer);
     pois.forEach((p) => { const [e, n] = T.poi[p.k]; L.marker(pointAt(R, p.d), { icon: L.divIcon({ className: "", html: `<div class="poiI" data-poi="${p.k}"><i></i>${n}</div>`, iconSize: [0, 0] }), interactive: false }).addTo(layer); void e; });
     car = L.marker(carLL ?? R.pts[0], { icon: L.divIcon({ className: "", html: '<div class="carI"><i class="ring"></i><i class="arw"></i><i class="dot"></i></div>', iconSize: [0, 0] }), interactive: false, zIndexOffset: 1000 }).addTo(layer);
     MAP.fitBounds(L.latLngBounds(R.pts.concat([home])).pad(0.18));
+  }
+
+  /* ---------- 寄り道のあと: 今いる所から道を引き直す ---------- */
+  async function reroute(from: LL) {
+    rerouteAt = Date.now(); const id = trip?.id; if (!id) return;
+    const o = await osrm(from, dest); if (!o || trip?.id !== id) return;
+    R = o.r; baseMin = Math.ceil(o.min + bufferMin(R.total / 1000)); rerouteBase = Date.now();
+    d = 0; prevD = undefined; backN = 0; offT = 0; offroute = false; $("map").classList.remove("offroute");
+    pois = poisFor(R, trip!.dir).map((k) => ({ k, d: project(R, POIS[k]).d })).filter((p) => !hit.has(p.k));
+    const keep = MAP.getZoom(), c = MAP.getCenter(); draw(); MAP.setView(c, keep, { animate: false });
   }
 
   /* ---------- 位置が来るたび ---------- */
@@ -232,7 +249,15 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     moveCar(ll);
     const pr = project(R, ll, prevD);
     offroute = pr.off > 150; $("map").classList.toggle("offroute", offroute);
-    if (!offroute) { d = prevD == null ? pr.d : Math.max(prevD - 40, pr.d); prevD = d; }
+    if (!offroute) {
+      // 少し戻った (GPS のぶれ) は無視。3 回続けて戻っていたら本当に引き返した → そのまま戻す
+      if (prevD != null && pr.d < prevD - 40) { backN++; d = backN >= 3 ? pr.d : prevD; } else { backN = 0; d = pr.d; }
+      prevD = d; offT = 0;
+    } else {
+      // 寄り道・別の道: 25 秒続いたら、今いる所から目的地までの道を引き直す (1 分に 1 回まで)
+      if (!offT) offT = tNow;
+      if (tNow - offT > 25000 && tNow - rerouteAt > 60000 && !arrived) void reroute(ll);
+    }
     const toDest = dist(ll, dest);
     const rem = offroute ? toDest * 1.3 : Math.max(0, R.total - d);
     const mins = arrived ? 0 : etaMin(baseMin, rem, R.total);
@@ -291,12 +316,17 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function qrHide() { $("qrp").classList.remove("on"); if (qrTimer) clearTimeout(qrTimer); qrTimer = null; }
   function qrTexts() {
     const M = MUSIC_T[lang] ?? MUSIC_T.en, q = qrLinks();
-    root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => { const k = b.dataset.q as "key" | "room"; (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : M.qRoom; b.style.display = q[k] ? "" : "none"; });
+    const GL: Record<GLang, string> = { ja: "入り方ガイド", zh: "进门指南", en: "How to get in", ko: "출입 안내" };
+    root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => {
+      const k = b.dataset.q as "key" | "room" | "guide";
+      (b.querySelector("b") as HTMLElement).textContent = k === "guide" ? GL[lang] : k === "key" ? M.qKey : M.qRoom;
+      b.style.display = k === "guide" || q[k] ? "" : "none";
+    });
     setText("aqTip", M.qTip);
-    $("aq").style.display = trip?.dir === "out" || (!q.key && !q.room) ? "none" : ""; // お見送りのときは出さない
+    $("aq").style.display = trip?.dir === "out" ? "none" : ""; // お見送りのときは出さない
     if ($("qrp").classList.contains("on")) void qrShow(qrK);
   }
-  root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.q as "key" | "room"); }));
+  root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); if (b.dataset.q === "guide") { qrHide(); guide.start(); } else void qrShow(b.dataset.q as "key" | "room"); }));
   root.querySelectorAll<HTMLElement>("[data-qt]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.qt as "key" | "room"); }));
   $("qrX").onclick = (e) => { e.stopPropagation(); qrHide(); };
   $("qrp").onclick = (e) => { e.stopPropagation(); if ((e.target as HTMLElement).id === "qrp") qrHide(); };
@@ -481,24 +511,47 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const ai = createAi({
     root, stage, ac, quiet: () => aiQuiet, voiceBusy: () => voiceN > 0,
     duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); },
+    hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
+    roomLights: () => { if (trip && !trip.id.startsWith("demo")) hooks.onLights?.(trip.id); setTimeout(roomLit, 2500); },
+    roomLit: () => roomLit(),
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
-      started: startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
+      started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
       arrived, offroute, boosting: bs.phase !== "off" || warpOn,
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
     }),
   });
-  setInterval(() => ai.tick(), 1000);
+  setInterval(() => { if (!guide.on()) ai.tick(); }, 1000);
+  function roomLit() { if (!trip || trip.dir !== "in") return; $("room").classList.add("lit"); $("ltI").className = ""; setText("ltE", T.ltOn); roomTexts(); }
+
+  /* ---------- 入り方ガイド (押したときだけ) ---------- */
+  const guide = createGuide({
+    root, stage, lang: () => lang, code: () => room?.keypad ?? null, keyUrl: () => qrLinks().key, ac,
+    duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); }, busy: () => ai.busy(),
+  });
+
+  /* ---------- チェックイン QR (全員共通の画像。お父さんのスマホで登録) ---------- */
+  let checkinUrl: string | null = null, ckT: ReturnType<typeof setTimeout> | null = null;
+  function showCheckin() {
+    if (!checkinUrl) return; const [title, steps] = CHECKIN_T[lang] ?? CHECKIN_T.en;
+    ($("ckImg") as HTMLImageElement).src = checkinUrl; setText("ckT", title);
+    $("ckS").innerHTML = steps.map((x) => `<li>${x.replace(/[<&>]/g, "")}</li>`).join("");
+    const p = $("ckp"); p.classList.remove("on"); void p.offsetWidth; p.classList.add("on");
+    if (ckT) clearTimeout(ckT); ckT = setTimeout(hideCheckin, 120000);
+  }
+  function hideCheckin() { $("ckp").classList.remove("on"); if (ckT) clearTimeout(ckT); ckT = null; }
+  $("ckx").onclick = (e) => { e.stopPropagation(); hideCheckin(); };
+  $("ckp").onclick = (e) => { e.stopPropagation(); if ((e.target as HTMLElement).id === "ckp") hideCheckin(); };
 
   /* ---------- 送迎の開始・終了 ---------- */
   async function start(t: CabinTrip, r: CabinRoom | null) {
     if (trip?.id === t.id) { if (r && room?.id !== r.id) { room = r; roomTexts(); } return; }
     stop();
     trip = t; room = r; lang = t.lang; T = CABIN_T[lang] ?? CABIN_T.en;
-    arrived = false; d = 0; prevD = undefined; carLL = null; lastFeed = null; hit = new Set(); offroute = false; bs = { ...BOOST_INIT };
+    arrived = false; d = 0; prevD = undefined; carLL = null; lastFeed = null; hit = new Set(); offroute = false; backN = 0; offT = 0; rerouteAt = 0; rerouteBase = 0; bs = { ...BOOST_INIT };
     const home = r?.home ?? CRANE_NEST, known = (PLACES as any)[t.placeKey] as { ll: LL } | undefined;
     const place: LL = known?.ll ?? t.placeLL ?? home;
-    dest = t.dir === "in" ? home : place;
+    dest = t.dir === "in" ? home : place; origin = place;
     const key = `${t.placeKey}_${t.dir}`;
     const fixed = known && dist(home, CRANE_NEST) < 400 ? routes[key] : null;
     if (fixed) { R = makeRoute(fixed); baseMin = BASE_MIN[key] ?? 15; }
@@ -526,7 +579,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset(); ai.reset();
+    qrHide(); npv.reset(); ai.reset(); guide.stop(); hideCheckin();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -590,5 +643,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       // 曲が変わったら AI がひと言
       if (np && track && np.id === track.id && np.id !== npId) { if (npId) ai.event("song"); npId = np.id; }
     },
-    setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); } };
+    setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); },
+    aiCommand: (cmd) => { if (trip) ai.command(cmd); },
+    setCheckin: (u) => { checkinUrl = u; } };
 }

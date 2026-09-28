@@ -712,3 +712,85 @@
 .cab .stage.port .aiP{left:352px;top:150px;width:520px}
 .cab .stage.trip.np-on[data-np="C"] .aiP{top:auto;bottom:100px;left:50%;width:min(820px,92%);transform:translate(-50%,30px)}
 .cab .stage.trip.np-on[data-np="C"].ai-talk .aiP{transform:translate(-50%,0)}
+
+/* ===== ASTRAEA: ゲストの質問メニュー ===== */
+.cab .aiMenu{position:absolute;right:112px;top:150px;z-index:1400;width:430px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-radius:18px;background:rgba(4,12,26,.95);border:1px solid rgba(95,227,255,.55);box-shadow:0 0 30px rgba(0,160,255,.3);opacity:0;pointer-events:none;transform:translateY(-10px) scale(.97);transition:.3s}
+.cab .aiMenu.on{opacity:1;pointer-events:auto;transform:none}
+.cab .aiMenu .mt{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.25em;color:#8ff0ff}
+.cab .aiMenu .mt button{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:none;color:#fff}
+.cab .aiMenu [data-q]{display:flex;align-items:center;gap:8px;min-height:54px;padding:8px 10px;border-radius:12px;border:1px solid rgba(95,227,255,.3);background:linear-gradient(135deg,rgba(20,50,90,.75),rgba(8,20,40,.75));color:#fff;font-size:15px;font-weight:700;text-align:left;opacity:0;animation:cab-aimin .35s forwards}
+.cab .aiMenu [data-q] i{font-style:normal;font-size:20px;flex:none}
+.cab .aiMenu [data-q].hot{border-color:#ffc27a;background:linear-gradient(135deg,rgba(120,70,10,.7),rgba(40,20,5,.7))}
+@keyframes cab-aimin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cab .aiDot::after{content:"ASK";position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);font:700 9px ui-monospace,Menlo,monospace;letter-spacing:.2em;color:#8ff0ff}
+.cab .f2map>.map .aiMenu{display:none}
+.cab .stage.port .aiMenu{right:100px;top:150px;width:560px}
+
+/* ===== チェックイン QR ===== */
+.cab .ckp{position:absolute;inset:0;z-index:3050;display:flex;align-items:center;justify-content:center;background:rgba(2,6,16,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .35s}
+.cab .ckp.on{opacity:1;pointer-events:auto}
+.cab .ckc{position:relative;width:860px;display:flex;gap:32px;align-items:center;padding:30px 36px;border-radius:26px;border:1px solid rgba(143,240,255,.4);background:linear-gradient(160deg,rgba(14,30,58,.97),rgba(6,14,30,.97));box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(0,160,255,.2)}
+.cab .ckq{position:relative;flex:none;width:340px;height:340px;padding:12px;border-radius:20px;background:#fff}
+.cab .ckq img{width:100%;height:100%;object-fit:contain;display:block}
+.cab .ckq i{position:absolute;left:12px;right:12px;height:3px;top:14px;background:linear-gradient(90deg,transparent,#00c8ff,transparent);box-shadow:0 0 12px #00c8ff;animation:cab-cks 2.4s ease-in-out infinite}
+@keyframes cab-cks{50%{top:calc(100% - 17px)}}
+.cab .cks{flex:1;color:#fff}.cab .cks small{font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.3em;color:#5fe3ff}
+.cab .cks h3{margin:8px 0 16px;font-size:26px;line-height:1.3}
+.cab .cks ol{margin:0;padding:0;list-style:none;counter-reset:q}.cab .cks li{counter-increment:q;display:flex;gap:12px;align-items:center;margin-bottom:12px;font-size:17px;color:#dfe9f5}
+.cab .cks li::before{content:counter(q);flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#04101f;background:linear-gradient(135deg,#8ff0ff,#3aa0ff)}
+.cab .ckx{position:absolute;right:18px;top:-54px;height:40px;padding:0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(10,20,40,.85);color:#fff;font-size:15px}
+.cab .stage.port .ckc{width:740px;flex-direction:column}
+.cab .aq button.gd{border-color:#8ff0ff;min-width:220px}
+
+/* ===== 入り方ガイド ===== */
+.cab .gdp{position:absolute;inset:0;z-index:3200;background:radial-gradient(ellipse at 30% 30%,#0f2446,#040a18 70%);opacity:0;pointer-events:none;transition:opacity .5s}
+.cab .gdp.on{opacity:1;pointer-events:auto}
+.cab .gdp::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(120,180,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,180,255,.05) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.cab .gdTop{position:absolute;left:34px;right:34px;top:20px;display:flex;align-items:center;gap:16px}
+.cab .gdTop b{font-size:26px;letter-spacing:.35em;font-weight:300;color:#fff}.cab .gdTop small{font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.3em;color:#e0b25a}
+.cab .gdDots{margin-left:auto;display:flex;gap:9px}.cab .gdDots i{width:46px;height:5px;border-radius:9px;background:rgba(150,190,240,.2);overflow:hidden;position:relative}
+.cab .gdDots i.done{background:#5fe3ff}.cab .gdDots i.on::after{content:"";position:absolute;inset:0;background:#5fe3ff;box-shadow:0 0 10px #00c8ff;transform-origin:left;animation:cab-gddp 9s linear forwards}
+@keyframes cab-gddp{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.cab .gdX{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(10,20,40,.8);color:#fff;font-size:16px}
+.cab .gdS{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .6s}.cab .gdS.on{opacity:1}
+.cab .gdArt{position:absolute;left:46px;top:98px;width:590px;height:540px;border-radius:26px;border:1px solid rgba(95,176,255,.3);background:linear-gradient(160deg,rgba(14,32,60,.7),rgba(4,12,26,.8));overflow:hidden}
+.cab .gdArt svg{width:100%;height:100%}
+.cab .gdTx{position:absolute;left:684px;right:46px;top:112px;color:#fff}
+.cab .gdN{width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:800;color:#04101f;background:linear-gradient(135deg,#8ff0ff,#2f8fff);box-shadow:0 0 30px rgba(0,180,255,.6)}
+.cab .gdTx h2{margin:20px 0 6px;font-size:44px;line-height:1.15}.cab .gdTx h4{margin:0;font:700 14px ui-monospace,Menlo,monospace;letter-spacing:.2em;color:#8ff0ff}
+.cab .gdTx p{margin:20px 0 0;font-size:22px;line-height:1.55;color:#dbe8f7}
+.cab .gdCode{margin-top:20px;display:flex;gap:7px;flex-wrap:wrap}
+.cab .gdCode span{width:52px;height:70px;border-radius:11px;display:flex;align-items:center;justify-content:center;font:800 42px ui-monospace,Menlo,monospace;color:#fff;background:rgba(95,227,255,.08);border:1px solid rgba(95,227,255,.4)}
+.cab .gdCode span.lit{background:rgba(95,227,255,.3);box-shadow:0 0 18px rgba(0,200,255,.6)}
+.cab .gdHint{margin-top:16px;font-size:16px;color:#ffc27a}
+.cab .gdAi{position:absolute;left:46px;right:46px;bottom:22px;display:flex;align-items:center;gap:16px;padding:10px 20px;border-radius:22px;background:rgba(4,12,26,.92);border:1px solid rgba(95,227,255,.4)}
+.cab .gdOrb{flex:none;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 42% 38%,#eaffff,#5fe3ff 40%,rgba(0,90,200,.3) 70%,transparent 72%);box-shadow:0 0 24px rgba(0,200,255,.7);animation:cab-gdorb 1.6s ease-in-out infinite}
+@keyframes cab-gdorb{50%{transform:scale(1.1);box-shadow:0 0 36px rgba(0,200,255,.9)}}
+.cab .gdNm{font:700 10.5px ui-monospace,Menlo,monospace;letter-spacing:.25em;color:#8ff0ff}
+.cab .gdSub{font-size:21px;font-weight:700;color:#f2feff;min-height:2.4em;line-height:1.3}.cab .gdSub span{opacity:0;animation:cab-aicin .2s forwards}
+.cab .gdEn{font-size:12px;color:#7fa6c8}
+.cab .gdSum{position:absolute;left:46px;right:46px;top:140px;bottom:140px;display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr .95fr;gap:14px}
+.cab .gc{position:relative;border-radius:18px;padding:16px;background:linear-gradient(160deg,rgba(14,32,60,.85),rgba(4,12,26,.9));border:1px solid rgba(95,176,255,.35);display:flex;flex-direction:column;gap:8px;min-width:0;color:#fff}
+.cab .gc .n{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:800;color:#04101f;background:linear-gradient(135deg,#8ff0ff,#2f8fff)}
+.cab .gc b{font-size:20px;line-height:1.2;min-height:2.4em}.cab .gc small{margin-top:auto;font-size:16px;font-weight:600;color:#e6eef8;line-height:1.45}
+.cab .gc .cd{font:800 38px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#5fe3ff;text-shadow:0 0 16px rgba(0,200,255,.6)}
+.cab .gc svg{width:100%;flex:1;min-height:0;max-height:190px}
+.cab .gc.q{align-items:center;justify-content:center}.cab .gc.q b{font-size:16px;text-align:center;min-height:0}
+.cab .gc .qr{background:#fff;border-radius:12px;padding:8px;width:100%;aspect-ratio:1}.cab .gc .qr svg{width:100%;height:100%;max-height:none}
+.cab .gdSnap{position:absolute;inset:78px 22px 116px;pointer-events:none}
+.cab .gdSnap i{position:absolute;width:56px;height:56px;border:5px solid #fff;filter:drop-shadow(0 0 8px #5fe3ff);animation:cab-gdsb 1.2s ease-in-out infinite}
+.cab .gdSnap i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}.cab .gdSnap i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}.cab .gdSnap i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}.cab .gdSnap i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+@keyframes cab-gdsb{50%{opacity:.4}}
+.cab .gdSnapT{position:absolute;left:50%;top:90px;transform:translateX(-50%);padding:8px 24px;border-radius:99px;background:rgba(255,194,122,.95);color:#2a1600;font-weight:800;font-size:19px;white-space:nowrap}
+.cab .gdFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}.cab .gdFlash.go{animation:cab-gdfl .6s ease-out}@keyframes cab-gdfl{0%{opacity:.85}100%{opacity:0}}
+.cab .stage.gd-on .aiP{display:none}
+/* 縦 */
+.cab .stage.port .gdArt{left:40px;right:40px;top:90px;width:auto;height:470px}
+.cab .stage.port .gdTx{left:48px;right:48px;top:585px}
+.cab .stage.port .gdN{width:64px;height:64px;font-size:34px;float:left;margin-right:18px}
+.cab .stage.port .gdTx h2{margin:4px 0 4px;font-size:36px}
+.cab .stage.port .gdSum{top:130px;bottom:140px;grid-template-columns:1fr 1fr;grid-auto-rows:1fr}
+.cab .stage.port .gdTop b{font-size:20px}
+.cab .aiMenu{top:268px}
+.cab .stage:has(.ckp.on) .aiP{left:590px;top:14px;width:760px}
+.cab .stage.port:has(.ckp.on) .aiP{left:410px;top:14px;width:720px}

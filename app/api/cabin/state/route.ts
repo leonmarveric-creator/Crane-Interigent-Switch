@@ -3,6 +3,8 @@ import { isStaff } from "@/lib/staffAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/cabinData";
 import { cleanCmd } from "@/lib/cabinMusic";
+import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
+import { checkinQrUrl } from "@/lib/cabinData";
 
 export const dynamic = "force-dynamic";
 const J = (v: any, status = 200) => NextResponse.json(v, { status, headers: { "cache-control": "no-store" } });
@@ -28,11 +30,12 @@ export async function GET(req: NextRequest) {
   }
   const trip = await activeTrip(device?.id ?? null);
   const have = req.nextUrl.searchParams.get("np") || "";
-  const [room, track] = await Promise.all([
+  const [room, track, checkin] = await Promise.all([
     trip ? cabinRoomById(trip.roomId) : null,
     trip?.np && trip.np.id !== have ? cabinTrackById(trip.np.id).catch(() => null) : null,
+    trip ? checkinQrUrl().catch(() => null) : null,
   ]);
-  return J({ ok: true, device, trip, room, track, now: Date.now() });
+  return J({ ok: true, device, trip, room, track, checkin, now: Date.now() });
 }
 
 /** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */
@@ -54,6 +57,17 @@ export async function POST(req: NextRequest) {
   if (b.op === "end" && isId(b.trip)) {
     const { error } = await supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", b.trip).eq("status", "active");
     return J(error ? { ok: false, error: error.message } : { ok: true });
+  }
+  // ゲストが iPad で「お部屋の明かりをつけて」(送迎中のお迎えだけ)
+  if (b.op === "lights" && isId(b.trip)) {
+    const { data: t } = await supabaseAdmin.from("cabin_trips").select("room_id, direction, status").eq("id", b.trip).maybeSingle();
+    if (!t || t.status !== "active" || t.direction !== "in" || !t.room_id) return J({ ok: false, error: "NO_TRIP" });
+    const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("id", t.room_id).maybeSingle();
+    if (!room) return J({ ok: false, error: "NO_ROOM" });
+    const action = room.switchbot_wafu_device_id ? "wafu_on_warm" : "light_on";
+    const r = await executeDeviceAction(room, action, "Cabin iPad").catch(() => ({ ok: false }));
+    await logDevice({ room_id: room.id, action, source: "admin", success: r.ok }).catch(() => {});
+    return J({ ok: r.ok });
   }
   if (b.op === "cmd" && isId(b.trip)) {
     const cmd = cleanCmd(b.c, b.v); if (!cmd) return J({ ok: false, error: "BAD_CMD" }, 400);

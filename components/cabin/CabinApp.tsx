@@ -76,6 +76,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           onEnd: (id) => void endTrip(id),
           // 全画面の再生ボタン → お父さんのスマホへ
           onCmd: (id, c, v) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "cmd", trip: id, c, v }) }).catch(() => {}),
+          // ゲストの「お部屋の明かりをつけて」→ 本物の照明
+          onLights: (id) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "lights", trip: id }) }).catch(() => {}),
         });
         eng.current.resize();
         if (wxRef.current) eng.current.weather(wxRef.current);
@@ -149,6 +151,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         e.setQuiet(!!t.aiQuiet); // AI の静かモード (お父さんのスマホで切り替え)
+        e.setCheckin(typeof j.checkin === "string" ? j.checkin : null); // チェックイン QR (全員共通)
+        e.aiCommand(t.aiCmd ?? null); // お父さんから ASTRAEA への指示
         // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }
         if (j.track) trackRef.current = j.track;
@@ -207,7 +211,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     const e = eng.current; if (!e) return;
     e.unlock(); setMenu(false);
     const room = rooms.find((r) => r.photo) ?? rooms[0] ?? null;
-    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null, npReady: true, aiQuiet: false };
+    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null, npReady: true, aiQuiet: false, aiCmd: null };
     tripRef.current = t; setInTrip(true);
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }

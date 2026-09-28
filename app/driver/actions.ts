@@ -9,6 +9,7 @@ import { loadDriverData, type DriverData, type DriverDesign } from "@/lib/driver
 import { langOf } from "@/lib/driverLogic";
 import { toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
+import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (e: any): { ok: false; error: string } => ({ ok: false, error: String(e?.message || e || "ERROR") });
@@ -247,6 +248,41 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   if (r.error) return fail(r.error.message);
   const row: any = r.data?.[0];
   return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok" };
+}
+/** お父さんから車内 iPad の ASTRAEA へ指示 (ボタン・声)。「お部屋の準備」は本当にエアコン + 照明もつける */
+export async function cabinAiCmd(tripId: string, c: CaptainCmdId): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId) || !CMD_IDS.includes(c)) return fail("BAD");
+  const { data: t, error } = await supabaseAdmin.from("cabin_trips").update({ ai_cmd: { c, n: Date.now() } }).eq("id", tripId).eq("status", "active").select("room_id").maybeSingle();
+  if (error) return fail(/ai_cmd/.test(error.message) ? "SETUP_AI" : error.message);
+  if (!t) return fail("NO_TRIP");
+  if (c === "room" && t.room_id) {
+    const room = await roomById(t.room_id);
+    if (room) {
+      const action = room.switchbot_wafu_device_id ? "welcome_cozy" : "welcome";
+      const r = await executeDeviceAction(room, action, "Cabin ASTRAEA").catch(() => ({ ok: false }));
+      await logDevice({ room_id: room.id, action, source: "admin", success: r.ok }).catch(() => {});
+    }
+  }
+  return { ok: true };
+}
+/** チェックイン QR の画像 (全員共通) をアップロードする URL */
+export async function cabinCheckinQrUploadUrl(ext: "png" | "jpg" | "webp"): Promise<R<{ path: string; signedUrl: string }>> {
+  const g = guard(); if (g) return g;
+  const path = `cabin/checkin-qr-${Date.now().toString(36)}.${ext === "jpg" ? "jpg" : ext === "webp" ? "webp" : "png"}`;
+  const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
+  if (error || !data) return fail(error?.message || "UPLOAD_URL");
+  return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** チェックイン QR を登録 / 外す (path = null)。前の画像は消す */
+export async function cabinSetCheckinQr(path: string | null): Promise<R<{ url: string | null }>> {
+  const g = guard(); if (g) return g;
+  if (path && !/^cabin\/checkin-qr-[\w-]+\.(png|jpg|webp)$/.test(path)) return fail("BAD_PATH");
+  const { data: old } = await supabaseAdmin.from("app_settings").select("cabin_checkin_qr").eq("id", 1).maybeSingle();
+  const { error } = await supabaseAdmin.from("app_settings").update({ cabin_checkin_qr: path }).eq("id", 1);
+  if (error) { if (path) await supabaseAdmin.storage.from("driver-music").remove([path]).catch(() => null); return fail(/cabin_checkin_qr/.test(error.message) ? "SETUP_AI" : error.message); }
+  const prev = (old as any)?.cabin_checkin_qr; if (prev && prev !== path) await supabaseAdmin.storage.from("driver-music").remove([prev]).catch(() => null);
+  return { ok: true, url: path ? supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl : null };
 }
 /** 車内 iPad の AI の静かモード (ひと言を止める) */
 export async function cabinSetQuiet(tripId: string, quiet: boolean): Promise<R> {

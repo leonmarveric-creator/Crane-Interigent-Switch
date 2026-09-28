@@ -7,11 +7,15 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, aiAudio, aiPick, sunsetMin, zorome, type AiId } from "@/lib/cabinAiLines";
+import { CAPTAIN, GUEST_Q, REPEAT, UNKNOWN, captainAudio, guestAudio, talkAudioUrls, weatherAnswer } from "@/lib/cabinAiTalk";
+
+const GUIDE_Q: Record<GLang, string> = { ja: "入り方を教えて", zh: "怎么进门？", en: "How do I get in?", ko: "들어가는 방법" };
 import type { GLang, LL } from "@/lib/cabinGeo";
 
 export interface AiState {
   tripId: string | null; dir: "in" | "out"; placeKey: string; lang: GLang;
   started: number;                 // 送迎が始まった時刻 (ms)
+  paceStart: number;               // 予定の所要時間の起点 (道を引き直したらその時刻)
   total: number; d: number;        // ルートの長さ・進んだ距離 (m)
   toDest: number;                  // 目的地までの直線距離 (m)
   baseMin: number;                 // 予定の所要時間 (分)
@@ -28,8 +32,13 @@ export interface AiCtx {
   ac: () => AudioContext | null;
   duck: (sec: number) => void;     // お父さんのスマホの音楽を下げる
   quiet: () => boolean;
+  hasCheckin: () => boolean;       // チェックイン QR が登録されているか
+  checkin: () => void;             // チェックイン QR を出す
+  guide: () => void;               // 入り方ガイドを流す
+  roomLights: () => void;          // お部屋の照明をつける (ゲストの質問から)
+  roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
 }
-export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[] }
+export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void }
 
 const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 const JST = (ms: number) => new Date(ms + 9 * 3600e3);
@@ -39,9 +48,9 @@ export function createAi(c: AiCtx): Ai {
   const el = new Audio(); let src: MediaElementAudioSourceNode | null = null, an: AnalyserNode | null = null;
   const blobs: Record<string, string> = {};
   let speaking = false, lastAt = 0, lastAny = 0, last: Partial<Record<AiId, number>> = {}, done = new Set<string>();
-  let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null, taps: number[] = [];
+  let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null;
 
-  function reset() { done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; }
+  function reset() { lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; }
 
   /* ---------- 話す ---------- */
   async function say(id: AiId, opt: { force?: boolean; duck?: boolean } = {}) {
@@ -54,18 +63,22 @@ export function createAi(c: AiCtx): Ai {
       if (!prio && now - lastAt < AI_GAP_MS) return false;
     }
     const i = aiPick(id, last[id]); last[id] = i;
-    const line = AI_LINES[id].v[i] as Record<GLang, string>;
-    speaking = true; if (!prio || id === "depart") lastAt = now; lastAny = now;
+    if (!prio || id === "depart") lastAt = now;
+    return speak(aiAudio(id, i), AI_LINES[id].v[i] as Record<GLang, string>, { duck: opt.duck });
+  }
+  /** 1 つのセリフを話す (声 + 字幕)。st = パネルの右上の小さな文字 */
+  async function speak(url: string, line: Record<GLang, string>, opt: { duck?: boolean; st?: string } = {}) {
+    if (speaking) return false;
+    speaking = true; lastAny = Date.now();
     // お父さんのスマホの音楽を先に下げる (届くまで 3 秒ほど)
     if (opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
     const lang = c.state().lang;
     $("aiSub").innerHTML = [...line[lang]].map((ch, k) => `<span style="animation-delay:${k * 26}ms">${ch.replace(/[<&>]/g, "")}</span>`).join("");
     $("aiEn").textContent = lang === "en" ? "" : line.en;
-    c.stage.classList.add("ai-talk"); $("aiSt").textContent = "SPEAKING";
+    c.stage.classList.add("ai-talk"); $("aiSt").textContent = opt.st ?? "SPEAKING";
     try {
       const ctx = c.ac(); if (ctx && !src) { src = ctx.createMediaElementSource(el); an = ctx.createAnalyser(); an.fftSize = 128; src.connect(an); an.connect(ctx.destination); }
     } catch { /* 分析なしで鳴らす */ }
-    const url = aiAudio(id, i);
     await new Promise<void>((ok) => {
       const end = () => { el.onended = el.onerror = null; ok(); };
       el.onended = end; el.onerror = end; el.src = blobs[url] || url; el.play().catch(end); setTimeout(end, 20000);
@@ -104,9 +117,9 @@ export function createAi(c: AiCtx): Ai {
     if (rem < 1000 && s.total > 2500) once("km1", "km1");
     if (s.dir === "in" && rem < 450) once("soon", "soon");
     // 遅れ・早い (予定のペースと比べて)
-    const expect = s.baseMin * 60 * u;
-    if (u > 0.15 && el2 - expect > 240) once("late", "late");
-    if (u > 0.4 && expect - el2 > 180) once("early", "early");
+    const expect = s.baseMin * 60 * u, elP = (now - s.paceStart) / 1000;
+    if (u > 0.15 && elP - expect > 240) once("late", "late");
+    if (u > 0.4 && expect - elP > 180) once("early", "early");
     // 場所
     if (s.ll) {
       const [la, lo] = s.ll;
@@ -146,11 +159,54 @@ export function createAi(c: AiCtx): Ai {
     if (e === "boostEnd") setTimeout(() => once("topspeed", "topspeed"), 9000);
   }
 
-  /* ---------- ゲストが光の玉を押す ---------- */
-  $("aiDot").onclick = (ev) => {
-    ev.stopPropagation(); const n = Date.now(); taps = taps.filter((x) => n - x < 8000); taps.push(n);
-    void say(taps.length >= 4 ? "tapmany" : "tap", { force: true, duck: false });
-  };
+  /* ---------- ゲストが光の玉を押す → 質問メニュー ---------- */
+  const TQ: Record<GLang, string> = { zh: "问问 ASTRAEA", ja: "ASTRAEA に聞く", en: "ASK ASTRAEA", ko: "ASTRAEA에게 묻기" };
+  let menuT: ReturnType<typeof setTimeout> | null = null; const asked: Record<string, number> = {}; const lastQ: Record<string, number> = {};
+  function menu() {
+    const s = c.state(), lang = s.lang, near = !!s.tripId && (s.arrived || Math.max(0, s.total - s.d) < 3000);
+    const qs = GUEST_Q.filter((q) => (q.id !== "lights" || (near && s.dir === "in")) && (q.id !== "checkin" || c.hasCheckin()));
+    const items = [...qs.map((q) => ({ id: q.id, icon: q.icon, t: q.q[lang] })), ...(s.dir === "in" ? [{ id: "guide", icon: "🔑", t: GUIDE_Q[lang] }] : [])];
+    const m = $("aiMenu");
+    m.innerHTML = `<div class="mt"><span>✦ ${TQ[lang]}</span><button data-x>✕</button></div>` + items.map((q, k) => `<button data-q="${q.id}" class="${q.id === "lights" || q.id === "guide" ? "hot" : ""}" style="animation-delay:${k * 45}ms"><i>${q.icon}</i><span>${q.t.replace(/[<&>]/g, "")}</span></button>`).join("");
+    m.querySelectorAll<HTMLElement>("[data-q]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); closeMenu(); void ask(b.dataset.q!); }));
+    (m.querySelector("[data-x]") as HTMLElement).onclick = (e) => { e.stopPropagation(); closeMenu(); };
+    m.classList.add("on"); if (menuT) clearTimeout(menuT); menuT = setTimeout(closeMenu, 12000);
+  }
+  function closeMenu() { $("aiMenu").classList.remove("on"); if (menuT) clearTimeout(menuT); menuT = null; }
+  $("aiDot").onclick = (ev) => { ev.stopPropagation(); if ($("aiMenu").classList.contains("on")) closeMenu(); else menu(); };
+  async function ask(id: string) {
+    if (id === "guide") { c.guide(); return; }
+    const q = GUEST_Q.find((x) => x.id === id); if (!q) return;
+    // 話している途中なら、終わるまで待つ (最大 20 秒)
+    for (let k = 0; speaking && k < 40; k++) await new Promise((r) => setTimeout(r, 500));
+    asked[id] = (asked[id] || 0) + 1;
+    if (asked[id] === 3 && id !== "lights" && id !== "checkin") { const i = (lastQ.rep = ((lastQ.rep ?? -1) + 1) % REPEAT.length); await speak(guestAudio("repeat", i), REPEAT[i], { st: "TO: GUEST" }); return; }
+    let i: number;
+    if (id === "weather") i = weatherAnswer(c.state().weather?.days?.[1]?.code);
+    else { i = Math.floor(Math.random() * q.v.length); if (q.v.length > 1 && i === lastQ[id]) i = (i + 1) % q.v.length; }
+    lastQ[id] = i;
+    if (id === "lights") c.roomLights();
+    if (id === "checkin") setTimeout(() => c.checkin(), 700);
+    await speak(guestAudio(id, i), q.v[i], { st: "TO: GUEST" });
+  }
+
+  /* ---------- お父さんの指示 (スマホのボタン・声) ---------- */
+  let lastCmd: number | null = null; const lastC: Record<string, number> = {};
+  function command(cmd: { c: string; n: number } | null) {
+    if (!cmd || typeof cmd.n !== "number") return;
+    if (lastCmd == null) { lastCmd = cmd.n; if (Date.now() - cmd.n > 20000) return; } // 前の送迎の指示は実行しない
+    else if (cmd.n <= lastCmd) return;
+    lastCmd = cmd.n;
+    if (cmd.c === "guide") { c.guide(); return; }
+    if (cmd.c === "unknown") { const i = (lastC.unknown = ((lastC.unknown ?? -1) + 1) % UNKNOWN.length); void speak(captainAudio("unknown", i), UNKNOWN[i], { st: "TO: CAPTAIN", duck: false }); return; }
+    const k = CAPTAIN.find((x) => x.id === cmd.c); if (!k) return;
+    let i = Math.floor(Math.random() * k.v.length); if (k.v.length > 1 && i === lastC[k.id]) i = (i + 1) % k.v.length; lastC[k.id] = i;
+    if (k.id === "checkin") setTimeout(() => c.checkin(), 700);
+    if (k.id === "room") setTimeout(() => c.roomLit(), 4000);
+    // 話している途中なら、終わってから
+    const go = () => { if (speaking) { setTimeout(go, 500); return; } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
+    go();
+  }
 
   /* ---------- 光の玉 (声に合わせて揺れる) ---------- */
   const FB = new Uint8Array(64);
@@ -178,10 +234,10 @@ export function createAi(c: AiCtx): Ai {
   };
   requestAnimationFrame(loop);
 
-  const urls = () => (Object.keys(AI_LINES) as AiId[]).flatMap((id) => AI_LINES[id].v.map((_, i) => aiAudio(id, i)));
+  const urls = () => (Object.keys(AI_LINES) as AiId[]).flatMap((id) => AI_LINES[id].v.map((_, i) => aiAudio(id, i))).concat(talkAudioUrls());
   /** 声を先に読み込む (保存済みなら iPad の中から) */
   function preload() {
     void (async () => { for (const u of urls()) { if (blobs[u]) continue; try { const r = await fetch(u); if (r.ok) blobs[u] = URL.createObjectURL(await r.blob()); } catch { /* 次へ */ } } })();
   }
-  return { tick, event, reset, preload, urls };
+  return { tick, event, reset, preload, urls, command, busy: () => speaking, closeMenu };
 }

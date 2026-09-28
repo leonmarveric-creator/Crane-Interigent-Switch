@@ -13,10 +13,11 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinPos, cabinEnd, cabinSetQuiet, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
+import { cabinStart, cabinPos, cabinEnd, cabinSetQuiet, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
 import { compressRoomPhoto } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import type { Music } from "@/components/driver/DriverMusic";
+import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
 type T = (s: string, v?: Record<string, string | number>) => string;
 const LANGS: [string, string][] = [["zh", "中文"], ["en", "EN"], ["ja", "日本語"], ["ko", "한국어"]];
@@ -78,7 +79,9 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const end = useCallback(async () => {
     if (!trip) return; const id = trip.id; setTrip(null); sfx.down(); await cabinEnd(id); toast(t("送迎を終わりにしました"));
   }, [trip, toast, t]);
-  return { trip, sending, start, end };
+  /** ASTRAEA に話しかける間、音楽を小さく */
+  const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
+  return { trip, sending, start, end, duck };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -171,9 +174,9 @@ export function CabinBar({ cab, data, t, ui }: { cab: Cabin; data: DriverData; t
   const tr = cab.trip; if (!tr) return null;
   const dev = data.cabin.devices.find((d) => d.id === tr.deviceId);
   const pn = tr.placeKey === "other" ? tr.placeName || t("その他") : (PLACES as any)[tr.placeKey]?.name[ui] ?? tr.placeKey;
-  return <CabinBarIn key={tr.id} tr={tr} dev={dev?.name ?? t("全部の iPad")} pn={pn} cab={cab} t={t} />;
+  return <CabinBarIn key={tr.id} tr={tr} dev={dev?.name ?? t("全部の iPad")} pn={pn} cab={cab} t={t} ui={ui} />;
 }
-function CabinBarIn({ tr, dev, pn, cab, t }: { tr: CabinTrip; dev: string; pn: string; cab: Cabin; t: T }) {
+function CabinBarIn({ tr, dev, pn, cab, t, ui }: { tr: CabinTrip; dev: string; pn: string; cab: Cabin; t: T; ui: "zh" | "ja" }) {
   // 🤫 静かモード: 車内 iPad の AI (ASTRAEA) のひと言を止める (道案内はそのまま)
   const [quiet, setQuiet] = useState(!!tr.aiQuiet);
   const toggleQuiet = async () => {
@@ -182,14 +185,67 @@ function CabinBarIn({ tr, dev, pn, cab, t }: { tr: CabinTrip; dev: string; pn: s
     if (!r.ok) { setQuiet(!q); toastQ(r.error === "SETUP_AI" ? t("静かモードには Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("切り替えられませんでした")); }
   };
   const [qMsg, toastQ] = useState("");
+  const [talk, setTalk] = useState(false);
   return (
     <div className="cabbar">
       <span className="live" />
       <span className="tx"><b>🚗 {dev}</b><small>{tr.dir === "in" ? `${pn} → ${t("お宿")}` : `${t("お宿")} → ${pn}`} · {cab.sending === "ok" ? "📡 " + t("位置を送信中") : cab.sending === "ng" ? "⚠ " + t("位置を送れません") : "…"}</small></span>
+      <button className="abtn" onClick={() => { sfx.tick(); setTalk(true); }}>🎙<small>ASTRAEA</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
+      {talk && <AstraeaSheet tr={tr} cab={cab} t={t} ui={ui} onClose={() => setTalk(false)} toast={toastQ} />}
     </div>
+  );
+}
+
+/* ================= ASTRAEA に話しかける (マイク) / 指示ボタン ================= */
+const GUIDE_BTN = { id: "guide" as const, icon: "🔑", zh: "进门方法", ja: "入り方ガイド" };
+function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: Cabin; t: T; ui: "zh" | "ja"; onClose: () => void; toast: (s: string) => void }) {
+  const [listen, setListen] = useState(false), [heard, setHeard] = useState(""), [sent, setSent] = useState(""), [btns, setBtns] = useState(false);
+  const rec = useRef<any>(null);
+  const send = async (c: CaptainCmdId, label: string) => {
+    sfx.tick(); vib(15);
+    const r = await cabinAiCmd(tr.id, c);
+    if (!r.ok) { sfx.error(); toast(r.error === "SETUP_AI" ? t("ASTRAEA の指示には Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("送れませんでした")); return; }
+    setSent("📡 " + label); setTimeout(() => setSent(""), 2500);
+    if (c !== "unknown") setTimeout(onClose, 900);
+  };
+  const SR = typeof window !== "undefined" ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
+  const mic = () => {
+    if (!SR) { toast(t("このスマホでは音声入力が使えません。ボタンで指示してください")); setBtns(true); return; }
+    if (rec.current) { rec.current.stop(); return; }
+    const r = new SR(); rec.current = r;
+    r.lang = ui === "ja" ? "ja-JP" : "zh-CN"; r.interimResults = true; r.continuous = false;
+    let fin = "";
+    r.onresult = (e: any) => { let s = ""; for (const x of e.results) { s += x[0].transcript; if (x.isFinal) fin = s; } setHeard(s); };
+    r.onerror = () => { /* 下の onend で */ };
+    r.onend = () => {
+      rec.current = null; setListen(false); cab.duck(false);
+      const s = (fin || "").trim() || heardRef.current.trim(); if (!s) return;
+      const id = matchCaptain(s);
+      if (id) { const b = id === "guide" ? GUIDE_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
+      else void send("unknown", "？");
+    };
+    setHeard(""); setListen(true); cab.duck(true); sfx.tick();
+    try { r.start(); } catch { setListen(false); cab.duck(false); rec.current = null; }
+  };
+  const heardRef = useRef(""); heardRef.current = heard;
+  useEffect(() => () => { try { rec.current?.abort?.(); } catch { /* ignore */ } cab.duck(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const all = [...CAPTAIN.map((c) => ({ id: c.id as CaptainCmdId, icon: c.icon, zh: c.zh, ja: c.ja })), GUIDE_BTN];
+  return (
+    <>
+      <div className="sheet-bg show" onClick={onClose} />
+      <div className="sheet show astr" onClick={(e) => e.stopPropagation()}>
+        <h4>🎙 ASTRAEA <small>{t("話しかけると iPad が答えます")}</small></h4>
+        <button className={`amic ${listen ? "rec" : ""}`} onClick={mic}>{listen ? "■" : "🎙"}</button>
+        <p className="aheard">{listen ? (heard || t("聞き取り中…")) : heard ? `「${heard}」` : t("押して話す（例：「阿斯特莱亚，办理入住」「アストレア、状況は？」）")}</p>
+        {sent ? <p className="asent">{sent} → iPad</p> : null}
+        <p className="awarn">⚠ {t("運転中は助手席の方が操作してください")}</p>
+        <button className="alink" onClick={() => setBtns((v) => !v)}>{btns ? "▲" : "▼"} {t("ボタンで指示")}</button>
+        {btns && <div className="agrid">{all.map((b) => <button key={b.id} onClick={() => void send(b.id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`)}>{b.icon} {ui === "zh" ? b.zh : b.ja}</button>)}</div>}
+      </div>
+    </>
   );
 }
 
@@ -211,6 +267,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       ))}
       {!data.cabin.devices.length && <p className="note">{t("まだ iPad がありません")}</p>}
       <button className="btn" style={{ width: "100%", marginTop: 8 }} onClick={onStart}>🚗 {t("予約なしで iPad に出して出発")}</button>
+      <CheckinQr url={data.cabin.checkinQr} t={t} toast={toast} refresh={refresh} />
       <div className="ctitle" style={{ marginTop: 14 }}>🏠 {t("部屋の写真（iPad 用）")}</div>
       <div className="cnote">{t("写真はアップロードすると自動で小さく（横 1280px・約 100KB）します。エアコン・照明・Wi-Fi の位置をタップで合わせると、iPad の演出がその場所から出ます。")}</div>
       <div className="cphotos">
@@ -224,6 +281,41 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       </div>
       {edit && <PhotoEditor room={edit} t={t} toast={toast} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void refresh(); }} />}
     </div>
+  );
+}
+
+/* チェックイン QR (全員共通の画像)。「チェックイン」と話しかけると iPad に大きく出る */
+function CheckinQr({ url, t, toast, refresh }: { url: string | null; t: T; toast: (s: string) => void; refresh: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const up = async (f: File) => {
+    setBusy(true);
+    try {
+      // QR はくっきりさせたいので、そのまま上げる (大きすぎる写真だけ 1400px の PNG に縮める)
+      let blob: Blob = f, ext: "png" | "jpg" | "webp" = f.type.includes("png") ? "png" : f.type.includes("webp") ? "webp" : "jpg";
+      if (f.size > 1.5 * 1024 * 1024 || !/image\/(png|jpe?g|webp)/.test(f.type)) {
+        const bm = await createImageBitmap(f); const s = Math.min(1, 1400 / Math.max(bm.width, bm.height));
+        const c = document.createElement("canvas"); c.width = Math.round(bm.width * s); c.height = Math.round(bm.height * s);
+        const g = c.getContext("2d")!; g.imageSmoothingEnabled = false; g.drawImage(bm, 0, 0, c.width, c.height);
+        blob = await new Promise<Blob>((ok, ng) => c.toBlob((b) => (b ? ok(b) : ng(new Error("toBlob"))), "image/png")); ext = "png";
+      }
+      const u = await cabinCheckinQrUploadUrl(ext); if (!u.ok) { toast(t("アップロードできませんでした")); return; }
+      const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": blob.type || "image/png", "x-upsert": "false" }, body: blob }).catch(() => null);
+      if (!put?.ok) { toast(t("アップロードできませんでした")); return; }
+      const r = await cabinSetCheckinQr(u.path);
+      if (!r.ok) { toast(r.error === "SETUP_AI" ? t("チェックイン QR には Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("保存できませんでした")); return; }
+      sfx.chord(); toast(t("✓ チェックイン QR を登録しました")); await refresh();
+    } catch { toast(t("画像を読み込めませんでした")); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <div className="ctitle" style={{ marginTop: 14 }}>📋 {t("チェックイン QR（全員共通）")}</div>
+      <div className="cnote">{t("パスポート登録・本人確認・送迎予約のページの QR 画像を登録します。ASTRAEA に「チェックイン」と話しかけると、iPad に大きく表示されます。")}</div>
+      <div className="ckrow">
+        {url ? <img src={url} alt="" /> : <span className="ckempty">QR</span>}
+        <label className="btn">{busy ? t("保存中…") : "🖼 " + (url ? t("変える") : t("QR 画像を選ぶ"))}<input type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void up(f); }} /></label>
+        {url ? <button onClick={async () => { if (!confirm(t("チェックイン QR を外しますか？"))) return; const r = await cabinSetCheckinQr(null); if (r.ok) { toast(t("外しました")); await refresh(); } }}>{t("外す")}</button> : null}
+      </div>
+    </>
   );
 }
 
