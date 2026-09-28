@@ -47,7 +47,9 @@ export function createNowPlaying(c: NpCtx): NpView {
     np = n;
   }
   const on = () => !!(np && tr && np.id === tr.id && !npStale(np, Date.now(), skew));
-  const pos = () => (np ? npPos(np, Date.now(), skew) : 0);
+  // スマホで位置を測ってからサーバに届くまでの時間 (約 0.3 秒) を足す
+  const LAG = 0.3;
+  const pos = () => (np ? npPos(np, Date.now(), skew) + (np.on ? LAG : 0) : 0);
 
   /* ---------- ホログラムの歌詞 (地図の下) ---------- */
   let hLi = -2, hOn = -1;
@@ -65,9 +67,8 @@ export function createNowPlaying(c: NpCtx): NpView {
       while (L.scrollWidth > W && fs > 16) { fs -= 1; L.style.fontSize = fs + "px"; }
       $("holo").style.setProperty("--hfs", fs + "px");
     }
-    const s0 = i >= 0 ? lrc[i].t : 0, s1 = lrc[i + 1]?.t ?? (np?.dur || s0 + 4), f = Math.max(0, Math.min(1, (t - s0) / Math.max(0.5, (s1 - s0) * 0.85)));
-    const spans = $("hLine").children, n = Math.round(f * spans.length);
-    if (n !== hOn) { for (let k = 0; k < spans.length; k++) spans[k].classList.toggle("on", k < n); hOn = n; }
+    // 歌詞の時間は「行の始まり」だけなので、1 文字ずつ色を進めると歌とずれる → 行が始まったら行全体を光らせる
+    if (hOn !== 1) { const spans = $("hLine").children; for (let k = 0; k < spans.length; k++) spans[k].classList.add("on"); hOn = 1; }
     $("hTime").textContent = np?.dur ? `${fmt(t)} / ${fmt(np.dur)}` : fmt(t);
   }
 

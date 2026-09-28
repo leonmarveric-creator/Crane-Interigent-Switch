@@ -229,7 +229,9 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       return { id, pos: a.currentTime || 0, dur: isFinite(a.duration) ? a.duration : 0, on: !a.paused };
     },
     /** 車内 iPad の再生ボタンから (ゲストが押す) */
-    remote(c: "toggle" | "next" | "prev" | "seek", v: number | null) {
+    remote(c: "toggle" | "next" | "prev" | "seek" | "duck", v: number | null) {
+      // 車内 iPad の AI が話す間は音楽を下げる
+      if (c === "duck") { if (!playing) return; api.duck(true); setTimeout(() => apiRef.current?.duck(false), Math.max(1, v ?? 10) * 1000); return; }
       if (boost.current) return; // 高速モード中は触らない
       if (c === "toggle") api.toggle(); else if (c === "next") api.next(); else if (c === "prev") api.prev(); else if (c === "seek" && v != null) api.seek(v);
     },

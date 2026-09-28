@@ -1,0 +1,187 @@
+/**
+ * 車内 iPad の AI「ASTRAEA（アストレア）」: 状況に合わせて自分から、ユーモアのあるひと言を話す。
+ *   きっかけ: 出発 / 半分 / 残り 5 km・1 km / 到着 / 信号で止まった・走り出した / 遅れ・早い / ルート外れ /
+ *            海・泉佐野・橋の手前 / 夕日 / 朝・夜 / 天気 / ぞろ目の時刻 / 週末 / 曲が変わった / 電波が切れた / 静かな時間の豆知識
+ *   決まり: 3 分に 1 回まで (出発・到着・橋などは別) / 道案内の声・高速モードと重ねない / 静かモードでは話さない
+ *   話す前にお父さんのスマホの音楽を下げる (music_cmd "duck")。ゲストが光の玉を押すと、おまけのひと言。
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, aiAudio, aiPick, sunsetMin, zorome, type AiId } from "@/lib/cabinAiLines";
+import type { GLang, LL } from "@/lib/cabinGeo";
+
+export interface AiState {
+  tripId: string | null; dir: "in" | "out"; placeKey: string; lang: GLang;
+  started: number;                 // 送迎が始まった時刻 (ms)
+  total: number; d: number;        // ルートの長さ・進んだ距離 (m)
+  toDest: number;                  // 目的地までの直線距離 (m)
+  baseMin: number;                 // 予定の所要時間 (分)
+  kmh: number | null; ll: LL | null;
+  arrived: boolean; offroute: boolean;
+  boosting: boolean;               // 高速モードの演出中
+  crossesBridge: boolean; hasIzumiPoi: boolean;
+  weather: { temp: number; code: number; days?: { code: number; max: number }[] } | null;
+}
+export interface AiCtx {
+  root: HTMLElement; stage: HTMLElement;
+  state: () => AiState;
+  voiceBusy: () => boolean;        // 道案内などの声が出ているか
+  ac: () => AudioContext | null;
+  duck: (sec: number) => void;     // お父さんのスマホの音楽を下げる
+  quiet: () => boolean;
+}
+export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[] }
+
+const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
+const JST = (ms: number) => new Date(ms + 9 * 3600e3);
+
+export function createAi(c: AiCtx): Ai {
+  const $ = (id: string) => c.root.querySelector("#" + id) as HTMLElement;
+  const el = new Audio(); let src: MediaElementAudioSourceNode | null = null, an: AnalyserNode | null = null;
+  const blobs: Record<string, string> = {};
+  let speaking = false, lastAt = 0, lastAny = 0, last: Partial<Record<AiId, number>> = {}, done = new Set<string>();
+  let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null, taps: number[] = [];
+
+  function reset() { done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; }
+
+  /* ---------- 話す ---------- */
+  async function say(id: AiId, opt: { force?: boolean; duck?: boolean } = {}) {
+    if (speaking) return false;
+    const s = c.state(); const now = Date.now();
+    const prio = AI_PRIORITY.includes(id);
+    if (!opt.force) {
+      if (c.quiet() && id !== "tap" && id !== "tapmany") return false;
+      if (c.voiceBusy() || (s.boosting && id !== "bridge")) return false;
+      if (!prio && now - lastAt < AI_GAP_MS) return false;
+    }
+    const i = aiPick(id, last[id]); last[id] = i;
+    const line = AI_LINES[id].v[i] as Record<GLang, string>;
+    speaking = true; if (!prio || id === "depart") lastAt = now; lastAny = now;
+    // お父さんのスマホの音楽を先に下げる (届くまで 3 秒ほど)
+    if (opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
+    const lang = c.state().lang;
+    $("aiSub").innerHTML = [...line[lang]].map((ch, k) => `<span style="animation-delay:${k * 26}ms">${ch.replace(/[<&>]/g, "")}</span>`).join("");
+    $("aiEn").textContent = lang === "en" ? "" : line.en;
+    c.stage.classList.add("ai-talk"); $("aiSt").textContent = "SPEAKING";
+    try {
+      const ctx = c.ac(); if (ctx && !src) { src = ctx.createMediaElementSource(el); an = ctx.createAnalyser(); an.fftSize = 128; src.connect(an); an.connect(ctx.destination); }
+    } catch { /* 分析なしで鳴らす */ }
+    const url = aiAudio(id, i);
+    await new Promise<void>((ok) => {
+      const end = () => { el.onended = el.onerror = null; ok(); };
+      el.onended = end; el.onerror = end; el.src = blobs[url] || url; el.play().catch(end); setTimeout(end, 20000);
+    });
+    setTimeout(() => { c.stage.classList.remove("ai-talk"); $("aiSt").textContent = "ONLINE"; }, 1200);
+    speaking = false; return true;
+  }
+  const once = (key: string, id: AiId, opt?: { force?: boolean; duck?: boolean }) => { if (done.has(key)) return; void say(id, opt).then((ok) => { if (ok) done.add(key); }); };
+
+  /* ---------- 毎秒: 今の状況を見て、話すことがあれば ---------- */
+  function tick() {
+    const s = c.state(); if (!s.tripId || speaking) return;
+    const now = Date.now(), el2 = (now - s.started) / 1000, rem = Math.max(0, s.total - s.d), u = s.total ? s.d / s.total : 0;
+    const t = JST(now), hh = t.getUTCHours(), mm = t.getUTCMinutes(), minNow = hh * 60 + mm + t.getUTCSeconds() / 60;
+    if (s.arrived) return;
+    // 出発
+    if (el2 > 9) once("depart", s.dir === "in" ? "depart" : "review", { force: s.dir === "in" });
+    if (el2 > 40 && s.lang !== "en" && done.has("depart")) once("subs", "subs");
+    if (s.dir === "in" && el2 > 70) once("stay", "stay");
+    if (s.dir === "out" && el2 > 80) once("locked", "locked");
+    // 止まった / 走り出した / 長い停車
+    const moving = (s.kmh ?? 0) > 12;
+    if (!moving && (s.kmh ?? 99) < 3 && s.toDest > 400) {
+      if (!stopT) stopT = now;
+      if (now - stopT > 60000 && !stopSaid && !done.has("stopped")) void say("stopped").then((ok) => { if (ok) { stopSaid = true; done.add("stopped"); } });
+      if (now - stopT > 180000 && !shopSaid) void say("shop").then((ok) => { if (ok) shopSaid = true; });
+    } else if (moving) {
+      if (stopSaid && !done.has("restart")) once("restart", "restart");
+      stopT = 0;
+    }
+    // ルートから外れた (20 秒続いたら)
+    if (s.offroute) { if (!offT) offT = now; if (now - offT > 20000) once("offroute", "offroute"); } else offT = 0;
+    // 距離
+    if (u >= 0.5 && s.total > 4000) once("half", "half");
+    if (rem < 5000 && s.total > 8000) once("km5", "km5");
+    if (rem < 1000 && s.total > 2500) once("km1", "km1");
+    if (s.dir === "in" && rem < 450) once("soon", "soon");
+    // 遅れ・早い (予定のペースと比べて)
+    const expect = s.baseMin * 60 * u;
+    if (u > 0.15 && el2 - expect > 240) once("late", "late");
+    if (u > 0.4 && expect - el2 > 180) once("early", "early");
+    // 場所
+    if (s.ll) {
+      const [la, lo] = s.ll;
+      // 橋の手前 (高速モードの前に)
+      if (s.crossesBridge) {
+        const toBridge = Math.min(Math.hypot((la - 34.41475) * 111000, (lo - 135.29395) * 91500), Math.hypot((la - 34.43725) * 111000, (lo - 135.26445) * 91500));
+        if (toBridge < 1300 && toBridge > 500 && moving) once("bridge", "bridge", { force: true });
+      }
+      if (Math.hypot((la - 34.4125) * 111000, (lo - 135.2935) * 91500) < 1500) once("sea", "sea");
+      if (!s.hasIzumiPoi && lo > 135.305 && s.dir === "in") once("izumi", "izumi");
+    }
+    // 夕日・時刻・曜日・天気
+    const ss = sunsetMin(now);
+    if (minNow > ss - 16 && minNow < ss - 3) once("sunset", "sunset");
+    if (zorome(hh, mm)) once("zorome", "zorome");
+    if (el2 > 100) {
+      if (hh >= 5 && hh < 10) once("tod", "morning"); else if (hh >= 19 || hh < 4) once("tod", "night");
+      const dow = t.getUTCDay(); if (dow === 5 || dow === 6) once("friday", "friday");
+      const w = s.weather;
+      if (w) {
+        if (rainy(w.code)) once("wx", "rain"); else if (w.temp >= 30) once("wx", "hot"); else if (w.temp <= 8) once("wx", "cold");
+        else if (w.days?.[1] && rainy(w.days[1].code)) once("wx", "rain_tmrw");
+      }
+    }
+    // 静かな時間が続いたら豆知識 (1 回の送迎で 2 つまで)
+    if (now - lastAny > AI_FACT_MS && el2 > 120) {
+      const facts: AiId[] = ["towel", "nasu", ...(s.placeKey.startsWith("kix") ? (["kix"] as AiId[]) : []), ...(s.crossesBridge ? (["bridgefact"] as AiId[]) : [])];
+      const left = facts.filter((f) => !done.has("fact:" + f));
+      if (left.length && [...done].filter((k) => k.startsWith("fact:")).length < 2) { const f = left[Math.floor(Math.random() * left.length)]; once("fact:" + f, f); }
+    }
+  }
+
+  function event(e: "arrive" | "song" | "boostEnd") {
+    const s = c.state(); if (!s.tripId) return;
+    if (e === "arrive") setTimeout(() => void say(s.dir === "in" ? "lights" : "bye", { force: !c.quiet() }), 7000);
+    if (e === "song" && Date.now() - s.started > 60000) void say("song");
+    if (e === "boostEnd") setTimeout(() => once("topspeed", "topspeed"), 9000);
+  }
+
+  /* ---------- ゲストが光の玉を押す ---------- */
+  $("aiDot").onclick = (ev) => {
+    ev.stopPropagation(); const n = Date.now(); taps = taps.filter((x) => n - x < 8000); taps.push(n);
+    void say(taps.length >= 4 ? "tapmany" : "tap", { force: true, duck: false });
+  };
+
+  /* ---------- 光の玉 (声に合わせて揺れる) ---------- */
+  const FB = new Uint8Array(64);
+  const draw = (cv: HTMLCanvasElement, big: boolean, lv: number, k: number) => {
+    const g = cv.getContext("2d")!, w = cv.width, cx = w / 2; g.clearRect(0, 0, w, w);
+    const R = w * (big ? 0.2 : 0.24) * (1 + lv * 0.5);
+    let gr = g.createRadialGradient(cx, cx, 0, cx, cx, R * 1.9); gr.addColorStop(0, `rgba(120,230,255,${0.3 + lv * 0.5})`); gr.addColorStop(1, "rgba(0,140,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, w);
+    g.lineWidth = w / 110;
+    for (let r = 0; r < 3; r++) {
+      g.strokeStyle = `rgba(143,240,255,${0.25 + 0.2 * r})`; g.beginPath();
+      for (let a = 0; a <= 48; a++) { const th = (a / 48) * 6.283, rr = R - r * R * 0.18 + Math.sin(th * (3 + r) + k * (1.2 + r * 0.4)) * (R * 0.06 + lv * R * 0.35) * (r ? 0.6 : 1); const x = cx + Math.cos(th) * rr, y = cx + Math.sin(th) * rr; if (a) g.lineTo(x, y); else g.moveTo(x, y); }
+      g.closePath(); g.stroke();
+    }
+    gr = g.createRadialGradient(cx - R * 0.15, cx - R * 0.2, 1, cx, cx, R * 0.75); gr.addColorStop(0, "#eaffff"); gr.addColorStop(0.4, "#5fe3ff"); gr.addColorStop(1, "rgba(0,90,200,.2)");
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cx, R * 0.72, 0, 6.283); g.fill();
+  };
+  let lastF = 0;
+  const loop = (n: number) => {
+    requestAnimationFrame(loop);
+    if (!c.stage.classList.contains("trip") || n - lastF < 45) return; lastF = n; // 毎秒 22 コマほど
+    let lv = 0; if (speaking && an) { an.getByteFrequencyData(FB); for (let i = 1; i < 24; i++) lv += FB[i]; lv /= 23 * 255; }
+    const k = n / 1000;
+    draw($("aiDotC") as HTMLCanvasElement, false, lv, k);
+    if (c.stage.classList.contains("ai-talk")) draw($("aiOrb") as HTMLCanvasElement, true, lv, k);
+  };
+  requestAnimationFrame(loop);
+
+  const urls = () => (Object.keys(AI_LINES) as AiId[]).flatMap((id) => AI_LINES[id].v.map((_, i) => aiAudio(id, i)));
+  /** 声を先に読み込む (保存済みなら iPad の中から) */
+  function preload() {
+    void (async () => { for (const u of urls()) { if (blobs[u]) continue; try { const r = await fetch(u); if (r.ok) blobs[u] = URL.createObjectURL(await r.blob()); } catch { /* 次へ */ } } })();
+  }
+  return { tick, event, reset, preload, urls };
+}

@@ -77,3 +77,26 @@ test("cabin: turning the iPad switches between the landscape (1180x820) and port
   assert.equal(man.orientation, "any", "home-screen app may rotate");
   assert.ok(man.icons.every((i) => i.src.includes("?v=2")), "new icon is picked up");
 });
+
+test("cabin AI ASTRAEA: every line has 4 languages and its own voice file; picks vary; sunset/zorome helpers", async () => {
+  const A = await load("cabinAiLines.ts");
+  const ids = Object.keys(A.AI_LINES); assert.ok(ids.length >= 35);
+  for (const id of ids) A.AI_LINES[id].v.forEach((v, i) => {
+    for (const l of ["en", "ja", "zh", "ko"]) assert.ok(v[l] && v[l].length > 3, `${id}-${i} ${l}`);
+    assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "ai", `${id}-${i}.mp3`)), `${id}-${i}.mp3`);
+  });
+  assert.ok(!JSON.stringify(A.AI_LINES).includes("Crane,"), "old name gone");
+  assert.equal(A.aiPick("song", 0, 0), 1, "never the same line twice in a row");
+  const ss = A.sunsetMin(Date.parse("2026-09-28T03:00:00Z")); assert.ok(ss > 17 * 60 + 30 && ss < 18 * 60, "Izumisano sunset in late Sept ≈ 17:45");
+  assert.equal(A.zorome(11, 11), true); assert.equal(A.zorome(12, 34), true); assert.equal(A.zorome(11, 12), false);
+  assert.equal(A.AI_GAP_MS, 180000, "at most one remark every 3 minutes");
+  const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /c\.voiceBusy\(\) \|\| \(s\.boosting/, "never over the guide voice or boost");
+  assert.match(ai, /if \(c\.quiet\(\) && id !== "tap"/, "quiet mode");
+  assert.match(ai, /c\.duck\(12\)/, "dad's music is lowered first");
+  const M = await load("cabinMusic.ts"); assert.equal(M.cleanCmd("duck", 12).v, 12); assert.equal(M.cleanCmd("duck", null), null);
+  assert.match(read("components", "driver", "DriverMusic.tsx"), /if \(c === "duck"\)/);
+  assert.match(read("supabase", "migration_cabin_ai.sql"), /add column if not exists ai_quiet boolean/);
+  assert.ok(!read("app", "cabin", "cabin.css").includes("ai-talk .holo"), "lyrics keep flowing while ASTRAEA talks");
+  assert.match(read("components", "cabin", "cabinNowPlaying.ts"), /行全体を光らせる/, "lyrics light a whole line (no drifting karaoke fill)");
+});

@@ -13,7 +13,7 @@ export interface NowPlaying extends NowPlayingIn { at: number }
 /** iPad に出す曲の情報 */
 export interface CabinTrack { id: string; title: string; artist: string | null; cover: string | null; lrc: string | null }
 /** iPad からスマホへの操作 */
-export type MusicCmd = "toggle" | "next" | "prev" | "seek";
+export type MusicCmd = "toggle" | "next" | "prev" | "seek" | "duck";
 export interface MusicCmdRow { c: MusicCmd; v: number | null; n: number }
 
 const num = (v: unknown, lo: number, hi: number): number | null => (typeof v === "number" && isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null);
@@ -41,9 +41,10 @@ export const NP_STALE_MS = 20000;
 export const npStale = (np: NowPlaying, nowMs: number, skewMs = 0) => nowMs + skewMs - np.at > NP_STALE_MS;
 
 export function cleanCmd(c: unknown, v: unknown): MusicCmdRow | null {
-  if (c !== "toggle" && c !== "next" && c !== "prev" && c !== "seek") return null;
-  const s = c === "seek" ? num(v, 0, 36000) : null;
-  if (c === "seek" && s == null) return null;
+  if (c !== "toggle" && c !== "next" && c !== "prev" && c !== "seek" && c !== "duck") return null;
+  // seek = 秒 / duck = 音楽を下げておく秒数 (AI が話す間)
+  const s = c === "seek" ? num(v, 0, 36000) : c === "duck" ? num(v, 1, 30) : null;
+  if ((c === "seek" || c === "duck") && s == null) return null;
   return { c, v: s, n: Date.now() };
 }
 

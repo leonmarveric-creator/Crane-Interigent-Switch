@@ -600,3 +600,7 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .phed .spot { position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:16px; background:rgba(4,12,26,.75); border:2px solid #8ff0ff; box-shadow:0 0 10px #5fe3ff; pointer-events:none; }
 .drv .phed .spot.on { border-color:#ffd199; box-shadow:0 0 14px #ffb35c; transform:scale(1.15); }
 .drv .fedit input.bst { flex:none; width:64px; text-align:center; font-family:ui-monospace,Menlo,monospace; color:#c9b8ff; border-color:rgba(160,110,255,.5); }
+.drv .cabbar .qbtn { min-width:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0 8px; border-color:rgba(95,227,255,.45); background:#0c1a2e; color:#bff6ff; font-size:16px; line-height:1.1; }
+.drv .cabbar .qbtn small { font-size:9.5px; font-weight:700; letter-spacing:.06em; }
+.drv .cabbar .qbtn.on { border-color:rgba(200,200,220,.5); background:#1b1f2a; color:#c9d6e6; }
+.drv .cabbar .qmsg { position:absolute; left:10px; right:10px; bottom:calc(100% + 8px); padding:8px 12px; border-radius:10px; background:rgba(40,20,20,.95); border:1px solid rgba(255,155,138,.5); color:#ffd2c8; font-style:normal; font-size:12.5px; }

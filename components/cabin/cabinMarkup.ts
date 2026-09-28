@@ -26,7 +26,7 @@ export const TRIP_HTML = `<div class="scr">
    <div class="mbtn"><button id="mPhoto" class="on">🛰</button><button id="mDark">🌙</button><button id="npFullBtn" class="npfb">🎵</button></div>
    <div class="cap" id="cap"><div class="ic" id="capI">🌉</div><div><b id="capT"></b><span id="capS"></span></div><div class="wv"><i></i><i></i><i></i></div></div>
    
-   <div class="osm2">出典：国土地理院</div><div class="holo" id="holo"><div class="hbeam"></div><div class="hbase"></div><div class="hcov"><img class="npcov" id="hCov" alt=""><i></i></div><div class="hly"><div class="hmeta"><span class="hdot"></span><span id="hMeta">HOLO LYRICS</span></div><div class="hline" id="hLine"></div><div class="hnext" id="hNext"></div><div class="hout" id="hOut"></div></div><div class="htime" id="hTime">00:00</div></div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
+   <div class="osm2">出典：国土地理院</div><div class="holo" id="holo"><div class="hbeam"></div><div class="hbase"></div><div class="hcov"><img class="npcov" id="hCov" alt=""><i></i></div><div class="hly"><div class="hmeta"><span class="hdot"></span><span id="hMeta">HOLO LYRICS</span></div><div class="hline" id="hLine"></div><div class="hnext" id="hNext"></div><div class="hout" id="hOut"></div></div><div class="htime" id="hTime">00:00</div></div><button class="aiDot" id="aiDot" aria-label="ASTRAEA"><canvas id="aiDotC" width="112" height="112"></canvas></button><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
    <canvas id="warp"></canvas><div class="shock" id="shock"></div><div class="shock s2" id="shock2"></div>
    <div class="bhud" id="bhud"><div class="hex"></div><div class="floor"></div><i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i><div class="scanl"></div>
     <div class="blog" id="blog"></div>
@@ -59,6 +59,7 @@ export const TRIP_HTML = `<div class="scr">
   </div>
  </div>
  ${NP_FULL}
+ <div class="aiP" id="aiP"><canvas id="aiOrb" width="220" height="220"></canvas><div class="aiTx"><div class="aiNm"><i></i>ASTRAEA<em id="aiSt">ONLINE</em></div><div class="aiSub" id="aiSub"></div><div class="aiEn" id="aiEn"></div></div></div>
  <div class="arrive" id="arrive"><div class="abg" id="abg"></div><div class="ashade"></div><canvas id="ptc"></canvas><div class="ak" id="ak"></div><div class="akEn" id="akEn"></div><div class="t1" id="arrT1">CRANE NEST</div><div class="t2" id="arrT2">WELCOME HOME</div><div class="t3" id="arrT"></div><div class="rows"><div id="arr1"></div><div id="arr2"></div><div id="arr3"></div></div>
   <div class="aq" id="aq"><button data-q="key"><i>🔑</i><span><b></b><small>ENTRANCE KEY</small></span></button><button data-q="room"><i>🚪</i><span><b></b><small>YOUR ROOM</small></span></button><p class="aqtip" id="aqTip"></p></div>
   <div class="qrp" id="qrp"><div class="qrc"><div class="qrtabs"><button data-qt="key"></button><button data-qt="room"></button></div>

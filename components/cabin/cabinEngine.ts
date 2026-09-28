@@ -12,6 +12,7 @@ import { CABIN_T, type CabinText } from "@/lib/cabinI18n";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import { MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
+import { createAi } from "@/components/cabin/cabinAi";
 import QRCode from "qrcode";
 
 const TILES = {
@@ -50,6 +51,8 @@ export interface Engine {
   weather(w: { temp: number; code: number; max?: number; min?: number; days?: { code: number; max: number }[]; rain?: number } | null): void;
   /** お父さんのスマホで流れている曲 (skewMs = サーバの時計 - この iPad の時計) */
   nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void;
+  /** AI (ASTRAEA) の静かモード */
+  setQuiet(q: boolean): void;
 }
 
 export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void }): Engine {
@@ -103,7 +106,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const blobs: Record<string, string> = {};
   const src = (k: string) => blobs[k] || AUDIO + k + ".mp3";
   const voice = new Audio(); let Q: Promise<void> = Promise.resolve();
-  const say = (k: string) => { Q = Q.then(() => new Promise<void>((r) => { voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); voice.play().catch(() => r()); setTimeout(r, 15000); })); return Q; };
+  let voiceN = 0; // 道案内などの声が出ている (待っている) 数。AI はこの間は話さない
+  const say = (k: string) => { voiceN++; Q = Q.then(() => new Promise<void>((r) => { voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); voice.play().catch(() => r()); setTimeout(r, 15000); })).then(() => { voiceN = Math.max(0, voiceN - 1); }); return Q; };
   const sfx = (k: string) => { const a = new Audio(src(k)); a.play().catch(() => {}); };
   const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
@@ -263,6 +267,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     else { byeS(); void say(byeKey); }
     $("sweep").classList.remove("on");
     T_(600, () => { $("arrive").classList.add("on"); startPtc(); });
+    ai.event("arrive");
     // 2 分たったら送迎を終わりにして、待機画面へ
     T_(120000, () => hooks.onEnd(id));
   }
@@ -400,7 +405,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function boostOff() {
     timers.forEach(clearTimeout); timers = []; if (chg) chg.stop = true;
     const m = $("map"), h = $("bhud");
-    sfx("boost-end");
+    sfx("boost-end"); ai.event("boostEnd");
     $("boostT").className = "boostT"; $("boostP").classList.remove("on");
     setText("bLbl", "COOLING"); $("bmode").className = "bmode boost"; setText("bmodeV", "BOOST");
     h.className = "bhud cool";
@@ -471,6 +476,20 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     tick: () => { const t = now(); tone(1500, 1500, t, 0.04, 0.03); },
   });
 
+  /* ---------- AI「ASTRAEA」: 状況に合わせて自分から話す ---------- */
+  let aiQuiet = false, startedAt = 0, npId: string | null = null;
+  const ai = createAi({
+    root, stage, ac, quiet: () => aiQuiet, voiceBusy: () => voiceN > 0,
+    duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); },
+    state: () => ({
+      tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
+      started: startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
+      arrived, offroute, boosting: bs.phase !== "off" || warpOn,
+      crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
+    }),
+  });
+  setInterval(() => ai.tick(), 1000);
+
   /* ---------- 送迎の開始・終了 ---------- */
   async function start(t: CabinTrip, r: CabinRoom | null) {
     if (trip?.id === t.id) { if (r && room?.id !== r.id) { room = r; roomTexts(); } return; }
@@ -497,7 +516,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (t.dir === "out") $("room").classList.add("lit");
     texts(); draw(); meter(0);
     ($("etaM").firstChild as Text).textContent = String(baseMin); setText("km", T.km.replace("{k}", (R.total / 1000).toFixed(1)));
-    stage.classList.add("trip");
+    stage.classList.add("trip"); startedAt = Date.now(); ai.reset(); npId = null;
     setTimeout(() => MAP.invalidateSize(), 50);
     // 出発の演出
     linkS(); void say(goKey); $("sweep").classList.add("on");
@@ -507,7 +526,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset();
+    qrHide(); npv.reset(); ai.reset();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -538,6 +557,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- 最初のタップで音を使えるように + 声・効果音をこの iPad に保存 ---------- */
   function unlock() {
+    ai.preload();
     ac(); voice.muted = true; voice.src = AUDIO + "en-arrive.mp3"; voice.play().then(() => { voice.pause(); voice.muted = false; }).catch(() => { voice.muted = false; });
     // 声・効果音を先に読み込んでおく (保存済みなら iPad の中から。再生のときに待たない)
     void (async () => {
@@ -564,6 +584,11 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     });
   }
 
-  return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3"), unlock, demo, saveOffline, resize, weather,
-    nowPlaying: (np, track, skew) => npv.update(np, track, skew) };
+  return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3").concat(ai.urls()), unlock, demo, saveOffline, resize, weather,
+    nowPlaying: (np, track, skew) => {
+      npv.update(np, track, skew);
+      // 曲が変わったら AI がひと言
+      if (np && track && np.id === track.id && np.id !== npId) { if (npId) ai.event("song"); npId = np.id; }
+    },
+    setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); } };
 }

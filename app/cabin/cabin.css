@@ -676,3 +676,39 @@
 .cab .stage.port .qrphone{display:none}.cab .stage.port .qrside ol{max-width:560px;margin:0 auto}.cab .stage.port .qrside code,.cab .stage.port .qrk{text-align:center}
 .cab .stage.port .f2left{height:auto;min-height:150px;row-gap:2px}.cab .stage.port .qrk{display:block}
 .cab .stage.port .f2right{top:720px}
+/* カバーは元の色のまま (ホログラムの色付けをしない) */
+.cab .hcov .npcov{filter:none!important;opacity:1!important}
+.cab .hcov i{background:repeating-linear-gradient(180deg,rgba(180,250,255,.06) 0 1px,transparent 1px 3px)!important}
+
+/* ===== AI「ASTRAEA」 ===== */
+.cab .aiDot{position:absolute;right:30px;top:216px;z-index:1001;width:56px;height:56px;padding:0;border:0;border-radius:50%;background:radial-gradient(circle,rgba(4,12,26,.55),rgba(4,12,26,0) 70%)}
+.cab .aiDot canvas{width:56px;height:56px;display:block}
+.cab .stage.ai-talk .aiDot{opacity:.3}
+.cab .stage.ai-quiet .aiDot{filter:grayscale(1);opacity:.5}
+.cab .aiP{position:absolute;left:50%;bottom:22px;z-index:3100;width:min(820px,92%);display:flex;align-items:center;gap:18px;padding:12px 24px 12px 12px;border-radius:24px;
+ background:linear-gradient(160deg,rgba(10,24,48,.94),rgba(4,12,26,.95));border:1px solid rgba(95,227,255,.6);box-shadow:0 0 40px rgba(0,180,255,.35),0 20px 50px rgba(0,0,0,.5);
+ transform:translate(-50%,30px);opacity:0;pointer-events:none;transition:opacity .45s,transform .45s cubic-bezier(.2,.9,.3,1)}
+.cab .stage.ai-talk .aiP{opacity:1;transform:translate(-50%,0)}
+.cab .stage.trip.np-on[data-np="C"] .aiP{bottom:100px}
+.cab .stage:has(.arrive.on) .aiP{bottom:auto;top:22px;transform:translate(-50%,-30px)}
+.cab .stage.ai-talk:has(.arrive.on) .aiP{transform:translate(-50%,0)}
+.cab .aiP canvas{flex:none;width:110px;height:110px}
+.cab .aiTx{flex:1;min-width:0}
+.cab .aiNm{display:flex;align-items:center;gap:10px;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.3em;color:#8ff0ff}
+.cab .aiNm i{width:8px;height:8px;border-radius:50%;background:#46e08a;box-shadow:0 0 8px #46e08a}
+.cab .aiNm em{font-style:normal;color:#6f86a3;letter-spacing:.15em}
+.cab .aiSub{margin-top:6px;font-size:24px;font-weight:700;line-height:1.35;color:#f2feff;text-shadow:0 0 12px rgba(95,227,255,.45)}
+.cab .aiSub span{opacity:0;animation:cab-aicin .25s forwards}
+@keyframes cab-aicin{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:none}}
+.cab .aiEn{margin-top:3px;font-size:12.5px;color:#7fa6c8}
+.cab .f2map>.map .aiDot{display:none}
+.cab .stage.port .aiP{width:92%}.cab .stage.port .aiSub{font-size:21px}
+.cab .map.boost .aiDot,.cab .map.boost-charge .aiDot{display:none}
+
+/* 話すパネルは地図の上側 (ルート表示のすぐ下)。下の歌詞はそのまま流れる */
+.cab .aiP{left:343px;top:150px;bottom:auto;width:440px;gap:14px;padding:9px 20px 9px 8px;border-radius:20px;transform:translate(-50%,-24px)}
+.cab .aiP canvas{width:76px;height:76px}
+.cab .aiSub{font-size:19px;margin-top:4px}.cab .aiEn{font-size:11.5px}
+.cab .stage.port .aiP{left:352px;top:150px;width:520px}
+.cab .stage.trip.np-on[data-np="C"] .aiP{top:auto;bottom:100px;left:50%;width:min(820px,92%);transform:translate(-50%,30px)}
+.cab .stage.trip.np-on[data-np="C"].ai-talk .aiP{transform:translate(-50%,0)}

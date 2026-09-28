@@ -248,6 +248,14 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   const row: any = r.data?.[0];
   return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok" };
 }
+/** 車内 iPad の AI の静かモード (ひと言を止める) */
+export async function cabinSetQuiet(tripId: string, quiet: boolean): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId)) return fail("BAD");
+  const { error } = await supabaseAdmin.from("cabin_trips").update({ ai_quiet: !!quiet }).eq("id", tripId);
+  if (error) return fail(/ai_quiet/.test(error.message) ? "SETUP_AI" : error.message);
+  return { ok: true };
+}
 export async function cabinEnd(tripId: string): Promise<R> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
