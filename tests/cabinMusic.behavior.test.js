@@ -128,3 +128,31 @@ test("ASTRAEA talk: guest menu, captain commands by voice/buttons, check-in QR, 
   assert.match(eng, /async function reroute\(from: LL\)/); assert.match(eng, /backN >= 3 \? pr\.d : prevD/, "turning back is followed");
   assert.match(read("app", "api", "cabin", "state", "route.ts"), /op === "lights"/);
 });
+
+test("Summer room guide: room keypad, turning steps, opposite-knob warning, smart-key QR, summary", async () => {
+  const K = await load("cabinAiTalk.ts");
+  assert.equal(K.roomGuideOf("room-summer"), "natsu"); assert.equal(K.roomGuideOf("natsu"), "natsu");
+  assert.equal(K.roomGuideOf("room-autumn"), null, "other rooms wait for their own guide"); assert.equal(K.roomGuideOf(null), null);
+  for (const k of ["intro", "s1", "s2", "s3", "room", "r1", "r2", "r3", "r4", "smart", "photo"]) {
+    assert.ok(fs.existsSync(path.join(root, "public", K.guideAudio(k))), k);
+    for (const l of ["ja", "zh", "en", "ko"]) assert.ok(K.GUIDE_VOICE[k][l], k + l);
+  }
+  for (const l of ["ja", "zh", "en", "ko"]) for (const k of ["t4", "t5", "t6", "t7", "d7", "t8", "d8", "k1", "k2", "rec", "p21", "p22", "p23", "p51", "p52", "p53", "c2", "c5", "tr", "tl"]) assert.ok(K.GUIDE_T[l][k], l + k);
+  const g = read("components", "cabin", "cabinGuide.ts");
+  assert.match(g, /id="gdPr2"/); assert.match(g, /id="gdPr5"/); assert.match(g, /pr\("gdPr5", 3\)/, "turning steps light in order");
+  assert.match(g, /\[7, "r4", a7\]/, "opposite-knob warning scene"); assert.match(g, /show\(8\); await Promise\.all\(\[say\("smart"\)/, "smart-key QR scene");
+  assert.match(g, /card\(5, "rmc"[^\n]*T\.c5/, "summary carries the room turning steps"); assert.match(g, /gcRec/);
+  const css = read("app", "cabin", "cabin.css");
+  for (const c of [".gdPr", ".gdSmart", ".gdQs", ".gcRec"]) assert.ok(css.includes(c), c);
+});
+test("guide summary shows the turning direction; intro makes no false time promise", async () => { const K = await load("cabinAiTalk.ts"); assert.ok(!/30/.test(K.GUIDE_VOICE.intro.en + K.GUIDE_VOICE.intro.ja)); const g = read("components", "cabin", "cabinGuide.ts"); assert.match(g, /turn\("gdMa2", 0, 90, [^\n]*"R"/); assert.match(g, /turn\("gdMa5", -60, -180, [^\n]*"L"/); });
+
+test("drop-off: forgotten-item check right after departure (4 random lines), no false 'room locked' claim", async () => {
+  const A = await load("cabinAiLines.ts");
+  assert.equal(A.AI_LINES.forgot.v.length, 4); assert.ok(!("locked" in A.AI_LINES));
+  for (const v of A.AI_LINES.forgot.v) { assert.ok(!/driver|ドライバー|locked|戸締まり/.test(v.en + v.ja)); for (const l of ["en", "ja", "zh", "ko"]) assert.ok(v[l]); }
+  for (let i = 0; i < 4; i++) assert.ok(fs.existsSync(path.join(root, "public", A.aiAudio("forgot", i))));
+  const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /once\("depart", s\.dir === "in" \? "depart" : "forgot", \{ force: true \}\)/);
+  assert.match(ai, /s\.dir === "out" && el2 > 80\) once\("review", "review"\)/);
+});

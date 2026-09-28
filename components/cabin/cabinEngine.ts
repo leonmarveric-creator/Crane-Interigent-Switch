@@ -14,7 +14,7 @@ import { MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
 import { createGuide } from "@/components/cabin/cabinGuide";
-import { CHECKIN_T } from "@/lib/cabinAiTalk";
+import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
 
 const TILES = {
@@ -527,6 +527,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   /* ---------- 入り方ガイド (押したときだけ) ---------- */
   const guide = createGuide({
     root, stage, lang: () => lang, code: () => room?.keypad ?? null, keyUrl: () => qrLinks().key, ac,
+    // お部屋の開け方 (今は夏のお部屋だけ。他の部屋は開け方が分かったら足す)
+    roomUrl: () => qrLinks().room,
+    room: () => ({ guide: roomGuideOf(room?.slug), code: room?.roomCode ?? null, name: room ? `${room.kanji} · ${room.en}` : "" }),
     duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); }, busy: () => ai.busy(),
   });
 

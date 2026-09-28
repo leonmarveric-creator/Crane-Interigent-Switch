@@ -16,6 +16,8 @@ export interface CabinRoom {
   roomSlug: string | null; entrance: string | null;
   /** エントランスの暗証番号 (入り方ガイド用。無ければ null) */
   keypad: string | null;
+  /** お部屋の暗証番号 (rooms.keypad_code。入り方ガイド用) */
+  roomCode: string | null;
   /** 和風ライトがあるか (ゲストの「明かりをつけて」で使う) */
   hasWafu: boolean;
 }
@@ -64,7 +66,7 @@ export function toCabinRoom(r: any, nowMs = Date.now()): CabinRoom {
     en: s?.[2] ?? nm.toUpperCase(), accent: roomColor(slug), fx: s?.[3] ?? fxOfMonth(nowMs),
     photo, photoKey: photoKey ? (BUILTIN[photoKey.replace(/^builtin:/, "")] ? "builtin:" + photoKey.replace(/^builtin:/, "") : photoKey) : null,
     spots, home, building: r.building || "Crane Nest",
-    roomSlug: r.slug ? String(r.slug) : null, entrance: null, keypad: null, hasWafu: !!r.switchbot_wafu_device_id,
+    roomSlug: r.slug ? String(r.slug) : null, entrance: null, keypad: null, roomCode: r.keypad_code ? String(r.keypad_code) : null, hasWafu: !!r.switchbot_wafu_device_id,
   };
 }
 function okSpot(v: any): Spot {

@@ -794,3 +794,55 @@
 .cab .aiMenu{top:268px}
 .cab .stage:has(.ckp.on) .aiP{left:590px;top:14px;width:760px}
 .cab .stage.port:has(.ckp.on) .aiP{left:410px;top:14px;width:720px}
+/* 入り方ガイド: 夏のお部屋 */
+.cab .gdS.rm .gdArt{border-color:rgba(255,179,92,.45);background:linear-gradient(160deg,rgba(60,34,12,.55),rgba(14,10,8,.85))}
+.cab .gdS.rm .gdN{background:linear-gradient(135deg,#ffd199,#ff8a3c);box-shadow:0 0 30px rgba(255,140,60,.6)}
+.cab .gdS.rm h4{color:#ffc27a}.cab .gdS.rm .gdCode span{border-color:rgba(255,179,92,.5);background:rgba(255,179,92,.08)}.cab .gdS.rm .gdCode span.lit{background:rgba(255,179,92,.35);box-shadow:0 0 18px rgba(255,150,60,.6)}
+.cab .gdRt{position:absolute;left:684px;top:72px;padding:5px 14px;border-radius:99px;background:rgba(255,179,92,.14);border:1px solid rgba(255,179,92,.5);color:#ffd199;font-size:15px;font-weight:800;letter-spacing:.08em}
+.cab .gdp.hasRoom .gdSum{top:150px;bottom:124px;grid-template-columns:1fr 1fr 1fr .8fr;grid-template-rows:1fr 1fr;row-gap:36px}
+.cab .gdp.hasRoom .gc.q{grid-column:4;grid-row:1/3}
+.cab .gdp.hasRoom .gc{padding:12px 14px;gap:4px}
+.cab .gdp.hasRoom .gc svg{max-height:92px}
+.cab .gdp.hasRoom .gc b{min-height:0;font-size:19px;padding-right:40px}.cab .gdp.hasRoom .gc .cd{font-size:34px}.cab .gdp.hasRoom .gc small{font-size:15px}
+.cab .gc .n{position:absolute;right:12px;top:12px}
+.cab .gc .lab{position:absolute;left:4px;top:-26px;font:800 12px ui-monospace,Menlo,monospace;letter-spacing:.25em;color:#8ff0ff;white-space:nowrap}
+.cab .gc.rmc{border-color:rgba(255,179,92,.45)}.cab .gc.rmc .lab{color:#ffc27a}.cab .gc.rmc .n{background:linear-gradient(135deg,#ffd199,#ff8a3c)}.cab .gc.rmc .cd{color:#ffc27a;text-shadow:0 0 16px rgba(255,150,60,.6)}
+.cab .gdp:not(.hasRoom) .gc .lab{display:none}
+.cab .stage.port .gdRt{left:48px;top:568px}
+.cab .stage.port .gdp.hasRoom .gdSum{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;top:140px}
+.cab .stage.port .gdp.hasRoom .gc.q{grid-column:1/4;grid-row:3}
+.cab .stage.port .gdp.hasRoom .gc.q .qr{width:220px}
+.cab .gc .qr svg{max-height:none!important;width:100%;height:100%}
+.cab .gdN.gdWarn{background:linear-gradient(135deg,#ffe07a,#ffb000)!important;box-shadow:0 0 30px rgba(255,200,0,.6)!important;color:#241400}
+.cab .gdS[data-s="7"] h4{color:#ffd23c!important}
+/* 回す手順 ①②③ */
+.cab .gdPr{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-direction:column;gap:9px;counter-reset:pr}
+.cab .gdPr li{counter-increment:pr;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;font-size:19px;font-weight:600;line-height:1.3;color:#9fb6d6;background:rgba(255,255,255,.04);border:1px solid rgba(143,240,255,.14);transition:all .45s}
+.cab .gdPr li::before{content:counter(pr);flex:0 0 30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 16px ui-monospace,Menlo,monospace;color:#8ff0ff;border:2px solid rgba(143,240,255,.5)}
+.cab .gdPr li.on{color:#fff;background:rgba(95,227,255,.14);border-color:#5fe3ff;box-shadow:0 0 22px rgba(0,200,255,.35);transform:translateX(6px)}
+.cab .gdPr li.on::before{background:#5fe3ff;color:#04101f;border-color:#5fe3ff}
+.cab .gdPr li.done{color:#dbe8f7}.cab .gdPr li.done::before{content:"✓";color:#46e08a;border-color:#46e08a}
+.cab .gdS.rm .gdPr li.on{background:rgba(255,179,92,.14);border-color:#ffb35c;box-shadow:0 0 22px rgba(255,150,60,.35)}.cab .gdS.rm .gdPr li.on::before{background:#ffb35c;border-color:#ffb35c}
+.cab .stage.port .gdPr{margin-top:10px;gap:6px}.cab .stage.port .gdPr li{font-size:17px;padding:7px 12px}
+/* ⑧ いちばん確実なのはスマホの鍵 */
+.cab .gdSmart{position:absolute;left:60px;right:60px;top:110px;bottom:150px;display:flex;flex-direction:column;align-items:center;text-align:center;color:#fff}
+.cab .gdRec{display:inline-block;padding:6px 18px;border-radius:30px;font:800 15px ui-monospace,Menlo,monospace;letter-spacing:.25em;color:#1a1200;background:linear-gradient(135deg,#ffe98a,#ffb81c);box-shadow:0 0 24px rgba(255,200,40,.55)}
+.cab .gdRec::before{content:"★ "}
+.cab .gdSmart h2{margin:14px 0 6px;font-size:40px;line-height:1.15}.cab .gdSmart p{margin:0;font-size:19px;line-height:1.5;color:#dbe8f7;max-width:820px}
+.cab .gdQs{margin-top:22px;flex:1;min-height:0;display:flex;gap:40px;justify-content:center;align-items:stretch}
+.cab .gdQ{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;border-radius:22px;background:linear-gradient(160deg,rgba(14,32,60,.85),rgba(4,12,26,.9));border:2px solid rgba(95,227,255,.55);box-shadow:0 0 30px rgba(0,200,255,.25)}
+.cab .gdQ .qr{background:#fff;border-radius:14px;padding:10px;height:100%;min-height:0;aspect-ratio:1;max-height:300px}.cab .gdQ .qr svg{width:100%;height:100%;display:block}
+.cab .gdQ b{font-size:20px}.cab .gdQ.rmq{border-color:rgba(255,179,92,.6);box-shadow:0 0 30px rgba(255,150,60,.25)}
+.cab .stage.port .gdSmart{left:40px;right:40px;top:120px;bottom:160px}.cab .stage.port .gdQs{flex-direction:column;align-items:center;gap:18px}.cab .stage.port .gdQ{flex-direction:row;gap:18px;padding:12px 18px}.cab .stage.port .gdQ .qr{height:auto;width:260px}
+/* まとめの QR カード */
+.cab .gcRec{position:absolute;top:-13px;left:50%;transform:translateX(-50%);white-space:nowrap;padding:3px 12px;border-radius:20px;font:800 12px ui-monospace,Menlo,monospace;letter-spacing:.15em;color:#1a1200;background:linear-gradient(135deg,#ffe98a,#ffb81c)}
+.cab .gc.q{border-color:rgba(255,210,60,.6)}
+.cab .gdp.hasRoom .gc.q .qr{width:auto;height:auto;max-width:150px;flex:0 1 auto}.cab .gdp.hasRoom .gc.q{gap:6px;padding:18px 12px 12px}.cab .gdp.hasRoom .gc.q b{font-size:14px}
+.cab .stage.port .gdp.hasRoom .gc.q{flex-direction:row;flex-wrap:wrap;justify-content:center}.cab .stage.port .gdp.hasRoom .gc.q .qr{width:150px}
+/* まとめの手順 ①②③ */
+.cab .gc .mp{list-style:none;margin:auto 0 0;padding:0;display:flex;flex-direction:column;gap:3px;counter-reset:mp}
+.cab .gc .mp li{counter-increment:mp;display:flex;gap:7px;align-items:center;font-size:15px;font-weight:600;color:#e6eef8;line-height:1.25}
+.cab .gc .mp li::before{content:counter(mp);flex:0 0 19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 11px ui-monospace,Menlo,monospace;color:#04101f;background:#8ff0ff}
+.cab .gc.rmc .mp li::before{background:#ffc27a}
+.cab .gc svg.turn{max-height:120px}.cab .gdp.hasRoom .gc svg.turn{max-height:96px}
+.cab .gc svg.turn{width:calc(100% - 46px);align-self:flex-start}

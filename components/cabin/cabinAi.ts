@@ -95,10 +95,11 @@ export function createAi(c: AiCtx): Ai {
     const t = JST(now), hh = t.getUTCHours(), mm = t.getUTCMinutes(), minNow = hh * 60 + mm + t.getUTCSeconds() / 60;
     if (s.arrived) return;
     // 出発
-    if (el2 > 9) once("depart", s.dir === "in" ? "depart" : "review", { force: s.dir === "in" });
+    // お見送りは出発直後に忘れ物チェック (まだ引き返せるうちに)、口コミのお願いはその後
+    if (el2 > 9) once("depart", s.dir === "in" ? "depart" : "forgot", { force: true });
     if (el2 > 40 && s.lang !== "en" && done.has("depart")) once("subs", "subs");
     if (s.dir === "in" && el2 > 70) once("stay", "stay");
-    if (s.dir === "out" && el2 > 80) once("locked", "locked");
+    if (s.dir === "out" && el2 > 80) once("review", "review");
     // 止まった / 走り出した / 長い停車
     const moving = (s.kmh ?? 0) > 12;
     if (!moving && (s.kmh ?? 99) < 3 && s.toDest > 400) {

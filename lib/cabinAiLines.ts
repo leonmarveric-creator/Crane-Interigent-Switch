@@ -42,8 +42,11 @@ export const AI_LINES = {
     { en: "Thank you for staying with us. I'll keep your seat warm. Figuratively.", ja: "ご滞在ありがとうございました。お席は温めておきます。比喩的な意味で。", zh: "感谢您的入住。我会帮您把座位留着，是比喻意义上的。", ko: "머물러 주셔서 감사합니다. 자리는 따뜻하게 데워 둘게요. 비유적으로요." },
     { en: "Safe travels. The Crane Nest light will be on whenever you return.", ja: "お気をつけて。またお越しの際は、Crane Nest の明かりをつけてお待ちしています。", zh: "一路顺风。无论何时回来，Crane Nest 的灯都会为您亮着。", ko: "안전한 여행 되세요. 다시 오실 땐 언제든 Crane Nest의 불을 켜 두겠습니다." },
   ] },
-  "locked": { cat: "出発・到着", when: "お見送りで部屋の鍵がかかったとき", v: [
-    { en: "Your room is now locked. If you forgot something, the driver knows where to find it.", ja: "お部屋の戸締まりが完了しました。忘れ物があっても、ドライバーが場所を知っています。", zh: "房间已上锁。如果忘了东西，司机知道在哪里找。", ko: "객실이 잠겼습니다. 잊은 물건이 있어도 기사님이 어디 있는지 압니다." },
+  "forgot": { cat: "出発・到着", when: "お見送りの出発直後 (忘れ物チェック・4 つからランダム)", v: [
+    { en: "Passport, phone, charger. Do you have them? I can't carry luggage, so I'm in charge of checking.", ja: "パスポート、スマホ、充電器。お持ちですか？私は荷物を持てないので、確認だけ担当しています。", zh: "护照、手机、充电器，都带了吗？我拿不了行李，所以只负责确认。", ko: "여권, 휴대폰, 충전기. 챙기셨나요? 저는 짐을 들 수 없어서 확인만 담당하고 있어요." },
+    { en: "Just in case, a quick check. Passport, wallet, phone. With all three, your trip is safe. According to my calculations.", ja: "念のため忘れ物チェックです。パスポート、お財布、スマホ。三つそろえば旅は安全です。私の計算では。", zh: "以防万一，检查一下随身物品。护照、钱包、手机。三样齐全，旅途就安全了。根据我的计算。", ko: "혹시 몰라 소지품 확인이에요. 여권, 지갑, 휴대폰. 세 가지가 다 있으면 여행은 안전해요. 제 계산으로는요." },
+    { en: "Forgetting anything? Chargers are the most commonly left-behind travel item in the world. According to my statistics.", ja: "お忘れ物はありませんか？充電器は、世界でいちばん置き忘れられる旅の道具です。私の統計によると。", zh: "有没有忘带东西？充电器是全世界最常被落下的旅行用品。根据我的统计。", ko: "잊으신 물건은 없나요? 충전기는 세계에서 가장 많이 두고 가는 여행 용품이에요. 제 통계에 따르면요." },
+    { en: "Final check before departure. Passport, phone, charger. My checklist is always perfect. The contents, however, are up to you.", ja: "出発前の最終確認です。パスポート、スマホ、充電器。私のチェックリストは、いつも完璧です。中身を持つのは皆さまですが。", zh: "出发前的最后确认。护照、手机、充电器。我的清单永远完美。不过里面的东西要靠您自己。", ko: "출발 전 마지막 확인이에요. 여권, 휴대폰, 충전기. 제 체크리스트는 언제나 완벽해요. 내용물은 여러분 몫이지만요." },
   ] },
   "stopped": { cat: "走り方", when: "信号などで 1 分以上止まっている", v: [
     { en: "I don't have permission to turn the lights green. Yet.", ja: "信号を青にする権限は、まだいただいていません。", zh: "我还没有把红灯变绿的权限。暂时还没有。", ko: "신호를 초록으로 바꿀 권한은 아직 없습니다. 아직은요." },
