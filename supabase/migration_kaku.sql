@@ -34,3 +34,15 @@ alter table public.app_settings add column if not exists kaku_bgm_normal text;
 alter table public.app_settings add column if not exists kaku_bgm_cruise text;
 alter table public.app_settings add column if not exists kaku_bgm_boot text;
 notify pgrst, 'reload schema';
+-- ミッション中のプレイリスト (起動 / ノーマル / クルーズ に何曲でも)
+create table if not exists public.kaku_tracks (
+  id uuid primary key default gen_random_uuid(),
+  which text not null check (which in ('boot','normal','cruise')),
+  title text not null,
+  path text not null,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists kaku_tracks_which on public.kaku_tracks (which, sort);
+alter table public.kaku_tracks enable row level security;
+notify pgrst, 'reload schema';
