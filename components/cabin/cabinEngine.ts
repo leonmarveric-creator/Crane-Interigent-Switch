@@ -15,6 +15,9 @@ import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
 import { createGuide } from "@/components/cabin/cabinGuide";
 import { createToilet } from "@/components/cabin/cabinToilet";
+import { createLock } from "@/components/cabin/cabinLock";
+import { SFX_MARK } from "@/lib/remoteVoice";
+import { hasRoomLock, LOCK_T } from "@/lib/cabinLock";
 import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
 import { playSafe } from "@/lib/cabinAudio";
@@ -131,7 +134,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     }).then(() => { voiceN = Math.max(0, voiceN - 1); });
     return Q;
   };
-  const sfx = (k: string) => { const a = new Audio(src(k)); a.play().catch(() => {}); };
+  // ブーストの効果音もスマホから (Bluetooth で車のスピーカー)。スマホが来ていなければ iPad から。音そのものは同じ
+  const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", SFX_MARK); return; } const a = new Audio(src(k)); a.play().catch(() => {}); };
   const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
 
@@ -313,7 +317,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     T_(600, () => { $("arrive").classList.add("on"); startPtc(); });
     ai.event("arrive");
     // 2 分たったら送迎を終わりにして、待機画面へ (ガイドを見ている間は待つ)
-    const endIfIdle = () => { if (guide.on() || toilet.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
+    const endIfIdle = () => { if (guide.on() || toilet.on() || lock.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
     T_(trip.dir === "out" ? 45000 : 120000, endIfIdle); // お見送りは早めに「帰り道 (回送)」へ
   }
   $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); qrHide(); };
@@ -345,8 +349,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     };
     root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => {
       const k = b.dataset.q as string;
-      (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : k === "room" ? M.qRoom : (GL[lang] ?? GL.en)[k];
-      b.style.display = k === "key" || k === "room" ? (q[k as "key" | "room"] ? "" : "none") : k === "gRoom" ? (guide.hasRoom() ? "" : "none") : "";
+      // 春・秋・冬のお部屋は「お部屋の鍵の使い方」(内側のつまみ)
+      const lk = k === "gRoom" && !guide.hasRoom() && hasRoomLock(room?.slug);
+      (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : k === "room" ? M.qRoom : lk ? (LOCK_T[lang] ?? LOCK_T.en).btn : (GL[lang] ?? GL.en)[k];
+      b.style.display = k === "key" || k === "room" ? (q[k as "key" | "room"] ? "" : "none") : k === "gRoom" ? (guide.hasRoom() || lk ? "" : "none") : "";
     });
     setText("aqTip", M.qTip);
     $("aq").style.display = trip?.dir === "out" ? "none" : ""; // お見送りのときは出さない
@@ -355,8 +361,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation(); const k = b.dataset.q!;
     if (k === "key" || k === "room") return void qrShow(k);
-    qrHide(); guide.stop(); toilet.stop();
-    if (k === "gEnt") guide.start("ent"); else if (k === "gRoom") guide.start("room"); else if (k === "gToilet") toilet.start();
+    qrHide(); guide.stop(); toilet.stop(); lock.stop();
+    if (k === "gEnt") guide.start("ent"); else if (k === "gRoom") { if (guide.hasRoom()) guide.start("room"); else lock.start(); } else if (k === "gToilet") toilet.start();
   }));
   root.querySelectorAll<HTMLElement>("[data-qt]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.qt as "key" | "room"); }));
   $("qrX").onclick = (e) => { e.stopPropagation(); qrHide(); };
@@ -549,11 +555,11 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
-      arrived, offroute, boosting: bs.phase !== "off" || warpOn,
+      arrived, offroute, boosting: bs.phase === "on" || warpOn, // "done" (橋を渡り終えた直後) は話してよい
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
     }),
   });
-  setInterval(() => { if (!guide.on() && !toilet.on()) ai.tick(); }, 1000);
+  setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on()) ai.tick(); }, 1000);
   function roomLit() { if (!trip || trip.dir !== "in") return; $("room").classList.add("lit"); $("ltI").className = ""; setText("ltE", T.ltOn); roomTexts(); }
 
   /* ---------- 入り方ガイド (押したときだけ) ---------- */
@@ -567,6 +573,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- トイレの使い方 (到着画面のボタンで。写真は撮らなくてよい) ---------- */
   const toilet = createToilet({ stage, lang: () => lang, ac, duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
+  /* ---------- お部屋の鍵の使い方 (春・秋・冬: 内側のつまみ。到着画面のボタンで) ---------- */
+  const lock = createLock({ stage, lang: () => lang, ac, room: () => ({ code: room?.roomCode ?? null, name: room ? `${room.kanji} · ${room.en}` : "" }), duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
 
   /* ---------- チェックイン QR (全員共通の画像。お父さんのスマホで登録) ---------- */
   let checkinUrl: string | null = null, ckT: ReturnType<typeof setTimeout> | null = null;
@@ -617,7 +625,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); hideCheckin();
+    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -648,7 +656,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- 最初のタップで音を使えるように + 声・効果音をこの iPad に保存 ---------- */
   function unlock() {
-    ai.preload(); ai.unlock(); guide.unlock(); toilet.unlock();
+    ai.preload(); ai.unlock(); guide.unlock(); toilet.unlock(); lock.unlock();
     ac(); voice.muted = true; voice.src = AUDIO + "en-arrive.mp3"; voice.play().then(() => { voice.pause(); voice.muted = false; }).catch(() => { voice.muted = false; });
     // 声・効果音を先に読み込んでおく (保存済みなら iPad の中から。再生のときに待たない)
     void (async () => {

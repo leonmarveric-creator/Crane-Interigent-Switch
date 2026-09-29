@@ -56,12 +56,12 @@ export function createNowPlaying(c: NpCtx): NpView {
   function holo() {
     const t = pos(), i = lyricIndex(lrc, t);
     if (i !== hLi) {
-      const old = $("hLine").textContent;
-      if (old) { const o = $("hOut"); o.textContent = old; o.classList.remove("go"); void o.offsetWidth; o.classList.add("go"); }
+      // 1 行だけだと歌とずれたときにわからないので、前の行と次の行も小さく出す
+      const pv = $("hPrev"); pv.textContent = i > 0 && lrc[i - 1]?.s ? lrc[i - 1].s : ""; pv.classList.remove("in"); void pv.offsetWidth; pv.classList.add("in");
       hLi = i; hOn = -1;
       const s = lrc[i]?.s ?? (lrc.length ? "♪" : tr?.title ?? "♪");
       $("hLine").innerHTML = [...s].map((ch, k) => `<span style="--i:${k};--gx:${(Math.random() * 10 - 5).toFixed(1)}px">${ch === " " ? " " : ch.replace(/[<&>"]/g, "")}</span>`).join("");
-      $("hNext").textContent = lrc[i + 1]?.s ? "▸ " + lrc[i + 1].s : "";
+      $("hNext").textContent = lrc[i + 1]?.s ?? "";
       // 長い行は文字を小さくして 1 行に収める (切らない)
       const L = $("hLine"), W = (L.parentElement as HTMLElement).clientWidth; let fs = 28; L.style.fontSize = fs + "px";
       while (L.scrollWidth > W && fs > 16) { fs -= 1; L.style.fontSize = fs + "px"; }
@@ -217,7 +217,7 @@ export function createNowPlaying(c: NpCtx): NpView {
       fLi = i; const now = $("f2Now"), s = lrc[i]?.s ?? (lrc.length ? "♪" : tr?.title ?? "♪");
       now.textContent = s; now.classList.remove("in"); void now.offsetWidth; now.classList.add("in");
       let fs = 40; now.style.fontSize = fs + "px"; const W = (now.parentElement as HTMLElement).clientWidth - 32; while (now.scrollWidth > W && fs > 20) now.style.fontSize = --fs + "px";
-      $("f2N1").textContent = lrc[i + 1]?.s ?? ""; $("f2N2").textContent = lrc[i + 2]?.s ?? "";
+      $("f2P1").textContent = i > 0 ? lrc[i - 1]?.s ?? "" : ""; $("f2N1").textContent = lrc[i + 1]?.s ?? ""; $("f2N2").textContent = lrc[i + 2]?.s ?? "";
     }
     const u = dur ? Math.min(1, t / dur) : 0;
     ($("f2Arc") as any).style.strokeDasharray = `${(u * ARC).toFixed(1)} 900`;

@@ -11,7 +11,7 @@ const NP_FULL = `<div class="npfull" id="npfull"><div class="f2bg"></div><canvas
   <div class="f2seek" id="f2Seek"><div class="f2bar"><i id="f2Fill"></i><b id="f2Knob"></b></div><div class="f2times"><span id="f2Cur">00:00</span><span id="f2Dur">00:00</span></div></div>
   <div class="f2ctl"><button id="f2Back10">↺</button><button id="f2Prev">⏮</button><button id="f2Play" class="pp">❚❚</button><button id="f2Next">⏭</button><button id="f2Fwd10">↻</button></div></section>
  <section class="f2mid"><div class="f2loc" id="f2Loc">OSAKA BAY</div><i class="f2dash"></i>
-  <div class="f2ly"><p class="f2now" id="f2Now"></p><p class="f2n1" id="f2N1"></p><p class="f2n2" id="f2N2"></p></div></section>
+  <div class="f2ly"><p class="f2p1" id="f2P1"></p><p class="f2now" id="f2Now"></p><p class="f2n1" id="f2N1"></p><p class="f2n2" id="f2N2"></p></div></section>
  <section class="f2right">
   <div class="f2card f2nav"><div class="f2h"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span>NAV</span><em id="f2Route"></em></div><div class="f2map"><div class="f2eta"><div><b id="f2Eta">--</b><small>min</small></div><span id="f2Km"></span></div><div class="f2comp">▲<small>N</small></div></div></div>
   <div class="f2card f2room"><div class="f2rslot" id="f2RSlot"></div></div></section>
@@ -26,7 +26,7 @@ export const TRIP_HTML = `<div class="scr">
    <div class="mbtn"><button id="mPhoto" class="on">🛰</button><button id="mDark">🌙</button><button id="npFullBtn" class="npfb">🎵</button></div>
    <div class="cap" id="cap"><div class="ic" id="capI">🌉</div><div><b id="capT"></b><span id="capS"></span></div><div class="wv"><i></i><i></i><i></i></div></div>
    
-   <div class="osm2">出典：国土地理院</div><div class="holo" id="holo"><div class="hbeam"></div><div class="hbase"></div><div class="hcov"><img class="npcov" id="hCov" alt=""><i></i></div><div class="hly"><div class="hmeta"><span class="hdot"></span><span id="hMeta">HOLO LYRICS</span></div><div class="hline" id="hLine"></div><div class="hnext" id="hNext"></div><div class="hout" id="hOut"></div></div><div class="htime" id="hTime">00:00</div></div><button class="aiDot" id="aiDot" aria-label="ASTRAEA"><canvas id="aiDotC" width="112" height="112"></canvas></button><div class="aiMenu" id="aiMenu"></div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
+   <div class="osm2">出典：国土地理院</div><div class="holo" id="holo"><div class="hbeam"></div><div class="hbase"></div><div class="hcov"><img class="npcov" id="hCov" alt=""><i></i></div><div class="hly"><div class="hmeta"><span class="hdot"></span><span id="hMeta">HOLO LYRICS</span></div><div class="hprev" id="hPrev"></div><div class="hline" id="hLine"></div><div class="hnext" id="hNext"></div><div class="hout" id="hOut"></div></div><div class="htime" id="hTime">00:00</div></div><button class="aiDot" id="aiDot" aria-label="ASTRAEA"><canvas id="aiDotC" width="112" height="112"></canvas></button><div class="aiMenu" id="aiMenu"></div><div class="rtchip" id="rtChip"></div><div class="offr" id="offr">↻ ROUTE</div>
    <canvas id="warp"></canvas><div class="shock" id="shock"></div><div class="shock s2" id="shock2"></div>
    <div class="bhud" id="bhud"><div class="hex"></div><div class="floor"></div><i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i><div class="scanl"></div>
     <div class="blog" id="blog"></div>
@@ -50,7 +50,7 @@ export const TRIP_HTML = `<div class="scr">
       <div class="rair" id="rair"><i></i><i></i><i></i><i></i></div>
       <div class="rscan"></div>
       <div class="rtag" id="tagAc"><b></b><span></span></div><div class="rtag" id="tagLt"><b></b><span></span></div><div class="rtag" id="tagWf"><b></b><span></span></div>
-      <span class="rlive">● LIVE</span><b class="rkanji" id="rkanji"></b></div>
+      <span class="rlive" id="rlive">📷 PHOTO</span><b class="rkanji" id="rkanji"></b></div>
      <div class="stat"><div><i class="run" id="acI"></i><span id="acT"></span><em id="acE"></em></div><div><i class="w" id="ltI"></i><span id="ltT"></span><em id="ltE"></em></div><div><i></i><span id="wfT">Wi-Fi</span><em id="wfE"></em></div></div>
      <div class="cmeter" id="cmeter"><div class="cl"><b id="clL"></b><small id="clS"></small></div><div class="cb"><span id="clA"></span><div class="cbar"><i id="cbar"></i></div><span id="clB"></span></div></div>
     </div>

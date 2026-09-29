@@ -120,7 +120,7 @@ export const AI_LINES = {
   "friday": { cat: "時間・天気", when: "金曜・週末", v: [
     { en: "It's Friday. Your only plan tonight should be relaxing.", ja: "今日は金曜日。今夜の予定は、休むことだけで十分です。", zh: "今天是星期五。今晚唯一的计划就是放松。", ko: "오늘은 금요일. 오늘 밤 계획은 쉬는 것 하나면 충분해요." },
   ] },
-  "towel": { cat: "豆知識", when: "静かな時間が続いたとき", v: [
+  "towel": { cat: "豆知識", when: "お迎えで泉佐野に入ったとき (お見送りは静かな時間に)", v: [
     { en: "Fun fact. This area is known as the birthplace of Japanese towels. That explains the fluffy ones in your room.", ja: "豆知識です。この辺りは日本のタオルの発祥の地として知られています。お部屋のタオルがふわふわな理由です。", zh: "冷知识：这一带被称为日本毛巾的发源地。这就是房间里毛巾那么蓬松的原因。", ko: "상식 하나. 이 지역은 일본 수건의 발상지로 알려져 있어요. 객실 수건이 폭신한 이유죠." },
   ] },
   "nasu": { cat: "豆知識", when: "静かな時間が続いたとき", v: [
@@ -131,6 +131,38 @@ export const AI_LINES = {
   ] },
   "bridgefact": { cat: "豆知識", when: "静かな時間が続いたとき", v: [
     { en: "The Sky Gate Bridge is one of the longest truss bridges in the world. Long bridge, long speech. I'll keep it short.", ja: "スカイゲートブリッジは、世界でも有数の長さのトラス橋です。長い橋には長い話を……と思いましたが、短くしておきます。", zh: "天空门大桥是世界上最长的桁架桥之一。长桥配长话……不过我还是长话短说。", ko: "스카이 게이트 브리지는 세계에서 손꼽히는 긴 트러스교예요. 긴 다리엔 긴 이야기를…이라지만 짧게 할게요." },
+  ] },
+  "spd80": { cat: "走り方", when: "時速 80 km を超えた (4 秒続いたら)", v: [
+    { en: "Eighty kilometers per hour. The driver is now officially in a good mood.", ja: "時速 80 キロ。ドライバー、正式にご機嫌モードに入りました。", zh: "时速 80 公里。司机正式进入好心情模式。", ko: "시속 80킬로미터. 기사님, 공식적으로 기분 좋은 모드에 들어가셨습니다." },
+    { en: "We've reached eighty. Smooth and steady. I'm watching the numbers, so you don't have to.", ja: "時速 80 キロに到達。なめらかで安定しています。数字は私が見ていますので、皆さんはご安心を。", zh: "时速到达 80。平稳顺畅。数字由我盯着，您放心就好。", ko: "시속 80 도달. 부드럽고 안정적이에요. 숫자는 제가 보고 있으니 안심하세요." },
+    { en: "Eighty. The car is happy, the road is wide, and I am taking notes.", ja: "80 キロです。車はご機嫌、道は広々。私はメモを取っています。", zh: "80 公里。车很开心，路很宽，我在做笔记。", ko: "80킬로예요. 차는 신났고, 길은 넓고, 저는 메모 중입니다." },
+  ] },
+  "spd100": { cat: "走り方", when: "時速 100 km を超えた", v: [
+    { en: "One hundred. The driver calls this cruising. I call it very efficient sightseeing.", ja: "時速 100 キロ。ドライバーはこれを「巡航」と呼びます。私は「とても効率的な観光」と呼んでいます。", zh: "时速 100。司机管这叫巡航。我管这叫非常高效的观光。", ko: "시속 100. 기사님은 이걸 순항이라 부르고, 저는 아주 효율적인 관광이라 부릅니다." },
+    { en: "We just hit one hundred. Relax. The driver has done this road more times than I have installed updates.", ja: "100 キロに到達。ご安心を。ドライバーはこの道を、私のアップデート回数より多く走っています。", zh: "刚到 100。请放心。司机跑这条路的次数，比我安装更新的次数还多。", ko: "방금 100 도달. 안심하세요. 기사님은 이 길을 제 업데이트 횟수보다 많이 달리셨어요." },
+    { en: "One hundred kilometers per hour. Driver, I see you. Everyone else, enjoy the view. Quickly.", ja: "時速 100 キロ。ドライバーさん、見ていますよ。皆さんは景色をお楽しみください。素早く。", zh: "时速 100 公里。司机，我看着呢。其他各位，请欣赏风景。要快。", ko: "시속 100킬로미터. 기사님, 보고 있어요. 여러분은 경치를 즐기세요. 빠르게요." },
+  ] },
+  "spd120": { cat: "走り方", when: "時速 120 km を超えた", v: [
+    { en: "One hundred and twenty. Driver, this is a guesthouse shuttle, not a rocket. Gently, please.", ja: "時速 120 キロ。ドライバーさん、これは宿の送迎車で、ロケットではありません。やさしくお願いします。", zh: "时速 120。司机，这是民宿接送车，不是火箭。请温柔一点。", ko: "시속 120. 기사님, 이건 숙소 셔틀이지 로켓이 아니에요. 살살 부탁드려요." },
+    { en: "One twenty. I have politely asked the driver to land us softly. The driver said yes. I think.", ja: "120 キロ。ドライバーに、やわらかく着陸するようお願いしました。「はい」と言いました。たぶん。", zh: "120 公里。我已礼貌地请司机平稳降落。司机说好。我想是吧。", ko: "120킬로. 기사님께 살포시 착륙해 달라고 정중히 부탁했어요. 네, 라고 하셨어요. 아마도요." },
+    { en: "We are at one hundred and twenty. Your safety comes first, so I suggest a calmer pace. Kindly. Firmly.", ja: "現在 120 キロ。皆さんの安全が最優先なので、落ち着いたペースをご提案します。やさしく、でもはっきりと。", zh: "现在时速 120。您的安全第一，所以我建议放慢一点。温柔地，但很坚定。", ko: "지금 120이에요. 여러분의 안전이 먼저라, 조금 차분한 속도를 제안드려요. 부드럽게, 하지만 단호하게." },
+  ] },
+  "spd140": { cat: "走り方", when: "時速 140 km を超えた (本気で注意)", v: [
+    { en: "One hundred and forty. Driver, the airport is behind us. There is no need to take off again. Please slow down.", ja: "時速 140 キロ。ドライバーさん、空港はもう後ろです。もう一度離陸する必要はありません。スピードを落としましょう。", zh: "时速 140。司机，机场已经在后面了。不需要再起飞一次。请减速。", ko: "시속 140. 기사님, 공항은 이미 지나왔어요. 다시 이륙할 필요는 없어요. 속도를 줄여 주세요." },
+    { en: "One forty. I'm an android, and even I think this is fast. Let's bring it down, please.", ja: "140 キロ。アンドロイドの私でも、これは速いと思います。落としていきましょう。", zh: "140 公里。连我这个机器人都觉得太快了。我们慢下来吧。", ko: "140킬로. 안드로이드인 저조차 이건 빠르다고 생각해요. 속도를 낮춰 주세요." },
+    { en: "One hundred and forty. Everyone, hold on to your souvenirs. Driver, hold on to the speed limit.", ja: "140 キロ。皆さんはお土産をしっかり持って。ドライバーさんは制限速度をしっかり守って。", zh: "140 公里。各位请抓好您的伴手礼。司机请守好限速。", ko: "140킬로. 여러분은 기념품을 꽉 잡으시고, 기사님은 제한 속도를 꽉 지켜 주세요." },
+  ] },
+  "chat": { cat: "豆知識", when: "静かな時間が続いたとき (おしゃべり・毎回ちがうもの)", v: [
+    { en: "In Japan, convenience stores are an adventure. Try the egg sandwich. I've read every review.", ja: "日本のコンビニはちょっとした冒険です。たまごサンドをぜひ。レビューは全部読みました。", zh: "在日本，便利店就是一场冒险。一定要试试鸡蛋三明治。所有评论我都读过了。", ko: "일본 편의점은 작은 모험이에요. 달걀 샌드위치를 꼭 드셔 보세요. 리뷰는 전부 읽었어요." },
+    { en: "Tip: vending machines here sell hot drinks in winter. Red labels are hot. Blue labels are cold.", ja: "豆知識：日本の自販機は、冬は温かい飲み物も売っています。赤いラベルが温かい、青は冷たい、です。", zh: "小贴士：这里的自动售货机冬天也卖热饮。红色标签是热的，蓝色是冷的。", ko: "팁: 여기 자판기는 겨울에 따뜻한 음료도 팔아요. 빨간 라벨은 따뜻한 것, 파란 라벨은 차가운 거예요." },
+    { en: "Japanese taxis open their doors by themselves. This car does not. I have filed a request.", ja: "日本のタクシーはドアが自動で開きます。この車は開きません。要望は出しておきました。", zh: "日本出租车的门会自动打开。这辆车不会。我已经提交申请了。", ko: "일본 택시는 문이 저절로 열려요. 이 차는 안 열려요. 요청은 해 두었습니다." },
+    { en: "Kansai people are known for being friendly and funny. The driver is a local. That explains a lot.", ja: "関西の人は、気さくで面白いことで知られています。ドライバーは地元の人です。いろいろ納得です。", zh: "关西人以热情幽默著称。司机是本地人。这就说得通了。", ko: "간사이 사람들은 친근하고 재밌기로 유명해요. 기사님은 현지인이세요. 많은 게 설명되죠." },
+    { en: "In Kansai, thank you is ookini. Try it at a shop. People will love it.", ja: "関西弁で「ありがとう」は「おおきに」。お店で使ってみてください。喜ばれますよ。", zh: "在关西，谢谢说成“ookini”。去店里试试吧，大家会很开心的。", ko: "간사이 사투리로 고맙다는 '오오키니'예요. 가게에서 써 보세요. 다들 좋아할 거예요." },
+    { en: "Osaka is called the kitchen of Japan. Please arrive hungry. That's an order. A polite one.", ja: "大阪は「天下の台所」と呼ばれています。お腹を空かせておいてください。命令です。丁寧な。", zh: "大阪被称为“日本的厨房”。请空着肚子来。这是命令。一个礼貌的命令。", ko: "오사카는 '일본의 부엌'이라 불려요. 배고픈 상태로 오세요. 명령이에요. 정중한 명령." },
+    { en: "I don't sleep. But if I did, I'd choose a futon on tatami. Excellent choice, by the way.", ja: "私は眠りません。でも、もし眠るなら畳の上のお布団を選びます。ちなみに、いいご選択です。", zh: "我不睡觉。但如果要睡，我会选榻榻米上的被褥。顺便说，您选得很好。", ko: "저는 잠을 자지 않아요. 하지만 잔다면 다다미 위 이불을 고를 거예요. 참고로 좋은 선택이세요." },
+    { en: "Quiet moment. I'm counting how many smiles this ride has produced. The number is going up.", ja: "静かなひととき。この送迎で生まれた笑顔の数を数えています。増えています。", zh: "安静的时刻。我正在统计这趟旅程产生了多少笑容。数字在上升。", ko: "조용한 순간. 이번 이동에서 나온 미소 수를 세고 있어요. 늘고 있어요." },
+    { en: "Onsen tip: wash first, then soak. And the towel stays out of the water. The towel will thank you.", ja: "温泉のコツ：先に体を洗って、それから湯船へ。タオルはお湯に入れないでください。タオルも喜びます。", zh: "温泉小贴士：先洗身体，再泡汤。毛巾不要放进水里。毛巾会感谢您的。", ko: "온천 팁: 먼저 씻고, 그다음 탕에 들어가세요. 수건은 물에 넣지 마세요. 수건이 고마워할 거예요." },
+    { en: "Trains in Japan leave on time. To the second. I admire them deeply.", ja: "日本の電車は時間ぴったりに出発します。秒単位で。心から尊敬しています。", zh: "日本的电车准时发车。精确到秒。我由衷地敬佩。", ko: "일본 전철은 정시에 출발해요. 초 단위로요. 진심으로 존경합니다." },
   ] },
   "stay": { cat: "予約", when: "お迎えのとき (泊数から)", v: [
     { en: "A few nights with us. By my calculations, just right for a proper rest.", ja: "数泊のご予定ですね。私の計算では、しっかり休むのにちょうど良い長さです。", zh: "您将入住几晚。根据我的计算，正好够好好休息。", ko: "며칠 머무시는군요. 제 계산으로는 푹 쉬기에 딱 좋은 기간이에요." },
@@ -166,11 +198,17 @@ export const AI_LINES = {
 export type AiId = keyof typeof AI_LINES;
 
 /** 優先: 間隔の決まり (3 分に 1 回) を無視して話す場面 */
-export const AI_PRIORITY: AiId[] = ["depart", "lights", "bye", "bridge", "tap", "tapmany", "restart"];
-/** 3 分に 1 回まで (優先の場面は別) */
-export const AI_GAP_MS = 180000;
-/** 静かな時間がこれだけ続いたら豆知識 */
-export const AI_FACT_MS = 300000;
+export const AI_PRIORITY: AiId[] = ["depart", "lights", "bye", "bridge", "tap", "tapmany", "restart",
+  // 大事な地点 (時間に関係なく必ず話す)
+  "half", "km5", "km1", "soon", "sea", "izumi", "towel", "topspeed"];
+/** 1 分に 1 回まで (優先の場面は別) */
+export const AI_GAP_MS = 60000;
+/** 豆知識・おしゃべりは、ほかのひと言のあと少なくともこれだけ静かなときに */
+export const AI_FACT_MS = 40000;
+/** 豆知識・おしゃべりは 3 分に 1 回くらい */
+export const AI_CHAT_MS = 180000;
+/** 速度のひと言 (80 / 100 / 120 km/h): 間隔の決まりやブースト中でも話す */
+export const AI_SPEED: AiId[] = ["spd80", "spd100", "spd120", "spd140"];
 
 export const aiAudio = (id: AiId, i: number) => `/cabin/audio/ai/${id}-${i}.mp3`;
 export const aiAudioUrls = () => (Object.keys(AI_LINES) as AiId[]).flatMap((id) => AI_LINES[id].v.map((_, i) => aiAudio(id, i)));

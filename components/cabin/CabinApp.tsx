@@ -11,6 +11,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TRIP_HTML } from "@/components/cabin/cabinMarkup";
 import { createEngine, tileCount, type Engine } from "@/components/cabin/cabinEngine";
 import { createDeadhead, type Deadhead } from "@/components/cabin/cabinDeadhead";
+import { TOILET_IMG } from "@/components/cabin/cabinToilet";
+import { TOILET_VOICE, toiletAudio, type ToiletKey } from "@/lib/cabinToilet";
+import { LOCK_IMG, LOCK_VOICE, lockAudio, type LockKey } from "@/lib/cabinLock";
+import { DH_LINES, dhAudio } from "@/lib/cabinDeadheadLines";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL } from "@/lib/cabinGeo";
@@ -219,7 +223,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   async function saveAll() {
     const e = eng.current; if (!e) return;
     e.unlock();
-    const urls = [...e.audioUrls(), "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
+    const urls = [...e.audioUrls(),
+      // 到着画面のガイド (トイレ・お部屋の鍵) と回送モードの声・写真も
+      ...(Object.keys(TOILET_VOICE) as ToiletKey[]).map(toiletAudio), ...Object.values(TOILET_IMG),
+      ...(Object.keys(LOCK_VOICE) as LockKey[]).map(lockAudio), ...Object.values(LOCK_IMG),
+      ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3",
+      "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });
     const reg = await navigator.serviceWorker?.ready.catch(() => null);

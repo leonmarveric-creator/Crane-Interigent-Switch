@@ -7,7 +7,8 @@
  *   Leaflet は先に読み込んでおくこと (window.L)。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { DH_LINES, dhAudio, callsignOf } from "@/lib/cabinDeadheadLines";
+import { SFX_MARK } from "@/lib/remoteVoice";
+import { DH_LINES, DH_IDLE, dhSpdFor, dhAudio, callsignOf } from "@/lib/cabinDeadheadLines";
 import { BRIDGE, CRANE_NEST, PLACES, dist, type GLang, type LL } from "@/lib/cabinGeo";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import { playSafe, unlockAudio } from "@/lib/cabinAudio";
@@ -54,7 +55,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
   const host = document.createElement("div"); host.className = "dh"; host.innerHTML = HTML; c.stage.appendChild(host);
   const $ = (id: string) => host.querySelector("#" + id) as any;
   let trip: CabinTrip | null = null, room: CabinRoom | null = null, info: DhInfo | null = null, back = false, onNow = false;
-  let RT: LL[] = [], CUM: number[] = [0], TOT = 1, prog = 0, carLL: LL | null = null, kmh = 0, said: Record<string, number> = {}, lastLim = 0, boosting = false, t0 = 0;
+  let RT: LL[] = [], CUM: number[] = [0], TOT = 1, prog = 0, carLL: LL | null = null, kmh = 0, said: Record<string, number> = {}, spdLv = 0, spdN = 0, spdAt = 0, quietAt = 0, idleAt = 0, boosting = false, t0 = 0;
   let map: any = null, done: any = null, dash: any = null, car: any = null, tgt: any = null;
 
   /* ---------- 声 (スマホから。スマホが来ていなければ iPad から) ---------- */
@@ -64,7 +65,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
     Q = Q.then(() => new Promise<void>((ok) => {
       $("dhJ").textContent = line.ja; $("dhE").textContent = line.en; $("dhSub").classList.add("talk"); talking = true;
       const rm = c.remote(); if (rm) c.say(dhAudio(k), line.en);
-      const end = () => { talking = false; $("dhSub").classList.remove("talk"); ok(); };
+      const end = () => { talking = false; quietAt = Date.now(); $("dhSub").classList.remove("talk"); ok(); };
       setTimeout(() => { el.muted = rm; el.src = dhAudio(k); el.onended = end; el.onerror = end; playSafe(el, () => c.ac(), end); }, rm ? 1100 : 0);
       setTimeout(end, 18000);
     }));
@@ -75,7 +76,8 @@ export function createDeadhead(c: DhCtx): Deadhead {
     const ctx = c.ac(); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
     g.gain.setValueAtTime(v, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + t + d); o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d + 0.05);
   };
-  const sfx = (u: string) => { const a = new Audio(u); a.play().catch(() => {}); };
+  // 効果音もスマホから (スマホが来ていなければ iPad から)
+  const sfx = (u: string) => { if (c.remote()) { c.say(u, SFX_MARK); return; } const a = new Audio(u); a.play().catch(() => {}); };
 
   /* ---------- 地図 ---------- */
   function ensureMap() {
@@ -210,7 +212,16 @@ export function createDeadhead(c: DhCtx): Deadhead {
     const cd = document.getElementById("dhCdE"); if (cd) cd.textContent = String(mins); const hm = document.getElementById("dhHomeM"); if (hm) hm.textContent = String(mins);
     const br = onBridge(ll); if (br.on && !boosting) boostIn(); if (!br.on && boosting) boostOut();
     if (boosting) { $("dhBP").style.width = `${Math.round(Math.max(0, Math.min(1, br.t)) * 100)}%`; if (br.t > 0.45 && br.t < 0.55 && !said.bm) { said.bm = 1; void say("boostMid"); } }
-    host.classList.toggle("over", kmh > LIMIT + 1); if (kmh > LIMIT + 1 && Date.now() - lastLim > 60000) { lastLim = Date.now(); void say("limit"); }
+    host.classList.toggle("over", kmh > LIMIT + 1);
+    // 速度のひと言 (80 / 100 / 120 km/h を超えて 2 回続いたら。70 未満に落ちて 3 分たてば、また言う)
+    const lv = kmh >= 140 ? 140 : kmh >= 120 ? 120 : kmh >= 100 ? 100 : kmh >= 80 ? 80 : 0;
+    if (lv > spdLv && Date.now() - t0 > 20000) { if (++spdN >= 2) { spdLv = lv; spdAt = Date.now(); spdN = 0; const ks = dhSpdFor(lv, back); void say(ks[Math.floor(Math.random() * ks.length)]); } } else spdN = 0;
+    if (spdLv && kmh < 70 && Date.now() - spdAt > 180000) spdLv = 0;
+    // ひと言は 3 分に 1 回くらい (ほかのセリフのあと 40 秒は静かに・同じものは 1 回だけ)
+    if (!talking && Date.now() - idleAt > 180000 && Date.now() - quietAt > 40000) {
+      const pool = [...DH_IDLE.both, ...(back ? DH_IDLE.back : DH_IDLE.go)].filter((k) => !said[k]);
+      if (pool.length) { const k = pool[Math.floor(Math.random() * pool.length)]; said[k] = 1; idleAt = quietAt = Date.now(); void say(k); }
+    }
     if (!back) {
       if (toEnd < 3000 && !said.near) { said.near = 1; void say("near"); }
       if (toEnd < 400 && kmh < 15 && !welcomeShown) { welcomeShown = true; showBoard(); }
@@ -236,7 +247,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
       const first = !trip || trip.id !== t.id || !onNow;
       trip = t; room = r; info = inf; back = t.dir === "out";
       if (first) {
-        onNow = true; host.classList.add("on"); c.stage.classList.add("dh-on"); ensureMap(); said = {}; prog = 0; boosting = false; welcomeShown = false; checkShown = false; t0 = Date.now(); host.classList.remove("boost", "over");
+        onNow = true; host.classList.add("on"); c.stage.classList.add("dh-on"); ensureMap(); said = {}; spdLv = 0; spdN = 0; quietAt = idleAt = Date.now(); prog = 0; boosting = false; welcomeShown = false; checkShown = false; t0 = Date.now(); host.classList.remove("boost", "over");
         $("dhWbP").classList.remove("on"); $("dhBoard").textContent = "🧳 ゲスト乗車"; $("dhWb").style.display = back ? "none" : "";
         const P = PLACES[t.placeKey as keyof typeof PLACES], pll: LL = (P?.ll as LL) ?? t.placeLL ?? CRANE_NEST;
         const rk = back ? `${t.placeKey}_in` : `${t.placeKey}_out`, raw = c.routes[rk];

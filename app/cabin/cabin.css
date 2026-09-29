@@ -947,3 +947,74 @@
 .cab .stage.port .dhs{grid-template-columns:1fr;grid-template-rows:1.25fr auto}
 .cab .stage.port .dh .side{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:auto}
 .cab .stage.port .dhrad{grid-column:1/3;min-height:190px}
+
+/* ===== 歌詞: 前の行・今の行・次の行 (1 行だけだと歌とずれたときにわからない) ===== */
+.cab .holo{height:156px}
+.cab .hbeam{height:158px}
+.cab .hprev{font-size:14px;font-weight:600;color:rgba(150,220,255,.42);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 3px;letter-spacing:.03em;text-shadow:0 0 6px rgba(0,200,255,.25)}
+.cab .hprev.in{animation:cab-hprv .5s ease-out}
+@keyframes cab-hprv{from{transform:translateY(14px);opacity:.1}}
+.cab .hnext{font-size:14px;font-weight:600;color:rgba(150,220,255,.55);margin-top:4px}
+.cab .hout{display:none}
+.cab .f2ly .f2p1{font-size:20px;font-weight:500;color:rgba(150,190,225,.55);margin-bottom:14px;overflow:hidden;text-overflow:ellipsis}
+.cab .f2ly{top:calc(41% + 34px)}
+.cab .f2ly .f2p1{font-size:18px;margin-bottom:8px}
+.cab .f2ly .f2n1{margin-top:12px}.cab .f2ly .f2n2{margin-top:10px}
+
+/* ===== お部屋の鍵 (春・秋・冬: 内側のつまみ) ===== */
+.cab .lkp .lkArt{background:#05080f}
+.cab .lkp .lkMain{position:absolute;left:50%;top:18px;width:350px;height:424px;margin-left:-175px;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px rgba(95,176,255,.35),0 10px 40px rgba(0,0,0,.5)}
+.cab .lkp .lkMain img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);transition:opacity .6s,transform 2.4s ease-out}
+.cab .lkp .lkMain img.on{opacity:1;transform:scale(1)}
+.cab .lkp .lkBadge{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(10px);padding:8px 22px;border-radius:99px;font:800 20px ui-monospace,Menlo,monospace;letter-spacing:.12em;white-space:nowrap;opacity:0;transition:opacity .4s,transform .4s;color:#fff;backdrop-filter:blur(6px)}
+.cab .lkp .lkBadge.on{opacity:1;transform:translateX(-50%)}
+.cab .lkp .lkBadge.s1{background:rgba(22,150,80,.85);box-shadow:0 0 20px rgba(62,224,143,.6)}
+.cab .lkp .lkBadge.s2{background:rgba(20,60,140,.85);box-shadow:0 0 20px rgba(95,176,255,.6)}
+.cab .lkp .lkBadge.s3{background:rgba(200,40,40,.88);box-shadow:0 0 20px rgba(255,90,90,.6)}
+.cab .lkp .lkStrip{position:absolute;left:0;right:0;bottom:12px;height:80px;display:flex;align-items:center;justify-content:center;gap:10px}
+.cab .lkp .lkTh{position:relative;width:62px;height:76px;border-radius:10px;overflow:hidden;border:2px solid rgba(150,190,240,.25);opacity:.45;transition:all .4s}
+.cab .lkp .lkTh img{width:100%;height:100%;object-fit:cover}
+.cab .lkp .lkTh small{position:absolute;left:0;right:0;bottom:0;font:700 8.5px ui-monospace,Menlo,monospace;text-align:center;background:rgba(3,8,20,.8);color:#cfe3f7;padding:2px 0;letter-spacing:.04em;white-space:nowrap;overflow:hidden}
+.cab .lkp .lkTh.done{opacity:.8}.cab .lkp .lkTh.on{opacity:1;border-color:#5fe3ff;box-shadow:0 0 16px rgba(0,200,255,.6);transform:scale(1.08)}
+.cab .lkp .lkAr{font-style:normal;font-size:20px;color:#ff7a3c}.cab .lkp .lkAr.u{color:#3ee08f}
+.cab .lkp .lkL .gdN{background:linear-gradient(135deg,#ffc08a,#ff6a2c);box-shadow:0 0 30px rgba(255,110,50,.55)}.cab .lkp .lkL h4{color:#ffb07a}
+.cab .lkp .lkU .gdN{background:linear-gradient(135deg,#9ff5c6,#1fbf6a);box-shadow:0 0 30px rgba(40,210,120,.55)}.cab .lkp .lkU h4{color:#7ff0b0}
+.cab .lkp .lkL .gdArt{border-color:rgba(255,122,60,.45)}.cab .lkp .lkU .gdArt{border-color:rgba(62,224,143,.45)}
+.cab .lkp .lkFirst{margin-top:22px;display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:14px;background:rgba(255,122,60,.08);border:1px solid rgba(255,122,60,.35);font-size:21px;font-weight:800;color:#ffd2b0;opacity:.35;transition:all .4s}
+.cab .lkp .lkFirst.on{opacity:1;background:rgba(255,122,60,.2);box-shadow:0 0 24px rgba(255,110,50,.45)}
+.cab .stage:not(.port) .gdp.lkp:not(.hasRoom) .lkSum{grid-template-columns:1fr 1fr 1.15fr;top:120px;bottom:150px;gap:18px}
+.cab .lkp .lkc{align-items:center;text-align:center;padding:18px}
+.cab .lkp .lkc b{min-height:0;font-size:26px}.cab .lkp .lkc em{font-style:normal;font-weight:800;font-size:20px}.cab .lkp .lkc small{margin-top:auto;font-size:17px}
+.cab .lkp .lkcL{border-color:rgba(255,122,60,.5)}.cab .lkp .lkcL em{color:#ff9a5c}
+.cab .lkp .lkcU{border-color:rgba(62,224,143,.5)}.cab .lkp .lkcU em{color:#5ff0a4}
+.cab .lkp .lkD{position:relative;width:200px;height:200px;flex:none;margin:22px 0 10px}
+.cab .lkp .lkD svg{position:absolute;inset:0;width:100%;height:100%;max-height:none}
+.cab .lkp .lkD .lkArc{inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);animation:cab-lkarc 3.2s ease-in-out infinite}
+@keyframes cab-lkarc{0%,15%{opacity:.25}40%,70%{opacity:1}100%{opacity:.25}}
+.cab .lkp .lkRotCW,.cab .lkp .lkRotCCW,.cab .lkp .lkV{transform-box:view-box;transform-origin:100px 100px}
+.cab .lkp .lkRotCW{animation:cab-lkcw 3.2s ease-in-out infinite}
+@keyframes cab-lkcw{0%,18%{transform:rotate(0)}48%,88%{transform:rotate(90deg)}100%{transform:rotate(0)}}
+.cab .lkp .lkRotCCW{animation:cab-lkccw 3.2s ease-in-out infinite}
+@keyframes cab-lkccw{0%,18%{transform:rotate(90deg)}48%,88%{transform:rotate(0)}100%{transform:rotate(90deg)}}
+.cab .lkp .lkV{transform:rotate(90deg)}
+.cab .lkp .lkPair{display:flex;gap:14px;justify-content:center;width:100%}
+.cab .lkp .lkPair>div{display:flex;flex-direction:column;align-items:center;gap:8px}
+.cab .lkp .lkPair svg{width:150px;height:150px;max-height:none}
+.cab .lkp .lkcC{justify-content:center;gap:18px}.cab .lkp .lkcC small{margin-top:0}
+.cab .lkp .lkPair span{font-weight:800;font-size:18px;padding:5px 12px;border-radius:99px}.cab .lkp .lkPair .r{background:rgba(255,90,90,.18);color:#ff8a8a}.cab .lkp .lkPair .g{background:rgba(62,224,143,.18);color:#6ff0a8}
+.cab .lkp .lkEnt{color:#ffc27a!important;font-size:15px!important;margin-top:4px!important}
+.cab .stage.port .gdp.lkp .lkSum{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;top:120px}
+.cab .stage.port .lkp .lkcC{grid-column:1/3}
+.cab .stage.port .lkp .lkMain{height:360px;width:298px;margin-left:-149px}
+/* お部屋の鍵: 外から (テンキー) */
+.cab .lkp .lkNo{margin-top:20px;display:inline-block;padding:10px 18px;border-radius:12px;background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.35);color:#ffb0b0;font-size:20px;font-weight:800;opacity:.3;transition:all .4s}
+.cab .lkp .lkNo.on{opacity:1;background:rgba(255,90,90,.2);box-shadow:0 0 24px rgba(255,60,60,.35)}
+.cab .lkp .lkcO{border-color:rgba(255,179,92,.5)}
+.cab .lkp .lkKpS{width:100%;height:210px;flex:none;margin:6px 0 4px}.cab .lkp .lkKpS svg{width:100%;height:100%;max-height:none}
+.cab .lkp .lkcO .cd{font-size:30px;color:#ffc27a;text-shadow:0 0 14px rgba(255,150,60,.5)}
+.cab .lkp .lkNoS{color:#ffb0b0!important;font-size:15px!important;margin-top:2px!important}
+.cab .stage:not(.port) .gdp.lkp:not(.hasRoom) .lkSum{grid-template-columns:1fr 1fr 1fr 1.15fr;gap:14px;left:34px;right:34px}
+.cab .lkp .lkD{width:170px;height:170px}
+.cab .lkp .lkPair svg{width:120px;height:120px}
+.cab .stage.port .gdp.lkp .lkSum{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cab .stage.port .lkp .lkcC{grid-column:auto}

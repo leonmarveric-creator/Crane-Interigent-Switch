@@ -38,7 +38,7 @@ export const GUEST_Q: GuestQ[] = [
     { en: "My sense of humor is still in beta. Please rate this joke five stars to help me improve.", ja: "私のユーモアはまだベータ版です。改善のため、このジョークに星 5 つをお願いします。", zh: "我的幽默感还在测试版。为了帮助我进步，请给这个笑话五星好评。", ko: "제 유머 감각은 아직 베타 버전이에요. 개선을 위해 이 농담에 별 다섯 개 부탁드려요." }
   ] },
   { id: "manners", icon: "🇯🇵", q: {"ja": "日本のマナーを教えて", "zh": "教我日本礼仪", "en": "Japanese manners?", "ko": "일본 매너 알려 줘요"}, v: [
-    { en: "Take your shoes off at the entrance. Slippers inside, bare feet on the tatami. I don't have feet, so I follow all the rules perfectly.", ja: "玄関で靴を脱ぎます。室内はスリッパ、畳の上は素足で。私には足がないので、完璧にルールを守れています。", zh: "在玄关脱鞋。室内穿拖鞋，榻榻米上光脚。我没有脚，所以规矩守得非常完美。", ko: "현관에서 신발을 벗어요. 실내는 슬리퍼, 다다미 위는 맨발로. 저는 발이 없어서 규칙을 완벽히 지켜요." },
+    { en: "Please take your shoes off at the entrance. Socks are perfectly fine. I don't have feet, so I follow this rule perfectly.", ja: "玄関で靴を脱いでお上がりください。靴下のままで大丈夫です。私には足がないので、このルールは完璧に守れています。", zh: "请在玄关脱鞋后进入。穿着袜子就可以。我没有脚，所以这条规矩守得非常完美。", ko: "현관에서 신발을 벗고 들어오세요. 양말은 신고 계셔도 괜찮아요. 저는 발이 없어서 이 규칙을 완벽히 지켜요." },
     { en: "In Japan, it's polite to be quiet on trains. In this car, however, you may laugh at my jokes as loudly as you like.", ja: "日本では電車の中は静かにするのがマナーです。ただしこの車の中では、私のジョークに大声で笑っていただいて構いません。", zh: "在日本，坐电车时保持安静是礼貌。不过在这辆车里，您可以尽情为我的笑话大笑。", ko: "일본에서는 전철 안에서 조용히 하는 게 매너예요. 하지만 이 차 안에서는 제 농담에 마음껏 크게 웃으셔도 돼요." }
   ] },
   { id: "lights", icon: "💡", q: {"ja": "お部屋の明かりをつけて", "zh": "打开房间的灯", "en": "Turn on my room lights", "ko": "객실 불 켜 줘요"}, v: [

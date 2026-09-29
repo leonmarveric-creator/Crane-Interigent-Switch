@@ -6,7 +6,7 @@
  *   話す前にお父さんのスマホの音楽を下げる (music_cmd "duck")。ゲストが光の玉を押すと、おまけのひと言。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, aiAudio, aiPick, sunsetMin, zorome, type AiId } from "@/lib/cabinAiLines";
+import { AI_CHAT_MS, AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, AI_SPEED, aiAudio, aiPick, sunsetMin, zorome, type AiId } from "@/lib/cabinAiLines";
 import { CAPTAIN, GUEST_Q, REPEAT, UNKNOWN, captainAudio, guestAudio, talkAudioUrls, weatherAnswer } from "@/lib/cabinAiTalk";
 
 const GUIDE_Q: Record<GLang, string> = { ja: "入り方を教えて", zh: "怎么进门？", en: "How do I get in?", ko: "들어가는 방법" };
@@ -50,22 +50,24 @@ export function createAi(c: AiCtx): Ai {
   const $ = (id: string) => c.root.querySelector("#" + id) as HTMLElement;
   const el = new Audio(); let src: MediaElementAudioSourceNode | null = null, an: AnalyserNode | null = null;
   const blobs: Record<string, string> = {};
+  let subTok = 0;
   let speaking = false, lastAt = 0, lastAny = 0, last: Partial<Record<AiId, number>> = {}, done = new Set<string>();
   let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null;
+  let spdLv = 0, spdN = 0, spdAt = 0, chatUsed = new Set<number>(), chatAt = 0, boostEndAt = 0;
 
-  function reset() { lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; }
+  function reset() { lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; spdLv = 0; spdN = 0; spdAt = 0; chatUsed = new Set(); chatAt = 0; boostEndAt = 0; }
 
   /* ---------- 話す ---------- */
-  async function say(id: AiId, opt: { force?: boolean; duck?: boolean } = {}) {
+  async function say(id: AiId, opt: { force?: boolean; duck?: boolean; i?: number } = {}) {
     if (speaking) return false;
     const s = c.state(); const now = Date.now();
-    const prio = AI_PRIORITY.includes(id);
+    const prio = AI_PRIORITY.includes(id), spd = AI_SPEED.includes(id);
     if (!opt.force) {
       if (c.quiet() && id !== "tap" && id !== "tapmany") return false;
-      if (c.voiceBusy() || (s.boosting && id !== "bridge")) return false;
-      if (!prio && now - lastAt < AI_GAP_MS) return false;
+      if (c.voiceBusy() || (s.boosting && id !== "bridge" && !spd)) return false;
+      if (!prio && !spd && now - lastAt < AI_GAP_MS) return false;
     }
-    const i = aiPick(id, last[id]); last[id] = i;
+    const i = opt.i ?? aiPick(id, last[id]); last[id] = i;
     if (!prio || id === "depart") lastAt = now;
     return speak(aiAudio(id, i), AI_LINES[id].v[i] as Record<GLang, string>, { duck: opt.duck });
   }
@@ -90,7 +92,10 @@ export function createAi(c: AiCtx): Ai {
       const end = () => { el.onended = el.onerror = null; ok(); };
       el.onended = end; el.onerror = end; el.muted = rm && !an; el.src = blobs[url] || url; playSafe(el, () => c.ac(), end); setTimeout(end, 20000);
     });
-    setTimeout(() => { c.stage.classList.remove("ai-talk"); $("aiSt").textContent = "ONLINE"; }, 1200);
+    // 字幕は話し終わってもしばらく残す (読むのがゆっくりな人のために・長い文ほど長く)
+    const my = ++subTok, hold = Math.min(9000, 3500 + [...line[lang]].length * (lang === "en" ? 25 : 60));
+    $("aiSt").textContent = "ONLINE";
+    setTimeout(() => { if (subTok === my) c.stage.classList.remove("ai-talk"); }, hold);
     speaking = false; return true;
   }
   const once = (key: string, id: AiId, opt?: { force?: boolean; duck?: boolean }) => { if (done.has(key)) return; void say(id, opt).then((ok) => { if (ok) done.add(key); }); };
@@ -117,6 +122,10 @@ export function createAi(c: AiCtx): Ai {
       if (stopSaid && !done.has("restart")) once("restart", "restart");
       stopT = 0;
     }
+    // 速度 (80 / 100 / 120 km/h を 4 秒続けて超えたら 1 回。70 未満に落ちて 3 分たてば、また言う)
+    const k = s.kmh ?? 0, lv = k >= 140 ? 140 : k >= 120 ? 120 : k >= 100 ? 100 : k >= 80 ? 80 : 0;
+    if (lv > spdLv && done.has("depart")) { if (++spdN >= 4) { const want = lv; void say(`spd${want}` as AiId).then((ok) => { if (ok) { spdLv = want; spdAt = Date.now(); spdN = 0; } }); } } else spdN = 0;
+    if (spdLv && k < 70 && now - spdAt > 180000) spdLv = 0;
     // ルートから外れた (20 秒続いたら)
     if (s.offroute) { if (!offT) offT = now; if (now - offT > 20000) once("offroute", "offroute"); } else offT = 0;
     // 距離
@@ -138,6 +147,8 @@ export function createAi(c: AiCtx): Ai {
       }
       if (Math.hypot((la - 34.4125) * 111000, (lo - 135.2935) * 91500) < 1500) once("sea", "sea");
       if (!s.hasIzumiPoi && lo > 135.305 && s.dir === "in") once("izumi", "izumi");
+      // 泉佐野に入ったら「タオル発祥の地」(お迎えのとき。お見送りは静かな時間の豆知識で)
+      if (lo > 135.305 && s.dir === "in") once("fact:towel", "towel");
     }
     // 夕日・時刻・曜日・天気
     const ss = sunsetMin(now);
@@ -152,11 +163,16 @@ export function createAi(c: AiCtx): Ai {
         else if (w.days?.[1] && rainy(w.days[1].code)) once("wx", "rain_tmrw");
       }
     }
-    // 静かな時間が続いたら豆知識 (1 回の送迎で 2 つまで)
-    if (now - lastAny > AI_FACT_MS && el2 > 120) {
-      const facts: AiId[] = ["towel", "nasu", ...(s.placeKey.startsWith("kix") ? (["kix"] as AiId[]) : []), ...(s.crossesBridge ? (["bridgefact"] as AiId[]) : [])];
+    // 橋 (ブースト) を渡り終えたら最高速度のひと言
+    if (boostEndAt && now - boostEndAt > 9000) once("topspeed", "topspeed");
+    // 豆知識・おしゃべりは 3 分に 1 回くらい (ほかのひと言のすぐあとは避ける・同じものは 1 回の送迎で 1 回だけ)
+    if (now - Math.max(chatAt, s.started) > AI_CHAT_MS && now - lastAny > AI_FACT_MS && now - lastAt > AI_GAP_MS) {
+      const facts: AiId[] = [...(s.dir === "in" ? [] : (["towel"] as AiId[])), "nasu", ...(s.placeKey.startsWith("kix") ? (["kix"] as AiId[]) : []), ...(s.crossesBridge ? (["bridgefact"] as AiId[]) : [])];
       const left = facts.filter((f) => !done.has("fact:" + f));
-      if (left.length && [...done].filter((k) => k.startsWith("fact:")).length < 2) { const f = left[Math.floor(Math.random() * left.length)]; once("fact:" + f, f); }
+      const chatLeft = AI_LINES.chat.v.map((_, i) => i).filter((i) => !chatUsed.has(i));
+      // 地元の豆知識と、おしゃべりを交互に
+      if (left.length && (done.has("lastChat") || !chatLeft.length)) { const f = left[Math.floor(Math.random() * left.length)]; void say(f).then((ok) => { if (ok) { done.add("fact:" + f); done.delete("lastChat"); chatAt = Date.now(); } }); }
+      else if (chatLeft.length) { const i = chatLeft[Math.floor(Math.random() * chatLeft.length)]; void say("chat", { i }).then((ok) => { if (ok) { chatUsed.add(i); done.add("lastChat"); chatAt = Date.now(); } }); }
     }
   }
 
@@ -164,7 +180,7 @@ export function createAi(c: AiCtx): Ai {
     const s = c.state(); if (!s.tripId) return;
     if (e === "arrive") setTimeout(() => void say(s.dir === "in" ? "lights" : "bye", { force: !c.quiet() }), 7000);
     if (e === "song" && Date.now() - s.started > 60000) void say("song");
-    if (e === "boostEnd") setTimeout(() => once("topspeed", "topspeed"), 9000);
+    if (e === "boostEnd") boostEndAt = Date.now();
   }
 
   /* ---------- ゲストが光の玉を押す → 質問メニュー ---------- */

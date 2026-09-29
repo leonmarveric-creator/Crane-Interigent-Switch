@@ -5,6 +5,8 @@
  *   unlock() は必ず指で押したとき (出発ボタンなど) に呼ぶこと (iPhone の決まり)。
  */
 export interface RemoteVoice { stop(): void; busy(): boolean }
+/** 効果音の印 (声の順番待ちに入れず、すぐ重ねて鳴らす・音楽も下げない) */
+export const SFX_MARK = "#sfx";
 let AC: AudioContext | null = null;
 const cache = new Map<string, Promise<AudioBuffer | null>>();
 export function unlockRemoteVoice() {
@@ -33,12 +35,23 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
     } catch { /* 次へ */ }
     busy = false; void pump();
   }
+  async function playFx(u: string) {
+    try {
+      if (!AC || !live) return; if (AC.state !== "running") await AC.resume().catch(() => {});
+      const buf = await load(u); if (!buf || !live) return;
+      const s = AC.createBufferSource(); s.buffer = buf; s.connect(AC.destination); s.start();
+    } catch { /* 鳴らせなくても続ける */ }
+  }
   const iv = setInterval(async () => {
     if (!live) return;
     const r = await fetch(`/api/cabin/voice?t=${tripId}&after=${last}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (!r?.ok) { if (r?.error === "SETUP" && !setupSaid) { setupSaid = true; h.onSetup?.(); } return; }
     if (!last) last = Number(r.now) - 3000; // 最初は 3 秒前より新しいものだけ (時計はサーバーのもの)
-    for (const it of (r.items ?? []).filter((x: any) => Number(x.n) > last)) { last = Math.max(last, Number(it.n)); q.push(String(it.u)); void load(String(it.u)); }
+    for (const it of (r.items ?? []).filter((x: any) => Number(x.n) > last)) {
+      last = Math.max(last, Number(it.n));
+      if (it.s === SFX_MARK) { void playFx(String(it.u)); continue; } // 効果音はすぐ鳴らす
+      q.push(String(it.u)); void load(String(it.u));
+    }
     void pump();
   }, 1000);
   return { stop() { live = false; clearInterval(iv); q.length = 0; }, busy: () => busy || q.length > 0 };

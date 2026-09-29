@@ -89,8 +89,21 @@ test("cabin AI ASTRAEA: every line has 4 languages and its own voice file; picks
   assert.equal(A.aiPick("song", 0, 0), 1, "never the same line twice in a row");
   const ss = A.sunsetMin(Date.parse("2026-09-28T03:00:00Z")); assert.ok(ss > 17 * 60 + 30 && ss < 18 * 60, "Izumisano sunset in late Sept ≈ 17:45");
   assert.equal(A.zorome(11, 11), true); assert.equal(A.zorome(12, 34), true); assert.equal(A.zorome(11, 12), false);
-  assert.equal(A.AI_GAP_MS, 180000, "at most one remark every 3 minutes");
+  assert.equal(A.AI_GAP_MS, 60000, "a remark about every minute (3 minutes of silence was too long)");
+  assert.ok(A.AI_FACT_MS <= 90000, "small talk after a short silence");
+  assert.deepEqual(A.AI_SPEED, ["spd80", "spd100", "spd120", "spd140"], "a humorous line at 80 / 100 / 120 / 140 km/h");
+  assert.equal(A.AI_CHAT_MS, 180000, "small talk about every 3 minutes");
+  for (const id of ["half", "km5", "km1", "soon", "sea", "izumi", "bridge", "topspeed"]) assert.ok(A.AI_PRIORITY.includes(id), `${id} always spoken`);
+  assert.ok(A.AI_LINES.chat.v.length >= 10, "plenty of small talk");
   const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /const k = s\.kmh \?\? 0, lv = k >= 140 \? 140 : k >= 120 \? 120 : k >= 100 \? 100 : k >= 80 \? 80 : 0/, "speed levels");
+  assert.match(ai, /if \(lv > spdLv && done\.has\("depart"\)\) \{ if \(\+\+spdN >= 4\)/, "only after 4 seconds above the level (GPS noise)");
+  const D = await load("cabinDeadheadLines.ts");
+  for (const k of [...Object.values(D.DH_SPD).flat(), ...Object.values(D.DH_IDLE).flat()]) {
+    assert.ok(D.DH_LINES[k]?.ja && D.DH_LINES[k]?.en, k);
+    assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "dh", `${k}.mp3`)), `dh/${k}.mp3`);
+  }
+  assert.match(read("components", "cabin", "cabinDeadhead.ts"), /Date\.now\(\) - idleAt > 180000/, "deadhead: a remark about every 3 minutes");
   assert.match(ai, /c\.voiceBusy\(\) \|\| \(s\.boosting/, "never over the guide voice or boost");
   assert.match(ai, /if \(c\.quiet\(\) && id !== "tap"/, "quiet mode");
   assert.match(ai, /c\.duck\(12\)/, "dad's music is lowered first");
@@ -123,7 +136,7 @@ test("ASTRAEA talk: guest menu, captain commands by voice/buttons, check-in QR, 
   const ai = read("components", "cabin", "cabinAi.ts");
   assert.match(ai, /if \(lastCmd == null\) \{ lastCmd = cmd\.n; if \(Date\.now\(\) - cmd\.n > 20000\) return; \}/, "old commands are not replayed");
   const eng = read("components", "cabin", "cabinEngine.ts");
-  assert.match(eng, /if \(k === "gEnt"\) guide\.start\("ent"\); else if \(k === "gRoom"\) guide\.start\("room"\); else if \(k === "gToilet"\) toilet\.start\(\)/, "guide buttons on the arrival screen");
+  assert.match(eng, /if \(k === "gEnt"\) guide\.start\("ent"\); else if \(k === "gRoom"\) \{ if \(guide\.hasRoom\(\)\) guide\.start\("room"\); else lock\.start\(\); \} else if \(k === "gToilet"\) toilet\.start\(\)/, "guide buttons on the arrival screen");
   assert.ok(!/guide\.start\(\)[^\n]*arrive\(\)/.test(eng), "guide never auto-plays");
   assert.match(eng, /async function reroute\(from: LL\)/); assert.match(eng, /backN >= 3 \? pr\.d : prevD/, "turning back is followed");
   assert.match(read("app", "api", "cabin", "state", "route.ts"), /op === "lights"/);
@@ -160,7 +173,7 @@ test("drop-off: forgotten-item check right after departure (4 random lines), no 
 test("arrival screen: separate guides (entrance / room / restroom), restroom has no photo step, trip waits while a guide plays", async () => {
   const eng = read("components", "cabin", "cabinEngine.ts"), mk = read("components", "cabin", "cabinMarkup.ts");
   for (const q of ["gEnt", "gRoom", "gToilet"]) assert.ok(mk.includes(`data-q="${q}"`), q);
-  assert.match(eng, /const endIfIdle = \(\) => \{ if \(guide\.on\(\) \|\| toilet\.on\(\)\) T_\(30000, endIfIdle\)/);
+  assert.match(eng, /const endIfIdle = \(\) => \{ if \(guide\.on\(\) \|\| toilet\.on\(\) \|\| lock\.on\(\)\) T_\(30000, endIfIdle\)/);
   const t = read("components", "cabin", "cabinToilet.ts");
   assert.ok(!/gdSnap|tlFlash/.test(t), "no photo step for the restroom");
   const T = await load("cabinToilet.ts");
@@ -190,4 +203,32 @@ test("voices come out of the phone (Bluetooth): iPad queues them, phone polls an
   assert.match(read("components", "kaku", "kakuEngine.ts"), /rv = startRemoteVoice\(r\.id/);
   assert.ok(!/onSay|remote\(\)/.test(read("components", "cabin", "cabinGuide.ts") + read("components", "cabin", "cabinToilet.ts")), "room / restroom guides keep playing on the iPad");
   assert.ok(read("supabase", "migration_cabin_voice.sql").includes("voice_q"));
+});
+
+test("room lock guide (spring / autumn / winter): button on the arrival screen, real photos, 4 languages + voice; everything is saved to the iPad", async () => {
+  const L = await load("cabinLock.ts");
+  for (const k of Object.keys(L.LOCK_VOICE)) {
+    for (const l of ["en", "ja", "zh", "ko"]) assert.ok(L.LOCK_VOICE[k][l].length > 5, `${k} ${l}`);
+    assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "ai", `lock-${k}.mp3`)), `lock-${k}.mp3`);
+  }
+  for (const u of Object.values(L.LOCK_IMG)) assert.ok(fs.existsSync(path.join(root, "public", u)), u);
+  assert.equal(L.hasRoomLock("room-spring"), true); assert.equal(L.hasRoomLock("room-autumn"), true); assert.equal(L.hasRoomLock("room-winter"), true);
+  assert.equal(L.hasRoomLock("room-summer"), false, "summer keeps its own guide");
+  assert.match(L.LOCK_VOICE.k1.en, /close the door first.*right, clockwise.*Vertical means locked/i);
+  assert.match(L.LOCK_VOICE.k2.en, /left, counterclockwise.*Horizontal means unlocked/i);
+  const e = read("components", "cabin", "cabinEngine.ts");
+  assert.match(e, /if \(guide\.hasRoom\(\)\) guide\.start\("room"\); else lock\.start\(\);/, "the room button starts the lock guide for spring/autumn/winter");
+  assert.match(e, /guide\.hasRoom\(\) \|\| lk \? "" : "none"/);
+  const app = read("components", "cabin", "CabinApp.tsx");
+  assert.match(app, /map\(lockAudio\), \.\.\.Object\.values\(LOCK_IMG\)/, "lock guide is saved with 📥");
+  assert.match(app, /map\(toiletAudio\), \.\.\.Object\.values\(TOILET_IMG\)/, "restroom guide is saved with 📥");
+  assert.match(app, /Object\.keys\(DH_LINES\)\.map\(dhAudio\)/, "deadhead voices are saved with 📥");
+  assert.match(read("public", "cabin-sw.js"), /cabin-static-v2/, "cache version bumped so replaced voices are fetched again");
+  assert.match(read("lib", "cabinAiTalk.ts"), /Socks are perfectly fine/, "no need to be barefoot");
+  assert.match(L.LOCK_VOICE.k0.en, /enter your room code.*unlock key at the bottom right.*does not lock by itself/i, "outside: code → bottom-right key; no auto-lock");
+  assert.match(read("components", "cabin", "cabinLock.ts"), /room: \(\) => \{ code: string \| null; name: string \}/);
+  // ブーストの効果音もスマホから (音はそのまま)
+  assert.match(e, /const sfx = \(k: string\) => \{ if \(remote\(\)\) \{ hooks\.onSay\?\.\(trip!\.id, AUDIO \+ k \+ "\.mp3", SFX_MARK\)/);
+  assert.match(read("components", "cabin", "cabinDeadhead.ts"), /if \(c\.remote\(\)\) \{ c\.say\(u, SFX_MARK\)/);
+  assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) \{ void playFx/, "effects play at once on the phone, without ducking");
 });
