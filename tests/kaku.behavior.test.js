@@ -55,3 +55,15 @@ test("AGENT KAKU drives the car iPad only while guests are aboard", () => {
   assert.match(read("components", "kaku", "KakuApp.tsx"), /import \{ cabinStart, cabinPos, cabinEnd \} from "@\/app\/driver\/actions"/);
   assert.match(read("app", "staff", "login", "page.tsx"), /"\/kaku": "AGENT KAKU"/, "login returns to /kaku");
 });
+
+test("AGENT KAKU: portrait/landscape, lock-on TARGET REACHED, new boot sound + uploadable boot BGM", () => {
+  const e = read("components", "kaku", "kakuEngine.ts"), css = read("app", "kaku", "kaku.css");
+  assert.match(e, /const W = land \? 1448 : 1086, H = land \? 1086 : 1448/);
+  assert.ok(css.includes(".kk .stage.land"), "landscape layout");
+  assert.match(e, /function showReached\(l: Leg\)/); assert.match(read("components", "kaku", "kakuMarkup.ts"), /LOCK CONFIRMED/);
+  assert.match(e, /function powerUp\(\)/); assert.match(e, /function impact\(\)/);
+  assert.match(e, /const MODES: BgmMode\[\] = \["boot", "normal", "cruise"\]/);
+  assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="upB"/);
+  assert.match(read("app", "api", "kaku", "route.ts"), /b\.which === "boot" \? "boot"/);
+  assert.ok(read("supabase", "migration_kaku.sql").includes("kaku_bgm_boot"));
+});

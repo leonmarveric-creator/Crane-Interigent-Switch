@@ -62,6 +62,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
   <div class="ov" id="st"><div class="ovb" style="top:60px;bottom:60px">
    <div class="ovh">SETTINGS · 設定<button class="x" data-x="st">✕</button></div>
    <div class="fmg">
+    <div class="sg"><b>⚡ 起動・ホーム BGM</b><span id="bgB">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upB" hidden></label><button class="rm" data-rm="boot">内蔵に戻す</button></div>
     <div class="sg"><b>🎵 ノーマル BGM</b><span id="bgN">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upN" hidden></label><button class="rm" data-rm="normal">内蔵に戻す</button></div>
     <div class="sg"><b>🌉 クルーズ BGM</b><span id="bgC">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upC" hidden></label><button class="rm" data-rm="cruise">内蔵に戻す</button></div>
     <div class="sgm" id="bgMsg"></div>
@@ -74,6 +75,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
  </div>
  <!-- ③ ミッション -->
  <div class="sc" id="s3">
+  <div class="lhd"><b>K A K U</b><small>MISSION SYSTEM</small><span class="lon"><i></i>ONLINE</span></div><div class="lact">ACTIVE MISSION</div><div class="ltm">MISSION TIME</div>
   <div class="cv" style="left:72px;top:140px;width:462px;height:92px"></div>
   <div class="ttl"><b id="mT">KIX T1 · お迎え</b><small id="mS">OPERATION 0929</small></div>
   <div class="badge wait" id="bdg">待機中</div>
@@ -90,11 +92,12 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
   <div class="mapx" id="mapx"><canvas id="stars" width="1040" height="470"></canvas><div class="cm" id="cmT">◆ CRUISE MODE ◆</div>
    <div class="bbar"><span>SKY GATE BRIDGE</span><div class="bb"><i id="bbF"></i><em id="bbM"></em></div><b id="bbT">0.0 / 3.8 km</b></div>
    <div class="cin" id="cin"><i class="sw"></i><div class="cinT" id="cinT"></div><div class="cinS" id="cinS">SKY GATE BRIDGE · OVER OSAKA BAY</div></div>
-   <div class="mid" id="mid">▲ MIDPOINT · 1.9 KM</div><div class="stamp" id="stamp">TARGET REACHED</div></div>
+   <div class="mid" id="mid">▲ MIDPOINT · 1.9 KM</div><div class="tr" id="tr"><i class="trg"></i><i class="trb a"></i><i class="trb b"></i><i class="trb c"></i><i class="trb d"></i><i class="trr r1"></i><i class="trr r2"></i><i class="trr r3"></i><i class="trx"></i><i class="try"></i>
+    <div class="trc"><div class="trk">◉ LOCK CONFIRMED</div><div class="trt" id="trT">TARGET REACHED</div><div class="trs" id="trS"></div><div class="trbar"><i id="trP"></i></div><div class="trph" id="trPh"></div></div></div></div>
   <div class="cv" style="left:36px;top:1068px;width:504px;height:80px"></div>
 
   <!-- 受信 (通信) -->
-  <div class="wp" style="left:34px;top:812px;width:500px;height:230px">
+  <div class="wp" style="left:34px;top:812px;width:500px;height:230px" id="wpF">
    <div class="wh"><b>受信</b><span>INCOMING FEED</span><em id="chN">CH 1/4</em></div>
    <canvas id="wave" width="150" height="120" class="wv"></canvas>
    <div class="ch" id="chBox"><div class="chT" id="chT"></div><div id="chB"></div></div>
@@ -109,7 +112,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
    <div class="eq" id="eq"></div>
   </div>
   <!-- ドライブ記録 (DEVICE STATUS) -->
-  <div class="wp dl" style="left:572px;top:1066px;width:482px;height:84px">
+  <div class="wp dl" style="left:572px;top:1066px;width:482px;height:84px" id="wpD">
    <div class="dlh">DRIVE LOG</div>
    <div class="dlr"><div><b id="dlKm">0.0</b><small>TODAY KM</small></div><div><b id="dlTm">0:00</b><small>DRIVE TIME</small></div><div><b id="dlKp">--</b><small>LIMIT KEPT</small></div><div><b id="dlRk">--</b><small>RANK</small></div></div>
   </div>

@@ -70,10 +70,11 @@ async function state() {
   const jst = new Date(Date.now() + 9 * 3600000);
   const month = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), 1) - 9 * 3600000).toISOString();
   const today = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * 3600000).toISOString();
-  const [pl, ms, st] = await Promise.all([
+  const [pl, ms, st, sb] = await Promise.all([
     supabaseAdmin.from("kaku_places").select("name,lat,lng,type,fav,visits").order("visits", { ascending: false }).limit(200),
     supabaseAdmin.from("kaku_missions").select("name,kind,type,km,sec,kept,rank,ended_at").gte("ended_at", month).order("ended_at", { ascending: false }).limit(300),
     supabaseAdmin.from("app_settings").select("kaku_bgm_normal,kaku_bgm_cruise").eq("id", 1).maybeSingle(),
+    supabaseAdmin.from("app_settings").select("kaku_bgm_boot").eq("id", 1).maybeSingle(),
   ]);
   const missions = (ms.data ?? []) as any[];
   return {
@@ -83,7 +84,7 @@ async function state() {
     monthKm: Math.round(missions.reduce((a, m) => a + Number(m.km || 0), 0) * 10) / 10,
     monthCount: missions.length,
     todayCount: missions.filter((m) => m.ended_at >= today).length,
-    bgm: { normal: pub((st.data as any)?.kaku_bgm_normal ?? null), cruise: pub((st.data as any)?.kaku_bgm_cruise ?? null) },
+    bgm: { boot: pub((sb.data as any)?.kaku_bgm_boot ?? null), normal: pub((st.data as any)?.kaku_bgm_normal ?? null), cruise: pub((st.data as any)?.kaku_bgm_cruise ?? null) },
   };
 }
 
@@ -130,13 +131,13 @@ export async function POST(req: NextRequest) {
   }
   // BGM: アップロード先を作る → 登録 / 外す (path: null)
   if (b.op === "bgmUrl") {
-    const which = b.which === "cruise" ? "cruise" : "normal", ext = /^(mp3|m4a|aac|wav)$/.test(String(b.ext)) ? b.ext : "mp3";
+    const which = b.which === "cruise" ? "cruise" : b.which === "boot" ? "boot" : "normal", ext = /^(mp3|m4a|aac|wav)$/.test(String(b.ext)) ? b.ext : "mp3";
     const path = `kaku/bgm-${which}-${Date.now().toString(36)}.${ext}`;
     const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(path);
     return J(error || !data ? { ok: false, error: error?.message || "UPLOAD_URL" } : { ok: true, path, signedUrl: data.signedUrl });
   }
   if (b.op === "bgmSet") {
-    const which = b.which === "cruise" ? "cruise" : "normal", col = `kaku_bgm_${which}`, path: string | null = b.path ?? null;
+    const which = b.which === "cruise" ? "cruise" : b.which === "boot" ? "boot" : "normal", col = `kaku_bgm_${which}`, path: string | null = b.path ?? null;
     if (path && !new RegExp(`^kaku/bgm-${which}-[\\w-]+\\.(mp3|m4a|aac|wav)$`).test(path)) return J({ ok: false, error: "BAD_PATH" });
     const { data: old } = await supabaseAdmin.from("app_settings").select(col).eq("id", 1).maybeSingle();
     const { error } = await supabaseAdmin.from("app_settings").update({ [col]: path }).eq("id", 1);

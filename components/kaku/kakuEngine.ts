@@ -15,7 +15,7 @@ type LL = [number, number];
 export interface KakuPlace { n: string; ll: LL; type?: string | null; fav?: boolean; visits?: number }
 export interface KakuState {
   setup: boolean; places: KakuPlace[]; missions: any[]; monthKm: number; monthCount: number; todayCount: number;
-  bgm: { normal: string | null; cruise: string | null };
+  bgm: { boot?: string | null; normal: string | null; cruise: string | null };
 }
 /** 車内 iPad (ゲスト用の画面) と一緒に動かすための情報 (今日の到着・出発の予約) */
 export interface KakuRes { id: string; guest: string | null; roomId: string; lang: string; arrive: boolean; pickupPlace: string | null; pickupAt: string | null; terminal: string | null; flightNo: string | null }
@@ -76,7 +76,15 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("kakuCfg") || "{}")); } catch { /* */ }
   const saveCfg = () => { try { localStorage.setItem("kakuCfg", JSON.stringify(cfg)); } catch { /* */ } };
 
-  function resize() { const r = root.getBoundingClientRect(), s = Math.min(r.width / 1086, r.height / 1448); stage.style.transform = `translate(-50%,-50%) scale(${s})`; }
+  /** 縦 (1086×1448) / 横 (1448×1086)。端末を回すと自動で切り替わる */
+  let land = false;
+  function resize() {
+    const r = root.getBoundingClientRect(), L2 = r.width > r.height * 1.05;
+    if (L2 !== land) { land = L2; stage.classList.toggle("land", land); setTimeout(() => { try { mapRef?.invalidateSize(); if (follow) mapRef?.panTo(curLL()); } catch { /* */ } }, 60); }
+    const W = land ? 1448 : 1086, H = land ? 1086 : 1448, s = Math.min(r.width / W, r.height / H);
+    stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  let mapRef: any = null;
   resize();
 
   /* ---------------- 音 ---------------- */
@@ -101,15 +109,42 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     g.gain.setValueAtTime(0.35, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + t + 1.2); o.connect(g); g.connect(c.destination); o.start(c.currentTime + t); o.stop(c.currentTime + t + 1.3);
   }
 
-  /* BGM: ノーマル / クルーズ。設定で曲をアップしていればそれ、無ければ内蔵 (オリジナル) */
-  let bgmRun = false, mode: "normal" | "cruise" = "normal", step = 0, synT: any = null, duck = 1;
+  /* 起動の効果音: 低いうなり → 周波数が駆け上がる → リレーのカチカチ (金属音) → 衝撃音 + 和音 → きらめき */
+  function powerUp() {
+    const c = ac(); if (!c) return; const t = c.currentTime;
+    const o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.type = "sawtooth"; o2.type = "square"; o.frequency.setValueAtTime(38, t); o.frequency.exponentialRampToValueAtTime(420, t + 1.35); o2.frequency.setValueAtTime(19, t); o2.frequency.exponentialRampToValueAtTime(210, t + 1.35);
+    f.type = "lowpass"; f.Q.value = 9; f.frequency.setValueAtTime(120, t); f.frequency.exponentialRampToValueAtTime(5200, t + 1.35);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.55);
+    o.connect(f); o2.connect(f); f.connect(g); g.connect(c.destination); o.start(t); o2.start(t); o.stop(t + 1.6); o2.stop(t + 1.6);
+    noise(0, 1.3, 0.04, 2500);
+  }
+  function relay(i: number) { tone(2400 + i * 260, 0, 0.05, 0.05, "square"); tone(5200 + i * 300, 0.01, 0.12, 0.02, "triangle"); noise(0, 0.02, 0.08, 6000); }
+  function impact() {
+    boom(0); noise(0, 0.6, 0.14, 900); noise(0.02, 0.25, 0.08, 5000);
+    [220, 277.2, 329.6, 440, 554.4].forEach((f, i) => tone(f, 0.05 + i * 0.01, 1.8, 0.035, "sawtooth"));
+    [1318.5, 1760, 2217.5, 2637].forEach((f, i) => tone(f, 0.45 + i * 0.09, 0.5, 0.025, "triangle"));
+  }
+
+  /* BGM: 起動 / ノーマル / クルーズ。設定で曲をアップしていればそれ、無ければ内蔵 (オリジナル) */
+  type BgmMode = "boot" | "normal" | "cruise";
+  const MODES: BgmMode[] = ["boot", "normal", "cruise"];
+  let bgmRun = false, mode: BgmMode = "boot", step = 0, synT: any = null, duck = 1;
   const BASS = [73.4, 73.4, 87.3, 73.4, 98, 73.4, 87.3, 82.4], ARP = [293.7, 440, 587.3, 440, 349.2, 523.3, 698.5, 523.3];
-  const trk: Record<string, HTMLAudioElement> = { normal: new Audio(), cruise: new Audio() };
+  const trk: Record<string, HTMLAudioElement> = { boot: new Audio(), normal: new Audio(), cruise: new Audio() };
   Object.values(trk).forEach((a) => { a.loop = true; a.volume = 0; a.preload = "auto"; });
-  const burl = (): Record<string, string | null> => ({ normal: S.bgm.normal, cruise: S.bgm.cruise });
-  function loadBgm() { for (const m of ["normal", "cruise"]) { const u = burl()[m]; if (u && trk[m].src !== u) trk[m].src = u; if (!u) { trk[m].pause(); trk[m].removeAttribute("src"); } } }
+  const burl = (): Record<string, string | null> => ({ boot: S.bgm.boot ?? null, normal: S.bgm.normal, cruise: S.bgm.cruise });
+  function loadBgm() { for (const m of MODES) { const u = burl()[m]; if (u && trk[m].src !== u) trk[m].src = u; if (!u) { trk[m].pause(); trk[m].removeAttribute("src"); } } }
+  /* 内蔵 BGM: 起動 = 深いパッドと鼓動 / ノーマル = 緊張感のあるベース / クルーズ = 速いアルペジオ */
+  const PAD = [[55, 82.4, 110, 164.8], [49, 73.4, 98, 146.8], [43.7, 65.4, 87.3, 130.8], [49, 73.4, 110, 146.8]];
+  function padChord(fs: number[], d: number, v: number) {
+    const c = ac(); if (!c) return; const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(300, c.currentTime); f.frequency.linearRampToValueAtTime(1400, c.currentTime + d * 0.5); f.frequency.linearRampToValueAtTime(400, c.currentTime + d);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.linearRampToValueAtTime(v, c.currentTime + d * 0.35); g.gain.linearRampToValueAtTime(0.0001, c.currentTime + d); f.connect(g); g.connect(c.destination);
+    for (const fr of fs) for (const dt of [-6, 6]) { const o = c.createOscillator(); o.type = "sawtooth"; o.frequency.value = fr; o.detune.value = dt; o.connect(f); o.start(); o.stop(c.currentTime + d + 0.1); }
+  }
   function synTick() {
     const s = step++ % 16;
+    if (mode === "boot") { if (s === 0) padChord(PAD[(step / 16 | 0) % 4], 4.6, 0.028 * duck); if (s === 0 || s === 3) tone(48, 0, 0.35, 0.16 * duck, "sine"); if (s % 4 === 2) noise(0, 0.03, 0.008 * duck, 9000); return; }
     if (mode === "normal") { if (s % 2 === 0) tone(BASS[(s / 2) | 0], 0, 0.22, 0.08 * duck, "sawtooth"); if (s === 4 || s === 12) noise(0, 0.12, 0.045 * duck, 1800); if (s % 4 === 2) noise(0, 0.04, 0.012 * duck, 8000); }
     else { tone(ARP[s % 8] * (s >= 8 ? 1.5 : 1), 0, 0.12, 0.035 * duck, "triangle"); if (s % 4 === 0) tone(73.4, 0, 0.3, 0.09 * duck, "sawtooth"); if (s % 2 === 1) noise(0, 0.03, 0.015 * duck, 9000); if (s === 8) noise(0, 0.2, 0.04 * duck, 1200); }
   }
@@ -119,13 +154,13 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   }
   function applyBgm() {
     const u = burl();
-    for (const m of ["normal", "cruise"]) { const a = trk[m], want = bgmRun && cfg.bgm && m === mode && !!u[m]; if (want) { if (a.paused) a.play().catch(() => {}); fade(a, 0.7 * duck); } else if (!a.paused) fade(a, 0); }
+    for (const m of MODES) { const a = trk[m], want = bgmRun && cfg.bgm && m === mode && !!u[m]; if (want) { if (a.paused) a.play().catch(() => {}); fade(a, 0.7 * duck); } else if (!a.paused) fade(a, 0); }
     const syn = bgmRun && cfg.bgm && !u[mode];
-    if (syn && !synT) synT = setInterval(synTick, mode === "cruise" ? 110 : 150); else if (!syn && synT) { clearInterval(synT); synT = null; }
+    if (syn && !synT) synT = setInterval(synTick, mode === "cruise" ? 110 : mode === "boot" ? 300 : 150); else if (!syn && synT) { clearInterval(synT); synT = null; }
   }
-  function setMode(m: "normal" | "cruise") { if (mode === m) return; mode = m; if (synT) { clearInterval(synT); synT = null; } applyBgm(); }
+  function setMode(m: BgmMode) { if (mode === m) return; mode = m; if (synT) { clearInterval(synT); synT = null; } applyBgm(); }
   function bgm(on: boolean) { bgmRun = on; if (synT) { clearInterval(synT); synT = null; } applyBgm(); }
-  function setDuck(d: number) { duck = d; for (const m of ["normal", "cruise"]) if (!trk[m].paused && m === mode) fade(trk[m], 0.7 * d, 400); }
+  function setDuck(d: number) { duck = d; for (const m of MODES) if (!trk[m].paused && m === mode) fade(trk[m], 0.7 * d, 400); }
 
   /* ---------------- 声と字幕 ---------------- */
   const el = new Audio(); let talking = false, endPrev: null | (() => void) = null, lastChat = 0, subT: any = null;
@@ -162,15 +197,17 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   $("pw").onclick = async () => {
     if (booted) return; booted = true; ac(); startGps();
     $("pw").classList.add("go"); $("flash").classList.add("go"); $("s1").classList.add("boot");
-    tone(110, 0, 1.2, 0.1, "sawtooth"); tone(220, 0.1, 1, 0.06, "sawtooth"); noise(0, 0.5, 0.08, 600);
-    for (let i = 0; i < 6; i++) { await wait(160); $("bm").children[i].classList.add("on"); $("bs").children[i].classList.add("on"); tone(900 + i * 120, 0, 0.06, 0.04, "square"); }
-    $("onl").textContent = "ONLINE"; $("onl").style.color = "#3dffa8"; $("scan").classList.add("go"); bgm(true);
+    powerUp();
+    for (let i = 0; i < 6; i++) { await wait(170); $("bm").children[i].classList.add("on"); $("bs").children[i].classList.add("on"); relay(i); }
+    await wait(250); impact();
+    $("onl").textContent = "ONLINE"; $("onl").style.color = "#3dffa8"; $("scan").classList.add("go"); setMode("boot"); bgm(true);
     await say("boot"); await wait(400); toHome();
   };
 
   /* ---------------- ② ホーム ---------------- */
   let WXC: number | null = null, RAINY = false;
   function toHome() {
+    setMode("boot");
     show("s2"); $("mNo").textContent = pad(S.todayCount + 1); $("tA").textContent = tfm(new Date()); $("tB").textContent = tfm(new Date(Date.now() + 18 * 60000));
     const w = WXC == null ? "" : RAINY ? " ☂ 雨" : WXC <= 1 ? ' <span style="color:#ffd35a">☀</span> 晴れ' : WXC <= 3 ? " ☁ くもり" : WXC >= 71 && WXC <= 77 ? " ❄ 雪" : " ☁ くもり";
     $("wxL").innerHTML = "泉佐野" + w;
@@ -263,6 +300,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
 
   /* ---------------- 設定 ---------------- */
   function renderSet() {
+    $("bgB").textContent = S.bgm.boot ? "✓ アップした曲" : "内蔵の BGM";
     $("bgN").textContent = S.bgm.normal ? "✓ アップした曲" : "内蔵の BGM"; $("bgC").textContent = S.bgm.cruise ? "✓ アップした曲" : "内蔵の BGM";
     $("limIn").value = cfg.limit; for (const [id, v] of [["qTg", cfg.quiet], ["dTg", cfg.demo], ["bTg", cfg.bgm]] as [string, boolean][]) { $(id).textContent = v ? "ON" : "OFF"; $(id).classList.toggle("on", v); }
     $("gpsSt").textContent = cfg.demo ? "GPS: デモ走行中は使いません" : gpsOk ? `GPS: OK (±${Math.round(gpsAcc)} m)` : gpsErr ? `GPS: ${gpsErr}` : "GPS: 位置を待っています…";
@@ -272,7 +310,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   $("qTg").onclick = () => { cfg.quiet = !cfg.quiet; saveCfg(); renderSet(); $("qm").classList.toggle("on", cfg.quiet); if (cfg.quiet) CQ = CQ.filter((x) => x.prio); void say(cfg.quiet ? "quiet_on" : "quiet_off"); };
   $("dTg").onclick = () => { cfg.demo = !cfg.demo; saveCfg(); renderSet(); };
   $("bTg").onclick = () => { cfg.bgm = !cfg.bgm; saveCfg(); renderSet(); applyBgm(); };
-  async function upBgm(which: "normal" | "cruise", f: File) {
+  async function upBgm(which: BgmMode, f: File) {
     const ext = (f.name.split(".").pop() || "mp3").toLowerCase().replace("mpeg", "mp3");
     $("bgMsg").textContent = "アップロード中…";
     const u = await post({ op: "bgmUrl", which, ext: /^(mp3|m4a|aac|wav)$/.test(ext) ? ext : "mp3" });
@@ -281,12 +319,13 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     if (!put || !put.ok) { $("bgMsg").textContent = "アップロードできませんでした"; return; }
     const s = await post({ op: "bgmSet", which, path: u.path });
     if (!s.ok) { $("bgMsg").textContent = s.error === "SETUP" ? "Supabase で migration_kaku.sql を実行してください" : "保存できませんでした: " + s.error; return; }
-    S.bgm[which] = s.url; loadBgm(); applyBgm(); renderSet(); $("bgMsg").textContent = `✓ ${which === "normal" ? "ノーマル" : "クルーズ"} BGM を保存しました`;
+    S.bgm[which] = s.url; loadBgm(); applyBgm(); renderSet(); $("bgMsg").textContent = `✓ ${which === "boot" ? "起動" : which === "normal" ? "ノーマル" : "クルーズ"} BGM を保存しました`;
   }
+  $("upB").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("boot", f); e.target.value = ""; };
   $("upN").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("normal", f); e.target.value = ""; };
   $("upC").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("cruise", f); e.target.value = ""; };
   root.querySelectorAll<HTMLElement>("[data-rm]").forEach((b) => (b.onclick = async () => {
-    const which = b.dataset.rm as "normal" | "cruise"; const s = await post({ op: "bgmSet", which, path: null });
+    const which = b.dataset.rm as BgmMode; const s = await post({ op: "bgmSet", which, path: null });
     if (s.ok) { S.bgm[which] = null; loadBgm(); applyBgm(); renderSet(); $("bgMsg").textContent = "内蔵の BGM に戻しました"; } else $("bgMsg").textContent = "できませんでした: " + s.error;
   }));
 
@@ -389,7 +428,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   const brLine = L.polyline([RT[0], RT[0]], { color: "#3dffa8", weight: 12, opacity: 0, className: "brRt" }).addTo(map);
   const tgM = L.marker(RT[1], { icon: L.divIcon({ className: "", html: '<div class="tgI"><b></b><i></i></div>' }) }).addTo(map);
   const car = L.marker(RT[0], { icon: L.divIcon({ className: "", html: '<div class="carI"><b></b><b></b><i id="carA"></i></div>' }) }).addTo(map);
-  map.setView(HOME, 12);
+  map.setView(HOME, 12); mapRef = map;
   function setRoute(pts: LL[]) {
     RT = pts.length > 1 ? pts : [pts[0], pts[0]]; calcRT(); calcBR(); rtBg.setLatLngs(RT); rtDash.setLatLngs(RT); rtDone.setLatLngs([RT[0]]);
     const seg = RT.filter((_p, i) => CUM[i] >= BR0 * TOT - 50 && CUM[i] <= BR1 * TOT + 50); brLine.setLatLngs(seg.length > 1 ? seg : [RT[0], RT[0]]);
@@ -444,10 +483,11 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   function resetHud() {
     phase = "brief"; prog = 0; spd = 0; fr = 0; okf = 0; said = {}; hwT = 0; hwOn = false; lateSaid = false; offT = 0; stopT = 0;
     $("tmr").textContent = "00:00:00"; $("bdg").textContent = "待機中"; $("bdg").classList.add("wait");
-    $("authT").textContent = "指紋で出発"; $("authT").style.fontSize = ""; $("fp").style.setProperty("--p", 0); $("stamp").classList.remove("on"); $("done").classList.remove("on");
+    $("authT").textContent = "指紋で出発"; $("authT").style.fontSize = ""; $("fp").style.setProperty("--p", 0); hideReached(); $("done").classList.remove("on");
     $("s3").classList.remove("cruise", "over", "hwy"); inBr = false; setMode("normal"); $("limT").textContent = `LIMIT ${cfg.limit}`;
   }
   function startMission() {
+    setMode("normal");
     cabTrip = null; cabSend = false;
     ac(); tone(660, 0, 0.1, 0.05); tone(990, 0.1, 0.2, 0.05); noise(0, 0.3, 0.05, 900);
     $("mT").textContent = M.name; $("mT").style.fontSize = M.name.length > 9 ? "36px" : "";
@@ -588,16 +628,29 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     const l = M.legs[leg];
     if (M.cab && M.cab.leg === leg && cabTrip) { const ll = l.ll; void cab.pos(cabTrip, ll[0], ll[1], 0); cabStop(false); } // 最後の位置を送って終わり (iPad は到着画面 → 自分で待機に戻る)
     if (l.home) { renderSteps(M.legs.length); return done(); }
-    renderSteps(leg); $("steps").children[leg].className = "done"; $("stamp").classList.add("on"); noise(0, 0.2, 0.1, 300); tone(220, 0, 0.5, 0.07, "sawtooth");
+    renderSteps(leg); $("steps").children[leg].className = "done"; showReached(l);
     const nx = M.legs[leg + 1];
     $("authT").textContent = nx ? `長押しで次へ ▸ ${nx.home ? "帰還" : short(nx.n, 6)}` : "長押しで完了"; $("authT").style.fontSize = "32px"; $("fp").style.setProperty("--p", 0);
     $("bdg").textContent = "停車中"; $("bdg").classList.add("wait"); holdT0 = performance.now();
     await say(M.kind === "guest" ? "arrive" : "farrive");
     if (M.kind === "free" && ARRIVE_LINE[M.type] && l.type !== "conv") chat(ARRIVE_LINE[M.type], true);
   }
+  /* TARGET REACHED: 四隅の照準が中心に集まる → リング → 十字線 → 文字が解読される → 進み具合のバー */
+  function showReached(l: Leg) {
+    const tr = $("tr"); tr.classList.remove("on"); void tr.offsetWidth; tr.classList.add("on");
+    const done2 = leg + 1, all = M.legs.length, sec = (performance.now() - t0) / 1000;
+    $("trP").style.setProperty("--w", `${Math.round(done2 / all * 100)}%`);
+    $("trS").textContent = `${l.ll[0].toFixed(4)}N ${l.ll[1].toFixed(4)}E · T+${fmt(sec * 1000)} · ${(lenOf(l.pts) / 1000).toFixed(1)} KM`;
+    $("trPh").textContent = `PHASE ${done2}/${all} COMPLETE`;
+    scramble($("trT"), "TARGET REACHED", 900);
+    [0, 0.14, 0.26, 0.36, 0.44, 0.5].forEach((t, i) => tone(1100 + i * 180, t, 0.05, 0.05, "square"));
+    boom(0.62); tone(440, 0.62, 1.2, 0.05, "sawtooth"); tone(554.4, 0.64, 1.2, 0.04, "sawtooth"); tone(659.3, 0.66, 1.2, 0.04, "sawtooth"); noise(0.62, 0.4, 0.08, 1200);
+    map.flyTo(l.ll, 17, { duration: 1.4 });
+  }
+  function hideReached() { $("tr").classList.remove("on"); }
   async function nextLeg() {
     const nx = M.legs[leg + 1]; if (!nx) return done();
-    $("stamp").classList.remove("on"); setLeg(leg + 1);
+    hideReached(); setLeg(leg + 1);
     if (M.cab && M.cab.leg === leg) void cabBegin(); phase = "drive"; said = {}; lateSaid = false; holdT0 = 0; offT = 0; stopT = 0;
     $("bdg").textContent = "進行中"; $("bdg").classList.remove("wait"); $("authT").textContent = "進行中 · 長押しで到着";
     tone(880, 0, 0.1, 0.06); tone(1320, 0.1, 0.25, 0.05); map.flyTo(curLL(), 16, { duration: 1.2 });

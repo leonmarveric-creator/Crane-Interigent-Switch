@@ -32,4 +32,5 @@ alter table public.kaku_missions enable row level security;
 -- ミッション中の BGM (Storage driver-music の kaku/ の中。未設定なら内蔵の BGM)
 alter table public.app_settings add column if not exists kaku_bgm_normal text;
 alter table public.app_settings add column if not exists kaku_bgm_cruise text;
+alter table public.app_settings add column if not exists kaku_bgm_boot text;
 notify pgrst, 'reload schema';
