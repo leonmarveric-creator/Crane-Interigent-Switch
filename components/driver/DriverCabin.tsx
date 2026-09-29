@@ -13,9 +13,10 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinPos, cabinEnd, cabinSetQuiet, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
 import { compressRoomPhoto } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
+import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
 import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
@@ -42,6 +43,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (r.event === "start") boosting = mRef.current.boostIn(5000);
       else if (r.event === "end" && boosting) { boosting = false; mRef.current.boostOut(); }
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+    // 車内 iPad の声 (ASTRAEA・道案内) をこのスマホで鳴らす (Bluetooth で車のスピーカーへ)。話している間は音楽を小さく
+    const rv = startRemoteVoice(trip.id, { onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")) });
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     let warned = false;
     const iv = setInterval(async () => {
@@ -54,6 +57,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
         if (last) setSending("ok");
         if (r.np === "setup" && !warned) { warned = true; toast(t("iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください")); }
         if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
+        // 回送 ⇄ ゲスト乗車 (iPad のボタンで切り替わることもある)
+        if (r.phase && r.phase !== trip.phase) setTrip((p) => (p && p.id === trip.id ? { ...p, phase: r.phase! } : p));
         // iPad の再生ボタン (ゲストが押した) → このスマホの音楽を操作
         if (lastCmd == null) lastCmd = r.cmd?.n ?? 0;
         else if (r.cmd && r.cmd.n > lastCmd) { lastCmd = r.cmd.n; mRef.current.remote(r.cmd.c, r.cmd.v); }
@@ -64,13 +69,15 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     const wake = () => { if ("wakeLock" in navigator && document.visibilityState === "visible") (navigator as any).wakeLock.request("screen").then((l: any) => { lock = l; }).catch(() => {}); };
     wake(); document.addEventListener("visibilitychange", wake);
     return () => {
-      live = false; if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
+      live = false; rv.stop(); if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
       document.removeEventListener("visibilitychange", wake); lock?.release?.().catch?.(() => {});
       if (boosting) mRef.current.boostOut();
     };
   }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tripRef2 = useRef(trip); tripRef2.current = trip;
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
+    unlockRemoteVoice(); // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
     const r = await cabinStart(v);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));
@@ -79,9 +86,16 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const end = useCallback(async () => {
     if (!trip) return; const id = trip.id; setTrip(null); sfx.down(); await cabinEnd(id); toast(t("送迎を終わりにしました"));
   }, [trip, toast, t]);
+  /** ゲスト乗車: 回送 (父向けの画面) → ゲスト用の送迎画面 */
+  const board = useCallback(async () => {
+    const tr = tripRef2.current; if (!tr) return; sfx.chord(); vib(30);
+    const r = await cabinBoard(tr.id);
+    if (!r.ok) { toast(r.error === "SETUP_VOICE" ? t("回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です") : t("切り替えられませんでした")); return; }
+    setTrip({ ...tr, phase: "guest" }); toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
+  }, [toast, t]);
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck };
+  return { trip, sending, start, end, duck, board };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -122,7 +136,7 @@ export function CabinSheet({ open, onClose, res, dir0, data, cab, t, roomName, u
     if (place === "other" && !other) { sfx.error(); return; }
     setBusy(true);
     try { if (dev) localStorage.setItem("drvCabDev", dev); } catch { /* ignore */ }
-    const ok = await cab.start({ deviceId: dev, resId: res?.id ?? null, dir, placeKey: place, placeName: place === "other" ? other!.name : null, placeLL: place === "other" ? other!.ll : null, roomId, lang, ac });
+    const ok = await cab.start({ deviceId: dev, resId: res?.id ?? null, dir, placeKey: place, placeName: place === "other" ? other!.name : null, placeLL: place === "other" ? other!.ll : null, roomId, lang, ac, phase: dir === "in" ? "dead" : "guest" });
     setBusy(false); if (ok) onClose();
   };
   const ago = (s: string | null) => { if (!s) return "—"; const m = Math.round((Date.now() - Date.parse(s)) / 60000); return m < 1 ? t("今") : m < 60 ? t("{m}分前", { m }) : t("{h}時間前", { h: Math.round(m / 60) }); };
@@ -189,7 +203,8 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui }: { tr: CabinTrip; dev: string; p
   return (
     <div className="cabbar">
       <span className="live" />
-      <span className="tx"><b>🚗 {dev}</b><small>{tr.dir === "in" ? `${pn} → ${t("お宿")}` : `${t("お宿")} → ${pn}`} · {cab.sending === "ok" ? "📡 " + t("位置を送信中") : cab.sending === "ng" ? "⚠ " + t("位置を送れません") : "…"}</small></span>
+      <span className="tx"><b>🚗 {dev}</b><small>{tr.phase === "dead" ? (tr.dir === "in" ? `${t("回送")} · ${t("お宿")} → ${pn}` : `${t("帰り道")} · ${pn} → ${t("お宿")}`) : tr.dir === "in" ? `${pn} → ${t("お宿")}` : `${t("お宿")} → ${pn}`} · {cab.sending === "ok" ? "📡 " + t("位置を送信中") : cab.sending === "ng" ? "⚠ " + t("位置を送れません") : "…"}</small></span>
+      {tr.phase === "dead" && tr.dir === "in" && <button className="board" onClick={() => void cab.board()}>🧳<small>{t("ゲスト乗車")}</small></button>}
       <button className="abtn" onClick={() => { sfx.tick(); setTalk(true); }}>🎙<small>ASTRAEA</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>

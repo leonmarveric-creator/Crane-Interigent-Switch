@@ -11,6 +11,7 @@ import { CAPTAIN, GUEST_Q, REPEAT, UNKNOWN, captainAudio, guestAudio, talkAudioU
 
 const GUIDE_Q: Record<GLang, string> = { ja: "入り方を教えて", zh: "怎么进门？", en: "How do I get in?", ko: "들어가는 방법" };
 import type { GLang, LL } from "@/lib/cabinGeo";
+import { playSafe, unlockAudio } from "@/lib/cabinAudio";
 
 export interface AiState {
   tripId: string | null; dir: "in" | "out"; placeKey: string; lang: GLang;
@@ -32,13 +33,15 @@ export interface AiCtx {
   ac: () => AudioContext | null;
   duck: (sec: number) => void;     // お父さんのスマホの音楽を下げる
   quiet: () => boolean;
+  remote: () => boolean;           // 声はスマホから流す (iPad は音を消して長さだけ合わせる)
+  send: (url: string, text: string) => void; // スマホへ声を送る
   hasCheckin: () => boolean;       // チェックイン QR が登録されているか
   checkin: () => void;             // チェックイン QR を出す
   guide: () => void;               // 入り方ガイドを流す
   roomLights: () => void;          // お部屋の照明をつける (ゲストの質問から)
   roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
 }
-export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void }
+export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
 
 const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 const JST = (ms: number) => new Date(ms + 9 * 3600e3);
@@ -71,17 +74,21 @@ export function createAi(c: AiCtx): Ai {
     if (speaking) return false;
     speaking = true; lastAny = Date.now();
     // お父さんのスマホの音楽を先に下げる (届くまで 3 秒ほど)
-    if (opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
+    const rm = c.remote();
+    if (rm) { c.send(url, line.en); await new Promise((r) => setTimeout(r, 1100)); } // スマホが鳴らす (音楽もスマホで小さくする)
+    else if (opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
     const lang = c.state().lang;
     $("aiSub").innerHTML = [...line[lang]].map((ch, k) => `<span style="animation-delay:${k * 26}ms">${ch.replace(/[<&>]/g, "")}</span>`).join("");
     $("aiEn").textContent = lang === "en" ? "" : line.en;
     c.stage.classList.add("ai-talk"); $("aiSt").textContent = opt.st ?? "SPEAKING";
     try {
-      const ctx = c.ac(); if (ctx && !src) { src = ctx.createMediaElementSource(el); an = ctx.createAnalyser(); an.fftSize = 128; src.connect(an); an.connect(ctx.destination); }
+      const ctx = c.ac(); if (ctx && !src) { src = ctx.createMediaElementSource(el); an = ctx.createAnalyser(); an.fftSize = 128; src.connect(an); }
+      // スマホから流すときは iPad からは鳴らさない (波形の動きだけ使う)
+      if (an && ctx) { try { an.disconnect(); } catch { /* */ } if (!rm) an.connect(ctx.destination); }
     } catch { /* 分析なしで鳴らす */ }
     await new Promise<void>((ok) => {
       const end = () => { el.onended = el.onerror = null; ok(); };
-      el.onended = end; el.onerror = end; el.src = blobs[url] || url; el.play().catch(end); setTimeout(end, 20000);
+      el.onended = end; el.onerror = end; el.muted = rm && !an; el.src = blobs[url] || url; playSafe(el, () => c.ac(), end); setTimeout(end, 20000);
     });
     setTimeout(() => { c.stage.classList.remove("ai-talk"); $("aiSt").textContent = "ONLINE"; }, 1200);
     speaking = false; return true;
@@ -240,5 +247,5 @@ export function createAi(c: AiCtx): Ai {
   function preload() {
     void (async () => { for (const u of urls()) { if (blobs[u]) continue; try { const r = await fetch(u); if (r.ok) blobs[u] = URL.createObjectURL(await r.blob()); } catch { /* 次へ */ } } })();
   }
-  return { tick, event, reset, preload, urls, command, busy: () => speaking, closeMenu };
+  return { tick, event, reset, preload, urls, command, busy: () => speaking, closeMenu, unlock: () => unlockAudio(el, urls()[0]) };
 }

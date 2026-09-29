@@ -46,14 +46,27 @@ test("AGENT KAKU: engine rules (GPS, arrival, reroute, cruise, quiet chat, no lo
   assert.ok(!read("app", "kaku", "kaku.css").includes(".kk .edge.on"), "no glowing screen edge in cruise mode");
 });
 
-test("AGENT KAKU drives the car iPad only while guests are aboard", () => {
+test("AGENT KAKU drives the car iPad for the whole mission (deadhead → guest aboard → return)", () => {
   const e = read("components", "kaku", "kakuEngine.ts");
-  assert.match(e, /leg: G\.dir === "in" \? 1 : 0/, "pickup: iPad on the way back / drop-off: iPad on the way out");
+  assert.match(e, /dir: G\.dir, leg: 0 \}/, "iPad links from the first leg");
+  assert.match(e, /phase: c\.dir === "in" \? "dead" : "guest"/, "pickup starts as deadhead");
   assert.match(e, /if \(M\.cab\?\.leg === 0\) void cabBegin\(\)/);
-  assert.match(e, /if \(M\.cab && M\.cab\.leg === leg\) void cabBegin\(\)/);
+  assert.match(e, /else if \(M\.cab\?\.dir === "in" && cabTrip && leg === 1\) void cab\.board\(cabTrip\)/, "leaving the pickup = guest boarded");
+  assert.match(e, /if \(M\.cab && cabTrip && l\.home\) \{/, "keeps sending until back at Crane Nest");
   assert.match(e, /cabStop\(true\)/, "abort ends the iPad trip");
-  assert.match(read("components", "kaku", "KakuApp.tsx"), /import \{ cabinStart, cabinPos, cabinEnd \} from "@\/app\/driver\/actions"/);
+  assert.match(read("components", "kaku", "KakuApp.tsx"), /import \{ cabinStart, cabinPos, cabinEnd, cabinBoard \} from "@\/app\/driver\/actions"/);
   assert.match(read("app", "staff", "login", "page.tsx"), /"\/kaku": "AGENT KAKU"/, "login returns to /kaku");
+});
+
+test("deadhead: blue co-pilot screen on the iPad, voices from the phone, guides stay on the iPad", () => {
+  const dh = read("components", "cabin", "cabinDeadhead.ts"), app = read("components", "cabin", "CabinApp.tsx"), api = read("app", "api", "cabin", "state", "route.ts");
+  assert.match(app, /t\.phase === "dead"/, "iPad switches to the deadhead screen");
+  assert.match(api, /op === "board"|"board"/, "board op");
+  assert.match(api, /"deadhead"/, "drop-off turns into the return leg");
+  assert.match(read("components", "driver", "DriverCabin.tsx"), /cabinBoard/, "phone has a guest boarded button");
+  assert.ok(dh.length > 1000);
+  assert.ok(!read("components", "cabin", "cabinGuide.ts").includes("onSay"), "guides play on the iPad");
+  assert.ok(!read("components", "cabin", "cabinToilet.ts").includes("onSay"), "restroom guide plays on the iPad");
 });
 
 test("AGENT KAKU: portrait/landscape, lock-on TARGET REACHED, new boot sound + uploadable boot BGM", () => {
@@ -66,4 +79,15 @@ test("AGENT KAKU: portrait/landscape, lock-on TARGET REACHED, new boot sound + u
   assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="upB"/);
   assert.match(read("app", "api", "kaku", "route.ts"), /b\.which === "boot" \? "boot"/);
   assert.ok(read("supabase", "migration_kaku.sql").includes("kaku_bgm_boot"));
+});
+
+test("AGENT KAKU playlists: many tracks per mode, order/shuffle, reorder/delete, next button, normal resumes after cruise", () => {
+  const e = read("components", "kaku", "kakuEngine.ts"), api = read("app", "api", "kaku", "route.ts"), mk = read("components", "kaku", "kakuMarkup.ts");
+  assert.ok(read("supabase", "migration_kaku.sql").includes("create table if not exists public.kaku_tracks"));
+  for (const op of ["trackAdd", "trackDel", "trackOrder"]) assert.ok(api.includes(`b.op === "${op}"`), op);
+  for (const id of ["upB", "upN", "upC"]) assert.match(mk, new RegExp(`multiple id="${id}"`));
+  assert.match(mk, /id="npN">⏭/); assert.match(mk, /id="shTg"/);
+  assert.match(e, /a\.onended = \(\) => nextTrack\(m\)/, "next track when one ends");
+  assert.match(e, /if \(cfg\.shuffle\) for \(let i = n - 1/, "shuffle");
+  assert.match(e, /else if \(to === 0\) a\.pause\(\)/, "fading out pauses (keeps the position) so normal resumes after cruise");
 });

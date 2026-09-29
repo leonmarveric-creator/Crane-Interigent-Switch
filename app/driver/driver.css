@@ -621,3 +621,5 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .ckrow img, .drv .ckrow .ckempty { width:72px; height:72px; border-radius:10px; background:#fff; object-fit:contain; flex:none; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px; }
 .drv .ckrow .ckempty { background:rgba(255,255,255,.08); color:var(--muted); }
 .drv .ckrow label.btn input { display:none; }
+.drv .cabbar .board { flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:74px; height:52px; border-radius:14px; border:0; background:linear-gradient(135deg,#46e08a,#1ea864); color:#03140d; font-size:22px; font-weight:900; box-shadow:0 0 16px rgba(70,224,138,.5); animation:drv-cblink 1.6s infinite; }
+.drv .cabbar .board small { font-size:10.5px; font-weight:800; }

@@ -10,21 +10,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { KAKU_LINES, kakuAudio, KAKU_TYPES, TYPE_LINE, ARRIVE_LINE, RETURN_LINE } from "@/lib/kakuLines";
 import { CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, placeFromText } from "@/lib/cabinGeo";
+import { startRemoteVoice, unlockRemoteVoice, type RemoteVoice } from "@/lib/remoteVoice";
 
 type LL = [number, number];
+export interface KakuTrack { id: string; title: string; url: string }
 export interface KakuPlace { n: string; ll: LL; type?: string | null; fav?: boolean; visits?: number }
 export interface KakuState {
   setup: boolean; places: KakuPlace[]; missions: any[]; monthKm: number; monthCount: number; todayCount: number;
   bgm: { boot?: string | null; normal: string | null; cruise: string | null };
+  tracks?: Record<string, KakuTrack[]>; tracksSetup?: boolean;
 }
 /** 車内 iPad (ゲスト用の画面) と一緒に動かすための情報 (今日の到着・出発の予約) */
 export interface KakuRes { id: string; guest: string | null; roomId: string; lang: string; arrive: boolean; pickupPlace: string | null; pickupAt: string | null; terminal: string | null; flightNo: string | null }
 export interface KakuCabinInfo { devices: { id: string; name: string }[]; rooms: { id: string; name: string }[]; res: KakuRes[]; missing: boolean }
 export interface KakuCabinApi {
   info: KakuCabinInfo;
-  start(v: { deviceId: string | null; resId: string | null; dir: "in" | "out"; placeKey: string; placeName: string | null; placeLL: [number, number] | null; roomId: string | null; lang: string; ac: "cool" | "heat" | "none" }): Promise<{ ok: boolean; id?: string; error?: string }>;
+  start(v: { deviceId: string | null; resId: string | null; dir: "in" | "out"; placeKey: string; placeName: string | null; placeLL: [number, number] | null; roomId: string | null; lang: string; ac: "cool" | "heat" | "none"; phase?: "dead" | "guest" }): Promise<{ ok: boolean; id?: string; error?: string }>;
   pos(id: string, lat: number | null, lng: number | null, kmh: number | null): Promise<{ ok: boolean; active: boolean }>;
   end(id: string): Promise<void>;
+  /** お迎え: 回送 → ゲスト乗車 */
+  board(id: string): Promise<void>;
 }
 interface CabLink { deviceId: string | null; resId: string | null; roomId: string | null; lang: string; placeKey: string; dir: "in" | "out"; leg: number }
 interface Leg { n: string; ll: LL; pts: LL[]; dur: number; home?: boolean; type?: string; real?: boolean }
@@ -72,7 +77,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   const api = (q: string) => fetch("/api/kaku?" + q, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false }));
   const post = (b: any) => fetch("/api/kaku", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json()).catch(() => ({ ok: false }));
   const ext = async (k: string, q = "") => { const r = await api(`op=ext&k=${k}${q}`); if (!r.ok) throw new Error(r.error || "ext"); return r.data; };
-  let cfg = { limit: 80, quiet: false, demo: false, bgm: true };
+  let cfg = { limit: 80, quiet: false, demo: false, bgm: true, shuffle: false };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("kakuCfg") || "{}")); } catch { /* */ }
   const saveCfg = () => { try { localStorage.setItem("kakuCfg", JSON.stringify(cfg)); } catch { /* */ } };
 
@@ -131,10 +136,41 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   const MODES: BgmMode[] = ["boot", "normal", "cruise"];
   let bgmRun = false, mode: BgmMode = "boot", step = 0, synT: any = null, duck = 1;
   const BASS = [73.4, 73.4, 87.3, 73.4, 98, 73.4, 87.3, 82.4], ARP = [293.7, 440, 587.3, 440, 349.2, 523.3, 698.5, 523.3];
+  /* プレイリスト: モードごとに 1 本の Audio。曲が終わったら次へ (登録順 / シャッフル)。
+     クルーズから戻ると、ノーマルは止めたところの続きから */
   const trk: Record<string, HTMLAudioElement> = { boot: new Audio(), normal: new Audio(), cruise: new Audio() };
-  Object.values(trk).forEach((a) => { a.loop = true; a.volume = 0; a.preload = "auto"; });
-  const burl = (): Record<string, string | null> => ({ boot: S.bgm.boot ?? null, normal: S.bgm.normal, cruise: S.bgm.cruise });
-  function loadBgm() { for (const m of MODES) { const u = burl()[m]; if (u && trk[m].src !== u) trk[m].src = u; if (!u) { trk[m].pause(); trk[m].removeAttribute("src"); } } }
+  const PL: Record<string, { list: KakuTrack[]; order: number[]; i: number }> = { boot: { list: [], order: [], i: 0 }, normal: { list: [], order: [], i: 0 }, cruise: { list: [], order: [], i: 0 } };
+  const lists = (): Record<string, KakuTrack[]> => S.tracks ?? { boot: S.bgm.boot ? [{ id: "b", title: "BGM", url: S.bgm.boot }] : [], normal: S.bgm.normal ? [{ id: "n", title: "BGM", url: S.bgm.normal }] : [], cruise: S.bgm.cruise ? [{ id: "c", title: "BGM", url: S.bgm.cruise }] : [] };
+  const burl = (): Record<string, string | null> => { const o: Record<string, string | null> = {}; for (const m of MODES) o[m] = PL[m].list.length ? "1" : null; return o; };
+  function mkOrder(n: number) { const o = Array.from({ length: n }, (_, i) => i); if (cfg.shuffle) for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return o; }
+  const cur = (m: string) => { const p = PL[m]; return p.list.length ? p.list[p.order[p.i % p.order.length]] : null; };
+  function loadBgm() {
+    const L = lists();
+    for (const m of MODES) {
+      const p = PL[m], nl = L[m] ?? [], same = nl.length === p.list.length && nl.every((t, i) => t.id === p.list[i].id);
+      if (same) continue;
+      const was = cur(m)?.id; p.list = nl; p.order = mkOrder(nl.length); p.i = Math.max(0, p.order.findIndex((k) => nl[k]?.id === was));
+      const a = trk[m]; a.loop = nl.length === 1;
+      const t = cur(m); if (t) { if (a.src !== t.url) a.src = t.url; } else { a.pause(); a.removeAttribute("src"); }
+    }
+    showNp();
+  }
+  function nextTrack(m: string, user = false) {
+    const p = PL[m]; if (!p.list.length) return; p.i++; if (p.i >= p.order.length) { p.i = 0; if (cfg.shuffle) p.order = mkOrder(p.list.length); }
+    const a = trk[m], t = cur(m)!; a.src = t.url; a.loop = p.list.length === 1;
+    if (bgmRun && cfg.bgm && mode === m) { a.volume = user ? 0 : a.volume; a.play().catch(() => {}); fade(a, 0.7 * duck, user ? 600 : 300); }
+    showNp();
+  }
+  MODES.forEach((m) => { const a = trk[m]; a.volume = 0; a.preload = "auto"; a.onended = () => nextTrack(m); a.onerror = () => { if (PL[m].list.length > 1) setTimeout(() => nextTrack(m), 500); }; });
+  /** ミッション画面の「曲名 ⏭」 */
+  function showNp() {
+    const e = root.querySelector("#np") as HTMLElement | null; if (!e) return;
+    const t = cur(mode), on = bgmRun && cfg.bgm;
+    e.classList.toggle("on", on && mode !== "boot");
+    $("npT").textContent = t ? t.title : mode === "cruise" ? "内蔵 BGM · CRUISE" : "内蔵 BGM";
+    $("npN").style.visibility = PL[mode].list.length > 1 ? "" : "hidden";
+    $("npM").textContent = mode === "cruise" ? "♪ CRUISE" : "♪ NORMAL";
+  }
   /* 内蔵 BGM: 起動 = 深いパッドと鼓動 / ノーマル = 緊張感のあるベース / クルーズ = 速いアルペジオ */
   const PAD = [[55, 82.4, 110, 164.8], [49, 73.4, 98, 146.8], [43.7, 65.4, 87.3, 130.8], [49, 73.4, 110, 146.8]];
   function padChord(fs: number[], d: number, v: number) {
@@ -158,8 +194,8 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     const syn = bgmRun && cfg.bgm && !u[mode];
     if (syn && !synT) synT = setInterval(synTick, mode === "cruise" ? 110 : mode === "boot" ? 300 : 150); else if (!syn && synT) { clearInterval(synT); synT = null; }
   }
-  function setMode(m: BgmMode) { if (mode === m) return; mode = m; if (synT) { clearInterval(synT); synT = null; } applyBgm(); }
-  function bgm(on: boolean) { bgmRun = on; if (synT) { clearInterval(synT); synT = null; } applyBgm(); }
+  function setMode(m: BgmMode) { if (mode === m) return; mode = m; if (synT) { clearInterval(synT); synT = null; } applyBgm(); showNp(); }
+  function bgm(on: boolean) { bgmRun = on; if (synT) { clearInterval(synT); synT = null; } applyBgm(); showNp(); }
   function setDuck(d: number) { duck = d; for (const m of MODES) if (!trk[m].paused && m === mode) fade(trk[m], 0.7 * d, 400); }
 
   /* ---------------- 声と字幕 ---------------- */
@@ -182,7 +218,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   every(500, () => {
     const nw = performance.now();
     CQ = CQ.filter((x) => x.prio || (/^(km5|km1|neardoc)$/.test(x.k) ? x.lg === leg && nw - x.t < 60000 : nw - x.t < 600000));
-    if (!CQ.length || talking) return;
+    if (!CQ.length || talking || rv?.busy()) return;
     const i = CQ.findIndex((x) => x.prio);
     const it = i >= 0 ? CQ.splice(i, 1)[0] : nw - lastChat > CHAT_GAP ? CQ.shift() : null;
     if (it) void say(it.k);
@@ -195,7 +231,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   ["bm", "bs"].forEach((id) => ($(id).innerHTML = "<i></i>".repeat(6)));
   let booted = false;
   $("pw").onclick = async () => {
-    if (booted) return; booted = true; ac(); startGps();
+    if (booted) return; booted = true; ac(); unlockRemoteVoice(); startGps();
     $("pw").classList.add("go"); $("flash").classList.add("go"); $("s1").classList.add("boot");
     powerUp();
     for (let i = 0; i < 6; i++) { await wait(170); $("bm").children[i].classList.add("on"); $("bs").children[i].classList.add("on"); relay(i); }
@@ -264,7 +300,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
         const legs: Leg[] = [{ n: P.name.ja, ll: P.ll as LL, pts: out, dur: lenOf(out) / d, real: true, type: k.startsWith("kix") ? "air" : "err" }, { n: "帰還", ll: HOME, pts: back, dur: lenOf(back) / d, home: true, real: true }];
         const who = G.res?.guest ? `${G.res.guest}さん` : "ゲスト";
         M = { kind: "guest", name: `${P.name.ja} · ${G.dir === "in" ? "お迎え" : "お見送り"}`, type: "guest", due: null, demo: cfg.demo, legs,
-          cab: G.ipad && G.dev ? { deviceId: G.dev, resId: G.res?.id ?? null, roomId: G.roomId, lang: G.lang, placeKey: k, dir: G.dir, leg: G.dir === "in" ? 1 : 0 } : null };
+          cab: G.ipad && G.dev ? { deviceId: G.dev, resId: G.res?.id ?? null, roomId: G.roomId, lang: G.lang, placeKey: k, dir: G.dir, leg: 0 } : null };
         try { if (G.dev) localStorage.setItem("drvCabDev", G.dev); } catch { /* */ }
         dyn.guestWho = who; startMission();
       };
@@ -276,11 +312,13 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   let cabTrip: string | null = null, cabSend = false;
   async function cabBegin() {
     const c = M.cab; if (!c || cabTrip) return;
-    const r = await cab.start({ deviceId: c.deviceId, resId: c.resId, dir: c.dir, placeKey: c.placeKey, placeName: null, placeLL: null, roomId: c.roomId, lang: c.lang, ac: acModeFor(Date.now()) });
-    if (r.ok && r.id) { cabTrip = r.id; cabSend = true; flash("📺 iPad ONLINE"); tone(1320, 0, 0.08, 0.05); tone(1760, 0.08, 0.15, 0.04); }
+    const r = await cab.start({ deviceId: c.deviceId, resId: c.resId, dir: c.dir, placeKey: c.placeKey, placeName: null, placeLL: null, roomId: c.roomId, lang: c.lang, ac: acModeFor(Date.now()), phase: c.dir === "in" ? "dead" : "guest" });
+    if (r.ok && r.id) { cabTrip = r.id; cabSend = true; rv?.stop(); rv = startRemoteVoice(r.id, { onStart: () => setDuck(0.35), onEnd: () => setDuck(1) }); flash("📺 iPad ONLINE"); tone(1320, 0, 0.08, 0.05); tone(1760, 0.08, 0.15, 0.04); }
     else flash("iPad に表示できませんでした");
   }
-  function cabStop(end: boolean) { const id = cabTrip; cabSend = false; if (end && id) { cabTrip = null; void cab.end(id); } }
+  // 車内 iPad の声もこの端末で鳴らす (到着の案内が終わるまで少し待ってから止める)
+  let rv: RemoteVoice | null = null;
+  function cabStop(end: boolean) { const id = cabTrip; cabSend = false; const r0 = rv; setTimeout(() => { if (rv === r0) { r0?.stop(); rv = null; } }, end ? 0 : 60000); if (end && id) { cabTrip = null; void cab.end(id); } }
   every(3000, async () => {
     if (!cabTrip || !cabSend) return; const ll = curLL();
     const r = await cab.pos(cabTrip, ll[0], ll[1], Math.round(spd));
@@ -300,8 +338,12 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
 
   /* ---------------- 設定 ---------------- */
   function renderSet() {
-    $("bgB").textContent = S.bgm.boot ? "✓ アップした曲" : "内蔵の BGM";
-    $("bgN").textContent = S.bgm.normal ? "✓ アップした曲" : "内蔵の BGM"; $("bgC").textContent = S.bgm.cruise ? "✓ アップした曲" : "内蔵の BGM";
+    const L = lists(), NM: Record<string, string> = { boot: "起動・ホーム", normal: "ノーマル", cruise: "クルーズ" };
+    for (const m of MODES) {
+      const box = $(`pl_${m}`), arr = L[m] ?? [];
+      box.innerHTML = arr.length ? arr.map((t, i) => `<li><span>${i + 1}. ${esc(t.title)}</span><button data-up="${m}:${i}" ${i ? "" : "disabled"}>▲</button><button data-dn="${m}:${i}" ${i < arr.length - 1 ? "" : "disabled"}>▼</button><button class="del" data-del="${m}:${i}">✕</button></li>`).join("") : `<li class="none">内蔵の BGM (${NM[m]})</li>`;
+    }
+    $("shTg").textContent = cfg.shuffle ? "シャッフル" : "登録順"; $("shTg").classList.toggle("on", cfg.shuffle);
     $("limIn").value = cfg.limit; for (const [id, v] of [["qTg", cfg.quiet], ["dTg", cfg.demo], ["bTg", cfg.bgm]] as [string, boolean][]) { $(id).textContent = v ? "ON" : "OFF"; $(id).classList.toggle("on", v); }
     $("gpsSt").textContent = cfg.demo ? "GPS: デモ走行中は使いません" : gpsOk ? `GPS: OK (±${Math.round(gpsAcc)} m)` : gpsErr ? `GPS: ${gpsErr}` : "GPS: 位置を待っています…";
   }
@@ -310,24 +352,47 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   $("qTg").onclick = () => { cfg.quiet = !cfg.quiet; saveCfg(); renderSet(); $("qm").classList.toggle("on", cfg.quiet); if (cfg.quiet) CQ = CQ.filter((x) => x.prio); void say(cfg.quiet ? "quiet_on" : "quiet_off"); };
   $("dTg").onclick = () => { cfg.demo = !cfg.demo; saveCfg(); renderSet(); };
   $("bTg").onclick = () => { cfg.bgm = !cfg.bgm; saveCfg(); renderSet(); applyBgm(); };
-  async function upBgm(which: BgmMode, f: File) {
-    const ext = (f.name.split(".").pop() || "mp3").toLowerCase().replace("mpeg", "mp3");
-    $("bgMsg").textContent = "アップロード中…";
-    const u = await post({ op: "bgmUrl", which, ext: /^(mp3|m4a|aac|wav)$/.test(ext) ? ext : "mp3" });
-    if (!u.ok) { $("bgMsg").textContent = "アップロードできませんでした: " + u.error; return; }
-    const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": f.type || "audio/mpeg", "x-upsert": "false" }, body: f }).catch(() => null);
-    if (!put || !put.ok) { $("bgMsg").textContent = "アップロードできませんでした"; return; }
-    const s = await post({ op: "bgmSet", which, path: u.path });
-    if (!s.ok) { $("bgMsg").textContent = s.error === "SETUP" ? "Supabase で migration_kaku.sql を実行してください" : "保存できませんでした: " + s.error; return; }
-    S.bgm[which] = s.url; loadBgm(); applyBgm(); renderSet(); $("bgMsg").textContent = `✓ ${which === "boot" ? "起動" : which === "normal" ? "ノーマル" : "クルーズ"} BGM を保存しました`;
+  async function upBgm(which: BgmMode, files: File[]) {
+    const NM: Record<string, string> = { boot: "起動・ホーム", normal: "ノーマル", cruise: "クルーズ" };
+    let ok = 0;
+    for (const [k, f] of files.entries()) {
+      $("bgMsg").textContent = `アップロード中… (${k + 1}/${files.length}) ${f.name}`;
+      const ext = (f.name.split(".").pop() || "mp3").toLowerCase();
+      const u = await post({ op: "bgmUrl", which, ext: /^(mp3|m4a|aac|wav)$/.test(ext) ? ext : "mp3" });
+      if (!u.ok) { $("bgMsg").textContent = "アップロードできませんでした: " + u.error; return; }
+      const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": f.type || "audio/mpeg", "x-upsert": "false" }, body: f }).catch(() => null);
+      if (!put || !put.ok) { $("bgMsg").textContent = `アップロードできませんでした: ${f.name}`; continue; }
+      const title = f.name.replace(/\.[^.]+$/, "").slice(0, 80);
+      const r = await post({ op: "trackAdd", which, path: u.path, title });
+      if (!r.ok) { $("bgMsg").textContent = r.error === "SETUP" ? "Supabase で migration_kaku.sql を実行してください (プレイリストの表)" : "保存できませんでした: " + r.error; return; }
+      ok++;
+    }
+    await refresh(); renderSet(); applyBgm(); $("bgMsg").textContent = `✓ ${NM[which]} のプレイリストに ${ok} 曲追加しました`;
   }
-  $("upB").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("boot", f); e.target.value = ""; };
-  $("upN").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("normal", f); e.target.value = ""; };
-  $("upC").onchange = (e: any) => { const f = e.target.files?.[0]; if (f) void upBgm("cruise", f); e.target.value = ""; };
-  root.querySelectorAll<HTMLElement>("[data-rm]").forEach((b) => (b.onclick = async () => {
-    const which = b.dataset.rm as BgmMode; const s = await post({ op: "bgmSet", which, path: null });
-    if (s.ok) { S.bgm[which] = null; loadBgm(); applyBgm(); renderSet(); $("bgMsg").textContent = "内蔵の BGM に戻しました"; } else $("bgMsg").textContent = "できませんでした: " + s.error;
-  }));
+  for (const [id, m] of [["upB", "boot"], ["upN", "normal"], ["upC", "cruise"]] as [string, BgmMode][]) {
+    $(id).onchange = (e: any) => { const fs = [...(e.target.files || [])] as File[]; if (fs.length) void upBgm(m, fs); e.target.value = ""; };
+  }
+  $("st").addEventListener("click", async (e: Event) => {
+    const b = (e.target as HTMLElement).closest("button"); if (!b) return;
+    const d = b.dataset.up || b.dataset.dn || b.dataset.del; if (!d) return;
+    const [m, is] = d.split(":"), i = Number(is), arr = [...(lists()[m] ?? [])];
+    if (b.dataset.del) {
+      if (!confirm2(b)) return;
+      const r = await post({ op: "trackDel", id: arr[i].id }); if (!r.ok) { $("bgMsg").textContent = "消せませんでした: " + r.error; return; }
+      $("bgMsg").textContent = `「${arr[i].title}」を消しました`;
+    } else {
+      const j = b.dataset.up ? i - 1 : i + 1; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]];
+      const ids = arr.map((t) => t.id).filter((x) => !x.startsWith("legacy-"));
+      if (arr.some((t) => t.id.startsWith("legacy-"))) { $("bgMsg").textContent = "前にアップした曲は並べ替えできません (消して追加し直してください)"; return; }
+      const r = await post({ op: "trackOrder", ids }); if (!r.ok) { $("bgMsg").textContent = "並べ替えできませんでした: " + r.error; return; }
+      if (S.tracks) S.tracks[m] = arr;
+    }
+    await refresh(); renderSet();
+  });
+  /** ✕ は 2 回押しで消す (押し間違い防止) */
+  function confirm2(b: HTMLElement) { if (b.dataset.sure) return true; b.dataset.sure = "1"; b.textContent = "消す?"; setTimeout(() => { delete b.dataset.sure; b.textContent = "✕"; }, 2500); return false; }
+  $("shTg").onclick = () => { cfg.shuffle = !cfg.shuffle; saveCfg(); for (const m of MODES) { const p = PL[m], was = cur(m)?.id; p.order = mkOrder(p.list.length); p.i = Math.max(0, p.order.findIndex((k) => p.list[k]?.id === was)); } renderSet(); };
+  $("npN").onclick = (e: Event) => { e.stopPropagation(); tone(1200, 0, 0.05, 0.04); nextTrack(mode, true); };
 
   /* ---------------- フリーミッションの作成 ---------------- */
   let WP: KakuPlace[] = [], fType = "err";
@@ -495,7 +560,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     show("s3"); resetHud(); setLeg(0); follow = false; map.invalidateSize(); map.fitBounds(L.latLngBounds(RT), { padding: [60, 120] });
     const km = M.legs.reduce((a, l) => a + lenOf(l.pts), 0) / 1000, min = Math.round(M.legs.reduce((a, l) => a + l.dur, 0) / 60);
     if (M.kind === "free") dyn.fbrief = `フリーミッションを読み込みました。目的地：${M.legs.filter((l) => !l.home).map((l) => l.n).join("、")}。全行程 ${km.toFixed(1)} km、約 ${min} 分。${M.due ? `目標到着 ${M.due}。` : ""}${M.legs.some((l) => !l.real) ? "（ルートが取れなかったので直線で仮表示）" : ""}ナビは私が、駐車はあなたが。始めますか？`;
-    else dyn.gbrief = M.cab?.dir === "out" || /お見送り/.test(M.name) ? `通信が入りました、Kaku。今回の任務：${dyn.guestWho || "ゲスト"}を${M.legs[0].n}まで無事にお送りすること。往復 ${km.toFixed(1)} km。${M.cab ? "車内 iPad も連動します。" : ""}引き受けますか？` : `通信が入りました、Kaku。今回の任務：${M.legs[0].n}で${dyn.guestWho || "ゲスト"}をお迎えし、無事に Crane Nest へ。往復 ${km.toFixed(1)} km。${M.cab ? "車内 iPad は帰り道で連動します。" : ""}コーヒーは未完了です。引き受けますか？`;
+    else dyn.gbrief = M.cab?.dir === "out" || /お見送り/.test(M.name) ? `通信が入りました、Kaku。今回の任務：${dyn.guestWho || "ゲスト"}を${M.legs[0].n}まで無事にお送りすること。往復 ${km.toFixed(1)} km。${M.cab ? "車内 iPad も連動します。" : ""}引き受けますか？` : `通信が入りました、Kaku。今回の任務：${M.legs[0].n}で${dyn.guestWho || "ゲスト"}をお迎えし、無事に Crane Nest へ。往復 ${km.toFixed(1)} km。${M.cab ? "車内 iPad も連動します。" : ""}コーヒーは未完了です。引き受けますか？`;
     etaTick(true); setTimeout(() => void say(M.kind === "free" ? "fbrief" : "gbrief"), 700);
   }
   /* 指紋を長押し: 出発 / 次へ / (走行中) ここで到着にする */
@@ -626,7 +691,8 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     if (phase !== "drive") return; phase = "hold"; spd = 0; $("spd").textContent = "0"; $("gb").style.width = "0"; $("s3").classList.remove("cruise", "over", "hwy"); inBr = false; hwT = 0; hwOn = false; setMode("normal");
     $("tgt").innerHTML = "0.0<small>km</small>"; placeCar(1);
     const l = M.legs[leg];
-    if (M.cab && M.cab.leg === leg && cabTrip) { const ll = l.ll; void cab.pos(cabTrip, ll[0], ll[1], 0); cabStop(false); } // 最後の位置を送って終わり (iPad は到着画面 → 自分で待機に戻る)
+    // iPad 連動: 迎え先・送り先では送り続ける (回送 / 帰り道も iPad に出す)。Crane Nest に着いたら最後の位置を送って終わり (iPad は自分で待機に戻る)
+    if (M.cab && cabTrip && l.home) { const ll = l.ll; void cab.pos(cabTrip, ll[0], ll[1], 0); cabStop(false); }
     if (l.home) { renderSteps(M.legs.length); return done(); }
     renderSteps(leg); $("steps").children[leg].className = "done"; showReached(l);
     const nx = M.legs[leg + 1];
@@ -651,7 +717,9 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   async function nextLeg() {
     const nx = M.legs[leg + 1]; if (!nx) return done();
     hideReached(); setLeg(leg + 1);
-    if (M.cab && M.cab.leg === leg) void cabBegin(); phase = "drive"; said = {}; lateSaid = false; holdT0 = 0; offT = 0; stopT = 0;
+    if (M.cab && !cabTrip && M.cab.leg === leg) void cabBegin();
+    else if (M.cab?.dir === "in" && cabTrip && leg === 1) void cab.board(cabTrip); // 迎え先を出発 = ゲスト乗車
+    phase = "drive"; said = {}; lateSaid = false; holdT0 = 0; offT = 0; stopT = 0;
     $("bdg").textContent = "進行中"; $("bdg").classList.remove("wait"); $("authT").textContent = "進行中 · 長押しで到着";
     tone(880, 0, 0.1, 0.06); tone(1320, 0.1, 0.25, 0.05); map.flyTo(curLL(), 16, { duration: 1.2 });
     if (!M.demo && gpsLL) { const p = project(gpsLL); if (p.off > 300) void reroute(gpsLL); }

@@ -170,3 +170,24 @@ test("arrival screen: separate guides (entrance / room / restroom), restroom has
   const g = read("components", "cabin", "cabinGuide.ts");
   assert.match(g, /export type GuideScope = "all" \| "ent" \| "room"/);
 });
+
+test("voices always play on iPad: every player is unlocked on the first tap and retried once; room photo is labelled as a photo", () => {
+  const eng = read("components", "cabin", "cabinEngine.ts");
+  assert.match(eng, /ai\.preload\(\); ai\.unlock\(\); guide\.unlock\(\); toilet\.unlock\(\);/);
+  for (const f of ["cabinAi.ts", "cabinGuide.ts", "cabinToilet.ts", "cabinEngine.ts"]) assert.match(read("components", "cabin", f), /playSafe\(/, f);
+  assert.ok(!read("components", "cabin", "cabinMarkup.ts").includes("● LIVE"), "no LIVE label on the room photo");
+  assert.match(eng, /ja: "📷 イメージ写真"/);
+});
+
+test("voices come out of the phone (Bluetooth): iPad queues them, phone polls and plays; guides stay on the iPad", () => {
+  const eng = read("components", "cabin", "cabinEngine.ts"), ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(eng, /const remote = \(\) => !!trip && !trip\.id\.startsWith\("demo"\) && Date\.now\(\) - phoneSeen < 12000/, "falls back to the iPad when the phone is not polling");
+  assert.match(eng, /hooks\.onSay\?\.\(trip!\.id, AUDIO \+ k \+ "\.mp3", ""\)/);
+  assert.match(ai, /if \(rm\) \{ c\.send\(url, line\.en\)/);
+  assert.match(read("app", "api", "cabin", "state", "route.ts"), /b\.op === "say"/);
+  assert.match(read("app", "api", "cabin", "voice", "route.ts"), /voice_seen/);
+  assert.match(read("components", "driver", "DriverCabin.tsx"), /startRemoteVoice\(trip\.id/);
+  assert.match(read("components", "kaku", "kakuEngine.ts"), /rv = startRemoteVoice\(r\.id/);
+  assert.ok(!/onSay|remote\(\)/.test(read("components", "cabin", "cabinGuide.ts") + read("components", "cabin", "cabinToilet.ts")), "room / restroom guides keep playing on the iPad");
+  assert.ok(read("supabase", "migration_cabin_voice.sql").includes("voice_q"));
+});

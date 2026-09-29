@@ -211,6 +211,8 @@ const isId = (x: unknown): x is string => typeof x === "string" && /^[0-9a-f-]{3
 export async function cabinStart(v: {
   deviceId: string | null; resId: string | null; dir: "in" | "out"; placeKey: string; placeName: string | null;
   placeLL: [number, number] | null; roomId: string | null; lang: string; ac: "cool" | "heat" | "none";
+  /** お迎えは「回送」(迎えに行く途中) から始める。ゲストが乗ったら cabinBoard */
+  phase?: "dead" | "guest";
 }): Promise<R<{ trip: CabinTrip }>> {
   const g = guard(); if (g) return g;
   if (!/^(kix|kix2|rinku|r833|hineno|other)$/.test(v.placeKey)) return fail("BAD_PLACE");
@@ -219,17 +221,29 @@ export async function cabinStart(v: {
   let end = supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: now }).eq("status", "active");
   if (isId(v.deviceId)) end = end.or(`device_id.eq.${v.deviceId},device_id.is.null`);
   const e1 = await end; if (e1.error) return fail(/cabin_trips/.test(e1.error.message) ? "SETUP" : e1.error.message);
-  const { data, error } = await supabaseAdmin.from("cabin_trips").insert({
+  const row: Record<string, unknown> = {
     device_id: isId(v.deviceId) ? v.deviceId : null, reservation_id: isId(v.resId) ? v.resId : null,
     direction: v.dir === "out" ? "out" : "in", place_key: v.placeKey, place_name: v.placeName?.slice(0, 80) ?? null,
     place_lat: v.placeLL?.[0] ?? null, place_lng: v.placeLL?.[1] ?? null, room_id: isId(v.roomId) ? v.roomId : null,
     guest_lang: langOf(v.lang), ac_mode: v.ac === "heat" ? "heat" : v.ac === "none" ? "none" : "cool",
-  }).select("*").single();
+    phase: v.phase === "dead" ? "dead" : "guest",
+  };
+  let ins = await supabaseAdmin.from("cabin_trips").insert(row).select("*").single();
+  // migration_cabin_voice.sql がまだなら、回送なし (今までどおり)
+  if (ins.error && /phase/.test(ins.error.message)) { delete row.phase; ins = await supabaseAdmin.from("cabin_trips").insert(row).select("*").single(); }
+  const { data, error } = ins;
   if (error || !data) return fail(error?.message || "INSERT");
   return { ok: true, trip: toCabinTrip(data) };
 }
+/** ゲスト乗車: 回送 → ゲストが乗っている (iPad がゲスト用の画面に切り替わる) */
+export async function cabinBoard(tripId: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId)) return fail("BAD");
+  const { error } = await supabaseAdmin.from("cabin_trips").update({ phase: "guest", started_at: new Date().toISOString() }).eq("id", tripId).eq("status", "active");
+  return error ? fail(/phase/.test(error.message) ? "SETUP_VOICE" : error.message) : { ok: true };
+}
 /** スマホの位置を送る (3 秒ごと)。送迎が終わっていたら active = false */
-export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup" }>> {
+export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup"; phase?: "dead" | "guest" }>> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
   const up: Record<string, unknown> = {};
@@ -237,7 +251,7 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   // 再生中の曲 (iPad の歌詞用)。受け取った時刻はサーバの時計で
   const n = cleanNowPlaying(np);
   const withNp = { ...up, now_playing: n ? { ...n, at: Date.now() } : null };
-  let r = await supabaseAdmin.from("cabin_trips").update(withNp).eq("id", tripId).eq("status", "active").select("id, music_cmd");
+  let r = await supabaseAdmin.from("cabin_trips").update(withNp).eq("id", tripId).eq("status", "active").select("*");
   // migration_cabin_music.sql がまだなら、位置だけ送る (今までどおり)
   if (r.error && /now_playing|music_cmd/.test(r.error.message)) {
     if (!Object.keys(up).length) return { ok: true, active: true, cmd: null, np: "setup" };
@@ -247,7 +261,7 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   }
   if (r.error) return fail(r.error.message);
   const row: any = r.data?.[0];
-  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok" };
+  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok", phase: row?.phase === "dead" ? "dead" : "guest" };
 }
 /** お父さんから車内 iPad の ASTRAEA へ指示 (ボタン・声)。「お部屋の準備」は本当にエアコン + 照明もつける */
 export async function cabinAiCmd(tripId: string, c: CaptainCmdId): Promise<R> {

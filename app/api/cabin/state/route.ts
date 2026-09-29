@@ -35,7 +35,21 @@ export async function GET(req: NextRequest) {
     trip?.np && trip.np.id !== have ? cabinTrackById(trip.np.id).catch(() => null) : null,
     trip ? checkinQrUrl().catch(() => null) : null,
   ]);
-  return J({ ok: true, device, trip, room, track, checkin, now: Date.now() });
+  // 回送中 (ゲストなし): 迎えに行くゲストの情報・お部屋の準備・鍵の電池 (父向けの画面に出す)
+  let dh: any = null;
+  if (trip?.phase === "dead") {
+    try {
+      const [{ data: r }, { data: bt }] = await Promise.all([
+        trip.resId ? supabaseAdmin.from("reservations").select("*").eq("id", trip.resId).maybeSingle() : Promise.resolve({ data: null }),
+        trip.roomId ? supabaseAdmin.from("lock_battery_logs").select("battery, checked_at").eq("room_id", trip.roomId).order("checked_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+      ] as any);
+      dh = {
+        guest: (r as any)?.entrance_name || (r as any)?.guest_name || null, flightNo: (r as any)?.flight_no ?? null, flight: (r as any)?.flight_info ?? null,
+        prepared: (r as any)?.prepared_at ?? null, pickupAt: (r as any)?.pickup_at ?? null, battery: typeof (bt as any)?.battery === "number" ? (bt as any).battery : null,
+      };
+    } catch { dh = {}; }
+  }
+  return J({ ok: true, device, trip, room, track, checkin, dh, now: Date.now() });
 }
 
 /** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */
@@ -73,6 +87,24 @@ export async function POST(req: NextRequest) {
     const cmd = cleanCmd(b.c, b.v); if (!cmd) return J({ ok: false, error: "BAD_CMD" }, 400);
     const { error } = await supabaseAdmin.from("cabin_trips").update({ music_cmd: cmd }).eq("id", b.trip).eq("status", "active");
     return J(error ? { ok: false, error: /music_cmd/.test(error.message) ? "SETUP" : error.message } : { ok: true });
+  }
+  // 回送の切り替え: board = ゲスト乗車 (iPad のボタン) / deadhead = お見送りの到着のあと、帰り道へ
+  if ((b.op === "board" || b.op === "deadhead") && isId(b.trip)) {
+    const up = b.op === "board" ? { phase: "guest", started_at: new Date().toISOString() } : { phase: "dead" };
+    const { error } = await supabaseAdmin.from("cabin_trips").update(up).eq("id", b.trip).eq("status", "active");
+    return J(error ? { ok: false, error: /phase/.test(error.message) ? "SETUP" : error.message } : { ok: true });
+  }
+  // iPad が話す声を、スマホで流してもらう (順番待ちに足す。古いものは 30 秒で消える)
+  if (b.op === "say" && isId(b.trip)) {
+    const u = String(b.u || "");
+    if (!/^\/(cabin|kaku)\/audio\/[\w\/.-]+\.mp3$/.test(u)) return J({ ok: false, error: "BAD_URL" }, 400);
+    const { data: t, error: e1 } = await supabaseAdmin.from("cabin_trips").select("voice_q, status").eq("id", b.trip).maybeSingle();
+    if (e1) return J({ ok: false, error: /voice_q/.test(e1.message) ? "SETUP" : e1.message });
+    if (!t || t.status !== "active") return J({ ok: false, error: "NO_TRIP" });
+    const now = Date.now(), q = (Array.isArray((t as any).voice_q) ? (t as any).voice_q : []).filter((x: any) => x && now - Number(x.n) < 30000);
+    q.push({ n: Math.max(now, ...q.map((x: any) => Number(x.n) + 1)), u, s: String(b.s || "").slice(0, 300) });
+    const { error } = await supabaseAdmin.from("cabin_trips").update({ voice_q: q.slice(-8) }).eq("id", b.trip);
+    return J(error ? { ok: false, error: error.message } : { ok: true });
   }
   return J({ ok: false, error: "BAD_OP" }, 400);
 }

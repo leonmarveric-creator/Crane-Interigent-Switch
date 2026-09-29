@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { KAKU_HTML } from "@/components/kaku/kakuMarkup";
 import { createKaku, type KakuCabinInfo, type KakuEngine, type KakuState } from "@/components/kaku/kakuEngine";
-import { cabinStart, cabinPos, cabinEnd } from "@/app/driver/actions";
+import { cabinStart, cabinPos, cabinEnd, cabinBoard } from "@/app/driver/actions";
 
 function loadLeaflet(): Promise<void> {
   const w = window as any;
@@ -38,6 +38,7 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
           start: async (v) => { const r = await cabinStart(v).catch((e) => ({ ok: false as const, error: String(e) })); return r.ok ? { ok: true, id: r.trip.id } : { ok: false, error: (r as any).error }; },
           pos: async (id, lat, lng, kmh) => { const r = await cabinPos(id, lat, lng, kmh, null).catch(() => null); return { ok: !!r?.ok, active: r?.ok ? r.active : true }; },
           end: async (id) => { await cabinEnd(id).catch(() => null); },
+          board: async (id) => { await cabinBoard(id).catch(() => null); },
         });
       } catch (e) { setErr(String((e as Error)?.message || e)); }
     })();

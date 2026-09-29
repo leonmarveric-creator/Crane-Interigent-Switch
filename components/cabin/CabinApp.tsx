@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TRIP_HTML } from "@/components/cabin/cabinMarkup";
 import { createEngine, tileCount, type Engine } from "@/components/cabin/cabinEngine";
+import { createDeadhead, type Deadhead } from "@/components/cabin/cabinDeadhead";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL } from "@/lib/cabinGeo";
@@ -32,6 +33,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null); // 送迎画面の中身 (React は触らない。engine が直接動かす)
   const eng = useRef<Engine | null>(null);
+  const dhRef = useRef<Deadhead | null>(null); // 回送モード (ゲストなし: 迎えに行く途中・送ったあとの帰り道)
   const [dev, setDev] = useState<{ id: string; name: string } | null>(null);
   const [needSetup, setNeedSetup] = useState(false);
   const [setupErr, setSetupErr] = useState("");
@@ -78,6 +80,17 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           onCmd: (id, c, v) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "cmd", trip: id, c, v }) }).catch(() => {}),
           // ゲストの「お部屋の明かりをつけて」→ 本物の照明
           onLights: (id) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "lights", trip: id }) }).catch(() => {}),
+          // 声はスマホ (Bluetooth) から流す
+          onSay: (id, u, s) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "say", trip: id, u, s }) }).catch(() => {}),
+        });
+        // 回送モード (ゲストが乗っていない区間。お父さん向けの画面)
+        const post = (b: any) => fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((x) => x.json()).catch(() => null);
+        dhRef.current = createDeadhead({
+          stage: root.current.querySelector(".stage") as HTMLElement, routes, ac: () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); void w.__dhAc.resume(); return w.__dhAc; } catch { return null; } },
+          remote: () => !!eng.current?.remoteVoice(),
+          say: (u, s) => { const id = tripRef.current?.id; if (id) void post({ op: "say", trip: id, u, s }); },
+          board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else void poll(); },
+          end: (id) => void endTrip(id, true),
         });
         eng.current.resize();
         if (wxRef.current) eng.current.weather(wxRef.current);
@@ -122,7 +135,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       if (acc > GOOD_ACC) return;
       const kmh = p.coords.speed != null && p.coords.speed >= 0 ? p.coords.speed * 3.6 : null;
       own.current = { ll: [p.coords.latitude, p.coords.longitude], kmh, t: Date.now() };
-      if (tripRef.current) eng.current?.feed(own.current.ll, kmh, "ipad");
+      if (tripRef.current) { if (dhRef.current?.on()) dhRef.current.feed(own.current.ll, kmh); else eng.current?.feed(own.current.ll, kmh, "ipad"); }
     }, () => { /* 許可されていない・取れない → スマホの位置を使う */ }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     const chk = setInterval(() => { if (gps.current.has === null && Date.now() - gps.current.since > 60000) { gps.current.has = false; setGpsState("no"); } }, 10000);
     return () => { navigator.geolocation.clearWatch(id); clearInterval(chk); };
@@ -144,6 +157,20 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       if (t) {
         const first = e.tripId() !== t.id;
         tripRef.current = t;
+        // スマホが声を取りに来ているか (来ていれば声はスマホから)
+        e.setVoiceSeen(t.voiceSeen && typeof j.now === "number" ? Math.max(0, j.now - Date.parse(t.voiceSeen)) : null);
+        // 回送中 (ゲストなし) は父向けの画面。ゲスト乗車 (phase = guest) でいつもの送迎画面へ
+        const dh = dhRef.current;
+        if (t.phase === "dead" && dh) {
+          if (e.tripId() === t.id) e.stop();
+          setInTrip(true); setMenu(false);
+          dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string");
+          const ownF = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
+          if (!ownF && t.phone && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) { phoneAt.current = t.phone.at; dh.feed(t.phone.ll, t.phone.kmh); }
+          else if (ownF) dh.feed(own.current!.ll, own.current!.kmh);
+          return;
+        }
+        if (dh?.on()) dh.hide();
         if (first) { setInTrip(true); setMenu(false); await e.start(t, j.room); phoneAt.current = ""; if (own.current && Date.now() - own.current.t < OWN_FRESH_MS) e.feed(own.current.ll, own.current.kmh, "ipad"); }
         // iPad の GPS が新しくなければ、お父さんのスマホの位置で
         const ownFresh = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
@@ -157,12 +184,18 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }
         if (j.track) trackRef.current = j.track;
         e.nowPlaying(t.np ?? null, t.np && trackRef.current?.id === t.np.id ? trackRef.current : null, typeof j.now === "number" ? j.now - Date.now() : 0);
-      } else if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); }
+      } else { dhRef.current?.hide(); if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); } }
     } catch { setOnline(false); }
   }, [dev, toast]);
   useEffect(() => { if (!dev) return; void poll(); const id = setInterval(() => void poll(), POLL_MS); return () => clearInterval(id); }, [dev, poll]);
 
-  async function endTrip(id: string) {
+  async function endTrip(id: string, force = false) {
+    // お見送りの到着のあとは、終わりにせず「帰り道 (回送)」へ (SQL がまだなら今までどおり終わり)
+    if (!force && !id.startsWith("demo") && tripRef.current?.id === id && tripRef.current.dir === "out") {
+      const r = await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "deadhead", trip: id }) }).then((x) => x.json()).catch(() => null);
+      if (r?.ok) { eng.current?.stop(); void poll(); return; }
+    }
+    dhRef.current?.hide();
     if (!id.startsWith("demo")) await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "end", trip: id }) }).catch(() => {});
     eng.current?.stop(); tripRef.current = null; setInTrip(false);
   }
@@ -211,12 +244,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     const e = eng.current; if (!e) return;
     e.unlock(); setMenu(false);
     const room = rooms.find((r) => r.photo) ?? rooms[0] ?? null;
-    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null, npReady: true, aiQuiet: false, aiCmd: null };
+    const t: CabinTrip = { id: "demo-" + Date.now(), deviceId: null, resId: null, dir, placeKey, placeName: null, placeLL: null, roomId: room?.id ?? null, lang: "zh", ac: acModeFor(Date.now()), startedAt: new Date().toISOString(), phone: null, np: null, cmd: null, npReady: true, aiQuiet: false, voiceSeen: null, phase: "guest", aiCmd: null };
     tripRef.current = t; setInTrip(true);
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }
 
-  const tap = () => { if (tapped) return; setTapped(true); eng.current?.unlock(); try { (document.documentElement as any).webkitRequestFullscreen?.(); } catch { /* ignore */ } };
+  const tap = () => { if (tapped) return; setTapped(true); eng.current?.unlock(); dhRef.current?.unlock(); try { (document.documentElement as any).webkitRequestFullscreen?.(); } catch { /* ignore */ } };
 
   return (
     <div className="cab" ref={root} onClick={tap}>

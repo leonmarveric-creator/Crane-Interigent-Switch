@@ -17,6 +17,7 @@ import { createGuide } from "@/components/cabin/cabinGuide";
 import { createToilet } from "@/components/cabin/cabinToilet";
 import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
+import { playSafe } from "@/lib/cabinAudio";
 
 const TILES = {
   dark: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
@@ -56,13 +57,16 @@ export interface Engine {
   nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void;
   /** AI (ASTRAEA) の静かモード */
   setQuiet(q: boolean): void;
+  setVoiceSeen(ageMs: number | null): void;
+  /** 声をスマホから流すか (スマホが取りに来ているか) */
+  remoteVoice(): boolean;
   /** お父さんから ASTRAEA への指示 */
   aiCommand(cmd: { c: string; n: number } | null): void;
   /** チェックイン QR の画像 (全員共通) */
   setCheckin(url: string | null): void;
 }
 
-export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void }): Engine {
+export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => void }): Engine {
   const L = (window as any).L;
   const $ = (id: string) => root.querySelector("#" + id) as HTMLElement;
   const stage = root.querySelector(".stage") as HTMLElement;
@@ -114,7 +118,19 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const src = (k: string) => blobs[k] || AUDIO + k + ".mp3";
   const voice = new Audio(); let Q: Promise<void> = Promise.resolve();
   let voiceN = 0; // 道案内などの声が出ている (待っている) 数。AI はこの間は話さない
-  const say = (k: string) => { voiceN++; Q = Q.then(() => new Promise<void>((r) => { voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); voice.play().catch(() => r()); setTimeout(r, 15000); })).then(() => { voiceN = Math.max(0, voiceN - 1); }); return Q; };
+  /* 声はスマホ (Bluetooth で車のスピーカー) から流す。スマホが来ていないときだけ iPad から。
+     スマホで流すときも、iPad は音を消して同じ声を再生して、長さ (字幕・順番) を合わせる */
+  let phoneSeen = 0;
+  const remote = () => !!trip && !trip.id.startsWith("demo") && Date.now() - phoneSeen < 12000;
+  const REMOTE_LAG = 1100; // スマホが取りに来て鳴らすまでのおおよその遅れ
+  const say = (k: string) => {
+    voiceN++;
+    Q = Q.then(async () => {
+      const rm = remote(); if (rm) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", ""); await new Promise((r) => setTimeout(r, REMOTE_LAG)); }
+      await new Promise<void>((r) => { voice.muted = rm; voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); playSafe(voice, () => ac(), () => r()); setTimeout(r, 15000); });
+    }).then(() => { voiceN = Math.max(0, voiceN - 1); });
+    return Q;
+  };
   const sfx = (k: string) => { const a = new Audio(src(k)); a.play().catch(() => {}); };
   const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
@@ -159,6 +175,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip) return;
     const O = trip.dir === "out", r = room, m = acMode();
     root.style.setProperty("--acc", r?.accent ?? "#5fe3ff");
+    // お部屋の写真は前に撮った写真 (カメラの映像ではない) と分かるように
+    setText("rlive", ({ ja: "📷 イメージ写真", zh: "📷 示意照片", en: "📷 Sample photo", ko: "📷 참고 사진" } as Record<GLang, string>)[lang] ?? "📷 Sample photo");
     const img = $("rimg") as HTMLImageElement;
     if (r?.photo) { if (img.getAttribute("src") !== r.photo) { img.src = r.photo; img.decode?.().catch(() => {}); } $("abg").style.backgroundImage = `url(${r.photo})`; $("rph").style.display = ""; }
     else { $("rph").style.display = "none"; $("abg").style.backgroundImage = ""; }
@@ -296,7 +314,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     ai.event("arrive");
     // 2 分たったら送迎を終わりにして、待機画面へ (ガイドを見ている間は待つ)
     const endIfIdle = () => { if (guide.on() || toilet.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
-    T_(120000, endIfIdle);
+    T_(trip.dir === "out" ? 45000 : 120000, endIfIdle); // お見送りは早めに「帰り道 (回送)」へ
   }
   $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); qrHide(); };
 
@@ -523,7 +541,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let aiQuiet = false, startedAt = 0, npId: string | null = null;
   const ai = createAi({
     root, stage, ac, quiet: () => aiQuiet, voiceBusy: () => voiceN > 0,
-    duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); },
+    duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
+    remote, send: (url, text) => { if (trip) hooks.onSay?.(trip.id, url, text); },
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
     roomLights: () => { if (trip && !trip.id.startsWith("demo")) hooks.onLights?.(trip.id); setTimeout(roomLit, 2500); },
     roomLit: () => roomLit(),
@@ -629,7 +648,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- 最初のタップで音を使えるように + 声・効果音をこの iPad に保存 ---------- */
   function unlock() {
-    ai.preload();
+    ai.preload(); ai.unlock(); guide.unlock(); toilet.unlock();
     ac(); voice.muted = true; voice.src = AUDIO + "en-arrive.mp3"; voice.play().then(() => { voice.pause(); voice.muted = false; }).catch(() => { voice.muted = false; });
     // 声・効果音を先に読み込んでおく (保存済みなら iPad の中から。再生のときに待たない)
     void (async () => {
@@ -663,6 +682,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       if (np && track && np.id === track.id && np.id !== npId) { if (npId) ai.event("song"); npId = np.id; }
     },
     setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); },
+    /** スマホが声を取りに来ている (ageMs = 最後に来てからの時間) */
+    remoteVoice: () => Date.now() - phoneSeen < 12000,
+    setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },
     aiCommand: (cmd) => { if (trip) ai.command(cmd); },
     setCheckin: (u) => { checkinUrl = u; } };
 }
