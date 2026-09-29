@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TOILET_T, TOILET_VOICE, toiletAudio, type ToiletKey } from "@/lib/cabinToilet";
 import type { GLang } from "@/lib/cabinGeo";
+import { playSafe, unlockAudio } from "@/lib/cabinAudio";
 
 export interface ToiletCtx {
   stage: HTMLElement;
@@ -14,7 +15,7 @@ export interface ToiletCtx {
   ac: () => AudioContext | null;
   duck: (sec: number) => void; // お父さんのスマホの音楽を下げる
 }
-export interface Toilet { start(): void; stop(): void; on(): boolean }
+export interface Toilet { start(): void; stop(): void; on(): boolean; unlock(): void }
 
 const esc = (s: string) => s.replace(/[<&>"]/g, "");
 /** 実際のトイレの写真 (差し替えるときはこのファイルを置き換える) */
@@ -64,7 +65,7 @@ export function createToilet(c: ToiletCtx): Toilet {
     const L = c.lang(), s = TOILET_VOICE[k];
     $("tlSub").innerHTML = [...s[L]].map((ch, i) => `<span style="animation-delay:${i * 22}ms">${esc(ch)}</span>`).join("");
     $("tlEn").textContent = L === "en" ? "" : s.en;
-    return new Promise<void>((ok) => { el.src = toiletAudio(k); el.onended = () => ok(); el.onerror = () => ok(); el.play().catch(() => ok()); setTimeout(ok, 22000); });
+    return new Promise<void>((ok) => { el.src = toiletAudio(k); el.onended = () => ok(); el.onerror = () => ok(); playSafe(el, () => c.ac(), () => ok()); setTimeout(ok, 22000); });
   }
   function show(n: number) {
     host.querySelectorAll<HTMLElement>(".gdS").forEach((e) => e.classList.toggle("on", Number(e.dataset.s) === n));
@@ -113,5 +114,5 @@ export function createToilet(c: ToiletCtx): Toilet {
   }
   $("tlX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();
-  return { start: () => void start(), stop, on: () => onNow };
+  return { start: () => void start(), stop, on: () => onNow, unlock: () => unlockAudio(el, toiletAudio("intro")) };
 }

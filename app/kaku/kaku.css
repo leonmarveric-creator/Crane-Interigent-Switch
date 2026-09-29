@@ -266,3 +266,19 @@
 .kk .stage.land .trt{font-size:64px}
 .kk .stage.land .auth{z-index:1}.kk .stage.land .fp,.kk .stage.land .fpScan,.kk .stage.land .authT{z-index:2}
 .kk .stage.land #radP .fl small{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* プレイリスト (設定) */
+.kk .sg.pl{grid-template-columns:1fr auto}.kk .sg.pl b{grid-column:1}.kk .sg.pl .fb{grid-column:2;grid-row:1}
+.kk .pll{grid-column:1/-1;margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.kk .pll li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(61,255,168,.06);font-size:17px;color:#fff}
+.kk .pll li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kk .pll li button{width:48px;height:40px;border-radius:9px;border:1px solid rgba(61,255,168,.5);background:rgba(61,255,168,.08);color:var(--g);font-size:16px;font-weight:800}
+.kk .pll li button:disabled{opacity:.25}.kk .pll li button.del{border-color:#a55;color:#fbb;background:none;width:64px}
+.kk .pll li.none{color:#8ab;background:none;font-size:15px}
+/* 再生中の曲 (ミッション画面) */
+.kk .np{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:none;align-items:center;gap:12px;max-width:520px;height:64px;padding:0 8px 0 18px;border-radius:32px;background:rgba(0,14,9,.88);border:1px solid rgba(61,255,168,.6);box-shadow:0 0 18px rgba(61,255,168,.2);pointer-events:auto;z-index:4}
+.kk .np.on{display:flex}
+.kk .np i{font:800 11px ui-monospace,Menlo,monospace;letter-spacing:.2em;color:var(--g);font-style:normal;white-space:nowrap}
+.kk .np b{font-size:18px;color:#fff;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kk .np button{width:56px;height:52px;border-radius:26px;border:0;background:var(--g);color:#03140d;font-size:24px;font-weight:900}
+.kk .np button:active{transform:scale(.94)}
+.kk .cruise .np{border-color:#e8fff4}

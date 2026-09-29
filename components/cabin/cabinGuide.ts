@@ -6,6 +6,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import QRCode from "qrcode";
+import { playSafe, unlockAudio } from "@/lib/cabinAudio";
 import { GUIDE_T, GUIDE_VOICE, guideAudio, type GuideKey, type RoomGuide } from "@/lib/cabinAiTalk";
 import type { GLang } from "@/lib/cabinGeo";
 
@@ -22,7 +23,7 @@ export interface GuideCtx {
 }
 /** all = エントランス + お部屋 (到着前・ASTRAEA) / ent = エントランスだけ / room = お部屋だけ (到着画面のボタン) */
 export type GuideScope = "all" | "ent" | "room";
-export interface Guide { start(scope?: GuideScope): void; stop(): void; on(): boolean; hasRoom(): boolean }
+export interface Guide { start(scope?: GuideScope): void; stop(): void; on(): boolean; hasRoom(): boolean; unlock(): void }
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "🔒", "0", "🔓"];
 const esc = (s: string) => s.replace(/[<&>"]/g, "");
@@ -90,7 +91,7 @@ export function createGuide(c: GuideCtx): Guide {
     const L = c.lang(), s = GUIDE_VOICE[k] as Record<GLang, string>;
     $("gdSub").innerHTML = [...s[L]].map((ch, i) => `<span style="animation-delay:${i * 22}ms">${esc(ch)}</span>`).join("");
     $("gdEn").textContent = L === "en" ? "" : s.en;
-    return new Promise<void>((ok) => { el.src = guideAudio(k); el.onended = () => ok(); el.onerror = () => ok(); el.play().catch(() => ok()); setTimeout(ok, 22000); });
+    return new Promise<void>((ok) => { el.src = guideAudio(k); el.onended = () => ok(); el.onerror = () => ok(); playSafe(el, () => c.ac(), () => ok()); setTimeout(ok, 22000); });
   }
   function show(n: number) {
     host.querySelectorAll<HTMLElement>(".gdS").forEach((e) => e.classList.toggle("on", Number(e.dataset.s) === n));
@@ -213,5 +214,5 @@ export function createGuide(c: GuideCtx): Guide {
   }
   $("gdX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();
-  return { start: (sc?: GuideScope) => void start(sc), stop, on: () => onNow, hasRoom: () => c.room().guide === "natsu" };
+  return { start: (sc?: GuideScope) => void start(sc), stop, on: () => onNow, hasRoom: () => c.room().guide === "natsu", unlock: () => unlockAudio(el, guideAudio("intro")) };
 }

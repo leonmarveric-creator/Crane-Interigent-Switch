@@ -62,9 +62,10 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
   <div class="ov" id="st"><div class="ovb" style="top:60px;bottom:60px">
    <div class="ovh">SETTINGS · 設定<button class="x" data-x="st">✕</button></div>
    <div class="fmg">
-    <div class="sg"><b>⚡ 起動・ホーム BGM</b><span id="bgB">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upB" hidden></label><button class="rm" data-rm="boot">内蔵に戻す</button></div>
-    <div class="sg"><b>🎵 ノーマル BGM</b><span id="bgN">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upN" hidden></label><button class="rm" data-rm="normal">内蔵に戻す</button></div>
-    <div class="sg"><b>🌉 クルーズ BGM</b><span id="bgC">内蔵の BGM</span><label class="fb">曲を選ぶ<input type="file" accept="audio/*" id="upC" hidden></label><button class="rm" data-rm="cruise">内蔵に戻す</button></div>
+    <div class="sg pl"><b>⚡ 起動・ホーム BGM</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upB" hidden></label><ol class="pll" id="pl_boot"></ol></div>
+    <div class="sg pl"><b>🎵 ノーマル BGM (ミッション中)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upN" hidden></label><ol class="pll" id="pl_normal"></ol></div>
+    <div class="sg pl"><b>🌉 クルーズ BGM (橋・高速)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upC" hidden></label><ol class="pll" id="pl_cruise"></ol></div>
+    <div class="sg"><b>🔀 再生の順番</b><span>曲が終わると次の曲へ進みます</span><button class="tg" id="shTg">登録順</button></div>
     <div class="sgm" id="bgMsg"></div>
     <div class="sg"><b>⚠ 制限速度の目安</b><span>超えると画面が琥珀色になり、ASTRAEA が注意します</span><input type="number" id="limIn" min="30" max="120" step="10" value="80"> <em>km/h</em></div>
     <div class="sg"><b>🤫 静かモード</b><span>案内と警告だけ話します</span><button class="tg" id="qTg">OFF</button></div>
@@ -88,6 +89,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
    <div class="tbox" style="top:auto;bottom:40px"><i>GPS</i><div class="tgt" style="font-size:30px">±<span id="acc">5</span><small>m</small></div></div>
    <div class="tco mono" id="tco">34.3830N 135.3226E</div><div class="tacq" id="tacq">ACQUIRING SATELLITE<span class="blink">_</span></div>
    <div class="qm" id="qm">🤫 QUIET</div><button class="tsw" id="tsw">SAT / LINE</button>
+   <div class="np" id="np"><i id="npM">♪ NORMAL</i><b id="npT"></b><button id="npN">⏭</button></div>
    <div class="ask"><button id="aEta">⏳<small>あと何分</small></button><button id="aConv">🏪<small>コンビニ</small></button><button id="aSt">📊<small>今日の成績</small></button></div></div>
   <div class="mapx" id="mapx"><canvas id="stars" width="1040" height="470"></canvas><div class="cm" id="cmT">◆ CRUISE MODE ◆</div>
    <div class="bbar"><span>SKY GATE BRIDGE</span><div class="bb"><i id="bbF"></i><em id="bbM"></em></div><b id="bbT">0.0 / 3.8 km</b></div>
