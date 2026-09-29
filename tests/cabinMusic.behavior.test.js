@@ -123,7 +123,7 @@ test("ASTRAEA talk: guest menu, captain commands by voice/buttons, check-in QR, 
   const ai = read("components", "cabin", "cabinAi.ts");
   assert.match(ai, /if \(lastCmd == null\) \{ lastCmd = cmd\.n; if \(Date\.now\(\) - cmd\.n > 20000\) return; \}/, "old commands are not replayed");
   const eng = read("components", "cabin", "cabinEngine.ts");
-  assert.match(eng, /if \(b\.dataset\.q === "guide"\)/, "guide button on the arrival screen");
+  assert.match(eng, /if \(k === "gEnt"\) guide\.start\("ent"\); else if \(k === "gRoom"\) guide\.start\("room"\); else if \(k === "gToilet"\) toilet\.start\(\)/, "guide buttons on the arrival screen");
   assert.ok(!/guide\.start\(\)[^\n]*arrive\(\)/.test(eng), "guide never auto-plays");
   assert.match(eng, /async function reroute\(from: LL\)/); assert.match(eng, /backN >= 3 \? pr\.d : prevD/, "turning back is followed");
   assert.match(read("app", "api", "cabin", "state", "route.ts"), /op === "lights"/);
@@ -141,7 +141,7 @@ test("Summer room guide: room keypad, turning steps, opposite-knob warning, smar
   const g = read("components", "cabin", "cabinGuide.ts");
   assert.match(g, /id="gdPr2"/); assert.match(g, /id="gdPr5"/); assert.match(g, /pr\("gdPr5", 3\)/, "turning steps light in order");
   assert.match(g, /\[7, "r4", a7\]/, "opposite-knob warning scene"); assert.match(g, /show\(8\); await Promise\.all\(\[say\("smart"\)/, "smart-key QR scene");
-  assert.match(g, /card\(5, "rmc"[^\n]*T\.c5/, "summary carries the room turning steps"); assert.match(g, /gcRec/);
+  assert.match(g, /card\(n0 \+ 1, cls, ""[^\n]*T\.c5/, "summary carries the room turning steps"); assert.match(g, /gcRec/);
   const css = read("app", "cabin", "cabin.css");
   for (const c of [".gdPr", ".gdSmart", ".gdQs", ".gcRec"]) assert.ok(css.includes(c), c);
 });
@@ -155,4 +155,18 @@ test("drop-off: forgotten-item check right after departure (4 random lines), no 
   const ai = read("components", "cabin", "cabinAi.ts");
   assert.match(ai, /once\("depart", s\.dir === "in" \? "depart" : "forgot", \{ force: true \}\)/);
   assert.match(ai, /s\.dir === "out" && el2 > 80\) once\("review", "review"\)/);
+});
+
+test("arrival screen: separate guides (entrance / room / restroom), restroom has no photo step, trip waits while a guide plays", async () => {
+  const eng = read("components", "cabin", "cabinEngine.ts"), mk = read("components", "cabin", "cabinMarkup.ts");
+  for (const q of ["gEnt", "gRoom", "gToilet"]) assert.ok(mk.includes(`data-q="${q}"`), q);
+  assert.match(eng, /const endIfIdle = \(\) => \{ if \(guide\.on\(\) \|\| toilet\.on\(\)\) T_\(30000, endIfIdle\)/);
+  const t = read("components", "cabin", "cabinToilet.ts");
+  assert.ok(!/gdSnap|tlFlash/.test(t), "no photo step for the restroom");
+  const T = await load("cabinToilet.ts");
+  for (const k of ["intro", "t1", "t2", "t3", "end"]) assert.ok(fs.existsSync(path.join(root, "public", T.toiletAudio(k))), k);
+  assert.ok(!/photo/i.test(T.TOILET_VOICE.end.en));
+  for (const f of ["toilet-guide.jpg", "toilet-uv.jpg"]) assert.ok(fs.existsSync(path.join(root, "public", "cabin", "img", f)), f);
+  const g = read("components", "cabin", "cabinGuide.ts");
+  assert.match(g, /export type GuideScope = "all" \| "ent" \| "room"/);
 });

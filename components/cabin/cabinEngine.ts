@@ -14,6 +14,7 @@ import { MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
 import { createGuide } from "@/components/cabin/cabinGuide";
+import { createToilet } from "@/components/cabin/cabinToilet";
 import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
 
@@ -293,8 +294,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     $("sweep").classList.remove("on");
     T_(600, () => { $("arrive").classList.add("on"); startPtc(); });
     ai.event("arrive");
-    // 2 分たったら送迎を終わりにして、待機画面へ
-    T_(120000, () => hooks.onEnd(id));
+    // 2 分たったら送迎を終わりにして、待機画面へ (ガイドを見ている間は待つ)
+    const endIfIdle = () => { if (guide.on() || toilet.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
+    T_(120000, endIfIdle);
   }
   $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); qrHide(); };
 
@@ -316,17 +318,28 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function qrHide() { $("qrp").classList.remove("on"); if (qrTimer) clearTimeout(qrTimer); qrTimer = null; }
   function qrTexts() {
     const M = MUSIC_T[lang] ?? MUSIC_T.en, q = qrLinks();
-    const GL: Record<GLang, string> = { ja: "入り方ガイド", zh: "进门指南", en: "How to get in", ko: "출입 안내" };
+    // 到着画面のガイド (押したときだけ流れる): エントランスの開け方 / お部屋の開け方 / トイレの使い方
+    const GL: Record<GLang, Record<string, string>> = {
+      ja: { gEnt: "エントランスの開け方", gRoom: "お部屋の開け方", gToilet: "トイレの使い方" },
+      zh: { gEnt: "入口怎么开", gRoom: "房间怎么开", gToilet: "卫生间怎么用" },
+      en: { gEnt: "Open the entrance", gRoom: "Open your room", gToilet: "Using the restroom" },
+      ko: { gEnt: "입구 여는 법", gRoom: "객실 여는 법", gToilet: "화장실 사용법" },
+    };
     root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => {
-      const k = b.dataset.q as "key" | "room" | "guide";
-      (b.querySelector("b") as HTMLElement).textContent = k === "guide" ? GL[lang] : k === "key" ? M.qKey : M.qRoom;
-      b.style.display = k === "guide" || q[k] ? "" : "none";
+      const k = b.dataset.q as string;
+      (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : k === "room" ? M.qRoom : (GL[lang] ?? GL.en)[k];
+      b.style.display = k === "key" || k === "room" ? (q[k as "key" | "room"] ? "" : "none") : k === "gRoom" ? (guide.hasRoom() ? "" : "none") : "";
     });
     setText("aqTip", M.qTip);
     $("aq").style.display = trip?.dir === "out" ? "none" : ""; // お見送りのときは出さない
     if ($("qrp").classList.contains("on")) void qrShow(qrK);
   }
-  root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); if (b.dataset.q === "guide") { qrHide(); guide.start(); } else void qrShow(b.dataset.q as "key" | "room"); }));
+  root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation(); const k = b.dataset.q!;
+    if (k === "key" || k === "room") return void qrShow(k);
+    qrHide(); guide.stop(); toilet.stop();
+    if (k === "gEnt") guide.start("ent"); else if (k === "gRoom") guide.start("room"); else if (k === "gToilet") toilet.start();
+  }));
   root.querySelectorAll<HTMLElement>("[data-qt]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); void qrShow(b.dataset.qt as "key" | "room"); }));
   $("qrX").onclick = (e) => { e.stopPropagation(); qrHide(); };
   $("qrp").onclick = (e) => { e.stopPropagation(); if ((e.target as HTMLElement).id === "qrp") qrHide(); };
@@ -521,7 +534,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
     }),
   });
-  setInterval(() => { if (!guide.on()) ai.tick(); }, 1000);
+  setInterval(() => { if (!guide.on() && !toilet.on()) ai.tick(); }, 1000);
   function roomLit() { if (!trip || trip.dir !== "in") return; $("room").classList.add("lit"); $("ltI").className = ""; setText("ltE", T.ltOn); roomTexts(); }
 
   /* ---------- 入り方ガイド (押したときだけ) ---------- */
@@ -532,6 +545,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     room: () => ({ guide: roomGuideOf(room?.slug), code: room?.roomCode ?? null, name: room ? `${room.kanji} · ${room.en}` : "" }),
     duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); }, busy: () => ai.busy(),
   });
+
+  /* ---------- トイレの使い方 (到着画面のボタンで。写真は撮らなくてよい) ---------- */
+  const toilet = createToilet({ stage, lang: () => lang, ac, duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
 
   /* ---------- チェックイン QR (全員共通の画像。お父さんのスマホで登録) ---------- */
   let checkinUrl: string | null = null, ckT: ReturnType<typeof setTimeout> | null = null;
@@ -582,7 +598,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset(); ai.reset(); guide.stop(); hideCheckin();
+    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); hideCheckin();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */

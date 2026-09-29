@@ -1,0 +1,15 @@
+{
+  "name": "AGENT KAKU",
+  "short_name": "KAKU",
+  "id": "/kaku",
+  "start_url": "/kaku",
+  "scope": "/kaku",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/kaku/icon-192.png?v=1", "sizes": "192x192", "type": "image/png" },
+    { "src": "/kaku/icon.png?v=1", "sizes": "512x512", "type": "image/png" }
+  ]
+}

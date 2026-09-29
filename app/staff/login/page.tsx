@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { Loader2, LogIn, ScanFace, Eye, EyeOff } from "lucide-react";
 import { hasPasskeyHere, loginWithPasskey, passkeySupported } from "@/lib/staffPasskeyClient";
 
-/** ログイン後の行き先 (お父さんの送迎画面 /driver からも同じログインを使う) */
+/** ログイン後の行き先 (お父さんの送迎画面 /driver・車内 iPad /cabin・Kaku さんの /kaku も同じログインを使う) */
+const NEXT: Record<string, string> = { "/driver": "HIROSHI DRIVE", "/cabin": "車内 iPad", "/kaku": "AGENT KAKU" };
 function nextUrl() {
-  try { const n = new URLSearchParams(location.search).get("next"); if (n === "/driver" || n === "/cabin") return n; } catch { /* ignore */ }
+  try { const n = new URLSearchParams(location.search).get("next"); if (n && NEXT[n]) return n; } catch { /* ignore */ }
   return "/staff";
 }
 
@@ -19,7 +20,8 @@ export default function StaffLogin() {
   const [pk, setPk] = useState(false);          // この端末で Face ID を登録済み
   const [pkBusy, setPkBusy] = useState(false);
   const [pkErr, setPkErr] = useState(false);
-  useEffect(() => { setPk(passkeySupported() && hasPasskeyHere()); }, []);
+  const [goName, setGoName] = useState<string | null>(null); // ログイン後に開く画面 (スタッフ画面以外のとき)
+  useEffect(() => { setPk(passkeySupported() && hasPasskeyHere()); const n = nextUrl(); setGoName(NEXT[n] ?? null); }, []);
   const faceLogin = async () => {
     setPkBusy(true); setPkErr(false);
     const r = await loginWithPasskey();
@@ -49,6 +51,11 @@ export default function StaffLogin() {
       </div>
       <h1 className="relative z-10 mt-3 text-center text-[28px] font-bold tracking-wide">Xiaobo 助手</h1>
       <p className="mt-1 text-center text-base text-[#7a6d5c]">民宿清扫・入住管理</p>
+      {goName && (
+        <div className="mt-4 rounded-2xl border-2 border-[#2f8a57] bg-white px-4 py-3 text-center text-[15px] font-semibold text-[#2f5a3f]">
+          ログインすると「{goName}」の画面が開きます。<br />ホーム画面への追加は、その画面が開いてから行ってください。
+        </div>
+      )}
       {pk && (
         <div className="mt-8">
           <button onClick={faceLogin} disabled={pkBusy}

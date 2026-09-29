@@ -96,5 +96,14 @@ test("cabin: phone → iPad flow (auth, SQL, boost music, GPS relay keeps the sc
   assert.match(cab, /boostIn\(5000\)/); assert.match(cab, /boostOut\(\)/); assert.match(cab, /wakeLock/);
   const mus = read("components", "driver", "DriverMusic.tsx");
   assert.match(mus, /x\.purpose === "boost"/); assert.match(mus, /a\.currentTime = tr\.startSec/);
-  assert.match(read("app", "staff", "login", "page.tsx"), /n === "\/cabin"/);
+  assert.match(read("app", "staff", "login", "page.tsx"), /"\/cabin": "車内 iPad"/);
+});
+
+test("cabin: can be added to the home screen (own manifest opening /cabin, icons, full screen)", () => {
+  const m = JSON.parse(read("public", "cabin", "manifest.webmanifest"));
+  assert.equal(m.start_url, "/cabin"); assert.equal(m.id, "/cabin"); assert.equal(m.display, "standalone");
+  assert.equal(m.scope, "/", "login page stays inside the home-screen app");
+  for (const f of ["icon.png", "icon-192.png", "apple-touch-icon.png"]) assert.ok(fs.existsSync(path.join(root, "public", "cabin", f)), f);
+  const lay = read("app", "cabin", "layout.tsx");
+  assert.match(lay, /manifest: "\/cabin\/manifest\.webmanifest"/); assert.match(lay, /apple-touch-icon/); assert.match(lay, /capable: true/);
 });

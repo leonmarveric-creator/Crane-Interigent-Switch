@@ -20,7 +20,9 @@ export interface GuideCtx {
   duck: (sec: number) => void;       // お父さんのスマホの音楽を下げる
   busy: () => boolean;               // ASTRAEA が話している
 }
-export interface Guide { start(): void; stop(): void; on(): boolean }
+/** all = エントランス + お部屋 (到着前・ASTRAEA) / ent = エントランスだけ / room = お部屋だけ (到着画面のボタン) */
+export type GuideScope = "all" | "ent" | "room";
+export interface Guide { start(scope?: GuideScope): void; stop(): void; on(): boolean; hasRoom(): boolean }
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "🔒", "0", "🔓"];
 const esc = (s: string) => s.replace(/[<&>"]/g, "");
@@ -94,13 +96,13 @@ export function createGuide(c: GuideCtx): Guide {
     host.querySelectorAll<HTMLElement>(".gdS").forEach((e) => e.classList.toggle("on", Number(e.dataset.s) === n));
     host.querySelectorAll<HTMLElement>("#gdDots i").forEach((e) => { const k = Number(e.dataset.n); e.className = k < n ? "done" : k === n ? "on" : ""; });
   }
-  async function texts() {
+  async function texts(scope: GuideScope) {
     const T = GUIDE_T[c.lang()] ?? GUIDE_T.en;
     host.querySelectorAll<HTMLElement>("[data-g]").forEach((e) => { e.textContent = T[e.dataset.g!] ?? ""; });
     $("gdTopT").textContent = T.top === "ENTRANCE GUIDE" ? T.top : `${T.top} · ENTRANCE GUIDE`;
-    const cd = code(), rm = c.room(), rc = (rm.code || "").replace(/\D/g, ""), hasRoom = rm.guide === "natsu";
+    const cd = code(), rm = c.room(), rc = (rm.code || "").replace(/\D/g, ""), hasRoom = rm.guide === "natsu" && scope !== "ent", ent = scope !== "room";
     const mk = async (u: string | null) => { if (!u) return ""; try { return await QRCode.toString(u, { type: "svg", errorCorrectionLevel: "M", margin: 1, color: { dark: "#0a1426", light: "#ffffff" } }); } catch { return ""; } };
-    const qrK = await mk(c.keyUrl()), qrR = hasRoom || c.roomUrl() ? await mk(c.roomUrl()) : "";
+    const qrK = ent ? await mk(c.keyUrl()) : "", qrR = hasRoom || (ent && c.roomUrl()) ? await mk(c.roomUrl()) : "";
     // ⑧ いちばん確実なのはスマホの鍵 (エントランス / お部屋の QR)
     $("gdQs").innerHTML = [qrK ? `<div class="gdQ"><div class="qr">${qrK}</div><b>🔑 ${esc(T.k1)}</b></div>` : "", qrR ? `<div class="gdQ rmq"><div class="qr">${qrR}</div><b>🚪 ${esc(T.k2)}</b></div>` : ""].join("");
     const pad = (on: string) => `<svg viewBox="0 0 100 100"><rect x="28" y="4" width="44" height="92" rx="12" fill="#12161f" stroke="#2c3546"/>${KEYS.map((_, i) => `<circle cx="${39 + (i % 3) * 11}" cy="${20 + Math.floor(i / 3) * 13}" r="4" fill="${i === 11 ? on : "#2a3346"}"/>`).join("")}<circle cx="61" cy="59" r="8" fill="none" stroke="${on}" stroke-width="1.6"/></svg>`;
@@ -112,17 +114,20 @@ export function createGuide(c: GuideCtx): Guide {
     };
     const card = (n: number, cls: string, lab: string, svg: string, t: string, small: string, cdv = "") =>
       `<div class="gc ${cls}">${lab ? `<span class="lab">${lab}</span>` : ""}<div class="n">${n}</div>${svg}<b>${esc(t)}</b>${cdv ? `<div class="cd">${cdv}</div>` : ""}${small.includes("→") ? `<ol class="mp">${small.split("→").map((x) => `<li>${esc(x.trim())}</li>`).join("")}</ol>` : `<small>${esc(small)}</small>`}</div>`; // 手順は ①②③ で並べる
-    host.classList.toggle("hasRoom", hasRoom);
-    $("gdSum").innerHTML =
+    const qc = qrK || qrR ? `<div class="gc q"><span class="gcRec">★ ${esc(T.rec)}</span>${qrK ? `<div class="qr">${qrK}</div><b>🔑 ${esc(T.k1)}</b>` : ""}${qrR ? `<div class="qr">${qrR}</div><b>🚪 ${esc(T.k2)}</b>` : ""}</div>` : "";
+    const roomCards = (n0: number, cls: string, lab: string) => card(n0, cls, lab, pad("#ffb35c"), T.t4, T.c4, rc) +
+      card(n0 + 1, cls, "", turn("gdMa5", -60, -180, "#9aa3b5", "L", "#5fe3ff", T.tl), T.t5, T.c5) +
+      card(n0 + 2, cls, "", '<svg viewBox="0 0 100 100"><g transform="rotate(-60 28 50)"><rect x="8" y="44" width="40" height="12" rx="4" fill="#ff5a5a"/></g><rect x="56" y="44" width="40" height="12" rx="4" fill="#46e08a"/><text x="28" y="90" text-anchor="middle" font-size="13">🔒</text><text x="76" y="90" text-anchor="middle" font-size="13">🔓</text></svg>', T.t6, `${T.c6}  ${T.c7}`);
+    host.classList.toggle("hasRoom", hasRoom && ent);
+    // お部屋だけのガイド: お部屋の 3 枚 + QR (エントランスは出さない)
+    if (!ent) $("gdSum").innerHTML = roomCards(1, "rmc", "") + qc;
+    else $("gdSum").innerHTML =
       card(1, "", `🏢 ${esc(T.ent)}${T.ent === "ENTRANCE" ? "" : " · ENTRANCE"}`, pad("#00c8ff"), T.t1, T.c1, cd) +
       card(2, "", "", turn("gdMa2", 0, 90, "#f4f6fb", "R", "#ff8a3c", T.tr), T.t2, T.c2) +
       card(3, "", "", '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34" fill="none" stroke="#5fe3ff" stroke-width="6"/><text x="50" y="59" text-anchor="middle" fill="#fff" font-size="24" font-weight="800" font-family="Menlo,monospace">15s</text></svg>', T.t3, T.c3) +
-      (qrK || qrR ? `<div class="gc q"><span class="gcRec">★ ${esc(T.rec)}</span>${qrK ? `<div class="qr">${qrK}</div><b>🔑 ${esc(T.k1)}</b>` : ""}${qrR ? `<div class="qr">${qrR}</div><b>🚪 ${esc(T.k2)}</b>` : ""}</div>` : "") +
-      (hasRoom ? card(4, "rmc", `🚪 ${esc(T.rm)} · ${esc(rm.name)}`, pad("#ffb35c"), T.t4, T.c4, rc) +
-        card(5, "rmc", "", turn("gdMa5", -60, -180, "#9aa3b5", "L", "#5fe3ff", T.tl), T.t5, T.c5) +
-        card(6, "rmc", "", '<svg viewBox="0 0 100 100"><g transform="rotate(-60 28 50)"><rect x="8" y="44" width="40" height="12" rx="4" fill="#ff5a5a"/></g><rect x="56" y="44" width="40" height="12" rx="4" fill="#46e08a"/><text x="28" y="90" text-anchor="middle" font-size="13">🔒</text><text x="76" y="90" text-anchor="middle" font-size="13">🔓</text></svg>', T.t6, `${T.c6}  ${T.c7}`) : "");
+      qc + (hasRoom ? roomCards(4, "rmc", `🚪 ${esc(T.rm)} · ${esc(rm.name)}`) : "");
     host.querySelectorAll<HTMLElement>("[data-rn]").forEach((e) => { e.textContent = "🚪 " + rm.name; });
-    const steps = [1, 2, 3, ...(hasRoom ? [4, 5, 6, 7] : []), ...(qrK || qrR ? [8] : []), 9].filter((n) => n !== 1 || cd);
+    const steps = [...(ent ? [1, 2, 3] : []), ...(hasRoom ? [4, 5, 6, 7] : []), ...(qrK || qrR ? [8] : []), 9].filter((n) => n !== 1 || cd);
     $("gdDots").innerHTML = steps.map((n) => `<i data-n="${n}"></i>`).join("");
     kpInto("gdKp", "gdCb", cd, "e", false); kpInto("gdRkp", "gdRcb", rc, "r", true);
   }
@@ -184,21 +189,21 @@ export function createGuide(c: GuideCtx): Guide {
     for (let k = 0; k < 4; k++) { $("gdCmpX").setAttribute("opacity", k % 2 ? "0.35" : "1"); tone(k % 2 ? 700 : 1100, 0, 0.1, 0.05); if (!(await wait(900, r))) return; }
     $("gdCmpX").setAttribute("opacity", "1");
   }
-  async function start() {
+  async function start(scope: GuideScope = "all") {
     if (onNow) return; onNow = true; const r = ++run;
-    c.duck(45); await texts(); c.ac();
+    c.duck(45); await texts(scope); c.ac();
     host.classList.add("on"); c.stage.classList.add("gd-on"); if (closeT) clearTimeout(closeT);
-    show(code() ? 1 : 2);
-    await say("intro"); if (r !== run) return;
-    const hasRoom = c.room().guide === "natsu";
-    const steps: [number, GuideKey, (r: number) => Promise<void>][] = [[1, "s1", a1], [2, "s2", a2], [3, "s3", a3], ...(hasRoom ? ([[4, "r1", a4], [5, "r2", a5], [6, "r3", a6], [7, "r4", a7]] as [number, GuideKey, (r: number) => Promise<void>][]) : [])];
+    const ent = scope !== "room", hasRoom = c.room().guide === "natsu" && scope !== "ent";
+    show(ent ? (code() ? 1 : 2) : 4);
+    if (ent) { await say("intro"); if (r !== run) return; }
+    const steps: [number, GuideKey, (r: number) => Promise<void>][] = [...(ent ? ([[1, "s1", a1], [2, "s2", a2], [3, "s3", a3]] as [number, GuideKey, (r: number) => Promise<void>][]) : []), ...(hasRoom ? ([[4, "r1", a4], [5, "r2", a5], [6, "r3", a6], [7, "r4", a7]] as [number, GuideKey, (r: number) => Promise<void>][]) : [])];
     for (const [n, k, a] of steps) {
       if (n === 1 && !code()) continue; // 暗証番号が登録されていなければ ① は飛ばす
       if (n === 4) { show(4); await say("room"); if (r !== run) return; }
       show(n); await Promise.all([say(k), a(r), wait(7500, r)]); if (r !== run) return;
       if (!(await wait(800, r))) return;
     }
-    if (c.keyUrl() || c.roomUrl()) { show(8); await Promise.all([say("smart"), wait(9000, r)]); if (r !== run) return; if (!(await wait(600, r))) return; }
+    if ((ent && c.keyUrl()) || (hasRoom && c.roomUrl()) || (ent && c.roomUrl())) { show(8); await Promise.all([say("smart"), wait(9000, r)]); if (r !== run) return; if (!(await wait(600, r))) return; }
     show(9); const f = $("gdFlash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); tone(2000, 0, 0.05, 0.05);
     await say("photo");
     closeT = setTimeout(stop, 120000); // 写真の画面は 2 分で閉じる
@@ -208,5 +213,5 @@ export function createGuide(c: GuideCtx): Guide {
   }
   $("gdX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();
-  return { start: () => void start(), stop, on: () => onNow };
+  return { start: (sc?: GuideScope) => void start(sc), stop, on: () => onNow, hasRoom: () => c.room().guide === "natsu" };
 }
