@@ -620,3 +620,210 @@
 .kpad .demo{display:none}.kpad.demo .demo{display:flex}
 .kpad .v{overflow:auto}
 
+/* ===== MISSION: iPad 縦向き (820×1180) ===== */
+.skin-mi.port{width:820px;height:1180px}
+/* 待機 */
+.skin-mi.port #vS .frm{height:820px}
+.skin-mi .tb{right:60px}
+.skin-mi.port .tb{gap:10px;letter-spacing:.14em;font-size:11.5px;overflow:hidden}
+.skin-mi.port .ring{top:120px;transform:scale(1.05)}
+.skin-mi.port .kkx{top:470px}
+.skin-mi.port .kkx .ln{width:640px}
+.skin-mi.port .kkx .jp{font-size:21px;letter-spacing:.06em;padding:0 40px;white-space:normal}
+.skin-mi.port .dev{top:760px;transform:translateX(-50%) scale(1.15);transform-origin:50% 100%}
+.skin-mi.port .st3{top:900px}
+.skin-mi.port .st3 div{padding-left:18px;gap:12px}
+.skin-mi.port .st3 .ic{width:48px;height:48px;flex:0 0 48px}
+.skin-mi.port .st3 b{font-size:19px;letter-spacing:.16em}
+.skin-mi.port .st3 small{letter-spacing:.2em}
+.skin-mi.port .foot{top:1070px;height:90px}
+.skin-mi.port .foot canvas{width:150px;height:30px}
+/* ブリーフィング */
+.skin-mi.port #mB{left:16px;top:54px;width:788px;height:470px}
+.skin-mi.port #pRA{left:16px;top:534px;width:788px;height:140px}
+.skin-mi.port #pRA .ra:nth-of-type(2){left:28px!important}
+.skin-mi.port #pRA .ra:nth-of-type(3){left:298px!important}
+.skin-mi.port #pRA .ra:nth-of-type(4){left:560px!important}
+.skin-mi.port #pRA .vs:nth-of-type(1){left:276px!important}
+.skin-mi.port #pRA .vs:nth-of-type(2){left:538px!important}
+.skin-mi.port #pBr{left:16px;top:684px;width:388px;height:420px}
+.skin-mi.port #pIn{left:414px;top:684px;width:390px;height:150px}
+.skin-mi.port #pIn .w{top:44px;width:354px}
+.skin-mi.port #pIn .w b{white-space:normal;font-size:15px}
+.skin-mi.port #pIn .bs{display:none}
+.skin-mi.port #pIn dl{left:18px;right:18px;top:96px;grid-template-columns:auto 1fr auto 1fr;border:0;padding:0;gap:5px 10px}
+.skin-mi.port #pAu{left:414px;top:844px;width:390px;height:160px}
+.skin-mi.port #pAu .bar{width:250px}
+.skin-mi.port #pAu dl{left:18px;right:18px;top:116px;grid-template-columns:auto 1fr auto 1fr;border:0;padding:0;gap:4px 8px}
+.skin-mi.port #pEl{left:414px;top:1014px;width:390px;height:90px}
+.skin-mi.port #pEl canvas{top:40px;width:160px;height:40px}
+.skin-mi.port #pEl .ea{left:196px;top:42px}
+.skin-mi.port #pEl dl{display:none}
+.skin-mi.port .nav{top:1116px}
+/* 走行中 */
+.skin-mi.port #hRow{left:16px;top:54px;width:788px;height:140px}
+.skin-mi.port #hRow .vl{display:none}
+.skin-mi.port #hRow .hc b{font-size:46px}
+.skin-mi.port #hRow .hc b.st{font-size:32px;margin-top:4px}
+.skin-mi.port #hRow .hc:nth-child(1){left:24px!important;top:10px}
+.skin-mi.port #hRow .hc:nth-child(3){left:430px!important;top:10px}
+.skin-mi.port #hRow .hc:nth-child(5){left:24px!important;top:74px}
+.skin-mi.port #hRow .hc:nth-child(7){left:430px!important;top:74px}
+.skin-mi.port #phs{left:16px;top:202px;width:788px;height:44px}
+.skin-mi.port #phs .nd:nth-child(2){left:18px!important}
+.skin-mi.port #phs .nd:nth-child(3){left:236px!important}
+.skin-mi.port #phs .nd:nth-child(4){left:454px!important}
+.skin-mi.port #phs .nd:nth-child(5){left:664px!important}
+.skin-mi.port #mR{left:16px;top:254px;width:788px;height:546px}
+.skin-mi.port #pV{left:16px;top:810px;width:388px;height:136px}
+.skin-mi.port #pN{left:16px;top:954px;width:388px;height:136px}
+.skin-mi.port #pC{left:414px;top:810px;width:390px;height:70px}
+.skin-mi.port #pP{left:414px;top:888px;width:390px;height:202px}
+.skin-mi.port #pP .cov{top:44px;height:70px}
+.skin-mi.port #pP .tt p{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.skin-mi.port #pP canvas{top:124px;width:354px}
+.skin-mi.port #pP .pb{top:150px}
+.skin-mi.port #pP .tm{top:156px}
+.skin-mi.port #pP .ctl{top:154px}
+.skin-mi.port #pA{left:16px;top:1098px;width:788px;height:74px}
+.skin-mi.port #pA .sj{right:190px}
+.skin-mi.port #pA canvas{display:none}
+/* まん中に出るもの */
+.skin-mi.port .alrt{width:560px}
+.skin-mi.port .rep{width:600px}
+
+/* ===== HOLO: iPad 縦向き (820×1180) ===== */
+.skin-ho.port{width:820px;height:1180px}
+.skin-ho.port #mbox{width:820px;height:1180px}
+.skin-ho.port .tabs{left:90px;right:90px}
+.skin-ho.port .cmp{left:170px;right:170px}
+.skin-ho.port .msn{top:170px;right:40px;width:300px}
+.skin-ho.port .np{top:360px;right:40px;width:300px}
+.skin-ho.port .hints{left:40px;right:40px;bottom:52px;gap:26px;font-size:15px;flex-wrap:wrap}
+.skin-ho.port .mode{bottom:130px}
+.skin-ho.port .cru{bottom:190px}
+.skin-ho.port .sub{max-width:700px;bottom:100px}
+.skin-ho.port .hov{width:620px}
+/* パネル表示 */
+.skin-ho.port.panel #mbox{left:40px;top:206px;width:740px;height:600px}
+.skin-ho.port .hp{width:362px}
+.skin-ho.port #hpV{left:40px;top:816px!important;height:118px!important}
+.skin-ho.port .hp[style*="top:398px"]{left:40px;top:942px!important;height:126px!important}
+.skin-ho.port #hpC{left:418px;top:816px!important;height:58px!important}
+.skin-ho.port .hp[style*="top:532px"]{left:418px;top:882px!important;height:186px!important}
+.skin-ho.port .ast{top:1082px}
+.skin-ho.port.panel .mode{left:54px;right:auto;bottom:388px;transform-origin:left bottom}
+/* テープ */
+.skin-ho.port .h3d{width:820px;height:1180px;perspective-origin:50% 60%}
+.skin-ho.port .h3w{left:-40px;top:560px;scale:.8}
+.skin-ho.port .beam{left:150px;right:150px;top:900px}
+.skin-ho.port .flare{height:1180px}
+.skin-ho.port .cat{left:60px;top:150px}
+.skin-ho.port #vT .lh[style*="top:258px"]{left:60px!important}
+.skin-ho.port #tapeL{left:60px!important;width:340px!important}
+.skin-ho.port .sel{left:430px;top:150px;width:350px}
+.skin-ho.port #vT .lh[style*="top:392px"]{left:430px!important;top:420px!important}
+.skin-ho.port #trkL{left:430px!important;top:444px!important;width:350px!important}
+.skin-ho.port .lyr2{top:1000px;padding:0 30px}
+.skin-ho.port .hb2{left:40px;top:1130px}
+/* ゲスト */
+.skin-ho.port .gcat{left:60px}
+.skin-ho.port .gtl{left:200px}
+.skin-ho.port .gtop{left:380px;right:40px;gap:24px}
+.skin-ho.port .globe{left:140px;top:210px}
+.skin-ho.port .por{left:285px;top:240px}
+.skin-ho.port #vG .lh[style*="left:130px"]{left:40px!important;top:780px!important}
+.skin-ho.port #gL{left:40px!important;top:804px!important;width:380px!important}
+.skin-ho.port #vG .lh[style*="top:228px"][style*="left:800px"]{left:450px!important;top:780px!important}
+.skin-ho.port .abl{left:460px;top:806px;height:170px}
+.skin-ho.port #vG .lh[style*="top:528px"]{left:450px!important;top:982px!important}
+.skin-ho.port .note{left:460px;top:1006px!important;max-height:44px;overflow:hidden}
+.skin-ho.port #vG .lh[style*="top:600px"]{left:450px!important;top:1052px!important}
+.skin-ho.port .lang{left:460px;top:1076px}
+.skin-ho.port .gsum{left:40px;top:1080px;width:380px}
+.skin-ho.port .hb2 span{width:236px}
+.skin-ho.port .hb2.g span{width:172px;font-size:14px;gap:8px}
+.skin-ho.port .gdesc{left:40px;top:1044px;font-size:14px;width:390px}
+.skin-ho.port .sortr{left:40px;right:auto;width:380px;top:736px;font-size:16px}
+.skin-ho.port .gbox{right:40px;top:700px}
+.skin-ho.port .gbtn{left:620px;top:226px}
+.skin-ho.port .gsum{top:1006px}
+.skin-ho.port .sel .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skin-ho.port .hrow>div{padding:6px 12px}
+.skin-ho.port .hrow b{font-size:26px;white-space:nowrap}
+.skin-ho.port .hrow b.st{font-size:19px}
+.skin-ho.port .ast .tx{right:200px}
+.skin-ho.port .ast canvas{width:170px}
+.skin-ho.port .tv .hb2,.skin-ho.port .tv .hb2.g{left:40px;top:1130px}
+.skin-ho.port .tv .hb2 span{width:236px}
+.skin-ho.port .tv .hb2.g span{width:172px;font-size:15px;gap:8px}
+.skin-ho.port .sel .nm{white-space:normal;width:auto;max-width:340px}
+.skin-ho.port.panel .mode{left:auto;right:54px;transform-origin:right bottom}
+.skin-ho .tv .hb2:not(.g) span{width:238px}
+.skin-ho.port .tv .hb2:not(.g) span{width:178px;font-size:15px;gap:8px}
+.skin-ho.port .abl{top:800px;height:236px}
+.skin-ho.port #vG .lh[style*="top:528px"],.skin-ho.port #vG .lh[style*="top:600px"]{display:none}
+.skin-ho.port .note{left:460px;top:1046px!important;max-height:30px}
+.skin-ho.port .lang{left:460px;top:1086px}
+.skin-ho .por .st2{white-space:nowrap}.skin-ho.port .tv .hb2.g span{font-size:13px;white-space:nowrap}
+
+/* ===== HOLO: 自分の位置 (3D) ===== */
+.skin-ho #me{perspective:620px;perspective-origin:0 -30px}
+.skin-ho #me .m3{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;transform:rotateX(var(--tilt,44deg)) rotateZ(var(--mhd,0deg));transition:transform 1.4s cubic-bezier(.3,.8,.2,1)}
+.skin-ho #me .pulse{transform:none;animation:ho-pl3 2.4s ease-out infinite}
+.skin-ho #me .gsh{position:absolute;left:-34px;top:-34px;width:68px;height:68px;border-radius:50%;background:radial-gradient(circle,rgba(200,240,255,.55),rgba(120,200,240,.18) 45%,transparent 70%)}
+.skin-ho #me .stk{position:absolute;left:-1px;top:0;width:2px;height:24px;transform-origin:50% 0;transform:rotateX(90deg);background:linear-gradient(rgba(220,245,255,.2),#fff);box-shadow:0 0 8px #fff}
+.skin-ho #me .ar{position:absolute;left:0;top:0;transform-style:preserve-3d;animation:ho-bob 2.6s ease-in-out infinite}
+.skin-ho #me .ar svg{position:absolute;left:-27px;top:-32px;width:54px;height:64px;filter:none}
+
+@keyframes ho-pl3{from{transform:scale(.2);opacity:1}to{transform:scale(2.2);opacity:0}}
+@keyframes ho-bob{0%,100%{transform:translateZ(20px)}50%{transform:translateZ(27px)}}
+
+/* ===== HOLO ゲスト: 普段は地球。パスポート写真はボタンで ===== */
+.skin-ho .bust{display:none}
+.skin-ho.pshow .bust{display:block;left:-110px;top:36px;width:470px;height:352px;z-index:46;background:rgba(5,18,26,.93);border:1px solid rgba(220,245,255,.65);box-shadow:0 0 26px rgba(160,225,255,.35),inset 0 0 30px rgba(120,200,240,.12);animation:ho-pvIn .5s ease-out both;pointer-events:auto}
+.skin-ho .bust::before,.skin-ho .bust::after{pointer-events:none}
+.skin-ho .ppw{position:absolute;left:14px;right:14px;top:44px;bottom:40px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid rgba(200,240,255,.25)}
+.skin-ho .ppw img{max-width:100%;max-height:100%;object-fit:contain;opacity:0;filter:blur(8px) saturate(.2) brightness(1.3);transition:opacity .7s,filter .9s}
+.skin-ho .ppw.ok img{opacity:1;filter:none}
+.skin-ho .ppw::after{content:"";position:absolute;left:0;right:0;height:2px;top:0;background:rgba(220,248,255,.9);box-shadow:0 0 12px #fff;animation:ho-ppscan 1.6s ease-in-out infinite}
+.skin-ho .ppw.ok::after{animation:ho-ppscan 1.4s ease-in-out 1 forwards}
+@keyframes ho-ppscan{0%{top:0;opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+.skin-ho .ppst{position:absolute;left:14px;bottom:12px;z-index:2;font:400 13px var(--mono);letter-spacing:.14em;color:var(--h)}
+.skin-ho .ppw.ok~.ppst,.skin-ho .ppw.ok .ppst{color:#fff}
+.skin-ho .pph{position:absolute;left:14px;right:52px;top:10px;display:flex;align-items:baseline;gap:12px;white-space:nowrap;overflow:hidden}
+.skin-ho .pph b{background:rgba(240,250,255,.92);color:#10181b;padding:1px 10px;font:600 13px var(--f);letter-spacing:.16em}
+.skin-ho .pph span{font:600 18px var(--f);color:#fff;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis}
+.skin-ho .ppx{position:absolute;right:8px;top:6px;width:34px;height:30px;border:1px solid rgba(220,245,255,.6);background:rgba(20,60,80,.6);color:#e8f8ff;font-size:14px;cursor:pointer}
+.skin-ho .pptab{position:absolute;right:14px;bottom:9px;z-index:2;display:flex;gap:6px;max-width:60%;overflow:hidden}
+.skin-ho .pptab span{padding:2px 8px;border:1px solid rgba(220,245,255,.45);font:500 12px var(--f);color:#dff;cursor:pointer;white-space:nowrap}
+.skin-ho .pptab span.on{background:rgba(220,245,255,.9);color:#10181b}
+.skin-ho .por .st2.can{cursor:pointer;padding:3px 10px;margin-left:-10px;border:1px solid rgba(220,245,255,.55);background:rgba(150,215,240,.16);box-shadow:0 0 10px rgba(160,225,255,.25);animation:ho-ppgl 2.4s ease-in-out infinite}
+@keyframes ho-ppgl{50%{box-shadow:0 0 18px rgba(200,240,255,.55)}}
+.skin-ho.pshow .globe{opacity:.45}
+
+/* ===== 操作パネル: 縦はこれまでどおり (まとまりは display:contents で見えない)、横は列に並べる ===== */
+.kpad .col{display:contents}
+.kpad:not(.land) #vB .inm{order:1}.kpad:not(.land) #mP{order:2}.kpad:not(.land) #vB .ra2{order:3}.kpad:not(.land) #vB .fpw{order:4}.kpad:not(.land) #bAbort{order:5}
+.kpad:not(.land) #vR .rh{order:1}.kpad:not(.land) #al{order:2}.kpad:not(.land) #bCr{order:3}.kpad:not(.land) #vR .g2b{order:4}.kpad:not(.land) #vR .ly{order:5}.kpad:not(.land) #mQ{order:6}.kpad:not(.land) #thm2{order:7}.kpad:not(.land) #demoR{order:8}
+/* 横向き (スマホを横にしたとき) */
+.kpad.land{padding:6px max(12px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));gap:6px}
+.kpad.land .top{height:38px;flex-basis:38px}
+.kpad.land .lnk{display:none}
+.kpad.land .v.on{display:grid;gap:10px;grid-template-columns:1fr 1fr;align-items:stretch;overflow:hidden}
+.kpad.land .v>.col{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0;overflow:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.kpad.land .v>.col::-webkit-scrollbar{display:none}
+.kpad.land #vB.on,.kpad.land #vR.on{grid-template-columns:1.15fr 1fr .95fr}
+.kpad.land #vS.on{grid-template-columns:1fr 1.1fr}
+.kpad.land #vS .cb{justify-content:center}
+.kpad.land #vS .sb{flex:1}
+.kpad.land .ca>.mapw{flex:1 1 auto!important;min-height:0!important;height:100%}
+.kpad.land #vB .cc,.kpad.land #vL .cb{justify-content:center}
+.kpad.land .fp{margin:-18px 0;transform:scale(.72)}
+.kpad.land .inm .op b{font-size:42px}
+.kpad.land .ra2 .n{font-size:38px}
+.kpad.land #vR .cb .ly{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+.kpad.land #vD .ca,.kpad.land #vD .cb{justify-content:center}
+.kpad.land .btn{padding:12px}
+.kpad.land .top canvas{flex:0 1 240px}.kpad.land .top .mnu{margin-left:auto}
+

@@ -144,3 +144,34 @@ export async function craneNestReport(res: (ResKey & { guest: string | null; roo
     return { on: true, error: null, rows };
   } catch (e) { return { on: true, error: String((e as Error)?.message || e), rows: [] }; }
 }
+
+/**
+ * 送迎予約 (dropId) のゲストのパスポート写真 (代表者が先)。5 分だけ見られるリンクにして返す。
+ *   写真は Crane Nest のシステムの Storage (passport-photos)。ページには埋め込まず、ボタンを押したときだけ読む。
+ */
+export async function craneNestPassportPhotos(dropId: string): Promise<{ on: boolean; photos: { name: string; url: string }[] }> {
+  const c = cn(); if (!c) return { on: false, photos: [] };
+  if (!/^[0-9a-f-]{36}$/i.test(dropId)) return { on: true, photos: [] };
+  const [tq, lq] = await Promise.all([
+    c.from("transfer_requests").select("id, guest_id").eq("id", dropId).maybeSingle(),
+    c.from("transfer_request_guests").select("guest_id, is_primary").eq("transfer_request_id", dropId),
+  ]);
+  if (!(tq as any).data) return { on: true, photos: [] };
+  const links = (((lq as any).error ? [] : (lq as any).data) ?? []) as any[];
+  links.sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+  const ids = [...new Set([(tq as any).data.guest_id, ...links.map((l) => l.guest_id)].filter(Boolean))] as string[];
+  if (!ids.length) return { on: true, photos: [] };
+  const { data: gs } = await c.from("guests").select("id, full_name, passport_image_url").in("id", ids);
+  const byId = new Map<string, any>(((gs ?? []) as any[]).map((g) => [g.id, g]));
+  const photos: { name: string; url: string }[] = [];
+  for (const id of ids) {
+    const g = byId.get(id); const raw = String(g?.passport_image_url || ""); if (!raw) continue;
+    // 公開 URL / パスのどちらでも: passport-photos の中のパスを取り出して、期限つきのリンクにする
+    const m = raw.match(/\/passport-photos\/([^?#]+)/); const path = m ? decodeURIComponent(m[1]) : /^https?:/.test(raw) ? null : raw.replace(/^\/+/, "");
+    let url: string | null = null;
+    if (path) { const s = await c.storage.from("passport-photos").createSignedUrl(path, 300); url = s.data?.signedUrl ?? null; }
+    if (!url && /^https?:/.test(raw)) url = raw;
+    if (url) photos.push({ name: String(g.full_name || ""), url });
+  }
+  return { on: true, photos };
+}

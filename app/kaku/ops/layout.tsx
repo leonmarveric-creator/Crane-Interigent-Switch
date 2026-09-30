@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
   title: "K-OPS · AGENT KAKU",
   robots: { index: false, follow: false },
-  manifest: "/kaku/manifest.webmanifest",
+  manifest: "/kaku/ops.webmanifest",
   icons: { apple: [{ url: "/kaku/apple-touch-icon.png?v=1", sizes: "180x180" }] },
   appleWebApp: { capable: true, title: "K-OPS", statusBarStyle: "black-translucent" },
 };

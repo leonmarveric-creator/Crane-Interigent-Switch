@@ -3,13 +3,16 @@ import { isStaff } from "@/lib/staffAuth";
 import { loadDriverData } from "@/lib/driverData";
 import { jstDay, jstTime } from "@/lib/driverLogic";
 import KakuApp from "@/components/kaku/KakuApp";
+import KakuChooser from "@/components/kaku/KakuChooser";
 import type { KakuCabinInfo } from "@/components/kaku/kakuEngine";
 
 export const dynamic = "force-dynamic";
 
 /** Kaku さん専用のミッション画面 (ログインはスタッフ画面と共通)。今日の到着・出発の予約と車内 iPad も渡す */
-export default async function KakuPage() {
+export default async function KakuPage({ searchParams }: { searchParams: { ui?: string } }) {
   if (!isStaff()) redirect("/staff/login?next=/kaku");
+  // 最初に K-OPS か CLASSIC を選ぶ
+  if (searchParams?.ui !== "classic") return <KakuChooser />;
   let cabin: KakuCabinInfo = { devices: [], rooms: [], res: [], missing: true };
   try {
     const d = await loadDriverData();

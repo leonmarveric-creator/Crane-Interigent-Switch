@@ -1,8 +1,8 @@
 {
-  "name": "AGENT KAKU",
-  "short_name": "KAKU",
-  "id": "/kaku",
-  "start_url": "/kaku",
+  "name": "K-OPS · AGENT KAKU",
+  "short_name": "K-OPS",
+  "id": "/kaku/ops",
+  "start_url": "/kaku/ops",
   "scope": "/kaku",
   "display": "standalone",
   "orientation": "any",

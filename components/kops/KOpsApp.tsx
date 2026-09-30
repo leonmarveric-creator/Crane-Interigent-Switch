@@ -8,14 +8,15 @@
 import { useEffect, useRef, useState } from "react";
 import { cabinStart, cabinPos, cabinEnd, cabinBoard } from "@/app/driver/actions";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
+import KOpsLibrary from "@/components/kops/KOpsLibrary";
 
 export interface KOpsGuest {
   id: string; name: string; room: string; roomId: string; lang: string; cat: "out" | "in" | "stay"; place: string | null;
-  pax: number; L: number; S: number; sp: number; nights: number; reg: boolean; note: string; nat: string;
+  pax: number; L: number; S: number; sp: number; nights: number; reg: boolean; dropId: string | null; note: string; nat: string;
 }
 export interface KOpsData { guests: KOpsGuest[]; devices: { id: string; name: string }[]; rooms: { id: string; name: string; kanji: string }[]; cabinMissing: boolean }
 
-const V = "1";
+const V = "2";
 function load(src: string): Promise<void> {
   return new Promise((ok, ng) => {
     if (/\.css(\?|$)/.test(src)) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = src; l.onload = () => ok(); l.onerror = () => ng(new Error(src)); document.head.appendChild(l); return; }
@@ -26,6 +27,8 @@ function load(src: string): Promise<void> {
 export default function KOpsApp({ data }: { data: KOpsData }) {
   const root = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState("");
+  // 曲・歌詞・カバーの管理 (K-OPS の ☰ や TAPES から開く)
+  const [lib, setLib] = useState<{ onChange: () => void } | null>(null);
   useEffect(() => {
     const w = window as any;
     w.KOPS_DATA = data;
@@ -36,6 +39,7 @@ export default function KOpsApp({ data }: { data: KOpsData }) {
       cabinBoard: (id: string) => cabinBoard(id).catch(() => null),
       remoteVoice: (id: string, h: any) => startRemoteVoice(id, h),
       unlockVoice: () => unlockRemoteVoice(),
+      openLibrary: (o: { onChange: () => void }) => setLib(o),
     };
     let dead = false;
     void (async () => {
@@ -53,6 +57,7 @@ export default function KOpsApp({ data }: { data: KOpsData }) {
   return (
     <>
       <div ref={root} style={{ position: "fixed", inset: 0, background: "#000" }} />
+      {lib && <KOpsLibrary onClose={() => setLib(null)} onChange={() => lib.onChange()} />}
       {err && <div style={{ position: "fixed", left: 16, right: 16, bottom: 16, padding: 12, borderRadius: 12, background: "#300", color: "#fcc", zIndex: 99 }}>読み込めませんでした: {err}</div>}
     </>
   );

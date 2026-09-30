@@ -75,9 +75,10 @@ async function state() {
     supabaseAdmin.from("kaku_missions").select("name,kind,type,km,sec,kept,rank,ended_at").gte("ended_at", month).order("ended_at", { ascending: false }).limit(300),
     supabaseAdmin.from("app_settings").select("kaku_bgm_normal,kaku_bgm_cruise").eq("id", 1).maybeSingle(),
     supabaseAdmin.from("app_settings").select("kaku_bgm_boot").eq("id", 1).maybeSingle(),
-    // 歌詞 (lrc) の列がまだ無い (migration_kaku_lyrics.sql 未実行) ときは歌詞なしで読む
-    supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc").order("sort").order("created_at").limit(300)
-      .then((r) => (r.error && /lrc/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noLrc: true })) : { ...r, noLrc: false })),
+    // カバー (cover_path)・歌詞 (lrc) の列がまだ無いときは、あるものだけで読む
+    supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc,cover_path").order("sort").order("created_at").limit(300)
+      .then((r) => (r.error && /cover_path/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noCover: true })) : { ...r, noCover: false }))
+      .then((r: any) => (r.error && /lrc/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noLrc: true, noCover: true })) : { ...r, noLrc: false })),
   ]);
   const missions = (ms.data ?? []) as any[];
   return {
@@ -89,14 +90,15 @@ async function state() {
     todayCount: missions.filter((m) => m.ended_at >= today).length,
     // プレイリスト。前の「1 曲だけ」の設定が残っていれば、先頭に入れる (id: legacy-…)
     tracks: (() => {
-      const out: Record<string, { id: string; title: string; url: string; lrc?: string | null }[]> = { boot: [], normal: [], cruise: [] };
+      const out: Record<string, { id: string; title: string; url: string; lrc?: string | null; cover?: string | null }[]> = { boot: [], normal: [], cruise: [] };
       const leg: Record<string, string | null> = { boot: (sb.data as any)?.kaku_bgm_boot ?? null, normal: (st.data as any)?.kaku_bgm_normal ?? null, cruise: (st.data as any)?.kaku_bgm_cruise ?? null };
       for (const w of ["boot", "normal", "cruise"]) if (leg[w]) out[w].push({ id: `legacy-${w}`, title: "アップした曲", url: pub(leg[w])! });
-      for (const t of (tk.data ?? []) as any[]) if (out[t.which]) out[t.which].push({ id: t.id, title: t.title, url: pub(t.path)!, lrc: t.lrc ?? null });
+      for (const t of (tk.data ?? []) as any[]) if (out[t.which]) out[t.which].push({ id: t.id, title: t.title, url: pub(t.path)!, lrc: t.lrc ?? null, cover: pub(t.cover_path ?? null) });
       return out;
     })(),
     tracksSetup: !!tk.error,
     lyricsSetup: !tk.error && (tk as any).noLrc === true,
+    coverSetup: !tk.error && (tk as any).noCover === true,
     bgm: { boot: pub((sb.data as any)?.kaku_bgm_boot ?? null), normal: pub((st.data as any)?.kaku_bgm_normal ?? null), cruise: pub((st.data as any)?.kaku_bgm_cruise ?? null) },
   };
 }
@@ -160,8 +162,10 @@ export async function POST(req: NextRequest) {
       return J({ ok: true });
     }
     if (!/^[0-9a-f-]{36}$/i.test(id)) return J({ ok: false, error: "BAD" });
-    const { data: row } = await supabaseAdmin.from("kaku_tracks").delete().eq("id", id).select("path").maybeSingle();
-    if ((row as any)?.path) await supabaseAdmin.storage.from(BUCKET).remove([(row as any).path]).catch(() => null);
+    let del: any = await supabaseAdmin.from("kaku_tracks").delete().eq("id", id).select("path,cover_path").maybeSingle();
+    if (del.error && /cover_path/.test(del.error.message)) del = await supabaseAdmin.from("kaku_tracks").delete().eq("id", id).select("path").maybeSingle();
+    const gone = [del.data?.path, del.data?.cover_path].filter(Boolean) as string[];
+    if (gone.length) await supabaseAdmin.storage.from(BUCKET).remove(gone).catch(() => null);
     return J({ ok: true });
   }
   // 歌詞 (LRC)。null で消す
@@ -172,6 +176,33 @@ export async function POST(req: NextRequest) {
     const lrc = b.lrc == null ? null : String(b.lrc).replace(/\u0000/g, "").slice(0, 60000) || null;
     const { error } = await supabaseAdmin.from("kaku_tracks").update({ lrc }).eq("id", id);
     return J(error ? { ok: false, error: /lrc/.test(error.message) ? "SETUP_LRC" : setupErr(error.message) } : { ok: true });
+  }
+  // 曲名を変える
+  if (b.op === "trackTitle") {
+    const id = String(b.id || ""), title = clean(b.title, 80);
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !title) return J({ ok: false, error: "BAD" });
+    const { error } = await supabaseAdmin.from("kaku_tracks").update({ title }).eq("id", id);
+    return J(error ? { ok: false, error: setupErr(error.message) } : { ok: true });
+  }
+  // アルバムカバー: アップロード先を作る → 付ける / 外す (path: null)。前の画像は消す
+  if (b.op === "coverUrl") {
+    const id = String(b.id || ""), ext = b.ext === "jpg" ? "jpg" : "webp";
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return J({ ok: false, error: "BAD" });
+    const path = `kaku/cover-${id.slice(0, 8)}-${Date.now().toString(36)}.${ext}`;
+    const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(path);
+    return J(error || !data ? { ok: false, error: error?.message || "UPLOAD_URL" } : { ok: true, path, signedUrl: data.signedUrl });
+  }
+  if (b.op === "coverSet") {
+    const id = String(b.id || ""), path: string | null = b.path ?? null;
+    if (!/^[0-9a-f-]{36}$/i.test(id) || (path && !/^kaku\/cover-[\w-]+\.(webp|jpg)$/.test(path))) return J({ ok: false, error: "BAD" });
+    const { data: old } = await supabaseAdmin.from("kaku_tracks").select("cover_path").eq("id", id).maybeSingle();
+    const { error } = await supabaseAdmin.from("kaku_tracks").update({ cover_path: path }).eq("id", id);
+    if (error) {
+      if (path) await supabaseAdmin.storage.from(BUCKET).remove([path]).catch(() => null);
+      return J({ ok: false, error: /cover_path/.test(error.message) ? "SETUP_COVER" : setupErr(error.message) });
+    }
+    const prev = (old as any)?.cover_path; if (prev && prev !== path) await supabaseAdmin.storage.from(BUCKET).remove([prev]).catch(() => null);
+    return J({ ok: true, url: pub(path) });
   }
   if (b.op === "trackOrder") {
     const ids = (Array.isArray(b.ids) ? b.ids : []).filter((x: any) => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x)).slice(0, 200);

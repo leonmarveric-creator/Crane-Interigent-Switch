@@ -37,7 +37,7 @@ export default async function KOpsPage() {
           cat: (leave ? "out" : arrive ? "in" : "stay") as "out" | "in" | "stay",
           place: place && place !== "other" ? place : null,
           pax: drop?.pax ?? 0, L: drop?.large ?? 0, S: drop?.small ?? 0, sp: drop?.special ?? 0,
-          nights: nights(r.checkIn, r.checkOut), reg: !!drop?.names?.length, note: note || "—", nat: NAT[r.lang] ?? "",
+          nights: nights(r.checkIn, r.checkOut), reg: !!drop?.names?.length, dropId: drop?.id ?? null, note: note || "—", nat: NAT[r.lang] ?? "",
         };
       });
   } catch { /* 予約が読めなくても使える */ }
