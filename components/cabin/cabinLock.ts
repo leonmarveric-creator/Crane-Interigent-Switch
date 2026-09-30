@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { LOCK_IMG, LOCK_T, LOCK_VOICE, lockAudio, type LockKey } from "@/lib/cabinLock";
 import type { GLang } from "@/lib/cabinGeo";
-import { playSafe, unlockAudio } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
 
 export interface LockCtx {
   stage: HTMLElement;
@@ -135,7 +135,7 @@ export function createLock(c: LockCtx): LockGuide {
     closeT = setTimeout(stop, 14000);
   }
   function stop() {
-    run++; onNow = false; el.pause(); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
+    run++; onNow = false; stopVoice(el); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
   }
   $("lkX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();

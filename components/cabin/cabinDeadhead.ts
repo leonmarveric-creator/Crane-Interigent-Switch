@@ -11,7 +11,7 @@ import { SFX_MARK } from "@/lib/remoteVoice";
 import { DH_LINES, DH_IDLE, dhSpdFor, dhAudio, callsignOf } from "@/lib/cabinDeadheadLines";
 import { BRIDGE, CRANE_NEST, PLACES, dist, type GLang, type LL } from "@/lib/cabinGeo";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
-import { playSafe, unlockAudio } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
 
 export interface DhInfo { guest: string | null; flightNo: string | null; flight: any; prepared: string | null; pickupAt: string | null; battery: number | null }
 export interface DhCtx {
@@ -63,6 +63,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
   function say(k: string) {
     const line = DH_LINES[k]; if (!line) return Q;
     Q = Q.then(() => new Promise<void>((ok) => {
+      if (!onNow) return ok(); /* 回送が終わったあとに残っていたひと言は流さない */
       $("dhJ").textContent = line.ja; $("dhE").textContent = line.en; $("dhSub").classList.add("talk"); talking = true;
       const rm = c.remote(); if (rm) c.say(dhAudio(k), line.en);
       const end = () => { talking = false; quietAt = Date.now(); $("dhSub").classList.remove("talk"); ok(); };
@@ -270,7 +271,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
       }
     },
     feed,
-    hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); el.pause(); },
+    hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); },
     on: () => onNow,
     tripId: () => trip?.id ?? null,
     unlock: () => unlockAudio(el, dhAudio("boot")),

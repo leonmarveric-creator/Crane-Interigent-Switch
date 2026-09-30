@@ -35,6 +35,14 @@
 .kops .kcp{position:relative;margin-top:10px;padding:12px 48px 12px 14px;border:1.5px solid #3cf2a6;border-radius:8px;background:rgba(60,242,166,.12);box-shadow:0 0 16px rgba(60,242,166,.2)}
 .kops .kcp b{display:block;font:700 17px "Hiragino Sans",sans-serif;color:#fff}.kops .kcp small{display:block;font-size:12px;color:#9fd6c0;margin-top:2px}.kops .kcp em{display:block;font-style:normal;font:600 13px "Rajdhani",sans-serif;letter-spacing:.08em;color:#3cf2a6;margin-top:6px}
 .kops .kcp .kx{position:absolute;right:8px;top:8px}
+.kops .kquick{display:block;width:100%;text-align:left;margin:4px 0 14px;padding:18px 18px;border:0;border-radius:10px;background:linear-gradient(90deg,#3cf2a6,#22d690);color:#02140c;cursor:pointer;box-shadow:0 0 24px rgba(60,242,166,.35)}
+.kops .kquick b{display:block;font:800 22px "Hiragino Sans",sans-serif;letter-spacing:.04em}.kops .kquick small{display:block;margin-top:4px;font:600 13px "Hiragino Sans",sans-serif;color:#063}
+.kops .kqr2{position:fixed;right:14px;bottom:14px;z-index:60;display:none;align-items:center;gap:12px;padding:10px 12px 10px 10px;border-radius:12px;background:rgba(2,16,10,.92);border:1px solid rgba(60,242,166,.6);box-shadow:0 0 24px rgba(60,242,166,.25);color:#e8fff4;max-width:360px}
+.kops .kqr2.on{display:flex}
+.kops .kqr2 img{width:120px;height:120px;background:#fff;border-radius:8px;padding:4px;flex:0 0 120px}
+.kops .kqr2 b{display:block;font:800 16px "Hiragino Sans",sans-serif}.kops .kqr2 small{display:block;font-size:12px;color:#9fd6c0;margin-top:4px;line-height:1.4}
+.kops .kqr2 em{display:block;margin-top:6px;font:700 15px "Share Tech Mono",monospace;font-style:normal;letter-spacing:.2em;color:#3cf2a6}
+.kops .kqr2 button{position:absolute;right:4px;top:4px;width:26px;height:26px;border:0;background:none;color:#9fd6c0;font-size:14px}
 
 .skin-mi{--g:#3cf2a6;--g2:#22d690;--t:#eafff6;--m:#86b9a5;--ln:rgba(70,245,175,.62);--ln2:rgba(60,242,166,.16);--a:#ffb020;--r:#ff5a5a;--pn:rgba(4,17,13,.88);
  --f:"Rajdhani","Barlow Condensed","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--fn:"Barlow Condensed","Rajdhani","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}

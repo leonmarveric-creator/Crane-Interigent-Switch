@@ -6,7 +6,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import QRCode from "qrcode";
-import { playSafe, unlockAudio } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
 import { GUIDE_T, GUIDE_VOICE, guideAudio, type GuideKey, type RoomGuide } from "@/lib/cabinAiTalk";
 import type { GLang } from "@/lib/cabinGeo";
 
@@ -210,7 +210,7 @@ export function createGuide(c: GuideCtx): Guide {
     closeT = setTimeout(stop, 120000); // 写真の画面は 2 分で閉じる
   }
   function stop() {
-    run++; onNow = false; el.pause(); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
+    run++; onNow = false; stopVoice(el); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
   }
   $("gdX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();

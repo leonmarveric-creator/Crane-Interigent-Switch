@@ -20,9 +20,9 @@ import { SFX_MARK } from "@/lib/remoteVoice";
 import { createTrains } from "@/components/cabin/cabinTrains";
 import { stationsFor } from "@/lib/cabinTrains";
 import { hasRoomLock, LOCK_T } from "@/lib/cabinLock";
-import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText } from "@/lib/cabinAiTalk";
+import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText, CHECKIN_DEFAULT_URL } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
-import { playSafe } from "@/lib/cabinAudio";
+import { playSafe, stopVoice } from "@/lib/cabinAudio";
 
 const TILES = {
   dark: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
@@ -135,6 +135,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const say = (k: string) => {
     voiceN++;
     Q = Q.then(async () => {
+      if (!trip) return; /* 送迎が終わったあとに残っていた声は流さない */
       const rm = remote(); if (rm) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", ""); await new Promise((r) => setTimeout(r, REMOTE_LAG)); }
       await new Promise<void>((r) => { voice.muted = rm; voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); playSafe(voice, () => ac(), () => r()); setTimeout(r, 15000); });
     }).then(() => { voiceN = Math.max(0, voiceN - 1); });
@@ -588,6 +589,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- チェックイン QR (全員共通の画像。お父さんのスマホで登録) ---------- */
   let checkinUrl: string | null = null, ckT: ReturnType<typeof setTimeout> | null = null;
+  /* 登録された QR が無いときは、Crane Nest のチェックインページ (ポスターと同じ QR) を出す */
+  let ckSet: string | null = null, ckDefault: string | null = null;
+  void QRCode.toDataURL(CHECKIN_DEFAULT_URL, { margin: 1, width: 560, errorCorrectionLevel: "M", color: { dark: "#0a5bc4", light: "#ffffff" } }).then((u) => { ckDefault = u; if (!ckSet) checkinUrl = u; }).catch(() => {});
   /* Wi-Fi の QR (ローミングが遅いときは、先に Wi-Fi につないでからチェックイン) */
   let wifiImg: string | null = null;
   void QRCode.toDataURL(wifiQrText(), { margin: 1, width: 560, errorCorrectionLevel: "M" }).then((u) => { wifiImg = u; }).catch(() => {});
@@ -659,7 +663,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide();
+    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide(); stopVoice(voice);
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -743,5 +747,5 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     remoteVoice: () => Date.now() - phoneSeen < 12000,
     setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },
     aiCommand: (cmd) => { if (trip) ai.command(cmd); },
-    setCheckin: (u) => { checkinUrl = u; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = u ? "" : "none"; } };
+    setCheckin: (u) => { ckSet = u; checkinUrl = u || ckDefault; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = checkinUrl ? "" : "none"; } };
 }

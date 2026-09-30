@@ -7,7 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TOILET_T, TOILET_VOICE, toiletAudio, type ToiletKey } from "@/lib/cabinToilet";
 import type { GLang } from "@/lib/cabinGeo";
-import { playSafe, unlockAudio } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
 
 export interface ToiletCtx {
   stage: HTMLElement;
@@ -110,7 +110,7 @@ export function createToilet(c: ToiletCtx): Toilet {
     closeT = setTimeout(stop, 2500);
   }
   function stop() {
-    run++; onNow = false; el.pause(); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
+    run++; onNow = false; stopVoice(el); host.classList.remove("on"); c.stage.classList.remove("gd-on"); if (closeT) clearTimeout(closeT); closeT = null;
   }
   $("tlX").onclick = (e: Event) => { e.stopPropagation(); stop(); };
   host.onclick = (e) => e.stopPropagation();

@@ -142,6 +142,8 @@ export type RoomGuide = "natsu";
 export const roomGuideOf = (slug: string | null | undefined): RoomGuide | null => (/summer|natsu|natu/i.test(String(slug || "")) ? "natsu" : null);
 
 /* ---------------- チェックイン QR の画面 ---------------- */
+/** チェックインのページ (ポスター「CHECK-IN REQUIRED BY JAPANESE LAW」の QR と同じ) */
+export const CHECKIN_DEFAULT_URL = "https://crane-nest-cmn2.vercel.app";
 /** お客さん用 Wi-Fi (電波が弱い・ローミングが遅いときに先につないでもらう) */
 export const GUEST_WIFI = { ssid: "Crane Nest_Guest", pass: "RemenberPassport1234" };
 export const wifiQrText = () => `WIFI:T:WPA;S:${GUEST_WIFI.ssid.replace(/([\\;,:"])/g, "\\$1")};P:${GUEST_WIFI.pass.replace(/([\\;,:"])/g, "\\$1")};;`;

@@ -7,7 +7,7 @@ import { hasPasskeyHere, loginWithPasskey, passkeySupported } from "@/lib/staffP
 /** ログイン後の行き先 (お父さんの送迎画面 /driver・車内 iPad /cabin・Kaku さんの /kaku も同じログインを使う) */
 const NEXT: Record<string, string> = { "/driver": "HIROSHI DRIVE", "/cabin": "車内 iPad", "/kaku": "AGENT KAKU", "/kaku/ops": "K-OPS" };
 function nextUrl() {
-  try { const n = new URLSearchParams(location.search).get("next"); if (n && NEXT[n]) return n; } catch { /* ignore */ }
+  try { const n = new URLSearchParams(location.search).get("next"); if (n && NEXT[n]) return n; if (n && /^\/kaku\/ops\?link=\d{4}$/.test(n)) return n; } catch { /* ignore */ }
   return "/staff";
 }
 

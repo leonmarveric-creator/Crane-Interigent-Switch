@@ -11,8 +11,10 @@ export const dynamic = "force-dynamic";
 const NAT: Record<string, string> = { zh: "CHN", ko: "KOR", ja: "JPN", en: "" };
 
 /** K-OPS: AGENT KAKU の新しい画面 (iPad・iPhone 1 台で / スマホで操作して iPad に表示)。テーマは MISSION / HOLO を切り替え */
-export default async function KOpsPage() {
-  if (!isStaff()) redirect("/staff/login?next=/kaku/ops");
+export default async function KOpsPage({ searchParams }: { searchParams?: { link?: string } }) {
+  // スマホで iPad の QR を読んだとき: ログインのあとも同じ iPad につなげるように番号を残す
+  const lk = searchParams?.link && /^\d{4}$/.test(searchParams.link) ? searchParams.link : null;
+  if (!isStaff()) redirect(lk ? `/staff/login?next=${encodeURIComponent(`/kaku/ops?link=${lk}`)}` : "/staff/login?next=/kaku/ops");
   const data: KOpsData = { guests: [], devices: [], rooms: [], cabinMissing: true };
   try {
     const d = await loadDriverData();

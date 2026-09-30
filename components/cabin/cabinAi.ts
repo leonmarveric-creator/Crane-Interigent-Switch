@@ -11,7 +11,7 @@ import { CAPTAIN, GUEST_Q, REPEAT, UNKNOWN, captainAudio, guestAudio, talkAudioU
 
 const GUIDE_Q: Record<GLang, string> = { ja: "入り方を教えて", zh: "怎么进门？", en: "How do I get in?", ko: "들어가는 방법" };
 import type { GLang, LL } from "@/lib/cabinGeo";
-import { playSafe, unlockAudio } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
 
 export interface AiState {
   tripId: string | null; dir: "in" | "out"; placeKey: string; lang: GLang;
@@ -55,7 +55,7 @@ export function createAi(c: AiCtx): Ai {
   let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null;
   let spdLv = 0, spdN = 0, spdAt = 0, chatUsed = new Set<number>(), chatAt = 0, boostEndAt = 0;
 
-  function reset() { lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; spdLv = 0; spdN = 0; spdAt = 0; chatUsed = new Set(); chatAt = 0; boostEndAt = 0; }
+  function reset() { stopVoice(el); lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; spdLv = 0; spdN = 0; spdAt = 0; chatUsed = new Set(); chatAt = 0; boostEndAt = 0; }
 
   /* ---------- 話す ---------- */
   async function say(id: AiId, opt: { force?: boolean; duck?: boolean; i?: number } = {}) {
