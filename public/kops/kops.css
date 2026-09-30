@@ -26,6 +26,15 @@
 .kops .kn{color:#9fc7b4;font-size:13px;padding:8px}
 .kops .kgo{margin-top:20px;text-align:center;background:#3cf2a6;color:#02140c;border:0;font:700 22px "Rajdhani",sans-serif;letter-spacing:.2em;padding:16px}.kops .kgo small{display:block;font:600 12px "Hiragino Sans",sans-serif;letter-spacing:.1em;color:#064}
 .kops .kf{margin-top:18px;font:500 11px "Share Tech Mono",monospace;color:#5d8a78;letter-spacing:.1em}
+.kops .ksr{display:flex;gap:8px}
+.kops .ksr input{flex:1;min-width:0;padding:12px 14px;border:1px solid rgba(60,242,166,.45);border-radius:6px;background:rgba(2,20,12,.8);color:#fff;font:500 16px "Hiragino Sans",sans-serif;outline:0;-webkit-appearance:none}
+.kops .ksr button{padding:0 18px;border:1px solid #3cf2a6;border-radius:6px;background:rgba(60,242,166,.14);color:#e8fff4;font:600 15px "Hiragino Sans",sans-serif;cursor:pointer}
+.kops .kqr{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-top:8px}
+.kops .kqi{text-align:left;padding:9px 12px;border:1px solid rgba(60,242,166,.25);border-radius:6px;background:rgba(4,20,14,.7);color:#e8fff4;cursor:pointer}
+.kops .kqi b{display:block;font:600 14px "Hiragino Sans",sans-serif}.kops .kqi small{display:block;font-size:11px;color:#86b9a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kops .kcp{position:relative;margin-top:10px;padding:12px 48px 12px 14px;border:1.5px solid #3cf2a6;border-radius:8px;background:rgba(60,242,166,.12);box-shadow:0 0 16px rgba(60,242,166,.2)}
+.kops .kcp b{display:block;font:700 17px "Hiragino Sans",sans-serif;color:#fff}.kops .kcp small{display:block;font-size:12px;color:#9fd6c0;margin-top:2px}.kops .kcp em{display:block;font-style:normal;font:600 13px "Rajdhani",sans-serif;letter-spacing:.08em;color:#3cf2a6;margin-top:6px}
+.kops .kcp .kx{position:absolute;right:8px;top:8px}
 
 .skin-mi{--g:#3cf2a6;--g2:#22d690;--t:#eafff6;--m:#86b9a5;--ln:rgba(70,245,175,.62);--ln2:rgba(60,242,166,.16);--a:#ffb020;--r:#ff5a5a;--pn:rgba(4,17,13,.88);
  --f:"Rajdhani","Barlow Condensed","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--fn:"Barlow Condensed","Rajdhani","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
@@ -691,6 +700,15 @@
 /* まん中に出るもの */
 .skin-mi.port .alrt{width:560px}
 .skin-mi.port .rep{width:600px}
+/* ===== MISSION: 地図のカメラ操作 ===== */
+.skin-mi #mR .camc{position:absolute;right:14px;top:96px;z-index:650;display:flex;flex-direction:column;gap:6px}
+.skin-mi #mR .camc button{width:44px;height:40px;display:grid;place-items:center;border:1px solid var(--ln);border-radius:6px;background:rgba(2,14,9,.82);color:var(--g);font:700 22px var(--f);cursor:pointer;box-shadow:0 0 10px rgba(60,242,166,.18)}
+.skin-mi #mR .camc button:active{background:rgba(60,242,166,.25)}
+.skin-mi.free #mR .camc button[data-cam="me"]{color:var(--a);border-color:var(--a);box-shadow:0 0 14px rgba(255,176,32,.45)}
+.skin-mi #mR .recen{position:absolute;left:50%;top:60px;transform:translateX(-50%);z-index:660;display:none;align-items:center;gap:8px;padding:8px 16px;border:1.5px solid var(--a);border-radius:6px;background:rgba(20,12,0,.85);color:#ffe2b0;font:700 14px var(--jp);letter-spacing:.06em;cursor:pointer;box-shadow:0 0 18px rgba(255,176,32,.35)}
+.skin-mi #mR .recen svg{color:var(--a)}
+.skin-mi.free #mR .recen{display:flex}
+.skin-mi #mR .leaflet-container{cursor:grab}
 
 /* ===== HOLO: iPad 縦向き (820×1180) ===== */
 .skin-ho.port{width:820px;height:1180px}
@@ -774,10 +792,29 @@
 .skin-ho #me .gsh{position:absolute;left:-34px;top:-34px;width:68px;height:68px;border-radius:50%;background:radial-gradient(circle,rgba(200,240,255,.55),rgba(120,200,240,.18) 45%,transparent 70%)}
 .skin-ho #me .stk{position:absolute;left:-1px;top:0;width:2px;height:24px;transform-origin:50% 0;transform:rotateX(90deg);background:linear-gradient(rgba(220,245,255,.2),#fff);box-shadow:0 0 8px #fff}
 .skin-ho #me .ar{position:absolute;left:0;top:0;transform-style:preserve-3d;animation:ho-bob 2.6s ease-in-out infinite}
-.skin-ho #me .ar svg{position:absolute;left:-27px;top:-32px;width:54px;height:64px;filter:none}
+.skin-ho #me .ar svg{position:absolute;left:-28px;top:-29px;width:56px;height:58px;filter:none}
 
 @keyframes ho-pl3{from{transform:scale(.2);opacity:1}to{transform:scale(2.2);opacity:0}}
 @keyframes ho-bob{0%,100%{transform:translateZ(20px)}50%{transform:translateZ(27px)}}
+/* ===== 地図のカメラ操作 ===== */
+.skin-ho #mbox{touch-action:none}
+.skin-ho .camc{position:absolute;left:44px;top:330px;z-index:11;display:flex;flex-direction:column;gap:6px}
+.skin-ho.panel .camc{left:10px;top:10px}
+.skin-ho .camc button{width:46px;height:42px;display:grid;place-items:center;border:1px solid rgba(220,245,255,.55);background:rgba(6,18,24,.62);color:#eaf8ff;font:600 22px var(--mono);cursor:pointer;box-shadow:0 0 10px rgba(160,225,255,.15);backdrop-filter:blur(3px)}
+.skin-ho .camc button:active{background:rgba(220,245,255,.3)}
+.skin-ho .camc button[data-cam="me"]{color:#9fe3ff}
+.skin-ho.free .camc button[data-cam="me"]{color:var(--y);border-color:var(--y);box-shadow:0 0 14px rgba(255,210,58,.4)}
+.skin-ho .camz{position:absolute;left:46px;top:520px;z-index:11;font:400 12px var(--mono);color:rgba(220,245,255,.7);letter-spacing:.1em}
+.skin-ho.panel .camz{left:12px;top:200px}
+.skin-ho .recen{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);z-index:12;display:none;align-items:center;gap:8px;padding:9px 18px;border:1.5px solid var(--y);background:rgba(20,16,4,.78);color:#fff3c2;font:600 15px var(--jp);letter-spacing:.06em;cursor:pointer;box-shadow:0 0 18px rgba(255,210,58,.35);animation:ho-ppgl 2.4s ease-in-out infinite}
+.skin-ho .recen svg{color:var(--y)}
+.skin-ho.free .recen{display:flex}
+.skin-ho.panel .recen{bottom:20px}
+.skin-ho.free #me{opacity:0}
+.skin-ho .meG{background:none;border:0}
+.skin-ho .meG svg{transform:rotate(var(--gr,0deg));filter:drop-shadow(0 0 6px rgba(200,240,255,.9))}
+.skin-ho.stby .recen{bottom:210px}
+.skin-ho.port .camc{top:360px}.skin-ho.port .camz{top:550px}
 
 /* ===== HOLO ゲスト: 普段は地球。パスポート写真はボタンで ===== */
 .skin-ho .bust{display:none}
@@ -801,6 +838,37 @@
 .skin-ho .por .st2.can{cursor:pointer;padding:3px 10px;margin-left:-10px;border:1px solid rgba(220,245,255,.55);background:rgba(150,215,240,.16);box-shadow:0 0 10px rgba(160,225,255,.25);animation:ho-ppgl 2.4s ease-in-out infinite}
 @keyframes ho-ppgl{50%{box-shadow:0 0 18px rgba(200,240,255,.55)}}
 .skin-ho.pshow .globe{opacity:.45}
+/* ===== TAPES: 曲の一覧ははみ出さない (スクロール)・カバー ===== */
+.skin-ho .lst.trk{max-height:232px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-right:0}
+.skin-ho .lst.trk::-webkit-scrollbar{display:none}
+.skin-ho .tv .lst.trk::after{display:none}
+.skin-ho .tv .lst.trk{box-shadow:inset -6px 0 0 rgba(235,250,255,.85)}
+.skin-ho .lst.trk div{white-space:nowrap}
+.skin-ho .lst.trk div .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skin-ho .tcw{display:flex;align-items:stretch;background:rgba(30,80,105,.35)}
+.skin-ho .tcv2{flex:1;min-width:0}
+.skin-ho .tcv2 .tn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:none!important}
+.skin-ho .tcv2 .pr{background:none!important}
+.skin-ho .tcv{flex:0 0 84px;width:84px;height:84px;margin:6px 0 6px 8px;object-fit:cover;border:1px solid rgba(220,245,255,.6);box-shadow:0 0 14px rgba(160,225,255,.35);opacity:.55;filter:saturate(.5)}
+.skin-ho .tcv.has{opacity:1;filter:none}
+.skin-ho.port .lst.trk{max-height:520px}
+/* ===== GUESTS: 過去のゲスト・検索 ===== */
+.skin-ho .gsrch{position:absolute;left:130px;top:216px;width:360px;height:34px;display:none;align-items:center;gap:8px;padding:0 10px;border:1px solid rgba(220,245,255,.55);background:rgba(8,32,46,.6);color:#e8f8ff;z-index:5}
+.skin-ho.gpast .gsrch{display:flex}
+.skin-ho.gpast #vG .lh[style*="left:130px"]{visibility:hidden}
+.skin-ho .gsrch input{flex:1;min-width:0;background:none;border:0;outline:0;color:#fff;font:500 17px var(--jp);-webkit-appearance:none}
+.skin-ho .gsrch input::placeholder{color:rgba(220,245,255,.5)}
+.skin-ho .gsrch span{font:400 13px var(--mono);color:var(--h2);white-space:nowrap}
+.skin-ho.gpast #gL{max-height:378px;overflow-y:auto;scrollbar-width:none}
+.skin-ho.gpast #gL::-webkit-scrollbar{display:none}
+.skin-ho.gpast #gL div::before{display:none}
+.skin-ho #gL em.dt{display:inline!important;font:400 13px var(--mono)!important;color:var(--h2)!important;border:0!important;padding:0!important;margin-right:2px}
+.skin-ho #gL .more{justify-content:center;color:var(--h2)!important;font:400 14px var(--mono)!important}
+.skin-ho.port .gsrch{left:40px;top:770px;width:380px}
+.skin-ho.port.gpast #gL{max-height:230px}
+.skin-ho.port .sel .nm{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;max-width:none!important}
+.skin-ho.port .lst.trk{max-height:420px}
+.skin-ho.port .tst{top:900px;right:40px}
 
 /* ===== 操作パネル: 縦はこれまでどおり (まとまりは display:contents で見えない)、横は列に並べる ===== */
 .kpad .col{display:contents}
