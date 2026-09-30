@@ -93,7 +93,7 @@ test("cabin: phone → iPad flow (auth, SQL, boost music, GPS relay keeps the sc
   for (const f of ["cabinStart", "cabinPos", "cabinEnd", "cabinSetRoomPhoto", "cabinPhotoUploadUrl"]) assert.match(act, new RegExp(`export async function ${f}\\(`));
   assert.match(act, /\.eq\("status", "active"\)\.select\("id"\)/, "position only for an active trip");
   const cab = read("components", "driver", "DriverCabin.tsx");
-  assert.match(cab, /boostIn\(5000\)/); assert.match(cab, /boostOut\(\)/); assert.match(cab, /wakeLock/);
+  assert.match(cab, /boostIn\(300\)/); assert.match(cab, /boostIn\(0\)/); assert.match(cab, /boostOut\(\)/); assert.match(cab, /wakeLock/);
   const mus = read("components", "driver", "DriverMusic.tsx");
   assert.match(mus, /x\.purpose === "boost"/); assert.match(mus, /a\.currentTime = tr\.startSec/);
   assert.match(read("app", "staff", "login", "page.tsx"), /"\/cabin": "車内 iPad"/);
