@@ -62,9 +62,9 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
   <div class="ov" id="st"><div class="ovb" style="top:60px;bottom:60px">
    <div class="ovh">SETTINGS · 設定<button class="x" data-x="st">✕</button></div>
    <div class="fmg">
-    <div class="sg pl"><b>⚡ 起動・ホーム BGM</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upB" hidden></label><ol class="pll" id="pl_boot"></ol></div>
-    <div class="sg pl"><b>🎵 ノーマル BGM (ミッション中)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upN" hidden></label><ol class="pll" id="pl_normal"></ol></div>
-    <div class="sg pl"><b>🌉 クルーズ BGM (橋・高速)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*" multiple id="upC" hidden></label><ol class="pll" id="pl_cruise"></ol></div>
+    <div class="sg pl"><b>⚡ 起動・ホーム BGM</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple id="upB" hidden></label><ol class="pll" id="pl_boot"></ol></div>
+    <div class="sg pl"><b>🎵 ノーマル BGM (ミッション中)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple id="upN" hidden></label><ol class="pll" id="pl_normal"></ol></div>
+    <div class="sg pl"><b>🌉 クルーズ BGM (橋・高速)</b><label class="fb">＋ 曲を追加<input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple id="upC" hidden></label><ol class="pll" id="pl_cruise"></ol></div>
     <div class="sg"><b>🔀 再生の順番</b><span>曲が終わると次の曲へ進みます</span><button class="tg" id="shTg">登録順</button></div>
     <div class="sgm" id="bgMsg"></div>
     <div class="sg"><b>⚠ 制限速度の目安</b><span>超えると画面が琥珀色になり、ASTRAEA が注意します</span><input type="number" id="limIn" min="30" max="120" step="10" value="80"> <em>km/h</em></div>
