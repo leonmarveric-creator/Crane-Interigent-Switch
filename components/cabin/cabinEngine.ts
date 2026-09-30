@@ -17,6 +17,8 @@ import { createGuide } from "@/components/cabin/cabinGuide";
 import { createToilet } from "@/components/cabin/cabinToilet";
 import { createLock } from "@/components/cabin/cabinLock";
 import { SFX_MARK } from "@/lib/remoteVoice";
+import { createTrains } from "@/components/cabin/cabinTrains";
+import { stationsFor } from "@/lib/cabinTrains";
 import { hasRoomLock, LOCK_T } from "@/lib/cabinLock";
 import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
@@ -342,17 +344,17 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const M = MUSIC_T[lang] ?? MUSIC_T.en, q = qrLinks();
     // 到着画面のガイド (押したときだけ流れる): エントランスの開け方 / お部屋の開け方 / トイレの使い方
     const GL: Record<GLang, Record<string, string>> = {
-      ja: { gEnt: "エントランスの開け方", gRoom: "お部屋の開け方", gToilet: "トイレの使い方" },
-      zh: { gEnt: "入口怎么开", gRoom: "房间怎么开", gToilet: "卫生间怎么用" },
-      en: { gEnt: "Open the entrance", gRoom: "Open your room", gToilet: "Using the restroom" },
-      ko: { gEnt: "입구 여는 법", gRoom: "객실 여는 법", gToilet: "화장실 사용법" },
+      ja: { gEnt: "エントランスの開け方", gRoom: "お部屋の開け方", gToilet: "トイレの使い方", ck: "チェックイン・パスポート登録" },
+      zh: { gEnt: "入口怎么开", gRoom: "房间怎么开", gToilet: "卫生间怎么用", ck: "办理入住·登记护照" },
+      en: { gEnt: "Open the entrance", gRoom: "Open your room", gToilet: "Using the restroom", ck: "Check-in · passport" },
+      ko: { gEnt: "입구 여는 법", gRoom: "객실 여는 법", gToilet: "화장실 사용법", ck: "체크인·여권 등록" },
     };
     root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => {
       const k = b.dataset.q as string;
       // 春・秋・冬のお部屋は「お部屋の鍵の使い方」(内側のつまみ)
       const lk = k === "gRoom" && !guide.hasRoom() && hasRoomLock(room?.slug);
       (b.querySelector("b") as HTMLElement).textContent = k === "key" ? M.qKey : k === "room" ? M.qRoom : lk ? (LOCK_T[lang] ?? LOCK_T.en).btn : (GL[lang] ?? GL.en)[k];
-      b.style.display = k === "key" || k === "room" ? (q[k as "key" | "room"] ? "" : "none") : k === "gRoom" ? (guide.hasRoom() || lk ? "" : "none") : "";
+      b.style.display = k === "key" || k === "room" ? (q[k as "key" | "room"] ? "" : "none") : k === "gRoom" ? (guide.hasRoom() || lk ? "" : "none") : k === "ck" ? (checkinUrl ? "" : "none") : "";
     });
     setText("aqTip", M.qTip);
     $("aq").style.display = trip?.dir === "out" ? "none" : ""; // お見送りのときは出さない
@@ -361,6 +363,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation(); const k = b.dataset.q!;
     if (k === "key" || k === "room") return void qrShow(k);
+    if (k === "ck") { qrHide(); guide.stop(); toilet.stop(); lock.stop(); return void showCheckin(); }
     qrHide(); guide.stop(); toilet.stop(); lock.stop();
     if (k === "gEnt") guide.start("ent"); else if (k === "gRoom") { if (guide.hasRoom()) guide.start("room"); else lock.start(); } else if (k === "gToilet") toilet.start();
   }));
@@ -573,6 +576,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- トイレの使い方 (到着画面のボタンで。写真は撮らなくてよい) ---------- */
   const toilet = createToilet({ stage, lang: () => lang, ac, duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
+  /* ---------- お見送り: 電車の案内 (右下の枠) ---------- */
+  const trains = createTrains({ box: $("recBox"), title: $("h-rec"), lang: () => lang });
   /* ---------- お部屋の鍵の使い方 (春・秋・冬: 内側のつまみ。到着画面のボタンで) ---------- */
   const lock = createLock({ stage, lang: () => lang, ac, room: () => ({ code: room?.roomCode ?? null, name: room ? `${room.kanji} · ${room.en}` : "" }), duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
 
@@ -614,6 +619,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     $("room").classList.remove("lit", "rscanning", "tagged"); $("arrive").classList.remove("on"); $("cap").classList.remove("show");
     if (t.dir === "out") $("room").classList.add("lit");
     texts(); draw(); meter(0);
+    // お見送りで駅へ: 右下の枠を「電車の案内」に (時刻表を登録した駅だけ)
+    if (t.dir === "out") trains.show(stationsFor(t.placeKey, t.placeName)); else trains.hide();
     ($("etaM").firstChild as Text).textContent = String(baseMin); setText("km", T.km.replace("{k}", (R.total / 1000).toFixed(1)));
     stage.classList.add("trip"); startedAt = Date.now(); ai.reset(); npId = null;
     setTimeout(() => MAP.invalidateSize(), 50);
@@ -625,7 +632,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
     trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
-    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin();
+    qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide();
   }
 
   /* ---------- 地図をこの iPad に保存 ---------- */
@@ -694,5 +701,5 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     remoteVoice: () => Date.now() - phoneSeen < 12000,
     setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },
     aiCommand: (cmd) => { if (trip) ai.command(cmd); },
-    setCheckin: (u) => { checkinUrl = u; } };
+    setCheckin: (u) => { checkinUrl = u; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = u ? "" : "none"; } };
 }

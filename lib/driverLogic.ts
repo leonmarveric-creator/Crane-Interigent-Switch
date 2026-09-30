@@ -25,6 +25,8 @@ export interface DRes {
   pickupPlace: string | null; pickupAt: string | null; pickupNone: boolean;
   flightNo: string | null; flightInfo: FlightInfo | null; flightCheckedAt: string | null;
   preparedAt: string | null;
+  /** Crane Nest のシステムの お見送り送迎予約 + パスポート登録 (紐づいたときだけ) */
+  drop?: import("@/lib/craneNest").CnDrop | null;
 }
 
 const JST = 9 * 3600e3;
@@ -107,49 +109,16 @@ export function prepDue(r: DRes, nowMs: number, minutes: number): boolean {
 }
 
 /* ---------------- 鍵の電池 ---------------- */
-export const BATTERY_REPLACE_AT = 30;   // これを下回ったら交換 (記録が少ないうち)
-export const BATTERY_MIN_AT_OUT = 20;   // チェックアウト時にこれを下回りそうなら交換
-export const BATTERY_IDLE_DAYS = 60;    // 空き部屋は 2 か月に 1 回
-export const BATTERY_LEAD_DAYS = 3;     // チェックインの 3 日前に確認
+// API を節約するため、鍵のある部屋を 15 日に 1 回だけ確認し、10% 以下なら知らせる
+export const BATTERY_CHECK_DAYS = 15;
+export const BATTERY_ALERT_AT = 10;
 
-/** 1 日あたりの減り方 (%/日)。交換 (大きく増えた) より後の記録だけで計算。2 件未満なら null */
-export function batteryDrainPerDay(logs: { battery: number | null; checked_at: string }[]): number | null {
-  const L = logs.filter((l) => typeof l.battery === "number").sort((a, b) => ms(a.checked_at) - ms(b.checked_at));
-  let start = 0;
-  for (let i = 1; i < L.length; i++) if ((L[i].battery as number) > (L[i - 1].battery as number) + 10) start = i; // 電池交換
-  const S = L.slice(start);
-  if (S.length < 2) return null;
-  const days = (ms(S[S.length - 1].checked_at) - ms(S[0].checked_at)) / 86400e3;
-  if (days < 3) return null;
-  return Math.max(0, ((S[0].battery as number) - (S[S.length - 1].battery as number)) / days);
+/** 今日電池を確認する部屋 (鍵があって、前回の確認から 15 日以上たった部屋・まだ確認していない部屋) */
+export function batteryTargets(rooms: DRoom[], lastCheck: Record<string, string | undefined>, nowMs: number): string[] {
+  return rooms.filter((r) => r.hasLock && (!lastCheck[r.id] || nowMs - ms(lastCheck[r.id]!) >= BATTERY_CHECK_DAYS * 86400e3 - 3600e3)).map((r) => r.id);
 }
-
-/** 交換が必要か (チェックアウトの日まで持つか) */
-export function batteryVerdict(battery: number, logs: { battery: number | null; checked_at: string }[], nowMs: number, untilMs: number): { replace: boolean; predicted: number | null } {
-  const rate = batteryDrainPerDay(logs);
-  if (rate == null) return { replace: battery < BATTERY_REPLACE_AT, predicted: null };
-  const predicted = Math.round(battery - rate * Math.max(0, (untilMs - nowMs) / 86400e3));
-  return { replace: predicted < BATTERY_MIN_AT_OUT || battery < BATTERY_MIN_AT_OUT, predicted };
-}
-
-/** 今日電池を確認する部屋 (チェックイン 3 日前 / 空き部屋で 60 日確認していない) */
-export function batteryTargets(rooms: DRoom[], res: DRes[], lastCheck: Record<string, string | undefined>, nowMs: number): { roomId: string; reason: "checkin" | "idle"; res?: DRes }[] {
-  const day = addDays(jstDay(nowMs), BATTERY_LEAD_DAYS);
-  const out: { roomId: string; reason: "checkin" | "idle"; res?: DRes }[] = [];
-  for (const room of rooms) {
-    if (!room.hasLock) continue;
-    const r = res.find((x) => x.roomId === room.id && jstDay(x.checkIn) === day);
-    const last = lastCheck[room.id];
-    if (r) {
-      // 前回の確認から 5 日以内なら (連続した予約など) 省く
-      if (!last || nowMs - ms(last) > 5 * 86400e3) out.push({ roomId: room.id, reason: "checkin", res: r });
-      continue;
-    }
-    const busySoon = res.some((x) => x.roomId === room.id && ms(x.checkOut) > nowMs && ms(x.checkIn) < nowMs + (BATTERY_LEAD_DAYS + 1) * 86400e3);
-    if (!busySoon && (!last || nowMs - ms(last) > BATTERY_IDLE_DAYS * 86400e3)) out.push({ roomId: room.id, reason: "idle" });
-  }
-  return out;
-}
+/** 交換が必要か */
+export const batteryLow = (battery: number) => battery <= BATTERY_ALERT_AT;
 
 /* ---------------- 歌詞 (LRC) ---------------- */
 export interface LrcLine { t: number; s: string }

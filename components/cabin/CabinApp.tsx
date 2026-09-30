@@ -8,6 +8,7 @@
  *   ・右下の ⚙: この iPad に保存 (声・効果音・写真・地図) / テスト走行 / 名前の変更
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { TRIP_HTML } from "@/components/cabin/cabinMarkup";
 import { createEngine, tileCount, type Engine } from "@/components/cabin/cabinEngine";
 import { createDeadhead, type Deadhead } from "@/components/cabin/cabinDeadhead";
@@ -37,7 +38,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null); // 送迎画面の中身 (React は触らない。engine が直接動かす)
   const eng = useRef<Engine | null>(null);
-  const dhRef = useRef<Deadhead | null>(null); // 回送モード (ゲストなし: 迎えに行く途中・送ったあとの帰り道)
+  const dhRef = useRef<Deadhead | null>(null);
+  const ckLink = useRef<{ link: string; img: string | null } | null>(null); // 予約つきチェックイン QR // 回送モード (ゲストなし: 迎えに行く途中・送ったあとの帰り道)
   const [dev, setDev] = useState<{ id: string; name: string } | null>(null);
   const [needSetup, setNeedSetup] = useState(false);
   const [setupErr, setSetupErr] = useState("");
@@ -168,7 +170,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (t.phase === "dead" && dh) {
           if (e.tripId() === t.id) e.stop();
           setInTrip(true); setMenu(false);
-          dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string");
+          dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string" || typeof j.checkinLink === "string");
           const ownF = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
           if (!ownF && t.phone && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) { phoneAt.current = t.phone.at; dh.feed(t.phone.ll, t.phone.kmh); }
           else if (ownF) dh.feed(own.current!.ll, own.current!.kmh);
@@ -182,7 +184,11 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         e.setQuiet(!!t.aiQuiet); // AI の静かモード (お父さんのスマホで切り替え)
-        e.setCheckin(typeof j.checkin === "string" ? j.checkin : null); // チェックイン QR (全員共通)
+        // チェックイン QR: 予約つき (合言葉入り・その予約に自動で紐づく) があればそれ、無ければ全員共通の画像
+        if (typeof j.checkinLink === "string") {
+          if (ckLink.current?.link !== j.checkinLink) { const link = j.checkinLink; ckLink.current = { link, img: null }; QRCode.toDataURL(link, { margin: 2, width: 560, errorCorrectionLevel: "M" }).then((img) => { const c = ckLink.current; if (c && c.link === link) { c.img = img; eng.current?.setCheckin(img); } }).catch(() => {}); }
+          e.setCheckin(ckLink.current?.img ?? (typeof j.checkin === "string" ? j.checkin : null));
+        } else e.setCheckin(typeof j.checkin === "string" ? j.checkin : null);
         e.aiCommand(t.aiCmd ?? null); // お父さんから ASTRAEA への指示
         // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }

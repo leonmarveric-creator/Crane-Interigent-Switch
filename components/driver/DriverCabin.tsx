@@ -32,7 +32,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
 
   useEffect(() => {
     if (!trip) { setSending(""); return; }
-    let live = true, last: { ll: LL; kmh: number | null; t: number } | null = null, bs = { ...BOOST_INIT }, boosting = false;
+    let live = true, last: { ll: LL; kmh: number | null; t: number } | null = null, bs = { ...BOOST_INIT }, boosting = false, gT: ReturnType<typeof setTimeout> | undefined;
     const geo = navigator.geolocation;
     const wid = geo?.watchPosition((p) => {
       const ll: LL = [p.coords.latitude, p.coords.longitude]; if (p.coords.accuracy > 80) return;
@@ -40,11 +40,21 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (kmh == null && last && Date.now() - last.t > 500) kmh = (dist(last.ll, ll) / ((Date.now() - last.t) / 1000)) * 3.6;
       last = { ll, kmh, t: Date.now() };
       const r = boostStep(bs, ll, kmh); bs = r.s;
-      if (r.event === "start") boosting = mRef.current.boostIn(5000);
-      else if (r.event === "end" && boosting) { boosting = false; mRef.current.boostOut(); }
+      // BOOST の曲は iPad の「ブースト開始 / 完了」のセリフに合わせる (下の onPlay)。
+      // セリフが来ないとき (iPad の声がスマホに来ていない) だけ、このスマホの GPS で始める / 終える
+      if (r.event === "start") { clearTimeout(gT); gT = setTimeout(() => { if (live && !mRef.current.inBoost()) boosting = mRef.current.boostIn(0); }, rv.ok() ? 12000 : 5000); }
+      else if (r.event === "end") { clearTimeout(gT); gT = setTimeout(() => { if (live && mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }, rv.ok() ? 12000 : 0); }
+      // 橋から離れたのに BOOST の曲のまま (終わりを見逃した) → 元の曲へ
+      else if (bs.phase === "off" && boosting && mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); }
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     // 車内 iPad の声 (ASTRAEA・道案内) をこのスマホで鳴らす (Bluetooth で車のスピーカーへ)。話している間は音楽を小さく
-    const rv = startRemoteVoice(trip.id, { onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")) });
+    const rv = startRemoteVoice(trip.id, {
+      // ブースト開始のセリフと一緒に BOOST の曲を始め、完了のセリフと一緒にフェードアウト (元の曲へ)
+      onPlay: (u) => {
+        if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
+        else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
+      },
+      onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")) });
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     let warned = false;
     const iv = setInterval(async () => {
@@ -69,9 +79,9 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     const wake = () => { if ("wakeLock" in navigator && document.visibilityState === "visible") (navigator as any).wakeLock.request("screen").then((l: any) => { lock = l; }).catch(() => {}); };
     wake(); document.addEventListener("visibilitychange", wake);
     return () => {
-      live = false; rv.stop(); if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
+      live = false; clearTimeout(gT); rv.stop(); if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
       document.removeEventListener("visibilitychange", wake); lock?.release?.().catch?.(() => {});
-      if (boosting) mRef.current.boostOut();
+      if (mRef.current.inBoost()) mRef.current.boostOut();
     };
   }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const tripRef2 = useRef(trip); tripRef2.current = trip;
@@ -119,7 +129,9 @@ export function CabinSheet({ open, onClose, res, dir0, data, cab, t, roomName, u
     let last: string | null = null; try { last = localStorage.getItem("drvCabDev"); } catch { /* ignore */ }
     setDev(devs.find((d) => d.id === last)?.id ?? devs[0]?.id ?? null);
     setDir(dir0);
-    const pk = placeFromText(res?.pickupPlace ?? null, res?.flightInfo?.terminal ?? null);
+    // お見送りは Crane Nest のシステムでゲストが選んだ行き先 (あれば)
+    const drop = dir0 === "out" ? res?.drop ?? null : null;
+    const pk = drop?.dest ? placeFromText(drop.dest, drop.terminal) : placeFromText(res?.pickupPlace ?? null, res?.flightInfo?.terminal ?? null);
     setPlace(pk ?? (res?.flightNo ? "kix" : "kix")); setOther(null); setHits([]); setQ(pk === null && res?.pickupPlace ? res.pickupPlace : "");
     setRoomId(res?.roomId ?? data.rooms[0]?.id ?? null);
     setLang(res?.lang ?? "zh"); setAc(acModeFor(Date.now()));

@@ -630,6 +630,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
                     <div className="row1"><span className="time">{jstTime(r.checkOut)}</span><span className="kind out">{t("お見送り")}</span><span className="eta">{eta(r.checkOut)}</span></div>
                     <div className="who">{gName(r)}<small>{r.lang.toUpperCase()}</small></div>
                     <div className="meta">{t("お部屋")} <b>{rName(r)}</b></div>
+                    <DropInfo d={r.drop ?? null} t={t} />
                     <div className="btns">
                       <button className="btn" onClick={() => { music.setPlaylist("out", r.lang as MLang, false); setTimeout(() => music.play(), 150); toast(t("お見送りの音楽を流します")); }}>🎵 {t("お見送りの音楽")}</button>
                       <button className="btn" onClick={() => cabS.open(r, "out")}>🚗 {cab.trip?.resId === r.id ? t("iPad に表示中") : t("車内 iPad に出して出発")}</button>
@@ -807,6 +808,22 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
       <CabinSheet open={!!cabS.state} onClose={cabS.close} res={cabS.state?.res ?? null} dir0={cabS.state?.dir ?? "in"} data={data} cab={cab} t={t} roomName={(id) => roomOf(id)?.name ?? "—"} ui={lang} />
       <CabinBar cab={cab} data={data} t={t} ui={lang} />
       <div className={`toast ${toastMsg ? "show" : ""}`}>{toastMsg}</div>
+    </div>
+  );
+}
+
+/** お見送り: Crane Nest のシステムでゲストが登録した 送迎予約 + パスポート (紐づいたとき) */
+function DropInfo({ d, t }: { d: import("@/lib/craneNest").CnDrop | null; t: (s: string, v?: Record<string, string | number>) => string }) {
+  if (!d) return <div className="drop none">🛂 {t("パスポート・お見送り：未登録")}</div>;
+  const hm = (iso: string | null) => (iso ? new Date(Date.parse(iso) + 9 * 3600e3).toISOString().slice(11, 16) : "");
+  const where = d.intent === "nankai" ? `${d.dest ?? ""} · ${t("南海に乗車")}` : d.intent === "airport" ? `${d.dest ?? ""} → ${t("空港")} T${d.terminal ?? "?"}` : `${d.dest ?? ""}${d.terminal ? ` · T${d.terminal}` : ""}`;
+  return (
+    <div className="drop">
+      <div className="dh"><b>🛂 {t("パスポート登録済み")} · {d.names.length}{t("名")}</b>{d.linked === "room" ? <small>{t("お部屋と日付で紐づけ")}</small> : null}</div>
+      <div className="dl">🛫 <b>{where}</b></div>
+      <div className="dl">⏰ {d.departAt ? `${t("出発")} ${d.departAt.slice(0, 5)}` : t("出発時刻：未定")}{d.flightAt ? ` · ✈ ${hm(d.flightAt)}` : ""}</div>
+      <div className="dl">👥 {d.pax}{t("名")} · 🧳 {d.large} · 👜 {d.small}{d.special ? ` · 🚲 ${d.special}` : ""}</div>
+      {d.names.length ? <div className="dn">{d.names.join(" / ")}</div> : null}
     </div>
   );
 }

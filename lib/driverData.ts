@@ -5,6 +5,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isMissingColumn } from "@/lib/stayTimes";
 import { langOf, monthKey, type DRoom, type DRes } from "@/lib/driverLogic";
+import { loadCraneNestDrops } from "@/lib/craneNest";
 import { activeTrip, checkinQrUrl, loadCabinDevices, toCabinRoom, type CabinDevice, type CabinRoom, type CabinTrip } from "@/lib/cabinData";
 
 export type DriverDesign = "hybrid" | "bike";
@@ -62,8 +63,8 @@ export function toDRes(r: any): DRes {
 }
 
 /** 予約 (from〜to に重なるもの)。列が無ければ基本の列だけで読む */
-export async function loadReservations(fromMs: number, toMs: number): Promise<{ res: DRes[]; missing: boolean }> {
-  const base = "id, room_id, guest_name, guest_lang, unlock_pin, status, check_in, check_out";
+export async function loadReservations(fromMs: number, toMs: number): Promise<{ res: DRes[]; missing: boolean; tokens: Record<string, string> }> {
+  const base = "id, room_id, guest_name, guest_lang, unlock_pin, status, check_in, check_out, guest_token";
   const extra = ", assigned_room_id, entrance_name, early_checkin_at, late_checkout_at";
   const drv = ", pickup_place, pickup_at, pickup_none, flight_no, flight_info, flight_checked_at, prepared_at";
   const q = (c: string) => supabaseAdmin.from("reservations").select(c).neq("status", "cancelled")
@@ -72,7 +73,10 @@ export async function loadReservations(fromMs: number, toMs: number): Promise<{ 
   let missing = false;
   if (isMissingColumn(r.error)) { missing = true; r = await q(base + extra); }
   if (isMissingColumn(r.error)) r = await q(base);
-  return { res: ((r.data ?? []) as any[]).map(toDRes), missing };
+  const rows = (r.data ?? []) as any[];
+  const tokens: Record<string, string> = {};
+  for (const x of rows) if (x.guest_token) tokens[x.id] = String(x.guest_token);
+  return { res: rows.map(toDRes), missing, tokens };
 }
 
 export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
@@ -102,8 +106,13 @@ export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
     activeTrip(null).catch(() => null),
   ]);
   const roomIds = new Set(rooms.map((r) => r.id));
+  const res = resR.res.filter((r) => roomIds.has(r.roomId));
+  // Crane Nest のシステムの お見送り送迎予約 + パスポート登録 を紐づける (設定が無ければ何もしない)
+  const kanji = new Map(cabinRooms.map((r) => [r.id, r.kanji]));
+  const drops = await loadCraneNestDrops(res.map((r) => ({ id: r.id, roomKanji: kanji.get(r.roomId) ?? null, checkOut: r.checkOut, token: resR.tokens[r.id] ?? null }))).catch(() => ({} as Record<string, never>));
+  for (const r of res) r.drop = drops[r.id] ?? null;
   return {
-    rooms, res: resR.res.filter((r) => roomIds.has(r.roomId)), places, tracks, settings, alerts, flightUsed, battery, entrances,
+    rooms, res, places, tracks, settings, alerts, flightUsed, battery, entrances,
     setupMissing: resR.missing,
     cabin: { devices: cabinDev.devices, trip: cabinTrip, rooms: cabinRooms, missing: cabinDev.missing, checkinQr: await checkinQrUrl().catch(() => null) },
   };

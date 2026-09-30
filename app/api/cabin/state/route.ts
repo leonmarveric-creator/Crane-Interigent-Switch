@@ -5,6 +5,7 @@ import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/
 import { cleanCmd } from "@/lib/cabinMusic";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { checkinQrUrl } from "@/lib/cabinData";
+import { checkinLinkFor } from "@/lib/craneNest";
 
 export const dynamic = "force-dynamic";
 const J = (v: any, status = 200) => NextResponse.json(v, { status, headers: { "cache-control": "no-store" } });
@@ -30,10 +31,12 @@ export async function GET(req: NextRequest) {
   }
   const trip = await activeTrip(device?.id ?? null);
   const have = req.nextUrl.searchParams.get("np") || "";
-  const [room, track, checkin] = await Promise.all([
+  const [room, track, checkin, checkinLink] = await Promise.all([
     trip ? cabinRoomById(trip.roomId) : null,
     trip?.np && trip.np.id !== have ? cabinTrackById(trip.np.id).catch(() => null) : null,
     trip ? checkinQrUrl().catch(() => null) : null,
+    // 予約つきのチェックイン QR (パスポート登録・お見送りの送迎予約。その予約の合言葉入り → 自動で紐づく)
+    trip?.resId ? (async () => { const { data } = await supabaseAdmin.from("reservations").select("guest_token").eq("id", trip.resId!).maybeSingle(); return data?.guest_token ? checkinLinkFor(String(data.guest_token)) : null; })().catch(() => null) : null,
   ]);
   // 回送中 (ゲストなし): 迎えに行くゲストの情報・お部屋の準備・鍵の電池 (父向けの画面に出す)
   let dh: any = null;
@@ -49,7 +52,7 @@ export async function GET(req: NextRequest) {
       };
     } catch { dh = {}; }
   }
-  return J({ ok: true, device, trip, room, track, checkin, dh, now: Date.now() });
+  return J({ ok: true, device, trip, room, track, checkin, checkinLink, dh, now: Date.now() });
 }
 
 /** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */

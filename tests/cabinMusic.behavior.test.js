@@ -232,3 +232,37 @@ test("room lock guide (spring / autumn / winter): button on the arrival screen, 
   assert.match(read("components", "cabin", "cabinDeadhead.ts"), /if \(c\.remote\(\)\) \{ c\.say\(u, SFX_MARK\)/);
   assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) \{ void playFx/, "effects play at once on the phone, without ducking");
 });
+
+test("Sky Gate boost music always returns to the normal song (voice ducking can't freeze the fade), manual pick ends boost, next bridge boosts again", () => {
+  const m = read("components", "driver", "DriverMusic.tsx"), c = read("components", "driver", "DriverCabin.tsx");
+  assert.match(m, /duck\(on: boolean\) \{ duckWanted\.current = on; if \(!playing \|\| switching\.current\) return;/, "no ducking while switching songs");
+  assert.match(m, /setTimeout\(\(\) => fadeTo\(0, 1800\), 200\);\s*setTimeout\(async \(\) => \{\s*if \(boost\.current !== b\) return;/, "boost-out switches back on a timer, not on the fade callback");
+  assert.match(m, /if \(boost\.current\) \{ dropBoost\(\); const tr = list\[i\] \?\? null;/, "picking a song during boost ends boost and plays it");
+  assert.match(m, /if \(boost\.current && Date\.now\(\) - boost\.current\.at > 600000\) dropBoost\(\);/, "a stuck boost never blocks the next bridge");
+  assert.match(m, /boostSafety\.current = setTimeout\(\(\) => \{ if \(boost\.current === me\) apiRef\.current\?\.boostOut\(\); \}, 480000\);/, "8-minute safety return");
+  assert.match(c, /else if \(bs\.phase === "off" && boosting && mRef\.current\.inBoost\(\)\)/, "left the bridge area but still boosting → back to normal");
+  // BOOST の曲は iPad の「ブースト開始 / 完了」のセリフと一緒に
+  assert.match(c, /if \(\/\(en-boost-on\|dh\\\/boostIn\)\\\.mp3\$\/\.test\(u\)\) \{ clearTimeout\(gT\); if \(!mRef\.current\.inBoost\(\)\) boosting = mRef\.current\.boostIn\(300\); \}/, "boost music starts with the boost-on line");
+  assert.match(c, /else if \(\/\(en-boost-off\|dh\\\/boostOut\)\\\.mp3\$\/\.test\(u\)\) \{ clearTimeout\(gT\); if \(mRef\.current\.inBoost\(\)\) \{ boosting = false; mRef\.current\.boostOut\(\); \} \}/, "fades out with the boost-complete line");
+  assert.match(c, /rv\.ok\(\) \? 12000 : 5000/, "phone GPS only as a fallback when no voice comes from the iPad");
+  assert.match(read("lib", "remoteVoice.ts"), /try \{ h\.onPlay\?\.\(u\); \} catch/);
+  assert.match(m, /duck\(on: boolean\) \{ duckWanted\.current = on;/, "music level follows the voice after the switch");
+});
+
+test("Crane Nest link: reservation QR with the booking's token, drop-off + passport shown to dad, prefill API for the form", async () => {
+  const cn = read("lib", "craneNest.ts");
+  assert.match(cn, /CRANENEST_SUPABASE_URL/); assert.match(cn, /CRANENEST_SUPABASE_SERVICE_KEY/);
+  assert.match(cn, /const LEGACY: Record<string, string> = \{ "105": "松", "106": "竹", "107": "林", "108": "梅", "109": "荷" \}/, "old room numbers");
+  assert.match(cn, /x\.reservation_token && x\.reservation_token === r\.token/, "① token link");
+  assert.match(cn, /!x\.reservation_token && x\.transfer_date === d && cnRoomKanji\(x\.room_number\) === r\.roomKanji/, "② room + checkout date");
+  assert.match(read("lib", "driverData.ts"), /for \(const r of res\) r\.drop = drops\[r\.id\] \?\? null;/);
+  assert.match(read("components", "driver", "DriverApp.tsx"), /<DropInfo d=\{r\.drop \?\? null\} t=\{t\} \/>/, "departure card shows the drop-off booking");
+  assert.match(read("components", "driver", "DriverCabin.tsx"), /drop\?\.dest \? placeFromText\(drop\.dest, drop\.terminal\)/, "iPad sheet uses the guest's chosen destination");
+  assert.match(read("app", "api", "cabin", "state", "route.ts"), /checkinLinkFor\(String\(data\.guest_token\)\)/, "iPad gets a per-reservation check-in link");
+  assert.match(read("components", "cabin", "CabinApp.tsx"), /QRCode\.toDataURL\(link/);
+  assert.match(read("components", "cabin", "cabinMarkup.ts"), /data-q="ck"/, "check-in button on the arrival screen");
+  const api = read("app", "api", "cn", "prefill", "route.ts");
+  assert.match(api, /\/\^\[a-f0-9\]\{24,128\}\$\/i\.test\(r\)/, "token format checked");
+  assert.match(api, /guest: name \? name\.split\(\/\\s\+\/\)\[0\] : null/, "only the first name leaves the system");
+  assert.ok(!/unlock_pin|keypad|guest_token:/.test(api.split("NextResponse.json({ ok: true")[1] || ""), "no secrets in the prefill answer");
+});

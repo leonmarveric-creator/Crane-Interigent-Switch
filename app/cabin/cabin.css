@@ -1018,3 +1018,43 @@
 .cab .lkp .lkPair svg{width:120px;height:120px}
 .cab .stage.port .gdp.lkp .lkSum{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .cab .stage.port .lkp .lkcC{grid-column:auto}
+/* ===== お見送り: 電車の案内 (右下の枠。時刻表から・参考) ===== */
+.cab .trn{display:none}
+.cab .box.trn-on{position:relative;overflow:hidden;border-color:rgba(95,227,255,.55);background:linear-gradient(160deg,rgba(10,34,66,.92),rgba(3,10,24,.94));box-shadow:0 0 26px rgba(0,170,255,.18),inset 0 0 40px rgba(0,120,255,.08)}
+.cab .box.trn-on::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(95,227,255,.035) 0 1px,transparent 1px 4px);pointer-events:none}
+.cab .box.trn-on::after{content:"";position:absolute;left:-40%;top:0;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(95,227,255,.08),transparent);animation:cab-trnSw 5s linear infinite;pointer-events:none}
+@keyframes cab-trnSw{to{left:140%}}
+.cab .box.trn-on .rec{display:none!important}
+.cab .box.trn-on .trn{display:flex;flex-direction:column;gap:6px;position:relative}
+.cab .box.trn-on h3{display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden}
+.cab .box.trn-on h3 em{font-style:normal;margin-left:auto;font-size:9.5px;letter-spacing:.14em;color:#ffb35c;border:1px solid rgba(255,179,92,.45);padding:2px 7px;border-radius:99px}
+.cab .trnDot{width:7px;height:7px;border-radius:50%;background:#5fe3ff;box-shadow:0 0 8px #00c8ff;animation:cab-bl 1.4s infinite;flex:none}
+.cab .trnTop{display:flex;align-items:center;gap:12px}
+.cab .trnRing{position:relative;width:78px;height:78px;flex:none}
+.cab .trnRing svg{position:absolute;inset:0;width:100%;height:100%}
+.cab .trnRb{fill:rgba(3,10,24,.7);stroke:rgba(95,227,255,.15);stroke-width:6}
+.cab .trnRf{fill:none;stroke:#5fe3ff;stroke-width:6;stroke-linecap:round;filter:drop-shadow(0 0 5px #00c8ff);transition:stroke-dasharray .9s linear}
+.cab .trnRf.hot{stroke:#ffb35c;filter:drop-shadow(0 0 6px #ff9a2c)}
+.cab .trnRing>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.cab .trnRing b{font:800 30px ui-monospace,Menlo,monospace;color:#fff;text-shadow:0 0 10px rgba(95,227,255,.7)}
+.cab .trnRing small{font-size:11px;color:#8fb2d9;margin-top:2px}.cab .trnRing small.nw{font-size:13px;font-weight:800;color:#46e08a;animation:cab-bl 1s steps(2) infinite}
+.cab .trnInf{min-width:0;flex:1}
+.cab .trnTy{display:flex;align-items:center;gap:6px}
+.cab .trnTy i{font-style:normal;padding:2px 9px;border-radius:7px;font-size:13px;font-weight:800;color:#fff;white-space:nowrap}
+.cab .trnTy .op{font:800 10px ui-monospace,Menlo,monospace;letter-spacing:.1em;padding:2px 6px;border-radius:5px;color:#fff}.cab .trnTy .op.jr{background:#1a8cff}.cab .trnTy .op.nk{background:#ff7a1a}
+.cab .trnTo{font-size:21px;font-weight:800;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .trnAt{font-size:12px;color:#8fb2d9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .trnMap{width:100%;height:52px;flex:none}
+.cab .trnLn{stroke:rgba(95,176,255,.5);stroke-width:4;stroke-linecap:round}
+.cab .trnSt{fill:#0b1830;stroke:#8fb2d9;stroke-width:2}.cab .trnMe{fill:#fff;stroke:#5fe3ff;stroke-width:3}
+.cab .trnPing{fill:none;stroke:#5fe3ff;stroke-width:1.5;animation:cab-trnPg 2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes cab-trnPg{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(1.6)}}
+.cab .trnNm{fill:#b9cbe3;font-size:10.5px;text-anchor:middle;font-weight:600}.cab .trnNm.me{fill:#fff;font-size:12px;font-weight:800}
+.cab .trnTr{transition:transform 1s linear}.cab .trnTr.past{opacity:.4}
+.cab .trnHi{fill:none;stroke:#fff;stroke-width:1.5;animation:cab-bl 1.2s infinite}
+.cab .trnRs{display:flex;flex-direction:column;gap:4px}
+.cab .trnR{display:grid;grid-template-columns:48px auto 1fr auto;align-items:center;gap:7px;padding:4px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:13px}
+.cab .trnR b{font:800 14px ui-monospace,Menlo,monospace}.cab .trnR i{font-style:normal;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:800;color:#fff;white-space:nowrap}
+.cab .trnR span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dbe8f7}.cab .trnR em{font-style:normal;font-weight:800;color:#5fe3ff}
+.cab .trnNote{font-size:10px;color:#6f8fb3;text-align:right;letter-spacing:.04em}
+.cab .trnNone{padding:20px 0;text-align:center;color:#8fb2d9}
