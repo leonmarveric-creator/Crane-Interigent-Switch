@@ -20,7 +20,7 @@ import { SFX_MARK } from "@/lib/remoteVoice";
 import { createTrains } from "@/components/cabin/cabinTrains";
 import { stationsFor } from "@/lib/cabinTrains";
 import { hasRoomLock, LOCK_T } from "@/lib/cabinLock";
-import { CHECKIN_T, roomGuideOf } from "@/lib/cabinAiTalk";
+import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
 import { playSafe } from "@/lib/cabinAudio";
 
@@ -67,6 +67,10 @@ export interface Engine {
   remoteVoice(): boolean;
   /** お父さんから ASTRAEA への指示 */
   aiCommand(cmd: { c: string; n: number } | null): void;
+  /** 待機中に ⚙ から手動でガイドを流す (トイレの前・ドアの前で)。送迎中は false */
+  manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "stop", room: CabinRoom | null, lang: GLang): boolean;
+  /** このお部屋で「お部屋の開け方」が使えるか */
+  hasRoomGuide(room: CabinRoom | null): boolean;
   /** チェックイン QR の画像 (全員共通) */
   setCheckin(url: string | null): void;
 }
@@ -344,10 +348,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const M = MUSIC_T[lang] ?? MUSIC_T.en, q = qrLinks();
     // 到着画面のガイド (押したときだけ流れる): エントランスの開け方 / お部屋の開け方 / トイレの使い方
     const GL: Record<GLang, Record<string, string>> = {
-      ja: { gEnt: "エントランスの開け方", gRoom: "お部屋の開け方", gToilet: "トイレの使い方", ck: "チェックイン・パスポート登録" },
-      zh: { gEnt: "入口怎么开", gRoom: "房间怎么开", gToilet: "卫生间怎么用", ck: "办理入住·登记护照" },
-      en: { gEnt: "Open the entrance", gRoom: "Open your room", gToilet: "Using the restroom", ck: "Check-in · passport" },
-      ko: { gEnt: "입구 여는 법", gRoom: "객실 여는 법", gToilet: "화장실 사용법", ck: "체크인·여권 등록" },
+      ja: { gEnt: "エントランスの開け方", gRoom: "お部屋の開け方", gToilet: "トイレの使い方", ck: "チェックイン・パスポート登録", wifi: "Wi-Fi につなぐ" },
+      zh: { gEnt: "入口怎么开", gRoom: "房间怎么开", gToilet: "卫生间怎么用", ck: "办理入住·登记护照", wifi: "连接 Wi-Fi" },
+      en: { gEnt: "Open the entrance", gRoom: "Open your room", gToilet: "Using the restroom", ck: "Check-in · passport", wifi: "Connect to Wi-Fi" },
+      ko: { gEnt: "입구 여는 법", gRoom: "객실 여는 법", gToilet: "화장실 사용법", ck: "체크인·여권 등록", wifi: "Wi-Fi 연결" },
     };
     root.querySelectorAll<HTMLElement>("#aq [data-q]").forEach((b) => {
       const k = b.dataset.q as string;
@@ -364,6 +368,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     e.stopPropagation(); const k = b.dataset.q!;
     if (k === "key" || k === "room") return void qrShow(k);
     if (k === "ck") { qrHide(); guide.stop(); toilet.stop(); lock.stop(); return void showCheckin(); }
+    if (k === "wifi") { qrHide(); guide.stop(); toilet.stop(); lock.stop(); return void showWifi(); }
     qrHide(); guide.stop(); toilet.stop(); lock.stop();
     if (k === "gEnt") guide.start("ent"); else if (k === "gRoom") { if (guide.hasRoom()) guide.start("room"); else lock.start(); } else if (k === "gToilet") toilet.start();
   }));
@@ -583,10 +588,32 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- チェックイン QR (全員共通の画像。お父さんのスマホで登録) ---------- */
   let checkinUrl: string | null = null, ckT: ReturnType<typeof setTimeout> | null = null;
+  /* Wi-Fi の QR (ローミングが遅いときは、先に Wi-Fi につないでからチェックイン) */
+  let wifiImg: string | null = null;
+  void QRCode.toDataURL(wifiQrText(), { margin: 1, width: 560, errorCorrectionLevel: "M" }).then((u) => { wifiImg = u; }).catch(() => {});
+  function showCk(mode: "ck" | "wifi") {
+    const W = WIFI_T[lang] ?? WIFI_T.en, esc2 = (x: string) => x.replace(/[<&>]/g, "");
+    $("ckTabC").classList.toggle("on", mode === "ck"); $("ckTabW").classList.toggle("on", mode === "wifi");
+    ($("ckTabC") as HTMLElement).style.display = checkinUrl ? "" : "none";
+    if (mode === "wifi") {
+      if (wifiImg) ($("ckImg") as HTMLImageElement).src = wifiImg;
+      setText("ckK", "GUEST Wi-Fi · SCAN WITH YOUR PHONE"); setText("ckT", W.title);
+      $("ckS").innerHTML = W.steps.map((x) => `<li>${esc2(x)}</li>`).join("");
+      $("ckW").innerHTML = `<div><small>${esc2(W.ssid)}</small><b>${esc2(GUEST_WIFI.ssid)}</b></div><div><small>${esc2(W.pass)}</small><b>${esc2(GUEST_WIFI.pass)}</b></div>${checkinUrl ? `<button data-ck="ck">🛂 ${esc2(W.ck)} ›</button>` : ""}`;
+    } else {
+      const [title, steps] = CHECKIN_T[lang] ?? CHECKIN_T.en;
+      ($("ckImg") as HTMLImageElement).src = checkinUrl!; setText("ckK", "CHECK-IN · SCAN WITH YOUR PHONE"); setText("ckT", title);
+      $("ckS").innerHTML = steps.map((x) => `<li>${esc2(x)}</li>`).join("");
+      $("ckW").innerHTML = `<button data-ck="wifi">📶 ${esc2(W.btn)}</button>`;
+    }
+  }
+  root.querySelector("#ckp")!.addEventListener("click", (e) => { const b = (e.target as HTMLElement).closest("[data-ck]") as HTMLElement | null; if (!b) return; e.stopPropagation(); showCk(b.dataset.ck as "ck" | "wifi"); if (ckT) clearTimeout(ckT); ckT = setTimeout(hideCheckin, 180000); });
+  function showWifi() {
+    showCk("wifi"); const p = $("ckp"); p.classList.remove("on"); void p.offsetWidth; p.classList.add("on");
+    if (ckT) clearTimeout(ckT); ckT = setTimeout(hideCheckin, 180000);
+  }
   function showCheckin() {
-    if (!checkinUrl) return; const [title, steps] = CHECKIN_T[lang] ?? CHECKIN_T.en;
-    ($("ckImg") as HTMLImageElement).src = checkinUrl; setText("ckT", title);
-    $("ckS").innerHTML = steps.map((x) => `<li>${x.replace(/[<&>]/g, "")}</li>`).join("");
+    if (!checkinUrl) return; showCk("ck");
     const p = $("ckp"); p.classList.remove("on"); void p.offsetWidth; p.classList.add("on");
     if (ckT) clearTimeout(ckT); ckT = setTimeout(hideCheckin, 120000);
   }
@@ -690,7 +717,22 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     });
   }
 
-  return { start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3").concat(ai.urls()), unlock, demo, saveOffline, resize, weather,
+  /* ---------- 待機中の手動ガイド (⚙ から。お部屋と言語を選んで押したときだけ流れる) ---------- */
+  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "stop", r: CabinRoom | null, l: GLang): boolean {
+    if (trip) return false;
+    qrHide(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin();
+    if (k === "stop") return true;
+    room = r; lang = CABIN_T[l] ? l : "en"; T = CABIN_T[lang] ?? CABIN_T.en;
+    unlock();
+    if (k === "ck") { showCheckin(); return !!checkinUrl; }
+    if (k === "wifi") { showWifi(); return true; }
+    if (k === "ent") guide.start("ent");
+    else if (k === "room") { if (roomGuideOf(r?.slug)) guide.start("room"); else if (hasRoomLock(r?.slug)) lock.start(); else return false; }
+    else if (k === "toilet") toilet.start();
+    return true;
+  }
+  const hasRoomGuide = (r: CabinRoom | null) => !!roomGuideOf(r?.slug) || hasRoomLock(r?.slug);
+  return { manual, hasRoomGuide, start, stop, feed, tripId: () => trip?.id ?? null, audioUrls: () => AUDIO_KEYS.map((k) => AUDIO + k + ".mp3").concat(ai.urls()), unlock, demo, saveOffline, resize, weather,
     nowPlaying: (np, track, skew) => {
       npv.update(np, track, skew);
       // 曲が変わったら AI がひと言

@@ -18,7 +18,7 @@ import { LOCK_IMG, LOCK_VOICE, lockAudio, type LockKey } from "@/lib/cabinLock";
 import { DH_LINES, dhAudio } from "@/lib/cabinDeadheadLines";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
-import { acModeFor, type LL } from "@/lib/cabinGeo";
+import { acModeFor, type LL, type GLang } from "@/lib/cabinGeo";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
 const POLL_MS = 3000;
@@ -254,6 +254,17 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     toast(`✓ この iPad に保存しました（地図 ${res.tiles} 枚・約 ${res.mb.toFixed(1)} MB${res.fail ? `・失敗 ${res.fail}` : ""}）`);
   }
 
+  /* ---------- 手動ガイド (待機中に ⚙ から。トイレやドアの前でゲストと一緒に聞く) ---------- */
+  const [mRoom, setMRoom] = useState<string | null>(rooms[0]?.id ?? null);
+  const [mLang, setMLang] = useState<GLang>(() => { try { const v = localStorage.getItem("cab.mlang"); if (v === "en" || v === "zh" || v === "ko" || v === "ja") return v; } catch { /* ignore */ } return "en"; });
+  const [mMsg, setMMsg] = useState("");
+  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi") {
+    const e = eng.current; if (!e) return;
+    if (inTrip) { setMMsg("送迎中は使えません（到着画面のボタンを使ってください）"); return; }
+    const ok = e.manual(k, rooms.find((r) => r.id === mRoom) ?? null, mLang);
+    if (!ok) { setMMsg(k === "ck" ? "チェックインの QR がまだ登録されていません（お父さんのスマホで登録）" : "このお部屋のガイドはまだありません"); return; }
+    setMMsg(""); setMenu(false);
+  }
   /* ---------- テスト走行 (スマホなしで動きを確認) ---------- */
   async function testRun(placeKey: string, dir: "in" | "out") {
     const e = eng.current; if (!e) return;
@@ -289,6 +300,13 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <button onClick={() => void saveAll()} disabled={!!prog}>📥 この iPad に保存（声・効果音・写真・地図）</button>
           {prog && <><small>{prog.label}… {Math.round(prog.p * 100)}%</small><div className="bar"><i style={{ width: `${prog.p * 100}%` }} /></div></>}
           <small>家の Wi-Fi で 1 回押してください。保存すると、走行中は通信なし・待ち時間なしで表示と音が出ます（地図 {saved} 枚保存済み）。</small>
+          <h4>手動ガイド（押したときだけ流れます）</h4>
+          <div className="row gsel">{rooms.map((r) => <button key={r.id} className={mRoom === r.id ? "on" : ""} onClick={() => setMRoom(r.id)}>{r.kanji}</button>)}</div>
+          <div className="row gsel">{(["en", "zh", "ko", "ja"] as GLang[]).map((l) => <button key={l} className={mLang === l ? "on" : ""} onClick={() => { setMLang(l); try { localStorage.setItem("cab.mlang", l); } catch { /* ignore */ } }}>{({ en: "English", zh: "中文", ko: "한국어", ja: "日本語" } as const)[l]}</button>)}</div>
+          <div className="row"><button onClick={() => manual("toilet")}>🚻 トイレの使い方</button><button onClick={() => manual("ent")}>🚪 エントランス</button></div>
+          <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button></div>
+          <div className="row"><button onClick={() => manual("room")} disabled={!eng.current?.hasRoomGuide(rooms.find((r) => r.id === mRoom) ?? null)}>🔑 お部屋の開け方・鍵</button><button onClick={() => manual("ck")}>🛂 チェックイン</button></div>
+          {mMsg && <small style={{ color: "#ffd199" }}>{mMsg}</small>}
           <h4>テスト走行（スマホなしで動きを確認）</h4>
           <div className="row"><button onClick={() => void testRun("kix", "in")}>✈ 関空T1 → 住まい</button><button onClick={() => void testRun("rinku", "out")}>住まい → りんくう</button></div>
           <h4>設定</h4>

@@ -142,6 +142,15 @@ export type RoomGuide = "natsu";
 export const roomGuideOf = (slug: string | null | undefined): RoomGuide | null => (/summer|natsu|natu/i.test(String(slug || "")) ? "natsu" : null);
 
 /* ---------------- チェックイン QR の画面 ---------------- */
+/** お客さん用 Wi-Fi (電波が弱い・ローミングが遅いときに先につないでもらう) */
+export const GUEST_WIFI = { ssid: "Crane Nest_Guest", pass: "RemenberPassport1234" };
+export const wifiQrText = () => `WIFI:T:WPA;S:${GUEST_WIFI.ssid.replace(/([\\;,:"])/g, "\\$1")};P:${GUEST_WIFI.pass.replace(/([\\;,:"])/g, "\\$1")};;`;
+export const WIFI_T: Record<GLang, { btn: string; title: string; steps: string[]; ssid: string; pass: string; ck: string }> = {
+  ja: { btn: "Wi-Fi につなぐ", title: "スマホで読む · Wi-Fi に接続", steps: ["スマホのカメラで QR を読む", "「接続」をタップ", "つながったらチェックインへ"], ssid: "ネットワーク名", pass: "パスワード", ck: "チェックインへ" },
+  zh: { btn: "连接 Wi-Fi", title: "用手机扫码 · 连接 Wi-Fi", steps: ["用手机相机扫描二维码", "点击「加入网络」", "连上后再办理入住"], ssid: "网络名称", pass: "密码", ck: "去办理入住" },
+  en: { btn: "Connect to Wi-Fi", title: "Scan with your phone · Wi-Fi", steps: ["Scan the code with your phone camera", "Tap “Join” / “Connect”", "Then continue to check-in"], ssid: "Network", pass: "Password", ck: "Go to check-in" },
+  ko: { btn: "Wi-Fi 연결", title: "휴대폰으로 스캔 · Wi-Fi 연결", steps: ["휴대폰 카메라로 QR 스캔", "「연결」 탭", "연결되면 체크인으로"], ssid: "네트워크 이름", pass: "비밀번호", ck: "체크인으로" },
+};
 export const CHECKIN_T: Record<GLang, [string, string[]]> = {
   zh: ["用手机扫码 · 办理入住", ["用手机相机扫描二维码", "拍摄护照并填写信息", "提交后即可完成入住"]],
   ja: ["スマホで読む · チェックイン", ["スマホのカメラで QR を読む", "パスポートを撮影して入力", "送信すればチェックイン完了"]],

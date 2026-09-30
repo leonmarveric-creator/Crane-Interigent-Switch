@@ -1068,3 +1068,18 @@
 .cab .trnR span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dbe8f7}.cab .trnR em{font-style:normal;font-weight:800;color:#5fe3ff}
 .cab .trnNote{font-size:10px;color:#6f8fb3;text-align:right;letter-spacing:.04em}
 .cab .trnNone{padding:20px 0;text-align:center;color:#8fb2d9}
+/* ⚙ 手動ガイド */
+.cab .menu .gsel{flex-wrap:wrap;gap:6px}
+.cab .menu .gsel button{flex:0 0 auto;min-width:52px;padding:8px 12px}
+.cab .menu .gsel button.on{background:#2f7de0;border-color:#5aa7ff;color:#fff}
+.cab .menu button:disabled{opacity:.4}
+.cab .menu{max-height:calc(100% - 100px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+/* チェックイン / Wi-Fi の切り替え */
+.cab .cktab{position:absolute;left:18px;top:-54px;display:flex;gap:8px}
+.cab .cktab button{height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(10,20,40,.85);color:#cfe0f5;font-size:15px;font-weight:700}
+.cab .cktab button.on{background:linear-gradient(135deg,#8ff0ff,#3aa0ff);color:#04101f;border-color:transparent}
+.cab .ckw{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.cab .ckw div{flex:1 1 100%;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(143,240,255,.25)}
+.cab .ckw small{display:block;font-size:11px;letter-spacing:.14em;color:#8fb2d9}
+.cab .ckw b{font:700 21px ui-monospace,Menlo,monospace;color:#fff;letter-spacing:.02em;word-break:break-all;-webkit-user-select:all;user-select:all}
+.cab .ckw button{height:46px;padding:0 18px;border-radius:14px;border:1px solid rgba(143,240,255,.5);background:rgba(58,160,255,.18);color:#fff;font-size:16px;font-weight:700}
