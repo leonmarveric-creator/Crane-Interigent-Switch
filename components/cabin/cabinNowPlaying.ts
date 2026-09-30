@@ -56,15 +56,15 @@ export function createNowPlaying(c: NpCtx): NpView {
   function holo() {
     const t = pos(), i = lyricIndex(lrc, t);
     if (i !== hLi) {
-      // 1 行だけだと歌とずれたときにわからないので、前の行と次の行も小さく出す
+      // ひとつ前の行も今の行と同じ大きさ・明るさで残す (車の Bluetooth は音が少し遅れて届くので、まだ前の行を歌っていることがある)。次の行は小さく
       const pv = $("hPrev"); pv.textContent = i > 0 && lrc[i - 1]?.s ? lrc[i - 1].s : ""; pv.classList.remove("in"); void pv.offsetWidth; pv.classList.add("in");
       hLi = i; hOn = -1;
       const s = lrc[i]?.s ?? (lrc.length ? "♪" : tr?.title ?? "♪");
       $("hLine").innerHTML = [...s].map((ch, k) => `<span style="--i:${k};--gx:${(Math.random() * 10 - 5).toFixed(1)}px">${ch === " " ? " " : ch.replace(/[<&>"]/g, "")}</span>`).join("");
       $("hNext").textContent = lrc[i + 1]?.s ?? "";
-      // 長い行は文字を小さくして 1 行に収める (切らない)
-      const L = $("hLine"), W = (L.parentElement as HTMLElement).clientWidth; let fs = 28; L.style.fontSize = fs + "px";
-      while (L.scrollWidth > W && fs > 16) { fs -= 1; L.style.fontSize = fs + "px"; }
+      // 長い行は文字を小さくして 1 行に収める (切らない)。前の行と今の行は同じ大きさ
+      const L = $("hLine"), W = (L.parentElement as HTMLElement).clientWidth; let fs = 28; L.style.fontSize = pv.style.fontSize = fs + "px";
+      while ((L.scrollWidth > W || pv.scrollWidth > W) && fs > 16) { fs -= 1; L.style.fontSize = pv.style.fontSize = fs + "px"; }
       $("holo").style.setProperty("--hfs", fs + "px");
     }
     // 歌詞の時間は「行の始まり」だけなので、1 文字ずつ色を進めると歌とずれる → 行が始まったら行全体を光らせる
@@ -216,8 +216,11 @@ export function createNowPlaying(c: NpCtx): NpView {
     if (i !== fLi) {
       fLi = i; const now = $("f2Now"), s = lrc[i]?.s ?? (lrc.length ? "♪" : tr?.title ?? "♪");
       now.textContent = s; now.classList.remove("in"); void now.offsetWidth; now.classList.add("in");
-      let fs = 40; now.style.fontSize = fs + "px"; const W = (now.parentElement as HTMLElement).clientWidth - 32; while (now.scrollWidth > W && fs > 20) now.style.fontSize = --fs + "px";
-      $("f2P1").textContent = i > 0 ? lrc[i - 1]?.s ?? "" : ""; $("f2N1").textContent = lrc[i + 1]?.s ?? ""; $("f2N2").textContent = lrc[i + 2]?.s ?? "";
+      // ひとつ前の行も今の行と同じ大きさ・明るさ (Bluetooth の遅れ対策)
+      const pv = $("f2P1"); pv.textContent = i > 0 ? lrc[i - 1]?.s ?? "" : ""; pv.classList.remove("in"); void pv.offsetWidth; pv.classList.add("in");
+      let fs = 40; now.style.fontSize = pv.style.fontSize = fs + "px"; const W = (now.parentElement as HTMLElement).clientWidth - 32;
+      while ((now.scrollWidth > W || pv.scrollWidth > W) && fs > 20) now.style.fontSize = pv.style.fontSize = --fs + "px";
+      $("f2N1").textContent = lrc[i + 1]?.s ?? ""; $("f2N2").textContent = lrc[i + 2]?.s ?? "";
     }
     const u = dur ? Math.min(1, t / dur) : 0;
     ($("f2Arc") as any).style.strokeDasharray = `${(u * ARC).toFixed(1)} 900`;

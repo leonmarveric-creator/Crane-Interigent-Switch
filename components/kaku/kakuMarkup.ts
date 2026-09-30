@@ -89,6 +89,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
    <div class="tbox" style="top:auto;bottom:40px"><i>GPS</i><div class="tgt" style="font-size:30px">±<span id="acc">5</span><small>m</small></div></div>
    <div class="tco mono" id="tco">34.3830N 135.3226E</div><div class="tacq" id="tacq">ACQUIRING SATELLITE<span class="blink">_</span></div>
    <div class="qm" id="qm">🤫 QUIET</div><button class="tsw" id="tsw">SAT / LINE</button>
+   <div class="nly" id="nly"><p class="now" id="ly1"></p><p class="now" id="ly2"></p><p class="nx" id="ly3"></p></div>
    <div class="np" id="np"><i id="npM">♪ NORMAL</i><b id="npT"></b><button id="npN">⏭</button></div>
    <div class="ask"><button id="aEta">⏳<small>あと何分</small></button><button id="aConv">🏪<small>コンビニ</small></button><button id="aSt">📊<small>今日の成績</small></button></div></div>
   <div class="mapx" id="mapx"><canvas id="stars" width="1040" height="470"></canvas><div class="cm" id="cmT">◆ CRUISE MODE ◆</div>

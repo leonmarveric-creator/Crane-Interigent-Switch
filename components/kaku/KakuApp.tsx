@@ -6,7 +6,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { KAKU_HTML } from "@/components/kaku/kakuMarkup";
-import { createKaku, type KakuCabinInfo, type KakuEngine, type KakuState } from "@/components/kaku/kakuEngine";
+import { createKaku, type KakuCabinInfo, type KakuEngine, type KakuState, type KakuTrack } from "@/components/kaku/kakuEngine";
+import { LyricsSheet } from "@/components/driver/DriverMusic";
+import type { DriverTrack } from "@/lib/driverData";
+import { makeT } from "@/lib/driverI18n";
 import { cabinStart, cabinPos, cabinEnd, cabinBoard } from "@/app/driver/actions";
 
 function loadLeaflet(): Promise<void> {
@@ -19,9 +22,15 @@ function loadLeaflet(): Promise<void> {
 }
 const EMPTY: KakuState = { setup: true, places: [], missions: [], monthKm: 0, monthCount: 0, todayCount: 0, bgm: { normal: null, cruise: null } };
 
+const tJa = makeT("ja");
+
 export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
   const root = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState("");
+  // 歌詞を付けるシート (お父さんの画面と同じもの)
+  const [ly, setLy] = useState<{ tr: KakuTrack; save: (lrc: string | null) => Promise<string | null> } | null>(null);
+  const [msg, setMsg] = useState("");
+  const toast = (s: string) => { setMsg(s); setTimeout(() => setMsg((x) => (x === s ? "" : x)), 2600); };
   useEffect(() => {
     let eng: KakuEngine | null = null, live = true;
     void (async () => {
@@ -39,7 +48,7 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
           pos: async (id, lat, lng, kmh) => { const r = await cabinPos(id, lat, lng, kmh, null).catch(() => null); return { ok: !!r?.ok, active: r?.ok ? r.active : true }; },
           end: async (id) => { await cabinEnd(id).catch(() => null); },
           board: async (id) => { await cabinBoard(id).catch(() => null); },
-        });
+        }, { lyrics: (tr, save) => setLy({ tr, save }) });
       } catch (e) { setErr(String((e as Error)?.message || e)); }
     })();
     return () => { live = false; eng?.destroy(); };
@@ -47,6 +56,17 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
   return (
     <div className="kk">
       <div className="kroot" ref={root} />
+      {ly && (
+        <div className="drv" style={{ position: "fixed", inset: 0, zIndex: 1000, minHeight: 0, padding: 0, background: "transparent", userSelect: "text", WebkitUserSelect: "text" }}>
+          <LyricsSheet
+            tr={{ id: ly.tr.id, purpose: "in", startSec: 0, lang: "ja", title: ly.tr.title, artist: null, url: ly.tr.url, cover: null, lrc: ly.tr.lrc ?? null, sort: 0 } as DriverTrack}
+            t={tJa} toast={toast} onClose={() => setLy(null)}
+            onSave={(lrc) => { setLy((x) => (x ? { ...x, tr: { ...x.tr, lrc } } : x)); void ly.save(lrc).then((e) => { if (e) toast(e); }); }}
+          />
+          {msg && <div className="toast show" style={{ zIndex: 1001 }}>{msg}</div>}
+        </div>
+      )}
+      {!ly && msg && <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", padding: "10px 16px", borderRadius: 12, background: "#031a10", color: "#dfffee", border: "1px solid #3dffa8", zIndex: 1001 }}>{msg}</div>}
       {err && <div style={{ position: "fixed", left: 16, right: 16, bottom: 16, padding: 12, borderRadius: 12, background: "#300", color: "#fcc", zIndex: 99 }}>読み込めませんでした: {err}</div>}
     </div>
   );

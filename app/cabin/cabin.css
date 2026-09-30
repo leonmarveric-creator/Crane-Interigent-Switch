@@ -961,6 +961,16 @@
 .cab .f2ly .f2p1{font-size:18px;margin-bottom:8px}
 .cab .f2ly .f2n1{margin-top:12px}.cab .f2ly .f2n2{margin-top:10px}
 
+/* ===== 歌詞: ひとつ前の行も今の行と同じ大きさ・明るさ (車の Bluetooth は音が少し遅れて届くため) ===== */
+.cab .holo{height:188px}
+.cab .hbeam{height:190px}
+.cab .hprev{font-size:var(--hfs,28px);font-weight:800;line-height:1.25;color:#f2feff;text-shadow:0 0 8px #5fe3ff,0 0 22px #00c8ff,0 0 40px rgba(0,160,255,.6);transform:rotateX(14deg);transform-origin:bottom center;margin:0 0 2px;letter-spacing:0;text-overflow:clip;overflow:visible}
+.cab .hprev:empty{display:none}
+.cab .f2ly .f2p1,.cab .npfull .f2ly .f2p1{color:#fff;-webkit-text-fill-color:#fff;font-weight:700;letter-spacing:-.01em;text-shadow:0 0 2px rgba(220,245,255,.9),0 0 14px rgba(120,200,255,.75),0 0 34px rgba(60,150,255,.45);margin-bottom:6px;overflow:visible;text-overflow:clip}
+.cab .f2ly .f2p1.in{animation:cab-f2up .45s cubic-bezier(.2,.9,.3,1)}@keyframes cab-f2up{from{transform:translateY(40px)}}
+.cab .f2ly{top:calc(41% - 4px)}
+.cab .stage.port .f2ly{top:calc(52% - 8px)}
+
 /* ===== お部屋の鍵 (春・秋・冬: 内側のつまみ) ===== */
 .cab .lkp .lkArt{background:#05080f}
 .cab .lkp .lkMain{position:absolute;left:50%;top:18px;width:350px;height:424px;margin-left:-175px;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px rgba(95,176,255,.35),0 10px 40px rgba(0,0,0,.5)}

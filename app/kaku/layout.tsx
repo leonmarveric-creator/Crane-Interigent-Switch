@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./kaku.css";
+// 歌詞を付けるシートはお父さんの画面 (HIROSHI DRIVE) と同じもの。見た目は .drv の中だけに効く
+import "../driver/driver.css";
 
 // Kaku さん専用のミッション画面。ホーム画面に追加すると AGENT KAKU のアイコンでアプリのように開ける。
 export const metadata: Metadata = {

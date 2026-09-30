@@ -11,14 +11,15 @@
 import { KAKU_LINES, kakuAudio, KAKU_TYPES, TYPE_LINE, ARRIVE_LINE, RETURN_LINE } from "@/lib/kakuLines";
 import { CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, placeFromText } from "@/lib/cabinGeo";
 import { startRemoteVoice, unlockRemoteVoice, type RemoteVoice } from "@/lib/remoteVoice";
+import { parseLrc, lyricIndex, type LrcLine } from "@/lib/driverLogic";
 
 type LL = [number, number];
-export interface KakuTrack { id: string; title: string; url: string }
+export interface KakuTrack { id: string; title: string; url: string; lrc?: string | null }
 export interface KakuPlace { n: string; ll: LL; type?: string | null; fav?: boolean; visits?: number }
 export interface KakuState {
   setup: boolean; places: KakuPlace[]; missions: any[]; monthKm: number; monthCount: number; todayCount: number;
   bgm: { boot?: string | null; normal: string | null; cruise: string | null };
-  tracks?: Record<string, KakuTrack[]>; tracksSetup?: boolean;
+  tracks?: Record<string, KakuTrack[]>; tracksSetup?: boolean; lyricsSetup?: boolean;
 }
 /** 車内 iPad (ゲスト用の画面) と一緒に動かすための情報 (今日の到着・出発の予約) */
 export interface KakuRes { id: string; guest: string | null; roomId: string; lang: string; arrive: boolean; pickupPlace: string | null; pickupAt: string | null; terminal: string | null; flightNo: string | null }
@@ -65,8 +66,10 @@ const jstHour = () => Number(new Date().toLocaleString("en-US", { timeZone: "Asi
 const jstDow = () => new Date(Date.now() + 9 * 3600000).getUTCDay();
 
 export interface KakuEngine { destroy(): void; resize(): void }
+/** 画面の外 (React) で開くもの: 歌詞を付けるシート (お父さんの画面と同じもの)。save は保存して、失敗ならエラー文を返す */
+export interface KakuUi { lyrics?(tr: KakuTrack, save: (lrc: string | null) => Promise<string | null>): void }
 
-export function createKaku(root: HTMLElement, routes: Record<string, [number, number][]>, st0: KakuState, cab: KakuCabinApi): KakuEngine {
+export function createKaku(root: HTMLElement, routes: Record<string, [number, number][]>, st0: KakuState, cab: KakuCabinApi, ui: KakuUi = {}): KakuEngine {
   const L = (window as any).L;
   const $ = (id: string): any => root.querySelector("#" + id);
   const stage = $("stage") as HTMLElement;
@@ -148,7 +151,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     const L = lists();
     for (const m of MODES) {
       const p = PL[m], nl = L[m] ?? [], same = nl.length === p.list.length && nl.every((t, i) => t.id === p.list[i].id);
-      if (same) continue;
+      if (same) { p.list = nl; continue; } // 同じ曲 (歌詞だけ変わったときも新しい方を使う)
       const was = cur(m)?.id; p.list = nl; p.order = mkOrder(nl.length); p.i = Math.max(0, p.order.findIndex((k) => nl[k]?.id === was));
       const a = trk[m]; a.loop = nl.length === 1;
       const t = cur(m); if (t) { if (a.src !== t.url) a.src = t.url; } else { a.pause(); a.removeAttribute("src"); }
@@ -170,6 +173,19 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     $("npT").textContent = t ? t.title : mode === "cruise" ? "内蔵 BGM · CRUISE" : "内蔵 BGM";
     $("npN").style.visibility = PL[mode].list.length > 1 ? "" : "hidden";
     $("npM").textContent = mode === "cruise" ? "♪ CRUISE" : "♪ NORMAL";
+  }
+  /* 歌詞 (地図の下に 3 行)。ひとつ前の行も今の行と同じ明るさで残す (車の Bluetooth は音が少し遅れて届くため) */
+  const lrcCache = new Map<string, { src: string; L: LrcLine[] }>();
+  let lyKey = "";
+  function lyTick() {
+    const box = root.querySelector("#nly") as HTMLElement | null; if (!box) return;
+    const t = cur(mode), a = trk[mode];
+    const on = !!(bgmRun && cfg.bgm && mode !== "boot" && t?.lrc && !a.paused);
+    box.classList.toggle("on", on); if (!on || !t?.lrc) { lyKey = ""; return; }
+    let c = lrcCache.get(t.id); if (!c || c.src !== t.lrc) { c = { src: t.lrc, L: parseLrc(t.lrc) }; lrcCache.set(t.id, c); }
+    const L = c.L, i = lyricIndex(L, a.currentTime), key = `${t.id}:${i}`; if (key === lyKey) return; lyKey = key;
+    $("ly1").textContent = i > 0 ? L[i - 1]?.s ?? "" : ""; $("ly2").textContent = i >= 0 ? L[i]?.s ?? "" : "♪"; $("ly3").textContent = L[i + 1]?.s ?? "";
+    const n = $("ly2") as HTMLElement; n.classList.remove("in"); void n.offsetWidth; n.classList.add("in");
   }
   /* 内蔵 BGM: 起動 = 深いパッドと鼓動 / ノーマル = 緊張感のあるベース / クルーズ = 速いアルペジオ */
   const PAD = [[55, 82.4, 110, 164.8], [49, 73.4, 98, 146.8], [43.7, 65.4, 87.3, 130.8], [49, 73.4, 110, 146.8]];
@@ -341,7 +357,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
     const L = lists(), NM: Record<string, string> = { boot: "起動・ホーム", normal: "ノーマル", cruise: "クルーズ" };
     for (const m of MODES) {
       const box = $(`pl_${m}`), arr = L[m] ?? [];
-      box.innerHTML = arr.length ? arr.map((t, i) => `<li><span>${i + 1}. ${esc(t.title)}</span><button data-up="${m}:${i}" ${i ? "" : "disabled"}>▲</button><button data-dn="${m}:${i}" ${i < arr.length - 1 ? "" : "disabled"}>▼</button><button class="del" data-del="${m}:${i}">✕</button></li>`).join("") : `<li class="none">内蔵の BGM (${NM[m]})</li>`;
+      box.innerHTML = arr.length ? arr.map((t, i) => `<li><span>${i + 1}. ${esc(t.title)}</span>${t.id.startsWith("legacy-") ? "" : `<button class="ly ${t.lrc ? "has" : ""}" data-ly="${m}:${i}">${t.lrc ? "✓ 歌詞" : "＋ 歌詞"}</button>`}<button data-up="${m}:${i}" ${i ? "" : "disabled"}>▲</button><button data-dn="${m}:${i}" ${i < arr.length - 1 ? "" : "disabled"}>▼</button><button class="del" data-del="${m}:${i}">✕</button></li>`).join("") : `<li class="none">内蔵の BGM (${NM[m]})</li>`;
     }
     $("shTg").textContent = cfg.shuffle ? "シャッフル" : "登録順"; $("shTg").classList.toggle("on", cfg.shuffle);
     $("limIn").value = cfg.limit; for (const [id, v] of [["qTg", cfg.quiet], ["dTg", cfg.demo], ["bTg", cfg.bgm]] as [string, boolean][]) { $(id).textContent = v ? "ON" : "OFF"; $(id).classList.toggle("on", v); }
@@ -374,6 +390,19 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   }
   $("st").addEventListener("click", async (e: Event) => {
     const b = (e.target as HTMLElement).closest("button"); if (!b) return;
+    if (b.dataset.ly) { // 歌詞を付ける (お父さんの画面と同じシート)
+      const [m, is] = b.dataset.ly.split(":"), tr = (lists()[m] ?? [])[Number(is)]; if (!tr || !ui.lyrics) return;
+      if (S.lyricsSetup) { $("bgMsg").textContent = "歌詞の保存には Supabase で migration_kaku_lyrics.sql を実行してください"; return; }
+      tone(900, 0, 0.05, 0.04);
+      ui.lyrics({ ...tr }, async (lrc) => {
+        const r = await post({ op: "trackLrc", id: tr.id, lrc });
+        if (!r.ok) return r.error === "SETUP_LRC" ? "Supabase で migration_kaku_lyrics.sql を実行してください" : r.error === "LEGACY" ? "前にアップした曲には歌詞を付けられません (消して追加し直してください)" : "保存できませんでした: " + (r.error || "");
+        for (const k of MODES) for (const x of S.tracks?.[k] ?? []) if (x.id === tr.id) x.lrc = lrc;
+        for (const k of MODES) for (const x of PL[k].list) if (x.id === tr.id) x.lrc = lrc;
+        lyKey = ""; renderSet(); return null;
+      });
+      return;
+    }
     const d = b.dataset.up || b.dataset.dn || b.dataset.del; if (!d) return;
     const [m, is] = d.split(":"), i = Number(is), arr = [...(lists()[m] ?? [])];
     if (b.dataset.del) {
@@ -872,6 +901,7 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   void loadFx(); void loadEq(); void loadPl(); void loadWx(); void loadNews(); chShow();
   every(8000, chShow); every(20000, () => void loadPl()); every(60000, () => void loadEq()); every(600000, () => { void loadWx(); void loadNews(); }); every(3600000, () => void loadFx());
   every(2000, () => { if ($("st").classList.contains("on")) renderSet(); });
+  every(200, lyTick);
   const onR = () => resize(); window.addEventListener("resize", onR);
 
   return {

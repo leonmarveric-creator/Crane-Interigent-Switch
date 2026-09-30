@@ -282,3 +282,10 @@
 .kk .np button{width:56px;height:52px;border-radius:26px;border:0;background:var(--g);color:#03140d;font-size:24px;font-weight:900}
 .kk .np button:active{transform:scale(.94)}
 .kk .cruise .np{border-color:#e8fff4}
+/* 歌詞 (曲名の上に 3 行): ひとつ前の行も今の行と同じ明るさ (車の Bluetooth は音が少し遅れて届くため)。3 行目は次の行 */
+.kk .nly{position:absolute;left:50%;bottom:88px;transform:translateX(-50%);width:calc(100% - 470px);max-width:640px;display:none;text-align:center;pointer-events:none;z-index:4;padding:8px 16px 10px;border-radius:14px;background:rgba(0,12,7,.72);border:1px solid rgba(61,255,168,.22)}
+.kk .nly.on{display:block}
+.kk .nly p{margin:0;font-size:24px;font-weight:800;line-height:1.4;color:#e8fff4;text-shadow:0 0 10px rgba(61,255,168,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.4em}
+.kk .nly p.nx{font-size:17px;font-weight:600;color:rgba(232,255,244,.38);text-shadow:none}
+.kk .nly p.in{animation:nlyIn .35s ease-out}@keyframes nlyIn{from{opacity:.2;transform:translateY(8px)}}
+.kk .pll li button.ly{width:auto;padding:0 10px;font-size:14px}.kk .pll li button.ly.has{background:rgba(61,255,168,.22)}

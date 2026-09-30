@@ -46,3 +46,6 @@ create table if not exists public.kaku_tracks (
 create index if not exists kaku_tracks_which on public.kaku_tracks (which, sort);
 alter table public.kaku_tracks enable row level security;
 notify pgrst, 'reload schema';
+-- 曲の歌詞 (LRC)
+alter table public.kaku_tracks add column if not exists lrc text;
+notify pgrst, 'reload schema';

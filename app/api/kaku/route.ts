@@ -75,7 +75,9 @@ async function state() {
     supabaseAdmin.from("kaku_missions").select("name,kind,type,km,sec,kept,rank,ended_at").gte("ended_at", month).order("ended_at", { ascending: false }).limit(300),
     supabaseAdmin.from("app_settings").select("kaku_bgm_normal,kaku_bgm_cruise").eq("id", 1).maybeSingle(),
     supabaseAdmin.from("app_settings").select("kaku_bgm_boot").eq("id", 1).maybeSingle(),
-    supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort").order("sort").order("created_at").limit(300),
+    // 歌詞 (lrc) の列がまだ無い (migration_kaku_lyrics.sql 未実行) ときは歌詞なしで読む
+    supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc").order("sort").order("created_at").limit(300)
+      .then((r) => (r.error && /lrc/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noLrc: true })) : { ...r, noLrc: false })),
   ]);
   const missions = (ms.data ?? []) as any[];
   return {
@@ -87,13 +89,14 @@ async function state() {
     todayCount: missions.filter((m) => m.ended_at >= today).length,
     // プレイリスト。前の「1 曲だけ」の設定が残っていれば、先頭に入れる (id: legacy-…)
     tracks: (() => {
-      const out: Record<string, { id: string; title: string; url: string }[]> = { boot: [], normal: [], cruise: [] };
+      const out: Record<string, { id: string; title: string; url: string; lrc?: string | null }[]> = { boot: [], normal: [], cruise: [] };
       const leg: Record<string, string | null> = { boot: (sb.data as any)?.kaku_bgm_boot ?? null, normal: (st.data as any)?.kaku_bgm_normal ?? null, cruise: (st.data as any)?.kaku_bgm_cruise ?? null };
       for (const w of ["boot", "normal", "cruise"]) if (leg[w]) out[w].push({ id: `legacy-${w}`, title: "アップした曲", url: pub(leg[w])! });
-      for (const t of (tk.data ?? []) as any[]) if (out[t.which]) out[t.which].push({ id: t.id, title: t.title, url: pub(t.path)! });
+      for (const t of (tk.data ?? []) as any[]) if (out[t.which]) out[t.which].push({ id: t.id, title: t.title, url: pub(t.path)!, lrc: t.lrc ?? null });
       return out;
     })(),
     tracksSetup: !!tk.error,
+    lyricsSetup: !tk.error && (tk as any).noLrc === true,
     bgm: { boot: pub((sb.data as any)?.kaku_bgm_boot ?? null), normal: pub((st.data as any)?.kaku_bgm_normal ?? null), cruise: pub((st.data as any)?.kaku_bgm_cruise ?? null) },
   };
 }
@@ -160,6 +163,15 @@ export async function POST(req: NextRequest) {
     const { data: row } = await supabaseAdmin.from("kaku_tracks").delete().eq("id", id).select("path").maybeSingle();
     if ((row as any)?.path) await supabaseAdmin.storage.from(BUCKET).remove([(row as any).path]).catch(() => null);
     return J({ ok: true });
+  }
+  // 歌詞 (LRC)。null で消す
+  if (b.op === "trackLrc") {
+    const id = String(b.id || "");
+    if (id.startsWith("legacy-")) return J({ ok: false, error: "LEGACY" });
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return J({ ok: false, error: "BAD" });
+    const lrc = b.lrc == null ? null : String(b.lrc).replace(/\u0000/g, "").slice(0, 60000) || null;
+    const { error } = await supabaseAdmin.from("kaku_tracks").update({ lrc }).eq("id", id);
+    return J(error ? { ok: false, error: /lrc/.test(error.message) ? "SETUP_LRC" : setupErr(error.message) } : { ok: true });
   }
   if (b.op === "trackOrder") {
     const ids = (Array.isArray(b.ids) ? b.ids : []).filter((x: any) => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x)).slice(0, 200);

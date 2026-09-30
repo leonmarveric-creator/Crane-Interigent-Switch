@@ -575,7 +575,7 @@ export function MusicAdmin({ m, t, toast, autoLang }: { m: Music; t: T; toast: (
 }
 
 /** 歌詞を付ける (LRC ファイル / 曲を流して作る / タイミング調整) */
-function LyricsSheet({ tr, t, toast, onClose, onSave }: { tr: DriverTrack; t: T; toast: (s: string) => void; onClose: () => void; onSave: (lrc: string | null) => void }) {
+export function LyricsSheet({ tr, t, toast, onClose, onSave }: { tr: DriverTrack; t: T; toast: (s: string) => void; onClose: () => void; onSave: (lrc: string | null) => void }) {
   const [tab, setTab] = useState<"paste" | "file" | "make" | "edit">(tr.lrc ? "edit" : "paste");
   const [paste, setPaste] = useState("");
   const pasted = useMemo(() => parseLrc(paste), [paste]);
