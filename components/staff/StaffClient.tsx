@@ -244,6 +244,8 @@ function Header({ t, lang, now, onLang, onLogout, big, onBig }: {
             </button>
           ))}
         </div>
+        {/* Crane Nest のシステムの登録ゲスト (パスポート・お見送り) と紐づけの確認 */}
+        <a href="/staff/guests" aria-label="guests" className="rounded-full bg-white/85 px-3 py-1.5 text-sm font-semibold text-[#3b3228] shadow backdrop-blur">🛂</a>
         <button onClick={onLogout} aria-label="logout" className="rounded-full bg-white/85 p-2 text-[#3b3228] shadow backdrop-blur">
           <LogOut className="h-4 w-4" />
         </button>

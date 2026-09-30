@@ -625,6 +625,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
               </div>
             ) : (
               <div className="pane">
+                <a className="btn gl" href={`/driver/guests?lang=${lang}`}>🛂 {t("Crane Nest の登録ゲスト一覧")} ›</a>
                 {board.departures.length ? board.departures.map((r) => (
                   <div key={r.id} className="card" style={{ ["--rc" as any]: roomColor(roomOf(r.roomId)?.slug ?? "") }}>
                     <div className="row1"><span className="time">{jstTime(r.checkOut)}</span><span className="kind out">{t("お見送り")}</span><span className="eta">{eta(r.checkOut)}</span></div>

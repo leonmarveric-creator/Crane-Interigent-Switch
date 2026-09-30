@@ -47,62 +47,100 @@ export interface CnDrop {
 
 const jstDate = (iso: string) => new Date(Date.parse(iso) + 9 * 3600e3).toISOString().slice(0, 10);
 
+interface RawDrop { raw: any; drop: CnDrop }
+/** Crane Nest の送迎予約を読む (送迎の日が from〜to のもの + 合言葉が tokens のもの。キャンセル以外) */
+async function fetchDrops(c: SupabaseClient, from: string, to: string, tokens: string[]): Promise<RawDrop[]> {
+  const [byDate, byTok] = await Promise.all([
+    c.from("transfer_requests").select("*").gte("transfer_date", from).lte("transfer_date", to).neq("status", "cancelled").order("created_at", { ascending: false }),
+    tokens.length ? c.from("transfer_requests").select("*").in("reservation_token", tokens).neq("status", "cancelled").order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
+  ]);
+  const rows = new Map<string, any>();
+  for (const r of [...((byTok as any).error ? [] : (byTok as any).data ?? []), ...(byDate.error ? [] : byDate.data ?? [])]) rows.set(r.id, r);
+  if (!rows.size) return [];
+  const list = [...rows.values()];
+  const ids = list.map((r) => r.id), destIds = [...new Set(list.map((r) => r.destination_id).filter(Boolean))];
+  const [dq, lq] = await Promise.all([
+    destIds.length ? c.from("destinations").select("id, name").in("id", destIds) : Promise.resolve({ data: [] as any[] }),
+    c.from("transfer_request_guests").select("transfer_request_id, guest_id, is_primary").in("transfer_request_id", ids),
+  ]);
+  const destName = new Map<string, string>(((dq as any).data ?? []).map((d: any) => [d.id, d.name]));
+  const links = ((lq as any).error ? [] : (lq as any).data ?? []) as any[];
+  const guestIds = [...new Set([...list.map((r) => r.guest_id), ...links.map((l) => l.guest_id)].filter(Boolean))];
+  const gq = guestIds.length ? await c.from("guests").select("id, full_name").in("id", guestIds) : { data: [] as any[] };
+  const gName = new Map<string, string>(((gq as any).data ?? []).map((g: any) => [g.id, g.full_name]));
+  return list.map((r) => {
+    const ls = links.filter((l) => l.transfer_request_id === r.id).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+    const names = [...new Set([r.guest_id, ...ls.map((l) => l.guest_id)].map((g) => gName.get(g)).filter(Boolean) as string[])];
+    return { raw: r, drop: {
+      id: r.id, status: String(r.status ?? "pending"), date: r.transfer_date ?? null, dest: destName.get(r.destination_id) ?? null,
+      terminal: r.terminal ?? null, intent: r.rinku_route_intent === "nankai" || r.rinku_route_intent === "airport" ? r.rinku_route_intent : null,
+      flightAt: r.flight_time ?? null, departAt: r.preferred_departure_time ?? null,
+      pax: Number(r.passenger_count) || 1, large: Number(r.luggage_large) || 0, small: Number(r.luggage_small) || 0, special: Number(r.luggage_special) || 0,
+      names, linked: "room" as const,
+    } };
+  });
+}
+
+type ResKey = { id: string; roomKanji: string | null; checkOut: string; token: string | null };
+/** 送迎予約 ⇔ こちらの予約 (① 合言葉 ② お部屋の漢字 + チェックアウト日)。返り値: 予約 ID → 送迎予約 */
+function matchDrops(rs: ResKey[], list: RawDrop[]): Record<string, CnDrop> {
+  const out: Record<string, CnDrop> = {};
+  const used = new Set<string>();
+  for (const r of rs) {
+    if (!r.token) continue;
+    const hit = list.find((x) => x.raw.reservation_token && x.raw.reservation_token === r.token);
+    if (hit) { out[r.id] = { ...hit.drop, linked: "token" }; used.add(hit.raw.id); }
+  }
+  for (const r of rs) {
+    if (out[r.id] || !r.roomKanji) continue;
+    const d = jstDate(r.checkOut);
+    const hit = list.find((x) => !used.has(x.raw.id) && !x.raw.reservation_token && x.raw.transfer_date === d && cnRoomKanji(x.raw.room_number) === r.roomKanji);
+    if (hit) { out[r.id] = { ...hit.drop, linked: "room" }; used.add(hit.raw.id); }
+  }
+  return out;
+}
+
 /**
  * こちらの予約に Crane Nest の送迎予約を紐づけて返す (予約 ID → 送迎予約)。
  *   rs: { id, roomKanji, checkOut, token } の配列。設定が無い・読めないときは空。
  */
-export async function loadCraneNestDrops(rs: { id: string; roomKanji: string | null; checkOut: string; token: string | null }[]): Promise<Record<string, CnDrop>> {
+export async function loadCraneNestDrops(rs: ResKey[]): Promise<Record<string, CnDrop>> {
   const c = cn(); if (!c || !rs.length) return {};
   try {
     const dates = rs.map((r) => jstDate(r.checkOut)).sort();
     const from = new Date(Date.parse(dates[0]) - 86400e3).toISOString().slice(0, 10), to = dates[dates.length - 1];
-    const tokens = rs.map((r) => r.token).filter(Boolean) as string[];
-    // 日付の範囲に入るもの + 合言葉つきのもの
-    const sel = "*";
-    const [byDate, byTok] = await Promise.all([
-      c.from("transfer_requests").select(sel).gte("transfer_date", from).lte("transfer_date", to).neq("status", "cancelled").order("created_at", { ascending: false }),
-      tokens.length ? c.from("transfer_requests").select(sel).in("reservation_token", tokens).neq("status", "cancelled").order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
-    ]);
-    const rows = new Map<string, any>();
-    for (const r of [...((byTok as any).error ? [] : (byTok as any).data ?? []), ...(byDate.error ? [] : byDate.data ?? [])]) rows.set(r.id, r);
-    if (!rows.size) return {};
-    const list = [...rows.values()];
-    const ids = list.map((r) => r.id), destIds = [...new Set(list.map((r) => r.destination_id).filter(Boolean))];
-    const [dq, lq] = await Promise.all([
-      destIds.length ? c.from("destinations").select("id, name").in("id", destIds) : Promise.resolve({ data: [] as any[] }),
-      c.from("transfer_request_guests").select("transfer_request_id, guest_id, is_primary").in("transfer_request_id", ids),
-    ]);
-    const destName = new Map<string, string>(((dq as any).data ?? []).map((d: any) => [d.id, d.name]));
-    const links = ((lq as any).error ? [] : (lq as any).data ?? []) as any[];
-    const guestIds = [...new Set([...list.map((r) => r.guest_id), ...links.map((l) => l.guest_id)].filter(Boolean))];
-    const gq = guestIds.length ? await c.from("guests").select("id, full_name").in("id", guestIds) : { data: [] as any[] };
-    const gName = new Map<string, string>(((gq as any).data ?? []).map((g: any) => [g.id, g.full_name]));
-    const toDrop = (r: any, how: CnDrop["linked"]): CnDrop => {
-      const ls = links.filter((l) => l.transfer_request_id === r.id).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
-      const names = [...new Set([r.guest_id, ...ls.map((l) => l.guest_id)].map((g) => gName.get(g)).filter(Boolean) as string[])];
-      return {
-        id: r.id, status: String(r.status ?? "pending"), date: r.transfer_date ?? null, dest: destName.get(r.destination_id) ?? null,
-        terminal: r.terminal ?? null, intent: r.rinku_route_intent === "nankai" || r.rinku_route_intent === "airport" ? r.rinku_route_intent : null,
-        flightAt: r.flight_time ?? null, departAt: r.preferred_departure_time ?? null,
-        pax: Number(r.passenger_count) || 1, large: Number(r.luggage_large) || 0, small: Number(r.luggage_small) || 0, special: Number(r.luggage_special) || 0,
-        names, linked: how,
-      };
-    };
-    const out: Record<string, CnDrop> = {};
-    const used = new Set<string>();
-    // ① 合言葉 (確実)
-    for (const r of rs) {
-      if (!r.token) continue;
-      const hit = list.find((x) => x.reservation_token && x.reservation_token === r.token);
-      if (hit) { out[r.id] = toDrop(hit, "token"); used.add(hit.id); }
-    }
-    // ② お部屋 + チェックアウト日 (合言葉の無い登録だけ)
-    for (const r of rs) {
-      if (out[r.id] || !r.roomKanji) continue;
-      const d = jstDate(r.checkOut);
-      const hit = list.find((x) => !used.has(x.id) && !x.reservation_token && x.transfer_date === d && cnRoomKanji(x.room_number) === r.roomKanji);
-      if (hit) { out[r.id] = toDrop(hit, "room"); used.add(hit.id); }
-    }
-    return out;
+    const list = await fetchDrops(c, from, to, rs.map((r) => r.token).filter(Boolean) as string[]);
+    return matchDrops(rs, list);
   } catch { return {}; }
+}
+
+export interface CnReportRow {
+  drop: CnDrop; roomName: string; createdAt: string | null; hasToken: boolean;
+  res: { id: string; guest: string | null; room: string; checkIn: string; checkOut: string } | null;
+  /** 紐づかなかった理由 */
+  why: string | null;
+}
+/** 確認用: Crane Nest に登録されたお見送り送迎予約の一覧と、どの予約に紐づいたか */
+export async function craneNestReport(res: (ResKey & { guest: string | null; room: string; checkIn: string })[], from: string, to: string): Promise<{ on: boolean; error: string | null; rows: CnReportRow[] }> {
+  const c = cn(); if (!c) return { on: false, error: null, rows: [] };
+  try {
+    const list = await fetchDrops(c, from, to, res.map((r) => r.token).filter(Boolean) as string[]);
+    const m = matchDrops(res, list);
+    const byDrop = new Map<string, (typeof res)[number]>();
+    for (const r of res) if (m[r.id]) byDrop.set(m[r.id].id, r);
+    const rows: CnReportRow[] = list.map(({ raw, drop }) => {
+      const r = byDrop.get(drop.id);
+      let why: string | null = null;
+      if (!r) {
+        const k = cnRoomKanji(raw.room_number);
+        if (raw.reservation_token) why = "合言葉に合う予約がありません（期間外・キャンセル）";
+        else if (!k) why = `お部屋「${raw.room_number}」がわかりません`;
+        else why = `${raw.transfer_date} にチェックアウトする「${k}」の予約がありません`;
+      }
+      const linked = r ? m[r.id] : drop;
+      return { drop: linked, roomName: String(raw.room_number ?? ""), createdAt: raw.created_at ?? null, hasToken: !!raw.reservation_token,
+        res: r ? { id: r.id, guest: r.guest, room: r.room, checkIn: r.checkIn, checkOut: r.checkOut } : null, why };
+    }).sort((a, b) => String(b.drop.date).localeCompare(String(a.drop.date)));
+    return { on: true, error: null, rows };
+  } catch (e) { return { on: true, error: String((e as Error)?.message || e), rows: [] }; }
 }

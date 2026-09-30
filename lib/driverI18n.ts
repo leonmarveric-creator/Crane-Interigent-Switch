@@ -21,7 +21,7 @@ const ZH: Record<string, string> = {
   "回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です": "回送模式需要先执行 Supabase 的 SQL（migration_cabin_voice.sql）",
   "🧳 ゲスト乗車。iPad をゲスト用の画面にしました": "🧳 客人已上车。iPad 已切换到客人画面",
   "ゲスト乗車": "客人上车", "回送": "空车前往", "帰り道": "返程",
-  "パスポート・お見送り：未登録": "护照·送机：未登记", "パスポート登録済み": "护照已登记", "名": "人", "南海に乗車": "乘南海线", "空港": "机场", "出発時刻：未定": "出发时间：未定", "お部屋と日付で紐づけ": "按房间和日期关联",
+  "パスポート・お見送り：未登録": "护照·送机：未登记", "パスポート登録済み": "护照已登记", "名": "人", "南海に乗車": "乘南海线", "空港": "机场", "出発時刻：未定": "出发时间：未定", "お部屋と日付で紐づけ": "按房间和日期关联", "Crane Nest の登録ゲスト一覧": "Crane Nest 登记的客人列表",
   "声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください": "要让语音从手机播放，请先执行 Supabase 的 SQL（migration_cabin_voice.sql）",
   "iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください": "要在 iPad 上显示歌词，请先执行 Supabase 的 SQL（migration_cabin_music.sql）",
   "iPad に表示中": "iPad 显示中",
