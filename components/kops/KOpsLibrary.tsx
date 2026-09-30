@@ -12,12 +12,13 @@ import type { DriverTrack } from "@/lib/driverData";
 import { makeT } from "@/lib/driverI18n";
 import { compressCover, mp3Cover } from "@/lib/driverCover";
 
-type Which = "boot" | "normal" | "cruise";
-interface Tr { id: string; title: string; url: string; lrc?: string | null; cover?: string | null }
+type Which = "boot" | "normal" | "cruise" | "dad";
+interface Tr { id: string; title: string; url: string; lrc?: string | null; cover?: string | null; artist?: string | null }
 const TAPES: { k: Which; n: string; en: string; d: string }[] = [
   { k: "normal", n: "ノーマル", en: "NORMAL", d: "ミッション中に流す曲" },
   { k: "cruise", n: "クルーズ", en: "CRUISE", d: "クルーズモード (橋・高速) の曲" },
   { k: "boot", n: "起動・ホーム", en: "BOOT", d: "起動・待機画面の曲" },
+  { k: "dad", n: "お父さんの曲", en: "HIROSHI", d: "お父さんの画面 (HIROSHI DRIVE) で登録した曲 (ここでは見るだけ。追加・歌詞・カバーはお父さんの画面で)。☰ の「ミッション中の曲」で HIROSHI か MIX を選ぶと流れます" },
 ];
 const tJa = makeT("ja");
 const post = (b: any) => fetch("/api/kaku", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json()).catch(() => ({ ok: false, error: "NET" }));
@@ -31,7 +32,7 @@ const em = (e?: string) => ERR[e || ""] || `できませんでした (${e || "?"
 
 export default function KOpsLibrary({ onClose, onChange }: { onClose: () => void; onChange: () => void }) {
   const [tab, setTab] = useState<Which>("normal");
-  const [tracks, setTracks] = useState<Record<Which, Tr[]>>({ boot: [], normal: [], cruise: [] });
+  const [tracks, setTracks] = useState<Record<Which, Tr[]>>({ boot: [], normal: [], cruise: [], dad: [] });
   const [setup, setSetup] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,7 +44,7 @@ export default function KOpsLibrary({ onClose, onChange }: { onClose: () => void
   const load = useCallback(async () => {
     const r = await fetch("/api/kaku", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setMsg("読み込めませんでした"); return; }
-    setTracks({ boot: r.tracks?.boot ?? [], normal: r.tracks?.normal ?? [], cruise: r.tracks?.cruise ?? [] });
+    setTracks({ boot: r.tracks?.boot ?? [], normal: r.tracks?.normal ?? [], cruise: r.tracks?.cruise ?? [], dad: r.tracks?.dad ?? [] });
     setSetup([r.tracksSetup && ERR.SETUP, r.lyricsSetup && ERR.SETUP_LRC, r.coverSetup && ERR.SETUP_COVER].filter(Boolean) as string[]);
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -100,19 +101,23 @@ export default function KOpsLibrary({ onClose, onChange }: { onClose: () => void
         <div className="kl-tabs">{TAPES.map((t) => (
           <button key={t.k} className={tab === t.k ? "on" : ""} onClick={() => { setTab(t.k); setDelId(null); }}><b>{t.en}</b><small>{t.n} · {tracks[t.k].length}</small></button>
         ))}</div>
-        <div className="kl-sub">{TAPES.find((t) => t.k === tab)!.d}。上から順に流れます。</div>
+        <div className="kl-sub">{TAPES.find((t) => t.k === tab)!.d}{tab === "dad" ? "" : "。上から順に流れます。"}</div>
         {setup.map((s) => <div key={s} className="kl-warn">{s}</div>)}
-        <label className={`kl-add ${busy ? "dis" : ""}`}>＋ 曲を追加<small>MP3 / M4A / AAC / WAV · 何曲でも</small>
+        {tab !== "dad" && <label className={`kl-add ${busy ? "dis" : ""}`}>＋ 曲を追加<small>MP3 / M4A / AAC / WAV · 何曲でも</small>
           <input type="file" multiple accept="audio/*,.mp3,.m4a,.aac,.wav" disabled={busy} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ""; if (fs.length) void addSongs(fs); }} />
-        </label>
+        </label>}
         <div className="kl-list">
           {!list.length && <div className="kl-empty">まだ曲がありません</div>}
-          {legacy.map((t) => (
+          {tab === "dad" && list.map((t, i) => (
+            <div key={t.id} className="kl-row"><div className="kl-cv"><img src={t.cover || "/cabin/bay.webp"} alt="" className={t.cover ? "" : "ph"} /></div>
+              <div className="kl-t"><b>{i + 1}. {t.title}</b><small>{t.artist ? `${t.artist} · ` : ""}{t.lrc ? "✓ 歌詞あり" : "歌詞なし"}{t.cover ? " · ✓ カバー" : ""}</small></div></div>
+          ))}
+          {tab !== "dad" && legacy.map((t) => (
             <div key={t.id} className="kl-row"><div className="kl-cv"><img src="/cabin/bay.webp" alt="" /></div>
               <div className="kl-t"><b>{t.title}</b><small>前の設定でアップした曲 · 歌詞・カバーは付けられません</small></div>
               <div className="kl-b">{delId === t.id ? <button className="del on" onClick={() => void del(t.id)}>本当に消す</button> : <button className="del" onClick={() => setDelId(t.id)}>🗑</button>}</div></div>
           ))}
-          {normal.map((t, i) => (
+          {tab !== "dad" && normal.map((t, i) => (
             <div key={t.id} className="kl-row">
               <label className="kl-cv" title="カバー画像を選ぶ"><img src={t.cover || "/cabin/bay.webp"} alt="" className={t.cover ? "" : "ph"} /><span>{t.cover ? "変更" : "＋ カバー"}</span>
                 <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void setCoverFile(t.id, f); }} /></label>
@@ -153,7 +158,7 @@ const CSS = `
 .kl-h{display:flex;align-items:baseline;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(60,242,166,.2)}
 .kl-h b{font-size:20px;letter-spacing:.24em;color:#3cf2a6}.kl-h small{font-size:13px;color:#86b9a5}
 .kl-x{margin-left:auto;background:none;border:1px solid rgba(70,245,175,.5);color:#bfffe0;width:36px;height:32px;border-radius:6px;font-size:16px}
-.kl-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 4px}
+.kl-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px 4px}
 .kl-tabs button{background:rgba(4,17,13,.9);border:1px solid rgba(60,242,166,.25);color:#cfe9df;padding:8px 4px;border-radius:6px;text-align:center}
 .kl-tabs button b{display:block;font-size:16px;letter-spacing:.2em}.kl-tabs button small{font-size:11.5px;color:#86b9a5}
 .kl-tabs button.on{border-color:#3cf2a6;background:linear-gradient(180deg,rgba(60,242,166,.18),rgba(60,242,166,.04));box-shadow:inset 0 -2px 0 #3cf2a6;color:#fff}

@@ -1,6 +1,6 @@
 /* K-OPS (AGENT KAKU の新しい画面): 画面の部品・字体・声・曲・地図の写真をこの端末に保存して、走行中のかくつきを防ぐ。
- * 対象: /kops/**・/cabin/leaflet/**・/cabin/routes.json・/cabin/bay.webp・国土地理院の地図・曲 (driver-music の kaku/)。ページ本体や API は保存しない。 */
-const VERSION = "kops-v2";
+ * 対象: /kops/**・/cabin/leaflet/**・/cabin/routes.json・/cabin/bay.webp・国土地理院の地図・曲とカバー (driver-music: KAKU の曲・お父さんの曲)。ページ本体や API は保存しない。 */
+const VERSION = "kops-v3";
 const TILES = "kops-tiles-v1";
 self.addEventListener("install", () => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
@@ -12,7 +12,7 @@ self.addEventListener("activate", (e) => {
 const isTile = (u) => u.hostname === "cyberjapandata.gsi.go.jp";
 const isStatic = (u) =>
   (u.origin === self.location.origin && (/^\/kops\//.test(u.pathname) || /^\/cabin\/leaflet\//.test(u.pathname) || u.pathname === "/cabin/routes.json" || u.pathname === "/cabin/bay.webp")) ||
-  /\/storage\/v1\/object\/public\/driver-music\/kaku\//.test(u.pathname);
+  /\/storage\/v1\/object\/public\/driver-music\//.test(u.pathname);
 self.addEventListener("message", (e) => {
   if (!e.data || e.data.type !== "precache") return;
   const port = e.ports[0];

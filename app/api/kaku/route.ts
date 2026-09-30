@@ -70,7 +70,7 @@ async function state() {
   const jst = new Date(Date.now() + 9 * 3600000);
   const month = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), 1) - 9 * 3600000).toISOString();
   const today = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * 3600000).toISOString();
-  const [pl, ms, st, sb, tk] = await Promise.all([
+  const [pl, ms, st, sb, tk, dd] = await Promise.all([
     supabaseAdmin.from("kaku_places").select("name,lat,lng,type,fav,visits").order("visits", { ascending: false }).limit(200),
     supabaseAdmin.from("kaku_missions").select("name,kind,type,km,sec,kept,rank,ended_at").gte("ended_at", month).order("ended_at", { ascending: false }).limit(300),
     supabaseAdmin.from("app_settings").select("kaku_bgm_normal,kaku_bgm_cruise").eq("id", 1).maybeSingle(),
@@ -79,6 +79,8 @@ async function state() {
     supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc,cover_path").order("sort").order("created_at").limit(300)
       .then((r) => (r.error && /cover_path/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort,lrc").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noCover: true })) : { ...r, noCover: false }))
       .then((r: any) => (r.error && /lrc/.test(r.error.message) ? supabaseAdmin.from("kaku_tracks").select("id,which,title,path,sort").order("sort").order("created_at").limit(300).then((x) => ({ ...x, noLrc: true, noCover: true })) : { ...r, noLrc: false })),
+    // お父さんの画面 (HIROSHI DRIVE) で登録した曲も、K-OPS で流せるようにする (読むだけ)
+    supabaseAdmin.from("driver_tracks").select("*").order("purpose").order("sort").order("created_at").limit(300),
   ]);
   const missions = (ms.data ?? []) as any[];
   return {
@@ -90,10 +92,11 @@ async function state() {
     todayCount: missions.filter((m) => m.ended_at >= today).length,
     // プレイリスト。前の「1 曲だけ」の設定が残っていれば、先頭に入れる (id: legacy-…)
     tracks: (() => {
-      const out: Record<string, { id: string; title: string; url: string; lrc?: string | null; cover?: string | null }[]> = { boot: [], normal: [], cruise: [] };
+      const out: Record<string, { id: string; title: string; url: string; lrc?: string | null; cover?: string | null; artist?: string | null; start?: number }[]> = { boot: [], normal: [], cruise: [], dad: [] };
       const leg: Record<string, string | null> = { boot: (sb.data as any)?.kaku_bgm_boot ?? null, normal: (st.data as any)?.kaku_bgm_normal ?? null, cruise: (st.data as any)?.kaku_bgm_cruise ?? null };
       for (const w of ["boot", "normal", "cruise"]) if (leg[w]) out[w].push({ id: `legacy-${w}`, title: "アップした曲", url: pub(leg[w])! });
       for (const t of (tk.data ?? []) as any[]) if (out[t.which]) out[t.which].push({ id: t.id, title: t.title, url: pub(t.path)!, lrc: t.lrc ?? null, cover: pub(t.cover_path ?? null) });
+      for (const t of ((dd as any).error ? [] : (dd as any).data ?? []) as any[]) if (t.file_path) out.dad.push({ id: `dad-${t.id}`, title: t.title, artist: t.artist ?? null, url: pub(t.file_path)!, lrc: t.lrc ?? null, cover: pub(t.cover_path ?? null), start: Number(t.start_sec) || 0 });
       return out;
     })(),
     tracksSetup: !!tk.error,
