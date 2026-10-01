@@ -43,6 +43,7 @@
 .kops .kqr2 b{display:block;font:800 16px "Hiragino Sans",sans-serif}.kops .kqr2 small{display:block;font-size:12px;color:#9fd6c0;margin-top:4px;line-height:1.4}
 .kops .kqr2 em{display:block;margin-top:6px;font:700 15px "Share Tech Mono",monospace;font-style:normal;letter-spacing:.2em;color:#3cf2a6}
 .kops .kqr2 button{position:absolute;right:4px;top:4px;width:26px;height:26px;border:0;background:none;color:#9fd6c0;font-size:14px}
+.kops .kcp.ab{padding-right:14px;border-color:#ffb020;background:rgba(255,176,32,.1);box-shadow:0 0 16px rgba(255,176,32,.2)}.kops .kcp.ab em{color:#ffb020}
 
 .skin-mi{--g:#3cf2a6;--g2:#22d690;--t:#eafff6;--m:#86b9a5;--ln:rgba(70,245,175,.62);--ln2:rgba(60,242,166,.16);--a:#ffb020;--r:#ff5a5a;--pn:rgba(4,17,13,.88);
  --f:"Rajdhani","Barlow Condensed","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--fn:"Barlow Condensed","Rajdhani","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}

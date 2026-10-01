@@ -16,7 +16,7 @@ export interface KOpsGuest {
 }
 export interface KOpsData { guests: KOpsGuest[]; devices: { id: string; name: string }[]; rooms: { id: string; name: string; kanji: string }[]; cabinMissing: boolean }
 
-const V = "9";
+const V = "10";
 function load(src: string): Promise<void> {
   return new Promise((ok, ng) => {
     if (/\.css(\?|$)/.test(src)) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = src; l.onload = () => ok(); l.onerror = () => ng(new Error(src)); document.head.appendChild(l); return; }
