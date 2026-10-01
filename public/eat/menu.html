@@ -87,6 +87,10 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .opts button { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 6px 10px; font-size: 12.5px; color: var(--text); }
 .opts button .pp { color: var(--gold); font-family: var(--mono); margin-left: 4px; }
 .opts button .q { margin-left: 6px; background: var(--cyan); color: #04121f; border-radius: 999px; padding: 0 6px; font-weight: 700; font-size: 11px; }
+/* 選んだサイズは「− 数 +」で増やす・減らす */
+.og { display: inline-flex; align-items: stretch; border: 1px solid var(--cyan); border-radius: 10px; overflow: hidden; }
+.og button { border: 0; border-radius: 0; }
+.og .om { min-width: 40px; font-size: 18px; font-weight: 800; color: var(--cyan); background: rgba(127, 212, 255, .12); border-right: 1px solid var(--line); }
 .note { margin: 16px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line); font-size: 12px; line-height: 1.6; color: var(--muted); }
 
 /* tray */
@@ -94,6 +98,8 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .tray button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; border-radius: 16px; padding: 14px 16px; background: linear-gradient(90deg, #ff6b4a, #f0a04a); color: #1a0703; font-weight: 800; font-size: 15px; box-shadow: 0 10px 30px -10px rgba(255, 107, 74, .8); }
 .tray button:disabled { background: #1a2740; color: var(--muted); box-shadow: none; }
 .tray .sum { font-family: var(--mono); }
+.tray { display: flex; gap: 8px; }
+.tray #clrBtn { width: auto; flex: 0 0 auto; padding: 14px 14px; background: #1a2740; color: #cfe0f5; border: 1px solid var(--line); box-shadow: none; font-weight: 700; }
 
 /* staff card */
 .staff { position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink); overflow-y: auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(24px + env(safe-area-inset-bottom, 0px)); }
@@ -141,7 +147,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
   <div class="note" id="note"></div>
 </div>
 
-<div class="tray"><button type="button" id="trayBtn" disabled></button></div>
+<div class="tray"><button type="button" id="clrBtn" hidden></button><button type="button" id="trayBtn" disabled></button></div>
 
 <div class="staff" id="staff" hidden>
   <div class="inner">
@@ -465,7 +471,8 @@ function row(it, sec) {
     optHtml = `<div class="opts">${it[3].map((o, i) => {
       const k = `${it[0]}|${i}`; const q = cartNow().get(k) || 0;
       const label = lang === "ja" ? (isNoodle(it) ? it[2] + o[0] : (o[0] || it[2])) : (o[2][lang] || itemName(it));
-      return `<button type="button" data-add="${k}">+ ${label}${ps.length > 1 ? `<span class="pp">${yen(o[1])}</span>` : ""}${q ? `<span class="q">${q}</span>` : ""}</button>`;
+      const add = `<button type="button" data-add="${k}">+ ${label}${ps.length > 1 ? `<span class="pp">${yen(o[1])}</span>` : ""}${q ? `<span class="q">${q}</span>` : ""}</button>`;
+      return q ? `<span class="og"><button type="button" class="om" data-sub="${k}" aria-label="−">−</button>${add}</span>` : add;
     }).join("")}</div>`;
   } else {
     priceTxt = yen(it[3]);
@@ -558,10 +565,14 @@ function rerenderKeepScroll() {
 
 // sample order so the first view shows how it works
 // 選んだものは、このタブの中だけで覚えておく (地図に戻って開き直しても消えない)
-const CK = "eats-cart-" + shopId;
-try { const v = JSON.parse(sessionStorage.getItem(CK) || "[]"); if (Array.isArray(v)) v.forEach(([k, q]) => q > 0 && cartNow().set(k, q)); } catch (e) {}
-const saveCart = () => { try { sessionStorage.setItem(CK, JSON.stringify([...cartNow()])); } catch (e) {} };
-const _upd = updateTray; updateTray = function () { _upd(); saveCart(); };
+// 3 時間さわらなければ消す (同じスマホで次の日に開いても、前の注文は残らない)
+const CK = "eats-cart-" + shopId, KEEP_MS = 3 * 3600e3;
+try { const v = JSON.parse(sessionStorage.getItem(CK) || "null"); if (v && Date.now() - v.at < KEEP_MS && Array.isArray(v.items)) v.items.forEach(([k, q]) => q > 0 && cartNow().set(k, q)); } catch (e) {}
+const saveCart = () => { try { if (cartNow().size) sessionStorage.setItem(CK, JSON.stringify({ at: Date.now(), items: [...cartNow()] })); else sessionStorage.removeItem(CK); } catch (e) {} };
+// 注文を全部消すボタン (選んでいるときだけ出る)
+const CLR = { en: ["↺ Clear", "Clear all items?"], zh: ["↺ 清空", "要清空全部吗？"], ko: ["↺ 비우기", "모두 지울까요?"], ja: ["↺ リセット", "選んだものを全部消しますか？"] };
+const _upd = updateTray; updateTray = function () { _upd(); saveCart(); const c = $("clrBtn"); c.hidden = !cartNow().size; c.textContent = CLR[lang][0]; };
+$("clrBtn").addEventListener("click", () => { if (!confirm(CLR[lang][1])) return; cartNow().clear(); rerenderKeepScroll(); });
 $("back").addEventListener("click", () => { if (history.length > 1 && document.referrer.startsWith(location.origin)) history.back(); else location.href = QS.get("from") || "/g/lounge?s=map"; });
 const BACK = { en: "‹ Around us", zh: "‹ 周边", ko: "‹ 주변", ja: "‹ 周辺" };
 const _render = render; render = function () { _render(); $("back").textContent = BACK[lang]; document.title = `${shop().name} ${shop().jp} · Menu`; };
