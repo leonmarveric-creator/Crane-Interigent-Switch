@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Menu · Crane Nest</title><meta name="robots" content="noindex"><meta name="theme-color" content="#070d18">
+<!-- ゲスト案内 (/g/部屋) の「Around us」から開く、近くのお店の 4 言語メニュー + 指さし注文。?shop=gyusen|petanko&l=en|zh|ko|ja -->
+<style>
+[hidden]{display:none!important}
+/* Layout: a phone-width guest page in the Crane Nest guide's night-navy style; sticky category rail, menu rows, order tray, full-screen Japanese order card for staff. */
+:root {
+  --bg: #070d18;
+  --bg2: #0c1628;
+  --panel: rgba(14, 26, 46, .82);
+  --line: rgba(120, 190, 255, .22);
+  --line2: rgba(120, 190, 255, .12);
+  --cyan: #7fd4ff;
+  --gold: #f0c26a;
+  --ember: #ff6b4a;          /* charcoal-grill ember, for GYUSEN accents */
+  --text: #eaf3ff;
+  --muted: #8fa8c6;
+  --paper: #fbf7ef;          /* staff card */
+  --ink: #1d1712;
+  --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "PingFang SC", "Apple SD Gothic Neo", "Noto Sans JP", sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: #03060c; color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.phone { max-width: 440px; margin: 0 auto; min-height: 100vh; background: radial-gradient(120% 50% at 50% -10%, #3a1a10 0%, #16233c 35%, var(--bg) 65%); position: relative; padding-bottom: 110px; }
+.phone::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(var(--line2) 1px, transparent 1px), linear-gradient(90deg, var(--line2) 1px, transparent 1px); background-size: 32px 32px; -webkit-mask: linear-gradient(#000, transparent 420px); mask: linear-gradient(#000, transparent 420px); }
+.pad { padding-inline: 16px; }
+
+/* top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(7, 13, 24, .88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line2); }
+.back { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.top h1 { margin: 0; font-size: 16px; flex: 1; min-width: 0; }
+.langs { display: flex; gap: 4px; }
+.langs button { width: 34px; height: 30px; border-radius: 999px; border: 1px solid var(--line); background: transparent; font-size: 12px; font-weight: 700; color: var(--muted); }
+.langs button[aria-pressed="true"] { background: var(--cyan); color: #04121f; border-color: var(--cyan); }
+
+/* hero */
+.hero { position: relative; padding: 18px 16px 6px; display: grid; gap: 10px; }
+.shop { display: flex; gap: 14px; align-items: center; }
+.seal { flex: none; width: 66px; height: 66px; border-radius: 16px; display: grid; place-items: center; background: linear-gradient(145deg, #2b1008, #120806); border: 1px solid rgba(255, 107, 74, .45); box-shadow: 0 0 24px -6px rgba(255, 107, 74, .6); font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; font-weight: 800; font-size: 26px; color: #ff4f3a; letter-spacing: -2px; }
+.shop h2 { margin: 0; font-size: 22px; letter-spacing: .04em; }
+.shop h2 small { display: block; font-size: 12px; color: var(--muted); letter-spacing: .02em; font-weight: 500; margin-top: 2px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { font-size: 11.5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+.fact b { color: var(--text); font-weight: 600; }
+.shops { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.shops button { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 8px 10px; text-align: left; font-size: 13px; font-weight: 700; color: var(--muted); }
+.shops button small { display: block; font-weight: 500; font-size: 11px; }
+.shops button[aria-pressed="true"] { border-color: var(--ember); color: #fff; background: rgba(255, 107, 74, .14); }
+.seal.okono { color: #f0c26a; border-color: rgba(240, 194, 106, .5); box-shadow: 0 0 24px -6px rgba(240, 194, 106, .55); font-size: 22px; letter-spacing: 0; }
+.how { font-size: 12.5px; line-height: 1.6; color: var(--muted); margin: 0; }
+
+/* category rail */
+.rail { position: sticky; top: calc(51px + env(safe-area-inset-top, 0px)); z-index: 15; display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px; background: rgba(7, 13, 24, .92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail button { flex: none; border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 12px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.rail button[aria-pressed="true"] { border-color: var(--ember); color: #fff; background: rgba(255, 107, 74, .16); }
+
+/* sections + rows */
+.sec { padding: 14px 16px 4px; scroll-margin-top: 110px; }
+.sec h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .12em; color: var(--gold); display: flex; align-items: baseline; gap: 8px; text-transform: uppercase; }
+.sec h3 small { letter-spacing: 0; color: var(--muted); font-weight: 500; text-transform: none; font-size: 11.5px; }
+.list { display: grid; gap: 8px; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 11px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line2); }
+.item.rec { border-color: rgba(240, 194, 106, .45); }
+.item.in { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(127, 212, 255, .25) inset; }
+.name { min-width: 0; }
+.name b { font-size: 15px; line-height: 1.35; display: block; }
+.name .ja { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.price { text-align: right; font-family: var(--mono); font-weight: 600; font-size: 14px; color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.desc { grid-column: 1 / -1; font-size: 12.5px; line-height: 1.55; color: #c3d3ea; margin: 0; }
+.tags { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; background: rgba(120, 190, 255, .1); color: var(--muted); }
+.tag.hot { background: rgba(255, 107, 74, .16); color: #ffb3a3; }
+.tag.star { background: rgba(240, 194, 106, .16); color: var(--gold); }
+.tag.res { background: rgba(127, 212, 255, .16); color: var(--cyan); }
+.ctrl { grid-column: 2; grid-row: span 2; align-self: end; display: flex; align-items: center; gap: 6px; }
+.ctrl button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg2); font-size: 18px; line-height: 1; display: grid; place-items: center; }
+.ctrl .add { background: var(--cyan); color: #04121f; border-color: var(--cyan); font-weight: 700; }
+.ctrl .n { min-width: 16px; text-align: center; font-family: var(--mono); font-weight: 600; }
+.opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.opts button { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 6px 10px; font-size: 12.5px; color: var(--text); }
+.opts button .pp { color: var(--gold); font-family: var(--mono); margin-left: 4px; }
+.opts button .q { margin-left: 6px; background: var(--cyan); color: #04121f; border-radius: 999px; padding: 0 6px; font-weight: 700; font-size: 11px; }
+.note { margin: 16px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line); font-size: 12px; line-height: 1.6; color: var(--muted); }
+
+/* tray */
+.tray { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(440px, 100%); z-index: 30; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, transparent, rgba(3, 6, 12, .96) 30%); }
+.tray button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; border-radius: 16px; padding: 14px 16px; background: linear-gradient(90deg, #ff6b4a, #f0a04a); color: #1a0703; font-weight: 800; font-size: 15px; box-shadow: 0 10px 30px -10px rgba(255, 107, 74, .8); }
+.tray button:disabled { background: #1a2740; color: var(--muted); box-shadow: none; }
+.tray .sum { font-family: var(--mono); }
+
+/* staff card */
+.staff { position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink); overflow-y: auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.staff .inner { max-width: 440px; margin: 0 auto; display: grid; gap: 14px; }
+.staff .hint { font-size: 12px; color: #7a6a5a; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.staff .hint button { border: 1px solid #d6c8b5; background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; color: var(--ink); }
+.staff h2 { margin: 0; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 28px; line-height: 1.35; }
+.staff h2 small { display: block; font-family: var(--sans); font-size: 13px; color: #7a6a5a; font-weight: 500; margin-top: 4px; }
+.olist { display: grid; gap: 0; border-top: 2px solid var(--ink); }
+.orow { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 2px; border-bottom: 1px solid #e3d8c7; align-items: baseline; }
+.orow b { font-size: 22px; line-height: 1.3; }
+.orow .qty { font-size: 26px; font-weight: 800; font-family: var(--mono); color: #c0301c; }
+.orow .sub { grid-column: 1 / -1; font-size: 12px; color: #7a6a5a; }
+.total { display: flex; justify-content: space-between; font-size: 15px; padding: 4px 2px; }
+.total b { font-family: var(--mono); font-size: 18px; }
+.phr h4 { margin: 0 0 8px; font-size: 13px; color: #7a6a5a; font-weight: 600; }
+.phrases { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.phrases button { border: 1px solid #d6c8b5; background: #fff; border-radius: 12px; padding: 10px; text-align: left; font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.phrases button small { display: block; font-size: 11px; font-weight: 500; color: #7a6a5a; }
+.big { position: fixed; inset: 0; z-index: 70; background: var(--paper); display: grid; place-items: center; padding: 24px; text-align: center; }
+.big p { margin: 0; font-size: clamp(32px, 11vw, 54px); font-weight: 800; line-height: 1.3; color: var(--ink); }
+.big small { display: block; margin-top: 18px; font-size: 14px; color: #7a6a5a; }
+@media (prefers-reduced-motion: no-preference) { .item.in { transition: border-color .2s; } }
+</style></head><body>
+
+<div class="phone">
+  <div class="top">
+    <button class="back" type="button" id="back">‹ Around us</button>
+    <h1 id="topTitle"></h1>
+    <div class="langs" id="langs"></div>
+  </div>
+
+  <section class="hero">
+    <div class="shops" id="shops" role="group" aria-label="Shop" hidden></div>
+    <div class="shop">
+      <div class="seal" id="seal" aria-hidden="true"></div>
+      <h2><span id="shopName"></span><small id="kind"></small></h2>
+    </div>
+    <div class="facts" id="facts"></div>
+    <p class="how" id="how"></p>
+  </section>
+
+  <nav class="rail" id="rail" aria-label="Menu sections"></nav>
+  <div id="menu"></div>
+  <div class="note" id="note"></div>
+</div>
+
+<div class="tray"><button type="button" id="trayBtn" disabled></button></div>
+
+<div class="staff" id="staff" hidden>
+  <div class="inner">
+    <div class="hint"><span id="staffHint"></span><button type="button" id="closeStaff"></button></div>
+    <h2>ご注文をお願いします<small id="staffSub"></small></h2>
+    <div class="olist" id="olist"></div>
+    <div class="total"><span id="otlab">合計（目安）</span><b id="otot"></b></div>
+    <div class="phr"><h4 id="phrTitle"></h4><div class="phrases" id="phrases"></div></div>
+  </div>
+</div>
+<div class="big" id="big" hidden><div><p id="bigText"></p><small id="bigSub"></small></div></div>
+
+<script>
+// ---------- UI words ----------
+const UI = {
+  en: { pick: "★ Good for first-timers",
+        how: "Tap + on what you want. Then show the order card to the staff. They will read it in Japanese.",
+        tray0: "Tap + to choose", tray: (n) => `Show order to staff · ${n} items`, close: "Back to menu", hint: "Show this screen to the staff", sub: "Crane Nest guest",
+        phr: "Tap to show a phrase", note: "Crane Nest translated this menu from the shop's menu. Prices and dishes may change. If you have an allergy, please ask the staff before ordering.",
+        res: "Reservation needed", lim: "While it lasts", hot: "Spicy", pp: "for 2–4", each: "each" },
+  zh: { pick: "★ 第一次来推荐",
+        how: "点 + 选择想吃的，然后把点餐卡给店员看。店员会看日文。",
+        tray0: "点 + 来选择", tray: (n) => `给店员看 · ${n} 份`, close: "返回菜单", hint: "请把这个画面给店员看", sub: "Crane Nest 住客",
+        phr: "点一下，显示日语短句", note: "本菜单由 Crane Nest 根据店内菜单翻译。价格和菜品可能变动。如有过敏，请在点餐前询问店员。",
+        res: "需预约", lim: "售完为止", hot: "辣", pp: "2–4人份", each: "各" },
+  ko: { pick: "★ 처음이라면 추천",
+        how: "먹고 싶은 메뉴의 + 를 누르고, 주문 카드를 점원에게 보여 주세요. 점원은 일본어로 읽습니다.",
+        tray0: "+ 를 눌러 선택", tray: (n) => `점원에게 보여주기 · ${n}개`, close: "메뉴로 돌아가기", hint: "이 화면을 점원에게 보여 주세요", sub: "Crane Nest 숙박객",
+        phr: "누르면 일본어 문장이 크게 나와요", note: "Crane Nest가 가게 메뉴를 번역했습니다. 가격과 메뉴는 바뀔 수 있습니다. 알레르기가 있으면 주문 전에 점원에게 물어보세요.",
+        res: "예약 필요", lim: "한정", hot: "매운맛", pp: "2–4인분", each: "각" },
+  ja: { pick: "★ はじめての方におすすめ",
+        how: "食べたいものの + を押して、注文カードをお店の人に見せてください。",
+        tray0: "+ で選んでください", tray: (n) => `お店の人に見せる · ${n}点`, close: "メニューに戻る", hint: "この画面をお店の人に見せてください", sub: "Crane Nest の宿泊客",
+        phr: "押すと日本語のひとことを大きく表示", note: "お店のメニューをもとに Crane Nest が翻訳しました。価格や内容は変わることがあります。アレルギーのある方は、注文の前にお店の人に確認してください。",
+        res: "要予約", lim: "売切れ御免", hot: "辛い", pp: "2〜4人前", each: "各" },
+};
+const LANGS = [["en", "EN"], ["zh", "中"], ["ko", "한"], ["ja", "日"]];
+
+const GYU_SECTIONS = [
+  ["pick", { en: "Top picks", zh: "推荐", ko: "추천", ja: "おすすめ" }],
+  ["beef", { en: "Beef", zh: "牛肉", ko: "소고기", ja: "牛肉" }],
+  ["set", { en: "Sets", zh: "套餐", ko: "세트", ja: "お得なセット" }],
+  ["offal", { en: "Offal (horumon)", zh: "牛杂", ko: "내장(호르몬)", ja: "ホルモン" }],
+  ["grill", { en: "Pork · chicken · seafood", zh: "猪·鸡·海鲜", ko: "돼지·닭·해산물", ja: "豚・鶏・海鮮・焼物" }],
+  ["special", { en: "GYUSEN specials", zh: "招牌菜", ko: "규센 스페셜", ja: "牛泉ならでは" }],
+  ["rice", { en: "Rice · noodles", zh: "饭·面", ko: "밥·면", ja: "ご飯もの・麺" }],
+  ["side", { en: "Salad · kimchi · sides", zh: "沙拉·泡菜·小菜", ko: "샐러드·김치·사이드", ja: "サラダ・キムチ・一品" }],
+  ["soup", { en: "Soup", zh: "汤", ko: "수프", ja: "スープ" }],
+  ["drink", { en: "Drinks", zh: "饮料", ko: "음료", ja: "飲み物" }],
+];
+
+// ---------- menu (from the shop's paper menu; all prices tax-included) ----------
+// [id, section, ja, price | [[optJa, price, {en,zh,ko}],...], {en,zh,ko}, {en,zh,ko} desc|null, flags]
+// flags: b beef, p pork, c chicken, s seafood, h spicy, r reservation, l limited, star top pick
+const T = (en, zh, ko) => ({ en, zh, ko });
+const GYU = [
+  ["tan3", "beef", "厚切り上塩タン", 2980, T("Thick-cut premium tongue (salt)", "厚切特级盐烤牛舌", "두툼한 특상 소금 우설"), T("Thick slices of beef tongue, seasoned with salt. Squeeze lemon on top.", "厚切牛舌，盐味。挤上柠檬汁吃。", "두껍게 썬 우설을 소금으로 양념. 레몬을 뿌려 드세요."), "b star"],
+  ["tan2", "beef", "上塩タン", 1600, T("Premium tongue (salt)", "特级盐烤牛舌", "특상 소금 우설"), T("Thin-sliced tongue. The classic first plate at a yakiniku place.", "薄切牛舌。烤肉店的经典第一盘。", "얇게 썬 우설. 야키니쿠의 첫 접시로 인기."), "b star"],
+  ["tan1", "beef", "塩赤タン", 780, T("Lean tongue (salt)", "盐烤牛舌（瘦肉部分）", "소금 우설 (살코기 부위)"), null, "b"],
+  ["yshabu", "beef", "焼きしゃぶ", 2280, T("Yaki-shabu (paper-thin beef)", "烤涮牛肉片", "야키샤부 (아주 얇은 소고기)"), T("Very thin slices. Grill only a few seconds on each side.", "非常薄的牛肉片，每面烤几秒即可。", "아주 얇은 고기. 앞뒤로 몇 초만 구워요."), "b"],
+  ["negi", "beef", "ネギツラミ", [["塩", 980, T("salt", "盐味", "소금")], ["タレ", 980, T("sauce", "酱汁", "양념")]], T("Beef cheek with green onion", "葱香牛脸肉", "파를 올린 소 볼살"), T("Choose salt or sweet soy sauce (tare).", "可选盐味或甜酱油（酱汁）。", "소금 또는 달콤한 간장 양념 중 선택."), "b"],
+  ["kaino", "beef", "カイノミ（希少部位）", 1880, T("Kainomi (rare flank cut)", "牛腹肉（稀有部位）", "카이노미 (희소 부위)"), T("A small cut near the flank. Tender with a rich beef flavor.", "靠近腹部的少量部位，柔软，牛肉味浓。", "옆구리 근처의 소량 부위. 부드럽고 진한 맛."), "b"],
+  ["harami", "beef", "ハラミ", 1800, T("Harami (skirt steak)", "牛横膈膜肉（Harami）", "하라미 (안창살)"), T("Juicy and tender. A favorite in Japan.", "多汁柔嫩，日本人的最爱。", "육즙이 많고 부드러워 일본에서 인기."), "b star"],
+  ["jkalbi", "beef", "上カルビ", 1800, T("Premium kalbi (short rib)", "特级牛五花（Kalbi）", "특상 갈비살"), T("Well-marbled rib meat. Rich and sweet.", "油花丰富的肋条肉，香甜浓郁。", "마블링이 좋은 갈비살. 고소하고 달큰해요."), "b star"],
+  ["kalbi", "beef", "カルビ", 1200, T("Kalbi (short rib)", "牛五花（Kalbi）", "갈비살"), null, "b"],
+  ["geta", "beef", "ゲタカルビ", 1300, T("Geta kalbi (rib finger meat)", "牛肋条肉", "게타 갈비 (늑간살)"), T("Meat from between the ribs. Chewy and full of flavor.", "肋骨之间的肉，有嚼劲，味道浓。", "갈비뼈 사이의 고기. 쫄깃하고 맛이 진해요."), "b"],
+  ["jrosu", "beef", "上ロース", 1800, T("Premium loin", "特级牛里脊", "특상 등심"), null, "b"],
+  ["rosu", "beef", "ロース", 1200, T("Loin", "牛里脊", "등심"), null, "b"],
+  ["kiri", "beef", "和牛切り落とし肉", 880, T("Wagyu offcuts", "和牛边角肉", "와규 자투리 고기"), T("Mixed wagyu trimmings at a low price. Limited each day.", "多种和牛边角肉，价格实惠。每日限量。", "여러 부위의 와규를 저렴하게. 매일 한정."), "b l"],
+
+  ["fam", "set", "牛泉ファミリーセット", 7000, T("GYUSEN family set", "牛泉家庭套餐", "규센 패밀리 세트"), T("Kalbi, loin, geta kalbi, 2 kinds of offal, sausage, grilled vegetables.", "牛五花、里脊、肋条肉、两种牛杂、香肠、烤蔬菜。", "갈비살, 등심, 게타 갈비, 내장 2종, 소시지, 구운 채소."), "b"],
+  ["famj", "set", "牛泉 上 ファミリーセット", 7500, T("GYUSEN premium family set", "牛泉特级家庭套餐", "규센 상(上) 패밀리 세트"), T("Premium kalbi, premium loin, geta kalbi, 2 kinds of offal, sausage, grilled vegetables.", "特级牛五花、特级里脊、肋条肉、两种牛杂、香肠、烤蔬菜。", "특상 갈비살, 특상 등심, 게타 갈비, 내장 2종, 소시지, 구운 채소."), "b"],
+  ["famt", "set", "牛泉 特 ファミリーセット", 8000, T("GYUSEN special family set", "牛泉特选家庭套餐", "규센 특(特) 패밀리 세트"), T("Harami, premium kalbi, premium loin, 2 kinds of offal, sausage, grilled vegetables.", "横膈膜肉、特级牛五花、特级里脊、两种牛杂、香肠、烤蔬菜。", "하라미, 특상 갈비살, 특상 등심, 내장 2종, 소시지, 구운 채소."), "b"],
+  ["dx", "set", "牛泉DXセット", 9500, T("GYUSEN DX set", "牛泉豪华套餐", "규센 DX 세트"), T("The shop's most popular cuts on one plate: harami, premium kalbi, premium loin, geta kalbi, premium rumen, large intestine, abomasum, sausage.", "店里最受欢迎的部位一盘集齐：横膈膜肉、特级牛五花、特级里脊、肋条肉、特级毛肚、牛大肠、皱胃、香肠。", "가게의 인기 부위를 한 접시에: 하라미, 특상 갈비살, 특상 등심, 게타 갈비, 특상 양, 대창, 막창, 소시지."), "b star"],
+
+  ["kokoro", "offal", "ココロ", 780, T("Heart", "牛心", "염통"), null, "b"],
+  ["urute", "offal", "ウルテ", 780, T("Windpipe cartilage (crunchy)", "牛气管软骨（脆）", "오돌뼈 (기관 연골)"), null, "b"],
+  ["ysen", "offal", "焼きセン", 780, T("Omasum, 3rd stomach (grilled)", "牛百叶（烤）", "천엽 (구이)"), null, "b"],
+  ["liver", "offal", "焼きレバー", 780, T("Liver (grilled)", "牛肝（烤）", "간 (구이)"), null, "b"],
+  ["toro", "offal", "トロテッチャン", 780, T("Fatty large intestine", "肥牛大肠", "기름진 대창"), null, "b"],
+  ["kori", "offal", "コリコリ", 780, T("Aorta (crunchy)", "牛心管（脆）", "심장 혈관 (오독오독)"), null, "b"],
+  ["akatan", "offal", "赤タン", 780, T("Lean tongue", "牛舌（瘦肉部分）", "우설 (살코기 부위)"), null, "b"],
+  ["mino", "offal", "上ミノ", 950, T("Premium rumen, 1st stomach", "特级毛肚（瘤胃）", "특상 양 (첫 번째 위)"), null, "b"],
+  ["akasen", "offal", "赤セン", 950, T("Abomasum, 4th stomach", "牛皱胃", "막창 (네 번째 위)"), null, "b"],
+  ["maru", "offal", "マルチョー", 950, T("Small intestine (round cut)", "牛小肠（圆切）", "곱창 (둥근 컷)"), null, "b"],
+  ["tecchan", "offal", "テッチャン", 950, T("Large intestine", "牛大肠", "대창"), null, "b"],
+  ["hset", "offal", "ホルモンセット（おまかせ三種盛り）", 1480, T("Offal platter, 3 kinds (chef's choice)", "牛杂拼盘（主厨精选三种）", "내장 모둠 3종 (주방장 추천)"), T("A good way to try horumon for the first time.", "第一次吃牛杂的好选择。", "내장을 처음 먹어 보는 분께 좋아요."), "b star"],
+
+  ["pbara", "grill", "国産豚バラ", 780, T("Japanese pork belly", "国产猪五花", "국산 삼겹살"), null, "p"],
+  ["tontoro", "grill", "トントロ", 580, T("Pork jowl", "猪颈肉", "항정살"), null, "p"],
+  ["tori", "grill", "国産若鶏", 580, T("Japanese young chicken", "国产嫩鸡", "국산 영계"), null, "c"],
+  ["ika", "grill", "イカ", 680, T("Squid", "鱿鱼", "오징어"), null, "s"],
+  ["hotate", "grill", "ホタテ", 680, T("Scallop", "扇贝", "가리비"), null, "s"],
+  ["ebi", "grill", "エビ", 880, T("Shrimp", "虾", "새우"), null, "s"],
+  ["kaisen", "grill", "海鮮盛り", 1980, T("Seafood platter", "海鲜拼盘", "해산물 모둠"), T("Squid, scallop and shrimp.", "鱿鱼、扇贝、虾。", "오징어, 가리비, 새우."), "s"],
+  ["wiener", "grill", "ウインナー", 480, T("Sausage", "香肠", "비엔나 소시지"), null, "p"],
+  ["chorizo", "grill", "チョリソー", 480, T("Chorizo (spicy sausage)", "辣味香肠", "초리소 (매운 소시지)"), null, "p h"],
+  ["yasai", "grill", "焼き野菜", 580, T("Grilled vegetables", "烤蔬菜", "구운 채소"), null, ""],
+  ["ninniku", "grill", "にんにくホイル", 480, T("Garlic in foil", "锡纸烤蒜", "마늘 호일구이"), null, ""],
+
+  ["samgyu", "special", "牛泉サムギョプサル", 1280, T("Samgyeopsal (pork belly wraps)", "韩式五花肉包菜", "규센 삼겹살"), T("5 slices of Japanese pork belly, namul, green onion, meat miso and 5 lettuce leaves. Wrap and eat.", "5片国产猪五花、拌菜、葱、肉味噌、5片生菜。包起来吃。", "국산 삼겹살 5장, 나물, 파, 고기 된장, 상추 5장. 싸서 드세요."), "p star"],
+  ["top_c", "special", "サムギョプサル追加トッピング", [["チーズ", 250, T("cheese", "芝士", "치즈")], ["にんにく", 250, T("garlic", "大蒜", "마늘")], ["キムチ", 250, T("kimchi", "泡菜", "김치")]], T("Samgyeopsal topping", "五花肉加料", "삼겹살 추가 토핑"), null, ""],
+  ["motsu", "special", "牛泉ピリ辛もつ鍋", 3980, T("Spicy offal hot pot", "牛泉香辣牛杂锅", "규센 매콤 곱창전골"), T("Offal, kimchi, cabbage, chives, bean sprouts, tofu and onion. Book in advance.", "牛杂、泡菜、卷心菜、韭菜、豆芽、豆腐、洋葱。需提前预约。", "내장, 김치, 양배추, 부추, 숙주, 두부, 양파. 미리 예약하세요."), "b h r pp"],
+  ["shime", "special", "もつ鍋の〆", [["麺", 380, T("noodles", "面", "면")], ["リゾット", 380, T("risotto", "烩饭", "리조또")]], T("Finish the hot pot", "锅底收尾", "전골 마무리"), T("Add noodles or rice to the leftover soup.", "在剩下的汤里加面或米饭。", "남은 국물에 면이나 밥을 넣어요."), ""],
+  ["kimo", "special", "炙りキモ", 980, T("Seared liver", "炙烤牛肝", "살짝 구운 간"), null, "b"],
+  ["yukke", "special", "炙りユッケ", 1280, T("Seared yukhoe (Korean beef tartare)", "炙烤韩式生拌牛肉", "살짝 구운 육회"), null, "b"],
+
+  ["ishiyaki", "rice", "石焼ビビンバ", [["", 1190, T("", "", "")], ["チーズのせ", 1340, T("with cheese", "加芝士", "치즈 추가")]], T("Stone-pot bibimbap", "石锅拌饭", "돌솥비빔밥"), T("Served sizzling. Mix well and let the rice crisp at the bottom.", "热石锅上桌。拌匀，让锅底的米饭变脆。", "뜨거운 돌솥에. 잘 비벼서 누룽지를 만들어요."), "b star"],
+  ["bibim", "rice", "ビビンバ", 850, T("Bibimbap", "拌饭", "비빔밥"), null, ""],
+  ["kuppa", "rice", "クッパ", 800, T("Gukbap (rice in soup)", "汤泡饭", "국밥"), null, ""],
+  ["ykuppa", "rice", "ユッケジャンクッパ", 1080, T("Spicy beef soup with rice", "辣牛肉汤泡饭", "육개장 국밥"), null, "b h"],
+  ["tamameshi", "rice", "たまごめし", 450, T("Egg rice", "鸡蛋饭", "계란밥"), null, ""],
+  ["rice", "rice", "ライス", [["大", 380, T("large", "大", "대")], ["中", 300, T("medium", "中", "중")], ["小", 250, T("small", "小", "소")]], T("Rice", "米饭", "공기밥"), null, ""],
+  ["reimen", "rice", "冷麺", 880, T("Cold noodles (naengmyeon)", "冷面", "냉면"), null, ""],
+
+  ["umadore", "side", "牛泉うまドレサラダ", 750, T("Salad with house dressing", "牛泉招牌酱沙拉", "규센 특제 드레싱 샐러드"), null, ""],
+  ["tofukimchi", "side", "豆腐とキムチのサラダ", 750, T("Tofu and kimchi salad", "豆腐泡菜沙拉", "두부 김치 샐러드"), null, "h"],
+  ["choregi", "side", "チョレギサラダ", 750, T("Korean-style green salad", "韩式生菜沙拉", "겉절이 샐러드"), null, ""],
+  ["kimchi", "side", "キムチ", [["白菜", 480, T("cabbage", "白菜", "배추")], ["大根", 480, T("radish", "萝卜", "깍두기")], ["キュウリ", 480, T("cucumber", "黄瓜", "오이")], ["レンコン", 480, T("lotus root", "莲藕", "연근")]], T("Kimchi", "泡菜", "김치"), null, "h"],
+  ["kmori", "side", "キムチ盛合わせ", 880, T("Kimchi platter", "泡菜拼盘", "김치 모둠"), null, "h"],
+  ["chijimi", "side", "チヂミ", [["海鮮", 880, T("seafood", "海鲜", "해물")], ["チーズ", 880, T("cheese", "芝士", "치즈")], ["キムチ", 880, T("kimchi", "泡菜", "김치")]], T("Korean pancake (jeon)", "韩式煎饼", "전"), null, ""],
+  ["namul", "side", "自家製ナムル", 680, T("Homemade namul", "自制拌菜", "수제 나물"), null, ""],
+  ["tannikomi", "side", "牛タン煮込み", 480, T("Simmered beef tongue", "炖牛舌", "우설 조림"), null, "b"],
+  ["suji", "side", "すじ煮込み", 480, T("Simmered beef tendon", "炖牛筋", "소 힘줄 조림"), null, "b"],
+  ["sujipon", "side", "すじポン", 480, T("Beef tendon with ponzu", "牛筋配柚子醋", "폰즈 소 힘줄"), null, "b"],
+  ["namasen", "side", "生セン", 780, T("Chilled omasum with sauce", "凉拌牛百叶", "차가운 천엽 무침"), null, "b"],
+  ["nori", "side", "韓国のり", 380, T("Korean seaweed", "韩国海苔", "김"), null, ""],
+  ["chisha", "side", "チシャ", 480, T("Lettuce for wrapping meat", "包肉用生菜", "쌈 채소 (상추)"), null, ""],
+  ["salad2", "side", "サービスサラダ（追加分）", 480, T("Extra house salad", "追加沙拉", "서비스 샐러드 추가"), null, ""],
+
+  ["egg", "soup", "たまごスープ", 480, T("Egg soup", "鸡蛋汤", "계란국"), null, ""],
+  ["wakame", "soup", "わかめスープ", 480, T("Seaweed soup", "海带汤", "미역국"), null, ""],
+  ["wakatama", "soup", "わかたまスープ", 530, T("Seaweed and egg soup", "海带鸡蛋汤", "미역 계란국"), null, ""],
+  ["yukkejang", "soup", "ユッケジャンスープ", 880, T("Spicy beef soup (yukgaejang)", "辣牛肉汤", "육개장"), null, "b h"],
+  ["motsukonabe", "soup", "もつ小鍋", 1080, T("Small offal hot pot", "小份牛杂锅", "작은 곱창전골"), T("Add risotto at the end for ¥480.", "最后可加烩饭 ¥480。", "마지막에 리조또 추가 ¥480."), "b"],
+
+  ["nama", "drink", "生ビール", [["大", 800, T("large", "大杯", "대")], ["中", 600, T("medium", "中杯", "중")], ["小", 450, T("small", "小杯", "소")]], T("Draft beer (Asahi Super Dry)", "生啤（朝日 Super Dry）", "생맥주 (아사히 슈퍼드라이)"), null, ""],
+  ["bin", "drink", "瓶ビール（中）", 600, T("Bottled beer (Asahi)", "瓶装啤酒（朝日）", "병맥주 (아사히)"), null, ""],
+  ["zero", "drink", "アサヒスーパードライゼロ", 580, T("Non-alcoholic beer", "无酒精啤酒", "무알코올 맥주"), null, ""],
+  ["high", "drink", "ハイボール", 500, T("Highball (whisky soda)", "嗨棒（威士忌苏打）", "하이볼"), null, ""],
+  ["chuhai", "drink", "酎ハイ", [["レモン", 480, T("lemon", "柠檬", "레몬")], ["ライム", 480, T("lime", "青柠", "라임")], ["カルピス", 480, T("Calpis", "可尔必思", "칼피스")], ["ゆず", 480, T("yuzu", "柚子", "유자")], ["シークワーサー", 480, T("shikuwasa citrus", "冲绳香柠", "시쿠와사")]], T("Chuhai (shochu soda)", "烧酒苏打（Chuhai）", "추하이"), null, ""],
+  ["umeshu", "drink", "梅酒", [["ロック", 700, T("on the rocks", "加冰", "온더록")], ["ソーダ割", 700, T("with soda", "加苏打", "소다")]], T("Plum wine (umeshu)", "梅酒", "매실주"), null, ""],
+  ["cassis", "drink", "カクテル", [["カシスソーダ", 600, T("cassis soda", "黑加仑苏打", "카시스 소다")], ["カシスオレンジ", 600, T("cassis orange", "黑加仑橙汁", "카시스 오렌지")], ["レッドアイ", 600, T("red eye (beer + tomato)", "红眼（啤酒+番茄）", "레드아이")]], T("Cocktail", "鸡尾酒", "칵테일"), null, ""],
+  ["shochu", "drink", "焼酎", [["いいちこ", 500, T("Iichiko (barley)", "iichiko（大麦）", "이이치코 (보리)")], ["二階堂", 500, T("Nikaido (barley)", "二阶堂（大麦）", "니카이도 (보리)")], ["黒霧島", 500, T("Kurokirishima (sweet potato)", "黑雾岛（红薯）", "구로키리시마 (고구마)")], ["白波", 500, T("Shiranami (sweet potato)", "白波（红薯）", "시라나미 (고구마)")]], T("Shochu", "烧酒", "소주 (일본)"), null, ""],
+  ["makgeolli", "drink", "マッコリ", 1500, T("Makgeolli", "马格利酒", "막걸리"), null, ""],
+  ["sake1", "drink", "日本酒（一合）", [["菊正宗", 600, T("Kikumasamune", "菊正宗", "기쿠마사무네")], ["剣菱", 700, T("Kenbishi", "剑菱", "겐비시")]], T("Sake (180 ml)", "日本酒（一合 180ml）", "사케 (180ml)"), null, ""],
+  ["sake2", "drink", "冷酒 一献", [["獺祭", 1000, T("Dassai", "獭祭", "닷사이")], ["田酒", 1000, T("Denshu", "田酒", "덴슈")], ["花邑", 1000, T("Hanaomoi", "花邑", "하나오모이")], ["寫樂", 1000, T("Sharaku", "写乐", "샤라쿠")]], T("Premium cold sake (one glass)", "精选冷酒（一杯）", "프리미엄 냉주 (한 잔)"), null, "star"],
+  ["soft", "drink", "ソフトドリンク", [["緑茶", 300, T("green tea", "绿茶", "녹차")], ["オレンジ", 300, T("orange", "橙汁", "오렌지")], ["コーラ", 300, T("cola", "可乐", "콜라")], ["ジンジャエール", 300, T("ginger ale", "姜汁汽水", "진저에일")], ["烏龍茶", 200, T("oolong tea", "乌龙茶", "우롱차")]], T("Soft drinks", "软饮料", "소프트드링크"), null, ""],
+  ["nonsour", "drink", "ノンアルコールサワー", [["レモン", 450, T("lemon", "柠檬", "레몬")], ["ゆず", 450, T("yuzu", "柚子", "유자")]], T("Non-alcoholic sour", "无酒精沙瓦", "무알코올 사와"), null, ""],
+];
+
+// ---------- PETANKO (from the shop's menu; prices as printed) ----------
+const PET_SECTIONS = [
+  ["pick", { en: "Top picks", zh: "推荐", ko: "추천", ja: "おすすめ" }],
+  ["okono", { en: "Okonomiyaki", zh: "大阪烧", ko: "오코노미야키", ja: "お好み焼" }],
+  ["noodle", { en: "Yakisoba · yaki-udon", zh: "炒面 · 炒乌冬", ko: "야키소바 · 야키우동", ja: "そば・うどん" }],
+  ["teppan", { en: "Teppanyaki (iron-griddle dishes)", zh: "铁板烧", ko: "철판구이", ja: "鉄板焼" }],
+  ["drink", { en: "Drinks", zh: "饮料", ko: "음료", ja: "お飲み物" }],
+];
+const NOODLE = (p) => [["そば", p, T("yakisoba (wheat noodles)", "炒面（小麦面）", "야키소바 (밀가루 면)")], ["うどん", p, T("yaki-udon (thick noodles)", "炒乌冬（粗面）", "야키우동 (굵은 면)")]];
+const PET = [
+  ["sp", "okono", "スペシャル焼", 1580, T("Special okonomiyaki", "特制大阪烧", "스페셜 오코노미야키"), T("Pork, squid, shrimp, scallop, beef and mochi. Everything in one.", "猪肉、鱿鱼、虾、干贝、牛肉、年糕，全部都有。", "돼지고기, 오징어, 새우, 관자, 소고기, 떡. 전부 들어 있어요."), "p s b star"],
+  ["pizza", "okono", "ピザ風焼", 1420, T("Pizza-style okonomiyaki", "披萨风味大阪烧", "피자풍 오코노미야키"), T("Pork, squid, cheese, green pepper and onion.", "猪肉、鱿鱼、芝士、青椒、洋葱。", "돼지고기, 오징어, 치즈, 피망, 양파."), "p s"],
+  ["mix", "okono", "ミックス焼", 1100, T("Mixed okonomiyaki", "什锦大阪烧", "믹스 오코노미야키"), T("Pork, squid and shrimp.", "猪肉、鱿鱼、虾。", "돼지고기, 오징어, 새우."), "p s"],
+  ["cheese", "okono", "チーズ焼", 1000, T("Cheese okonomiyaki", "芝士大阪烧", "치즈 오코노미야키"), T("Pork, squid and cheese.", "猪肉、鱿鱼、芝士。", "돼지고기, 오징어, 치즈."), "p s"],
+  ["kimchi", "okono", "キムチ焼", 1000, T("Kimchi okonomiyaki", "泡菜大阪烧", "김치 오코노미야키"), T("Pork, squid and kimchi.", "猪肉、鱿鱼、泡菜。", "돼지고기, 오징어, 김치."), "p s h"],
+  ["modan", "okono", "モダン焼", 1100, T("Modan-yaki (with noodles)", "摩登烧（夹炒面）", "모단야키 (면이 들어간)"), T("Okonomiyaki layered with yakisoba noodles. Pork and squid.", "大阪烧里夹着炒面，有猪肉和鱿鱼。", "야키소바 면을 넣은 오코노미야키. 돼지고기와 오징어."), "p s star"],
+  ["petanko", "okono", "ペタンコ焼", 870, T("PETANKO-yaki (house special)", "招牌 PETANKO 烧", "페탄코야키 (가게 대표 메뉴)"), T("The shop's namesake. Pork, squid and mochi, pressed flat on the griddle.", "店名同名招牌。猪肉、鱿鱼、年糕，在铁板上压平烤制。", "가게 이름을 딴 대표 메뉴. 돼지고기, 오징어, 떡을 철판에 납작하게 눌러 구워요."), "p s star"],
+  ["kaibashira", "okono", "貝柱玉", 920, T("Scallop okonomiyaki", "干贝大阪烧", "관자 오코노미야키"), null, "s"],
+  ["kakibuta", "okono", "カキブタ玉", 1100, T("Oyster & pork okonomiyaki", "牡蛎猪肉大阪烧", "굴 돼지고기 오코노미야키"), null, "s p"],
+  ["kaki", "okono", "カキ玉", 920, T("Oyster okonomiyaki", "牡蛎大阪烧", "굴 오코노미야키"), null, "s"],
+  ["niku", "okono", "肉玉", 870, T("Beef okonomiyaki", "牛肉大阪烧", "소고기 오코노미야키"), null, "b"],
+  ["ebi", "okono", "エビ玉", 870, T("Shrimp okonomiyaki", "虾大阪烧", "새우 오코노미야키"), null, "s"],
+  ["curry", "okono", "カレー玉", 870, T("Curry okonomiyaki", "咖喱大阪烧", "카레 오코노미야키"), null, ""],
+  ["buta", "okono", "ブタ玉", 800, T("Pork okonomiyaki (the classic)", "猪肉大阪烧（经典）", "돼지고기 오코노미야키 (기본)"), T("The standard Osaka order. A good first choice.", "大阪最经典的点法，第一次来就点它。", "오사카의 기본 메뉴. 처음이라면 이것부터."), "p star"],
+  ["ika", "okono", "イカ玉", 800, T("Squid okonomiyaki", "鱿鱼大阪烧", "오징어 오코노미야키"), null, "s"],
+  ["tako", "okono", "タコ玉", 800, T("Octopus okonomiyaki", "章鱼大阪烧", "문어 오코노미야키"), null, "s"],
+  ["negi", "okono", "ネギのせ（お好みプラス）", 200, T("Green onion topping (+¥200)", "加葱花（+¥200）", "파 토핑 추가 (+¥200)"), T("Add to any okonomiyaki.", "可加在任何大阪烧上。", "어느 오코노미야키에나 추가할 수 있어요."), ""],
+
+  ["nmix", "noodle", "ミックス", NOODLE(1100), T("Mixed", "什锦", "믹스"), T("Choose yakisoba (wheat noodles, not buckwheat) or yaki-udon.", "可选炒面（小麦面，不是荞麦）或炒乌冬。", "야키소바 (메밀이 아닌 밀가루 면) 또는 야키우동 중 선택."), "p s"],
+  ["nkakibuta", "noodle", "カキブタ", NOODLE(1100), T("Oyster & pork", "牡蛎猪肉", "굴 돼지고기"), null, "s p"],
+  ["nomu", "noodle", "オム", NOODLE(980), T("Omelet-wrapped", "蛋包", "오믈렛으로 감싼"), T("Noodles wrapped in a thin omelet.", "用薄蛋皮包着的炒面。", "얇은 달걀로 감싼 면."), "star"],
+  ["nkimchi", "noodle", "キムチ", NOODLE(950), T("Kimchi", "泡菜", "김치"), null, "h"],
+  ["ncurry", "noodle", "カレー", NOODLE(870), T("Curry", "咖喱", "카레"), null, ""],
+  ["nplain", "noodle", "焼", NOODLE(800), T("Classic", "经典", "기본"), null, ""],
+
+  ["iso", "teppan", "磯塩焼", 1470, T("Seafood mix, salt-grilled", "海鲜盐烤", "해산물 소금구이"), null, "s"],
+  ["oebi", "teppan", "大海老塩焼", 1470, T("Large prawns, salt-grilled", "大虾盐烤", "왕새우 소금구이"), null, "s"],
+  ["dice", "teppan", "サイコロステーキ", 1200, T("Diced steak", "骰子牛排", "깍둑 스테이크"), null, "b star"],
+  ["yakiniku", "teppan", "焼肉", 1100, T("Grilled sliced meat", "铁板烤肉片", "철판 고기구이"), null, "b"],
+  ["kaishio", "teppan", "貝柱塩焼", 1000, T("Scallops, salt-grilled", "干贝盐烤", "관자 소금구이"), null, "s"],
+  ["takoshio", "teppan", "タコ塩焼", 1000, T("Octopus, salt-grilled", "章鱼盐烤", "문어 소금구이"), null, "s"],
+  ["kakisauce", "teppan", "カキソース焼", 980, T("Oysters with sauce", "酱汁烤牡蛎", "굴 소스구이"), null, "s"],
+  ["kakimayo", "teppan", "カキマヨ焼", 980, T("Oysters with mayonnaise", "蛋黄酱烤牡蛎", "굴 마요구이"), null, "s"],
+  ["ikashio", "teppan", "イカ塩焼", 930, T("Squid, salt-grilled", "鱿鱼盐烤", "오징어 소금구이"), null, "s"],
+  ["aori", "teppan", "アオリイカ塩焼", 980, T("Bigfin reef squid, salt-grilled", "软丝（拟乌贼）盐烤", "흰꼴뚜기 소금구이"), null, "s"],
+  ["shoga", "teppan", "豚肉生姜焼", 880, T("Ginger pork", "姜汁猪肉", "돼지고기 생강구이"), null, "p"],
+  ["butakimchi", "teppan", "豚キムチ炒め", 880, T("Stir-fried pork & kimchi", "泡菜炒猪肉", "돼지 김치볶음"), null, "p h"],
+  ["yasai", "teppan", "野菜炒め", 880, T("Stir-fried vegetables", "炒蔬菜", "채소볶음"), null, ""],
+  ["shironegi", "teppan", "白ねぎ", 850, T("Grilled leeks", "烤大葱", "대파구이"), null, ""],
+  ["dashimaki", "teppan", "だし巻ポン酢", 750, T("Rolled omelet with ponzu", "日式高汤蛋卷配柚子醋", "다시마키 (계란말이) 폰즈"), null, ""],
+  ["butamoyashi", "teppan", "豚もやしポン酢", 750, T("Pork & bean sprouts with ponzu", "猪肉豆芽配柚子醋", "돼지고기 숙주 폰즈"), null, "p"],
+  ["butasauce", "teppan", "豚ソース焼", 750, T("Pork with sauce", "酱汁烤猪肉", "돼지고기 소스구이"), null, "p"],
+  ["butashio", "teppan", "豚塩焼", 750, T("Pork, salt-grilled", "盐烤猪肉", "돼지고기 소금구이"), null, "p"],
+  ["moyashi", "teppan", "もやし炒め", 700, T("Stir-fried bean sprouts", "炒豆芽", "숙주볶음"), null, ""],
+  ["ikaebimaki", "teppan", "イカ・エビ玉子巻", 950, T("Squid & shrimp omelet roll", "鱿鱼虾蛋卷", "오징어·새우 달걀말이"), null, "s"],
+  ["ikamaki", "teppan", "イカの玉子巻", 700, T("Squid omelet roll", "鱿鱼蛋卷", "오징어 달걀말이"), null, "s"],
+  ["ebimaki", "teppan", "エビの玉子巻", 700, T("Shrimp omelet roll", "虾蛋卷", "새우 달걀말이"), null, "s"],
+  ["butamaki", "teppan", "豚の玉子巻", 700, T("Pork omelet roll", "猪肉蛋卷", "돼지고기 달걀말이"), null, "p"],
+  ["seacheese", "teppan", "シーフードチーズ", 1100, T("Seafood & cheese", "海鲜芝士", "해산물 치즈"), null, "s"],
+  ["takocheese", "teppan", "タコチーズ", 1100, T("Octopus & cheese", "章鱼芝士", "문어 치즈"), null, "s"],
+  ["mentai", "teppan", "明太チーズ", 1100, T("Mentaiko (spicy cod roe) & cheese", "明太子芝士", "명란 치즈"), null, "s h"],
+  ["minogarlic", "teppan", "ミノガーリック", 1100, T("Beef tripe with garlic", "蒜香牛肚", "양 마늘구이"), null, "b"],
+  ["minotare", "teppan", "ミノたれ", 1100, T("Beef tripe with sauce", "酱汁牛肚", "양 양념구이"), null, "b"],
+  ["tonpei", "teppan", "トンペイ焼（豚入）", 600, T("Tonpei-yaki (pork omelet, Osaka style)", "猪肉蛋卷（大阪风味）", "돈페이야키 (오사카식 돼지고기 오믈렛)"), T("Pork wrapped in egg, topped with sauce and mayo. A cheap Osaka favorite.", "鸡蛋包猪肉，淋上酱汁和蛋黄酱。便宜又受欢迎的大阪小吃。", "달걀로 돼지고기를 감싸 소스와 마요를 뿌린 오사카 인기 메뉴."), "p star"],
+  ["enoki", "teppan", "えのきポン酢", 400, T("Enoki mushrooms with ponzu", "金针菇配柚子醋", "팽이버섯 폰즈"), null, ""],
+
+  ["nama", "drink", "生ビール", [["大", 750, T("large", "大杯", "대")], ["中", 580, T("medium", "中杯", "중")], ["小", 450, T("small", "小杯", "소")], ["ひとくち", 220, T("mini", "迷你杯", "미니")]], T("Draft beer", "生啤", "생맥주"), null, ""],
+  ["bin", "drink", "瓶ビール", 580, T("Bottled beer", "瓶装啤酒", "병맥주"), null, ""],
+  ["chuhai", "drink", "酎ハイ", 430, T("Chuhai (shochu soda)", "烧酒苏打（Chuhai）", "추하이"), null, ""],
+  ["sake", "drink", "日本酒", 430, T("Sake", "日本酒", "사케"), null, ""],
+  ["reishu", "drink", "冷酒", 770, T("Cold sake", "冷酒", "냉주"), null, ""],
+  ["suishin", "drink", "酔心", 530, T("Suishin (sake)", "醉心（日本酒）", "스이신 (사케)"), null, ""],
+  ["zima", "drink", "ジーマ", 580, T("ZIMA", "ZIMA", "지마"), null, ""],
+  ["reserve", "drink", "リザーブ", 750, T("Reserve (whisky)", "Reserve 威士忌", "리저브 (위스키)"), null, ""],
+  ["umeshu", "drink", "梅酒", [["水割", 550, T("with water", "兑水", "물 희석")], ["湯割", 550, T("with hot water", "兑热水", "뜨거운 물 희석")], ["ロック", 660, T("on the rocks", "加冰", "온더록")]], T("Plum wine (umeshu)", "梅酒", "매실주"), null, ""],
+  ["nonal", "drink", "ノンアルビール", 400, T("Non-alcoholic beer", "无酒精啤酒", "무알코올 맥주"), null, ""],
+  ["juice", "drink", "ジュース", 250, T("Juice", "果汁", "주스"), null, ""],
+  ["oolong", "drink", "ウーロン茶", 300, T("Oolong tea", "乌龙茶", "우롱차"), null, ""],
+  ["calpis", "drink", "カルピス", 330, T("Calpis", "可尔必思", "칼피스"), null, ""],
+];
+
+const COMMON_PHR = [
+  ["お会計お願いします", T("Check, please", "请结账", "계산해 주세요")],
+  ["取り皿をください", T("Extra plates, please", "请给我小盘子", "앞접시 주세요")],
+  ["お水をください", T("Water, please", "请给我水", "물 주세요")],
+  ["おすすめは何ですか？", T("What do you recommend?", "有什么推荐？", "추천 메뉴는 뭐예요?")],
+];
+const SHOPS = {
+  gyusen: {
+    name: "GYUSEN", jp: "牛泉", seal: "牛泉", sealClass: "",
+    kind: T("Yakiniku · Korean BBQ · grill it yourself", "烤肉 · 韩式烤肉 · 自己动手烤", "야키니쿠 · 한국식 고기구이 · 직접 구워요"), kindJa: "焼肉・韓国料理（自分で焼くスタイル）",
+    walk: 6, style: T("Charcoal grill", "炭火烤肉", "숯불구이"), styleJa: "炭火焼肉",
+    tax: T("All prices include tax", "价格均含税", "가격은 모두 세금 포함"), taxJa: "すべて税込価格",
+    sections: GYU_SECTIONS, items: GYU,
+    phrases: [...COMMON_PHR.slice(0, 1), ["網を替えてください", T("Please change the grill net", "请换烤网", "불판 바꿔 주세요")], ...COMMON_PHR.slice(1), ["辛くないものはどれですか？", T("Which ones are not spicy?", "哪些不辣？", "안 매운 건 뭐예요?")]],
+  },
+  petanko: {
+    name: "PETANKO", jp: "ぺたんこ", seal: "ぺた<br>んこ", sealClass: "okono",
+    kind: T("Osaka okonomiyaki · teppanyaki", "大阪烧 · 铁板烧", "오사카 오코노미야키 · 철판구이"), kindJa: "お好み焼・鉄板焼（大阪の味）",
+    walk: 7, style: T("Osaka-style griddle", "大阪风味铁板", "오사카식 철판"), styleJa: "大阪風味",
+    tax: T("Prices as on the shop menu", "价格以店内菜单为准", "가격은 가게 메뉴 기준"), taxJa: "価格はお店のメニューどおり",
+    sections: PET_SECTIONS, items: PET,
+    phrases: [...COMMON_PHR.slice(0, 1), ["焼いてもらえますか？", T("Could you cook it for us?", "可以帮我们烤吗？", "구워 주실 수 있나요?")], ...COMMON_PHR.slice(1), ["マヨネーズなしでお願いします", T("No mayonnaise, please", "请不要加蛋黄酱", "마요네즈 빼 주세요")]],
+  },
+};
+
+// ---------- state ----------
+const QS = new URLSearchParams(location.search);
+let lang = "en";
+try { const l = localStorage.getItem("eats-lang"); if (l && UI[l]) lang = l; } catch (e) {}
+if (UI[QS.get("l")]) lang = QS.get("l"); // ゲスト案内で選んでいる言語を優先
+let shopId = SHOPS[QS.get("shop")] ? QS.get("shop") : "gyusen";
+const carts = { gyusen: new Map(), petanko: new Map() }; // key "id|opt" -> qty
+const shop = () => SHOPS[shopId];
+const cartNow = () => carts[shopId];
+const $ = (id) => document.getElementById(id);
+const yen = (n) => "¥" + n.toLocaleString("en-US");
+const L3 = (o, ja) => (lang === "ja" ? ja : o[lang]);
+const walkTxt = (m) => ({ en: `${m} min walk`, zh: `步行${m}分钟`, ko: `도보 ${m}분`, ja: `徒歩${m}分` })[lang];
+
+function itemName(it) {
+  return lang === "ja" ? it[2] : it[4][lang];
+}
+function flagsOf(it) { return (it[6] || "").split(" ").filter(Boolean); }
+const isNoodle = (it) => it[1] === "noodle";
+
+let render = function () {
+  const u = UI[lang], S = shop();
+  document.documentElement.lang = lang === "zh" ? "zh-Hans" : lang;
+  $("langs").innerHTML = LANGS.map(([k, l]) => `<button type="button" data-l="${k}" aria-pressed="${k === lang}">${l}</button>`).join("");
+  $("shops").innerHTML = Object.entries(SHOPS).map(([k, x]) => `<button type="button" data-shop="${k}" aria-pressed="${k === shopId}">${x.name} ${x.jp}<small>${L3(x.kind, x.kindJa)}</small></button>`).join("");
+  $("topTitle").textContent = S.name;
+  $("seal").innerHTML = S.seal;
+  $("seal").className = "seal " + S.sealClass;
+  $("shopName").textContent = `${S.name} ${S.jp}`;
+  $("kind").textContent = L3(S.kind, S.kindJa);
+  $("facts").innerHTML = [`🚶 <b>${walkTxt(S.walk)}</b>`, `🔥 ${L3(S.style, S.styleJa)}`, `¥ ${L3(S.tax, S.taxJa)}`].map((f) => `<span class="fact">${f}</span>`).join("");
+  $("how").textContent = u.how;
+  $("note").textContent = u.note;
+  $("rail").innerHTML = S.sections.map(([k, n], i) => `<button type="button" data-s="${k}" aria-pressed="${i === 0}">${n[lang]}</button>`).join("");
+
+  const html = S.sections.map(([sec, n]) => {
+    const items = sec === "pick" ? S.items.filter((it) => flagsOf(it).includes("star")) : S.items.filter((it) => it[1] === sec);
+    const head = sec === "pick" ? `<h3>${n[lang]} <small>${u.pick.replace("★ ", "")}</small></h3>` : `<h3>${n[lang]}</h3>`;
+    return `<section class="sec" id="s-${sec}">${head}<div class="list">${items.map((it) => row(it, sec)).join("")}</div></section>`;
+  }).join("");
+  $("menu").innerHTML = html;
+  updateTray();
+}
+
+function row(it, sec) {
+  const u = UI[lang];
+  const f = flagsOf(it);
+  const opts = Array.isArray(it[3]);
+  const qtyAll = [...cartNow().entries()].filter(([k]) => k.split("|")[0] === it[0]).reduce((s, [, q]) => s + q, 0);
+  const tags = [];
+  if (f.includes("star") && sec !== "pick") tags.push(`<span class="tag star">★</span>`);
+  if (f.includes("h")) tags.push(`<span class="tag hot">🌶 ${u.hot}</span>`);
+  if (f.includes("r")) tags.push(`<span class="tag res">📞 ${u.res}</span>`);
+  if (f.includes("l")) tags.push(`<span class="tag hot">${u.lim}</span>`);
+  if (f.includes("pp")) tags.push(`<span class="tag">${u.pp}</span>`);
+  const meat = [["p", "🐖"], ["b", "🐄"], ["c", "🐓"], ["s", "🦐"]].filter(([k]) => f.includes(k)).map(([, e]) => e).join("");
+  if (meat) tags.unshift(`<span class="tag">${meat}</span>`);
+  const desc = it[5] && lang !== "ja" ? `<p class="desc">${it[5][lang]}</p>` : "";
+  const sub = lang === "ja" ? "" : `<div class="ja">${it[2]}</div>`;
+  let priceTxt, ctrl = "", optHtml = "";
+  if (opts) {
+    const ps = [...new Set(it[3].map((o) => o[1]))];
+    priceTxt = ps.length === 1 ? (it[3].length > 1 ? `${u.each} ` : "") + yen(ps[0]) : `${yen(Math.min(...ps))}–`;
+    optHtml = `<div class="opts">${it[3].map((o, i) => {
+      const k = `${it[0]}|${i}`; const q = cartNow().get(k) || 0;
+      const label = lang === "ja" ? (isNoodle(it) ? it[2] + o[0] : (o[0] || it[2])) : (o[2][lang] || itemName(it));
+      return `<button type="button" data-add="${k}">+ ${label}${ps.length > 1 ? `<span class="pp">${yen(o[1])}</span>` : ""}${q ? `<span class="q">${q}</span>` : ""}</button>`;
+    }).join("")}</div>`;
+  } else {
+    priceTxt = yen(it[3]);
+    const k = `${it[0]}|`; const q = cartNow().get(k) || 0;
+    ctrl = `<div class="ctrl">${q ? `<button type="button" data-sub="${k}" aria-label="−">−</button><span class="n">${q}</span>` : ""}<button type="button" class="add" data-add="${k}" aria-label="+">+</button></div>`;
+  }
+  return `<div class="item${f.includes("star") ? " rec" : ""}${qtyAll ? " in" : ""}">
+    <div class="name"><b>${itemName(it)}</b>${sub}</div><div class="price">${priceTxt}</div>
+    ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}${ctrl}${desc}${optHtml}</div>`;
+}
+
+function lines() {
+  const out = [];
+  for (const [k, q] of cartNow()) {
+    if (!q) continue;
+    const [id, oi] = k.split("|");
+    const it = shop().items.find((x) => x[0] === id);
+    let ja = it[2], price = it[3], local = itemName(it);
+    if (oi !== "") {
+      const o = it[3][+oi];
+      price = o[1];
+      if (o[0]) ja = isNoodle(it) ? it[2] + o[0] : `${it[2]}（${o[0]}）`;
+      if (lang !== "ja" && o[2][lang]) local = `${itemName(it)} · ${o[2][lang]}`;
+    }
+    out.push({ ja, price, q, local });
+  }
+  return out;
+}
+
+let updateTray = function () {
+  const u = UI[lang];
+  const L = lines();
+  const n = L.reduce((s, x) => s + x.q, 0);
+  const sum = L.reduce((s, x) => s + x.q * x.price, 0);
+  const b = $("trayBtn");
+  b.disabled = !n;
+  b.innerHTML = n ? `<span>${u.tray(n)}</span><span class="sum">${yen(sum)}</span>` : `<span>${u.tray0}</span>`;
+}
+
+function openStaff() {
+  const u = UI[lang];
+  const L = lines();
+  $("staffHint").textContent = u.hint;
+  $("closeStaff").textContent = u.close;
+  $("staffSub").textContent = `${u.sub} · ${shop().jp}`;
+  $("olist").innerHTML = L.map((x) => `<div class="orow"><b>${x.ja}</b><span class="qty">×${x.q}</span>${lang === "ja" ? "" : `<span class="sub">${x.local} · ${yen(x.price)}</span>`}</div>`).join("");
+  $("otlab").textContent = shopId === "gyusen" ? "合計（税込・目安）" : "合計（目安）";
+  $("otot").textContent = yen(L.reduce((s, x) => s + x.q * x.price, 0));
+  $("phrTitle").textContent = u.phr;
+  $("phrases").innerHTML = shop().phrases.map(([ja, t], i) => `<button type="button" data-p="${i}">${ja}${lang === "ja" ? "" : `<small>${t[lang]}</small>`}</button>`).join("");
+  $("staff").hidden = false;
+  $("staff").scrollTop = 0;
+}
+
+// ---------- events ----------
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.l) { lang = t.dataset.l; try { localStorage.setItem("eats-lang", lang); } catch (err) {} render(); return; }
+  if (t.dataset.shop) { shopId = t.dataset.shop; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.add) { const c = cartNow(); c.set(t.dataset.add, (c.get(t.dataset.add) || 0) + 1); rerenderKeepScroll(); return; }
+  if (t.dataset.sub) { const c = cartNow(); const q = (c.get(t.dataset.sub) || 0) - 1; if (q > 0) c.set(t.dataset.sub, q); else c.delete(t.dataset.sub); rerenderKeepScroll(); return; }
+  if (t.dataset.s) {
+    document.querySelectorAll("#rail button").forEach((b) => b.setAttribute("aria-pressed", b === t));
+    const el = $("s-" + t.dataset.s);
+    if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    return;
+  }
+  if (t.dataset.p !== undefined) {
+    const [ja, tr] = shop().phrases[+t.dataset.p];
+    $("bigText").textContent = ja;
+    $("bigSub").textContent = lang === "ja" ? "タップで戻る" : `${tr[lang]} · tap to close`;
+    $("big").hidden = false;
+    return;
+  }
+});
+$("trayBtn").addEventListener("click", openStaff);
+$("closeStaff").addEventListener("click", () => ($("staff").hidden = true));
+$("big").addEventListener("click", () => ($("big").hidden = true));
+
+function rerenderKeepScroll() {
+  const y = window.scrollY;
+  const rail = $("rail").scrollLeft;
+  const active = document.querySelector('#rail button[aria-pressed="true"]')?.dataset.s;
+  render();
+  window.scrollTo(0, y);
+  $("rail").scrollLeft = rail;
+  if (active) document.querySelectorAll("#rail button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.s === active));
+}
+
+// sample order so the first view shows how it works
+// 選んだものは、このタブの中だけで覚えておく (地図に戻って開き直しても消えない)
+const CK = "eats-cart-" + shopId;
+try { const v = JSON.parse(sessionStorage.getItem(CK) || "[]"); if (Array.isArray(v)) v.forEach(([k, q]) => q > 0 && cartNow().set(k, q)); } catch (e) {}
+const saveCart = () => { try { sessionStorage.setItem(CK, JSON.stringify([...cartNow()])); } catch (e) {} };
+const _upd = updateTray; updateTray = function () { _upd(); saveCart(); };
+$("back").addEventListener("click", () => { if (history.length > 1 && document.referrer.startsWith(location.origin)) history.back(); else location.href = QS.get("from") || "/g/lounge?s=map"; });
+const BACK = { en: "‹ Around us", zh: "‹ 周边", ko: "‹ 주변", ja: "‹ 周辺" };
+const _render = render; render = function () { _render(); $("back").textContent = BACK[lang]; document.title = `${shop().name} ${shop().jp} · Menu`; };
+render();
+</script>
+
+</body></html>

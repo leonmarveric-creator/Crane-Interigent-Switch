@@ -54,7 +54,13 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
         if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
         else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
       },
-      onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")) });
+      onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")),
+      // iPhone が音を止めていた (電話・Siri・画面オフのあとなど)。この声は iPad が代わりに鳴らす。画面に触れれば戻る
+      onBlocked: () => { if (Date.now() - blockedAt > 30000) { blockedAt = Date.now(); toast(t("🔇 スマホの音が止まっています。画面をタップすると ASTRAEA の声が戻ります（今は iPad が話します）")); } } });
+    let blockedAt = 0;
+    // 画面のどこかに触れたら音を戻す (iPhone は指で触れたときしか音を再開できない)
+    const reUnlock = () => unlockRemoteVoice();
+    document.addEventListener("pointerdown", reUnlock, true);
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     let warned = false;
     const iv = setInterval(async () => {
@@ -81,6 +87,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     return () => {
       live = false; clearTimeout(gT); rv.stop(); if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
       document.removeEventListener("visibilitychange", wake); lock?.release?.().catch?.(() => {});
+      document.removeEventListener("pointerdown", reUnlock, true);
       if (mRef.current.inBoost()) mRef.current.boostOut();
     };
   }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps

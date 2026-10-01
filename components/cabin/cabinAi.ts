@@ -34,7 +34,7 @@ export interface AiCtx {
   duck: (sec: number) => void;     // お父さんのスマホの音楽を下げる
   quiet: () => boolean;
   remote: () => boolean;           // 声はスマホから流す (iPad は音を消して長さだけ合わせる)
-  send: (url: string, text: string) => void; // スマホへ声を送る
+  send: (url: string, text: string) => Promise<boolean>; // スマホへ声を送る (スマホが鳴らし始めたら true)
   hasCheckin: () => boolean;       // チェックイン QR が登録されているか
   checkin: () => void;             // チェックイン QR を出す
   guide: () => void;               // 入り方ガイドを流す
@@ -76,9 +76,9 @@ export function createAi(c: AiCtx): Ai {
     if (speaking) return false;
     speaking = true; lastAny = Date.now();
     // お父さんのスマホの音楽を先に下げる (届くまで 3 秒ほど)
-    const rm = c.remote();
-    if (rm) { c.send(url, line.en); await new Promise((r) => setTimeout(r, 1100)); } // スマホが鳴らす (音楽もスマホで小さくする)
-    else if (opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
+    // スマホが鳴らす (音楽もスマホで小さくする)。返事が無ければ iPad が鳴らす
+    const rm = c.remote() ? await c.send(url, line.en) : false;
+    if (!rm && !c.remote() && opt.duck !== false) { c.duck(12); await new Promise((r) => setTimeout(r, 2600)); }
     const lang = c.state().lang;
     $("aiSub").innerHTML = [...line[lang]].map((ch, k) => `<span style="animation-delay:${k * 26}ms">${ch.replace(/[<&>]/g, "")}</span>`).join("");
     $("aiEn").textContent = lang === "en" ? "" : line.en;

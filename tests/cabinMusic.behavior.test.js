@@ -194,9 +194,14 @@ test("voices always play on iPad: every player is unlocked on the first tap and 
 
 test("voices come out of the phone (Bluetooth): iPad queues them, phone polls and plays; guides stay on the iPad", () => {
   const eng = read("components", "cabin", "cabinEngine.ts"), ai = read("components", "cabin", "cabinAi.ts");
-  assert.match(eng, /const remote = \(\) => !!trip && !trip\.id\.startsWith\("demo"\) && Date\.now\(\) - phoneSeen < 12000/, "falls back to the iPad when the phone is not polling");
-  assert.match(eng, /hooks\.onSay\?\.\(trip!\.id, AUDIO \+ k \+ "\.mp3", ""\)/);
-  assert.match(ai, /if \(rm\) \{ c\.send\(url, line\.en\)/);
+  assert.match(eng, /const remote = \(\) => !!trip && !trip\.id\.startsWith\("demo"\) && Date\.now\(\) - phoneSeen < 12000 && \(hooks\.phoneOk\?\.\(\) \?\? true\)/, "falls back to the iPad when the phone is not polling");
+  assert.match(eng, /const rm = await viaPhone\(AUDIO \+ k \+ "\.mp3", ""\)/);
+  assert.match(eng, /hooks\.onSay\?\.\(trip\.id, url, text\)/);
+  // スマホが鳴らせなかった声は iPad が鳴らす (返事 = voice_ack を待つ)
+  assert.match(read("components", "cabin", "CabinApp.tsx"), /peek=1/, "iPad waits for the phone's ack, else plays it itself");
+  assert.ok(read("supabase", "migration_cabin_voice_ack.sql").includes("voice_ack"));
+  assert.match(read("lib", "remoteVoice.ts"), /ready=\$\{voiceReady\(\) \? 1 : 0\}/, "phone only claims the voice when its audio can play");
+  assert.match(ai, /const rm = c\.remote\(\) \? await c\.send\(url, line\.en\) : false/);
   assert.match(read("app", "api", "cabin", "state", "route.ts"), /b\.op === "say"/);
   assert.match(read("app", "api", "cabin", "voice", "route.ts"), /voice_seen/);
   assert.match(read("components", "driver", "DriverCabin.tsx"), /startRemoteVoice\(trip\.id/);
@@ -229,7 +234,7 @@ test("room lock guide (spring / autumn / winter): button on the arrival screen, 
   assert.match(read("components", "cabin", "cabinLock.ts"), /room: \(\) => \{ code: string \| null; name: string \}/);
   // ブーストの効果音もスマホから (音はそのまま)
   assert.match(e, /const sfx = \(k: string\) => \{ if \(remote\(\)\) \{ hooks\.onSay\?\.\(trip!\.id, AUDIO \+ k \+ "\.mp3", SFX_MARK\)/);
-  assert.match(read("components", "cabin", "cabinDeadhead.ts"), /if \(c\.remote\(\)\) \{ c\.say\(u, SFX_MARK\)/);
+  assert.match(read("components", "cabin", "cabinDeadhead.ts"), /if \(c\.remote\(\)\) \{ void c\.say\(u, SFX_MARK\)/);
   assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) \{ void playFx/, "effects play at once on the phone, without ducking");
 });
 
@@ -245,7 +250,7 @@ test("Sky Gate boost music always returns to the normal song (voice ducking can'
   assert.match(c, /if \(\/\(en-boost-on\|dh\\\/boostIn\)\\\.mp3\$\/\.test\(u\)\) \{ clearTimeout\(gT\); if \(!mRef\.current\.inBoost\(\)\) boosting = mRef\.current\.boostIn\(300\); \}/, "boost music starts with the boost-on line");
   assert.match(c, /else if \(\/\(en-boost-off\|dh\\\/boostOut\)\\\.mp3\$\/\.test\(u\)\) \{ clearTimeout\(gT\); if \(mRef\.current\.inBoost\(\)\) \{ boosting = false; mRef\.current\.boostOut\(\); \} \}/, "fades out with the boost-complete line");
   assert.match(c, /rv\.ok\(\) \? 12000 : 5000/, "phone GPS only as a fallback when no voice comes from the iPad");
-  assert.match(read("lib", "remoteVoice.ts"), /try \{ h\.onPlay\?\.\(u\); \} catch/);
+  assert.match(read("lib", "remoteVoice.ts"), /try \{ h\.onPlay\?\.\(it\.u\); \} catch/);
   assert.match(m, /duck\(on: boolean\) \{ duckWanted\.current = on;/, "music level follows the voice after the switch");
 });
 
@@ -270,4 +275,14 @@ test("Crane Nest link: reservation QR with the booking's token, drop-off + passp
   assert.match(api, /\/\^\[a-f0-9\]\{24,128\}\$\/i\.test\(r\)/, "token format checked");
   assert.match(api, /guest: name \? name\.split\(\/\\s\+\/\)\[0\] : null/, "only the first name leaves the system");
   assert.ok(!/unlock_pin|keypad|guest_token:/.test(api.split("NextResponse.json({ ok: true")[1] || ""), "no secrets in the prefill answer");
+});
+
+test("guest guide: GYUSEN / PETANKO menus (4 languages + point-to-order) open from Around us; the map is the dark high-tech style", () => {
+  const menu = read("public", "eat", "menu.html"), g = read("lib", "nfcPage.ts");
+  assert.match(menu, /let shopId = SHOPS\[QS\.get\(\\?"shop\\?"\)\]/, "shop comes from ?shop=");
+  assert.match(menu, /gyusen: \{/); assert.match(menu, /petanko: \{/);
+  assert.ok(!/carts\.gyusen\.set\("tan2/.test(menu), "no sample order on the real page");
+  assert.match(g, /mn:\\"gyusen\\"/); assert.match(g, /mn:\\"petanko\\"/);
+  assert.match(g, /\/eat\/menu\.html\?shop=/, "menu button links to the menu page with the guest's language");
+  assert.match(g, /xyz\/pale\//, "guest map uses the pale tiles, styled dark");
 });

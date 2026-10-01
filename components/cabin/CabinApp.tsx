@@ -19,6 +19,7 @@ import { DH_LINES, dhAudio } from "@/lib/cabinDeadheadLines";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL, type GLang } from "@/lib/cabinGeo";
+import { SFX_MARK } from "@/lib/remoteVoice";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
 const POLL_MS = 3000;
@@ -64,6 +65,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const phoneAt = useRef<string>("");
   const tripRef = useRef<CabinTrip | null>(null);
   const trackRef = useRef<CabinTrack | null>(null);
+  const phoneMissUntil = useRef(0); // スマホが声の返事をしなかった → この時刻までは iPad が鳴らす
   const npWarned = useRef(false); // 再生中の曲 (曲名・カバー・歌詞)。変わったときだけサーバから来る
 
   /* ---------- 起動 ---------- */
@@ -80,6 +82,25 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         const routes = await (await fetch("/cabin/routes.json")).json();
         if (!live || !root.current || !host.current) return;
         if (!host.current.firstChild) host.current.innerHTML = TRIP_HTML;
+        /* 声をスマホへ送り、スマホが「鳴らし始めた」と返事をするまで最大 3.5 秒待つ。
+           返事が無ければ false (iPad が自分で鳴らす)。そのあと 20 秒はスマホに任せない (毎回待たないように) */
+        const sendVoice = async (id: string, u: string, s: string): Promise<boolean> => {
+          const r = await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "say", trip: id, u, s }) }).then((x) => x.json()).catch(() => null);
+          if (s === SFX_MARK) return true; // 効果音は返事を待たない
+          const n = Number(r?.n || 0);
+          if (!r?.ok || !n) { phoneMissUntil.current = Date.now() + 20000; return false; }
+          const until = Date.now() + 3500;
+          while (Date.now() < until) {
+            await new Promise((ok) => setTimeout(ok, 400));
+            const a = await fetch(`/api/cabin/voice?t=${id}&peek=1`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+            if (a?.ok && Number(a.ack) >= n) return true;
+            // 返事の列がまだ無い (migration_cabin_voice_ack.sql 未実行) → 今までどおりスマホに任せる
+            if (a && !a.ok && a.error === "SETUP_ACK") { await new Promise((ok) => setTimeout(ok, 700)); return true; }
+          }
+          phoneMissUntil.current = Date.now() + 20000;
+          return false;
+        };
+        const phoneOk = () => Date.now() > phoneMissUntil.current;
         eng.current = createEngine(root.current, routes, {
           onEnd: (id) => void endTrip(id),
           // 全画面の再生ボタン → お父さんのスマホへ
@@ -87,14 +108,15 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           // ゲストの「お部屋の明かりをつけて」→ 本物の照明
           onLights: (id) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "lights", trip: id }) }).catch(() => {}),
           // 声はスマホ (Bluetooth) から流す
-          onSay: (id, u, s) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "say", trip: id, u, s }) }).catch(() => {}),
+          onSay: (id, u, s) => sendVoice(id, u, s),
+          phoneOk,
         });
         // 回送モード (ゲストが乗っていない区間。お父さん向けの画面)
         const post = (b: any) => fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((x) => x.json()).catch(() => null);
         dhRef.current = createDeadhead({
           stage: root.current.querySelector(".stage") as HTMLElement, routes, ac: () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); void w.__dhAc.resume(); return w.__dhAc; } catch { return null; } },
-          remote: () => !!eng.current?.remoteVoice(),
-          say: (u, s) => { const id = tripRef.current?.id; if (id) void post({ op: "say", trip: id, u, s }); },
+          remote: () => !!eng.current?.remoteVoice() && phoneOk(),
+          say: (u, s) => { const id = tripRef.current?.id; return id ? sendVoice(id, u, s) : Promise.resolve(false); },
           board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else void poll(); },
           end: (id) => void endTrip(id, true),
         });

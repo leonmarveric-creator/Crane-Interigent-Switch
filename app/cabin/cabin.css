@@ -882,9 +882,28 @@
 .cab .stage.dh-on .scr,.cab .stage.dh-on .npfull{visibility:hidden}
 .cab .dhs{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr 1fr;gap:18px;padding:18px}
 .cab .dhmap{border-color:rgba(95,227,255,.45)!important;box-shadow:0 0 0 1px rgba(95,227,255,.15),0 0 40px rgba(47,143,255,.12)}
-.cab #dhMap{position:absolute;inset:0;z-index:0}
-.cab .dhmap .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.6) sepia(1) hue-rotate(170deg) saturate(2.2) contrast(1.1)}
-.cab .dhmap .tint{position:absolute;inset:0;z-index:400;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(3,8,20,.75))}
+/* 回送の地図: 濃紺のホログラム風 + 少し奥へ傾けた 3D 表示 + 方眼 + スキャン線 */
+.cab .dhmap{overflow:hidden;background:#020814}
+.cab #dhMap{position:absolute;inset:0;z-index:0;background:#020814;transform:perspective(1100px) rotateX(24deg) scale(1.32);transform-origin:50% 62%}
+/* 淡色地図は「白い道 + 薄い灰色の地面」。反転すると道も地面も暗くなるので、暗くしてからコントラストを上げて、道だけを光らせる */
+.cab .dhmap .leaflet-tile-pane{filter:grayscale(1) brightness(.5) contrast(12) sepia(1) hue-rotate(172deg) saturate(2.6) brightness(.55)}
+.cab .dhmap .leaflet-container{background:#020814}
+.cab .dhgrid{position:absolute;inset:0;z-index:399;pointer-events:none;opacity:.55;
+  background:linear-gradient(rgba(95,227,255,.07) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,rgba(95,227,255,.07) 1px,transparent 1px) 0 0/48px 48px;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 100%);mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 100%)}
+.cab .dhscan{position:absolute;left:0;right:0;top:0;height:28%;z-index:399;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(95,227,255,.07) 85%,rgba(95,227,255,.22) 100%);animation:cab-dhscan 5.5s linear infinite}
+@keyframes cab-dhscan{0%{transform:translateY(-100%)}100%{transform:translateY(360%)}}
+.cab .dhmap .tint{position:absolute;inset:0;z-index:400;pointer-events:none;background:linear-gradient(180deg,#020814 0,rgba(2,8,20,.85) 9%,rgba(2,8,20,0) 30%),radial-gradient(ellipse at 50% 60%,transparent 48%,rgba(2,6,17,.8) 100%)}
+.cab .dhcn{position:absolute;z-index:1001;width:26px;height:26px;pointer-events:none;border:2px solid #5fe3ff;opacity:.8;filter:drop-shadow(0 0 6px #5fe3ff)}
+.cab .dhcn.a{left:8px;top:8px;border-right:0;border-bottom:0;border-top-left-radius:8px}.cab .dhcn.b{right:8px;top:8px;border-left:0;border-bottom:0;border-top-right-radius:8px}
+.cab .dhcn.c{left:8px;bottom:8px;border-right:0;border-top:0;border-bottom-left-radius:8px}.cab .dhcn.d{right:8px;bottom:8px;border-left:0;border-top:0;border-bottom-right-radius:8px}
+.cab .dhgps{position:absolute;right:16px;bottom:96px;z-index:1000;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:6px 10px;border-radius:10px;background:rgba(2,8,20,.72);border:1px solid rgba(95,227,255,.28);font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;color:#8fe8ff;pointer-events:none}
+.cab .dhgps b{color:#46e08a;font-size:10px;letter-spacing:.3em;animation:cab-dhblink 1.4s steps(2) infinite}@keyframes cab-dhblink{50%{opacity:.35}}
+/* 道: 太い光の帯 + 流れる点線 (これから走る) + 白く光る線 (走った) */
+.cab .dhmap path.dhbg{filter:blur(4px)}
+.cab .dhmap path.dhflow{animation:cab-dhflow 1.1s linear infinite;filter:drop-shadow(0 0 4px #5fe3ff)}
+@keyframes cab-dhflow{to{stroke-dashoffset:-32}}
+.cab .dhmap path.dhdone2{filter:drop-shadow(0 0 5px #9ff0ff) drop-shadow(0 0 12px #2f8fff)}
 .cab .dhmap .hud{position:absolute;left:16px;right:16px;top:14px;display:flex;align-items:flex-start;gap:12px;z-index:1000}
 .cab .dhmap .eta b{color:#8fe8ff}
 .cab .dhpill{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0 auto;padding:8px 18px;border-radius:14px;background:rgba(4,10,22,.8);border:1px solid rgba(95,227,255,.45)}
@@ -894,10 +913,18 @@
 .cab .dhspd{padding:8px 14px;border-radius:14px;background:rgba(4,10,22,.8);border:1px solid rgba(95,176,255,.4);text-align:center}
 .cab .dhspd b{display:block;font:800 34px Rajdhani,ui-monospace,monospace;line-height:1;color:#fff}.cab .dhspd small{font-size:11px;color:#8fb2d9;letter-spacing:.2em}
 .cab .dh.over .dhspd{border-color:#ffb020}.cab .dh.over .dhspd b{color:#ffb020}
-.cab .dhcar{position:relative;width:0;height:0}.cab .dhcar b{position:absolute;left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;border:2px solid #5fe3ff;animation:cab-dhping 1.6s ease-out infinite}.cab .dhcar b:nth-child(2){animation-delay:.8s}
+.cab .dhcar{position:relative;width:0;height:0}
+.cab .dhcar u{position:absolute;left:-70px;top:-70px;width:140px;height:140px;border-radius:50%;background:conic-gradient(from 0deg,rgba(95,227,255,.45),rgba(95,227,255,0) 70deg,transparent);-webkit-mask:radial-gradient(circle,#000 0 69px,transparent 70px);mask:radial-gradient(circle,#000 0 69px,transparent 70px);box-shadow:inset 0 0 0 1px rgba(95,227,255,.25);animation:cab-dhsweep 2.6s linear infinite}
+@keyframes cab-dhsweep{to{transform:rotate(360deg)}}
+.cab .dhcar b{position:absolute;left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;border:2px solid #5fe3ff;animation:cab-dhping 1.6s ease-out infinite}.cab .dhcar b:nth-child(2){animation-delay:.8s}
 @keyframes cab-dhping{0%{transform:scale(.4);opacity:1}100%{transform:scale(2.6);opacity:0}}
 .cab .dhcar i{position:absolute;left:-15px;top:-18px;width:30px;height:36px;background:#e8f7ff;clip-path:polygon(50% 0,100% 100%,50% 76%,0 100%);filter:drop-shadow(0 0 8px #5fe3ff);transition:transform .6s}
-.cab .dhtgt i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border:4px solid #fff;transform:rotate(45deg);box-shadow:0 0 14px #5fe3ff;background:rgba(95,227,255,.3)}
+.cab .dhtgt{position:relative;width:0;height:0}
+.cab .dhtgt i{position:absolute;left:-13px;top:-13px;width:26px;height:26px;border:3px solid #fff;transform:rotate(45deg);box-shadow:0 0 14px #ffb020,inset 0 0 10px rgba(255,176,32,.6);background:rgba(255,176,32,.35);animation:cab-dhtg 2.4s ease-in-out infinite}
+@keyframes cab-dhtg{50%{transform:rotate(225deg)}}
+.cab .dhtgt s{position:absolute;left:-40px;top:-40px;width:80px;height:80px;border-radius:50%;border:2px solid rgba(255,176,32,.8);animation:cab-dhping 2.2s ease-out infinite}.cab .dhtgt s+s{animation-delay:1.1s}
+.cab .dhtgt em{position:absolute;left:22px;top:-34px;white-space:nowrap;padding:3px 9px;border-radius:6px;background:rgba(2,8,20,.85);border:1px solid #ffb020;font:800 11px ui-monospace,Menlo,monospace;letter-spacing:.25em;font-style:normal;color:#ffcf6a;box-shadow:0 0 12px rgba(255,176,32,.35)}
+.cab .dh.back .dhtgt i{box-shadow:0 0 14px #46e08a;background:rgba(70,224,138,.35)}.cab .dh.back .dhtgt s{border-color:rgba(70,224,138,.8)}.cab .dh.back .dhtgt em{border-color:#46e08a;color:#8ff5bd}
 .cab #dhStars{position:absolute;inset:0;width:100%;height:100%;z-index:450;opacity:0;transition:opacity .8s;pointer-events:none}
 .cab .dh.boost #dhStars{opacity:1}
 .cab .dhboost{position:absolute;inset:0;z-index:460;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;opacity:0;transition:opacity .5s}

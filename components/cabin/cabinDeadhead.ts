@@ -19,7 +19,7 @@ export interface DhCtx {
   routes: Record<string, [number, number][]>;
   ac: () => AudioContext | null;
   remote: () => boolean;                          // 声はスマホから
-  say: (url: string, text: string) => void;       // スマホへ声を送る
+  say: (url: string, text: string) => Promise<boolean>; // スマホへ声を送る (スマホが鳴らし始めたら true)
   board: (tripId: string) => void;                // ゲスト乗車
   end: (tripId: string) => void;                  // 帰着 (送迎を終わりに)
 }
@@ -32,7 +32,9 @@ const tfm = (d: Date) => d.toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo",
 const LIMIT = 80;
 
 const HTML = `<div class="dhs">
- <div class="map dhmap"><div id="dhMap"></div><div class="tint"></div>
+ <div class="map dhmap"><div id="dhMap"></div><div class="dhgrid"></div><div class="dhscan"></div><div class="tint"></div>
+  <i class="dhcn a"></i><i class="dhcn b"></i><i class="dhcn c"></i><i class="dhcn d"></i>
+  <div class="dhgps"><b>● GPS</b><span id="dhGps">-- N · -- E</span><span id="dhHd">HDG ---°</span></div>
   <div class="hud"><div class="eta"><small id="dhEtaL">迎え先まで あと</small><b id="dhEta">--<em>分</em></b><div class="km" id="dhKm">—</div></div>
    <div class="dhpill"><span class="dhtag" id="dhTag">回送中 · DEADHEAD</span><b id="dhRoute"></b></div>
    <div class="dhspd"><b id="dhSpd">0</b><small>km/h</small></div></div>
@@ -62,14 +64,18 @@ export function createDeadhead(c: DhCtx): Deadhead {
   const el = new Audio(); let Q: Promise<void> = Promise.resolve(), talking = false;
   function say(k: string) {
     const line = DH_LINES[k]; if (!line) return Q;
-    Q = Q.then(() => new Promise<void>((ok) => {
-      if (!onNow) return ok(); /* 回送が終わったあとに残っていたひと言は流さない */
+    Q = Q.then(async () => {
+      if (!onNow) return; /* 回送が終わったあとに残っていたひと言は流さない */
       $("dhJ").textContent = line.ja; $("dhE").textContent = line.en; $("dhSub").classList.add("talk"); talking = true;
-      const rm = c.remote(); if (rm) c.say(dhAudio(k), line.en);
-      const end = () => { talking = false; quietAt = Date.now(); $("dhSub").classList.remove("talk"); ok(); };
-      setTimeout(() => { el.muted = rm; el.src = dhAudio(k); el.onended = end; el.onerror = end; playSafe(el, () => c.ac(), end); }, rm ? 1100 : 0);
-      setTimeout(end, 18000);
-    }));
+      // スマホが鳴らし始めたら iPad は音を消して長さだけ合わせる。返事が無ければ iPad が鳴らす
+      const rm = c.remote() ? await c.say(dhAudio(k), line.en) : false;
+      await new Promise<void>((ok) => {
+        const end = () => { talking = false; quietAt = Date.now(); $("dhSub").classList.remove("talk"); ok(); };
+        if (!onNow) return end();
+        el.muted = rm; el.src = dhAudio(k); el.onended = end; el.onerror = end; playSafe(el, () => c.ac(), end);
+        setTimeout(end, 18000);
+      });
+    });
     return Q;
   }
   const once = (k: string) => { if (said[k]) return; said[k] = 1; void say(k); };
@@ -78,23 +84,26 @@ export function createDeadhead(c: DhCtx): Deadhead {
     g.gain.setValueAtTime(v, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + t + d); o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d + 0.05);
   };
   // 効果音もスマホから (スマホが来ていなければ iPad から)
-  const sfx = (u: string) => { if (c.remote()) { c.say(u, SFX_MARK); return; } const a = new Audio(u); a.play().catch(() => {}); };
+  const sfx = (u: string) => { if (c.remote()) { void c.say(u, SFX_MARK); return; } const a = new Audio(u); a.play().catch(() => {}); };
 
   /* ---------- 地図 ---------- */
   function ensureMap() {
     if (map) return;
     map = L.map($("dhMap"), { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, keyboard: false }).setView(CRANE_NEST, 13); // 先に表示位置を決めておく (未設定のまま線や車を足すと描けない)
+    // 地図は国土地理院 (淡色)。CSS で暗い青のホログラム風にして、少し奥へ傾ける (cabin.css の .dhmap)
     L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
-    L.polyline([CRANE_NEST, CRANE_NEST], { color: "#5fe3ff", weight: 12, opacity: 0.18, className: "dhbg" }).addTo(map);
-    done = L.polyline([CRANE_NEST], { color: "#eafaff", weight: 6 }).addTo(map);
-    dash = L.polyline([CRANE_NEST, CRANE_NEST], { color: "#5fe3ff", weight: 4, dashArray: "10 10" }).addTo(map);
-    tgt = L.marker(CRANE_NEST, { icon: L.divIcon({ className: "", html: '<div class="dhtgt"><i></i></div>' }) }).addTo(map);
-    car = L.marker(CRANE_NEST, { icon: L.divIcon({ className: "", html: '<div class="dhcar"><b></b><b></b><i id="dhCi"></i></div>' }) }).addTo(map);
+    L.polyline([CRANE_NEST, CRANE_NEST], { color: "#2f8fff", weight: 18, opacity: 0.22, className: "dhbg" }).addTo(map);
+    dash = L.polyline([CRANE_NEST, CRANE_NEST], { color: "#5fe3ff", weight: 5, opacity: 0.9, dashArray: "2 14", lineCap: "round", className: "dhflow" }).addTo(map);
+    done = L.polyline([CRANE_NEST], { color: "#eafaff", weight: 6, className: "dhdone2" }).addTo(map);
+    tgt = L.marker(CRANE_NEST, { icon: L.divIcon({ className: "", html: '<div class="dhtgt"><s></s><s></s><i></i><em id="dhTgL">PICKUP</em></div>' }) }).addTo(map);
+    car = L.marker(CRANE_NEST, { zIndexOffset: 1000, icon: L.divIcon({ className: "", html: '<div class="dhcar"><u></u><b></b><b></b><i id="dhCi"></i></div>' }) }).addTo(map);
   }
   function setRoute(pts: LL[]) {
     RT = pts.length > 1 ? pts : [pts[0], pts[0]]; CUM = [0]; for (let i = 1; i < RT.length; i++) CUM.push(CUM[i - 1] + dist(RT[i - 1], RT[i])); TOT = Math.max(1, CUM[CUM.length - 1]);
     map.eachLayer((l: any) => { if (l.options?.className === "dhbg") l.setLatLngs(RT); }); dash.setLatLngs(RT); done.setLatLngs([RT[0]]); tgt.setLatLng(RT[RT.length - 1]); car.setLatLng(RT[0]);
-    setTimeout(() => { map.invalidateSize(); map.fitBounds(L.latLngBounds(RT), { padding: [60, 60] }); }, 80);
+    const tl = document.getElementById("dhTgL"); if (tl) tl.textContent = back ? "HOME · CRANE NEST" : "PICKUP";
+    // 奥へ傾けているので、上は広め・下は狭めに余白をとる
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(L.latLngBounds(RT), { paddingTopLeft: [90, 150], paddingBottomRight: [90, 130] }); }, 80);
   }
   function project(p: LL) {
     let best = { d: 0, off: Infinity, hd: 0 }; const cx = Math.cos(p[0] * Math.PI / 180), R = 6371000, rad = Math.PI / 180;
@@ -206,6 +215,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
     if (!onNow || !trip) return; carLL = ll; kmh = Math.max(0, v ?? kmh);
     const p = project(ll); if (p.off < 200) prog = Math.max(prog, Math.min(1, p.d / TOT));
     car.setLatLng(ll); const ci = document.getElementById("dhCi"); if (ci && p.off < 200) ci.style.transform = `rotate(${p.hd}deg)`;
+    $("dhGps").textContent = `${ll[0].toFixed(4)} N · ${ll[1].toFixed(4)} E`; $("dhHd").textContent = `HDG ${String(Math.round((p.hd + 360) % 360)).padStart(3, "0")}°`;
     const k = Math.max(1, CUM.findIndex((x) => x >= prog * TOT)); done.setLatLngs([...RT.slice(0, k), ll]);
     if (Date.now() - lastPan > 1500) { lastPan = Date.now(); map.panTo(ll, { animate: true, duration: 0.6 }); if (map.getZoom() < 14) map.setZoom(15); }
     const rem = Math.max(0, (1 - prog) * TOT), toEnd = dist(ll, RT[RT.length - 1]), mins = Math.max(0, Math.round(rem / (38 / 3.6) / 60));

@@ -105,9 +105,11 @@ export async function POST(req: NextRequest) {
     if (e1) return J({ ok: false, error: /voice_q/.test(e1.message) ? "SETUP" : e1.message });
     if (!t || t.status !== "active") return J({ ok: false, error: "NO_TRIP" });
     const now = Date.now(), q = (Array.isArray((t as any).voice_q) ? (t as any).voice_q : []).filter((x: any) => x && now - Number(x.n) < 30000);
-    q.push({ n: Math.max(now, ...q.map((x: any) => Number(x.n) + 1)), u, s: String(b.s || "").slice(0, 300) });
+    const n = Math.max(now, ...q.map((x: any) => Number(x.n) + 1));
+    q.push({ n, u, s: String(b.s || "").slice(0, 300) });
     const { error } = await supabaseAdmin.from("cabin_trips").update({ voice_q: q.slice(-8) }).eq("id", b.trip);
-    return J(error ? { ok: false, error: error.message } : { ok: true });
+    // n はスマホの返事 (voice_ack) と照らし合わせるために返す
+    return J(error ? { ok: false, error: error.message } : { ok: true, n });
   }
   return J({ ok: false, error: "BAD_OP" }, 400);
 }

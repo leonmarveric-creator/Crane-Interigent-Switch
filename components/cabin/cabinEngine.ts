@@ -75,7 +75,7 @@ export interface Engine {
   setCheckin(url: string | null): void;
 }
 
-export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => void }): Engine {
+export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean }): Engine {
   const L = (window as any).L;
   const $ = (id: string) => root.querySelector("#" + id) as HTMLElement;
   const stage = root.querySelector(".stage") as HTMLElement;
@@ -128,15 +128,22 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const voice = new Audio(); let Q: Promise<void> = Promise.resolve();
   let voiceN = 0; // 道案内などの声が出ている (待っている) 数。AI はこの間は話さない
   /* 声はスマホ (Bluetooth で車のスピーカー) から流す。スマホが来ていないときだけ iPad から。
-     スマホで流すときも、iPad は音を消して同じ声を再生して、長さ (字幕・順番) を合わせる */
+     スマホで流すときも、iPad は音を消して同じ声を再生して、長さ (字幕・順番) を合わせる。
+     スマホが「鳴らした」と返事をしなければ (画面が消えている・電話中など)、iPad が自分で鳴らす */
   let phoneSeen = 0;
-  const remote = () => !!trip && !trip.id.startsWith("demo") && Date.now() - phoneSeen < 12000;
-  const REMOTE_LAG = 1100; // スマホが取りに来て鳴らすまでのおおよその遅れ
+  const remote = () => !!trip && !trip.id.startsWith("demo") && Date.now() - phoneSeen < 12000 && (hooks.phoneOk?.() ?? true);
+  /** スマホへ声を送り、スマホが鳴らし始めたら true (返事が無ければ false → iPad が鳴らす) */
+  const viaPhone = async (url: string, text: string) => {
+    if (!trip || !remote()) return false;
+    const r = await Promise.resolve(hooks.onSay?.(trip.id, url, text)).catch(() => false);
+    return r !== false;
+  };
   const say = (k: string) => {
     voiceN++;
     Q = Q.then(async () => {
       if (!trip) return; /* 送迎が終わったあとに残っていた声は流さない */
-      const rm = remote(); if (rm) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", ""); await new Promise((r) => setTimeout(r, REMOTE_LAG)); }
+      const rm = await viaPhone(AUDIO + k + ".mp3", "");
+      if (!trip) return;
       await new Promise<void>((r) => { voice.muted = rm; voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); playSafe(voice, () => ac(), () => r()); setTimeout(r, 15000); });
     }).then(() => { voiceN = Math.max(0, voiceN - 1); });
     return Q;
@@ -557,7 +564,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const ai = createAi({
     root, stage, ac, quiet: () => aiQuiet, voiceBusy: () => voiceN > 0,
     duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
-    remote, send: (url, text) => { if (trip) hooks.onSay?.(trip.id, url, text); },
+    remote, send: (url, text) => viaPhone(url, text),
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
     roomLights: () => { if (trip && !trip.id.startsWith("demo")) hooks.onLights?.(trip.id); setTimeout(roomLit, 2500); },
     roomLit: () => roomLit(),
