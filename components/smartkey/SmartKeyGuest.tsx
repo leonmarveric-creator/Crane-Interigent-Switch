@@ -53,7 +53,7 @@ export default function SmartKeyGuest({
     try {
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await res.json().catch(() => ({}));
-      return { ok: res.ok && j.ok !== false, error: j.error as string | undefined, distance: typeof j.distance === "number" ? j.distance : undefined };
+      return { ok: res.ok && j.ok !== false, error: j.error as string | undefined, distance: typeof j.distance === "number" ? j.distance : undefined, needName: j.needName === true };
     } catch {
       return { ok: false, error: "NETWORK" };
     }
@@ -97,7 +97,7 @@ export default function SmartKeyGuest({
         doors={data.roomSlug ? 2 : 1}
         roomPanelHref={roomPanelHref}
         onVerify={async (name, digits) => {
-          const r = await post(`${base}/verify`, { name, digits });
+          const r = await post(`${base}/verify`, name ? { name, digits } : { digits });
           if (r.ok) router.refresh();
           return r;
         }}

@@ -21,15 +21,17 @@ function clientIp(req: NextRequest): string {
 }
 
 /**
- * エントランスの本人確認。名前 + 電話番号の下4桁(= 予約の unlock_pin)を照合し、
+ * エントランスの本人確認。電話番号の下4桁(= 予約の unlock_pin)を照合し、
  * この棟に泊まる予約が見つかれば、エントランス用セッションと部屋用セッションを発行。
- * POST /api/key/[entrance]/verify   body: { name, digits }
+ * 名前は聞かない (チェックインのパスポート登録で入る)。同じ4桁の予約が重なって
+ * 決められないときだけ AMBIGUOUS (needName) を返し、画面で名前を聞いてもう一度送ってもらう。
+ * POST /api/key/[entrance]/verify   body: { digits, name? }
  */
 export async function POST(req: NextRequest, { params }: { params: { entrance: string } }) {
   const body = (await req.json().catch(() => ({}))) as { name?: string; digits?: string };
   const name = String(body.name ?? "").trim().slice(0, 60);
   const digits = String(body.digits ?? "").replace(/\D/g, "").slice(0, 6);
-  if (!name || digits.length < 4) {
+  if (digits.length < 4) {
     return NextResponse.json({ ok: false, error: "MISSING" }, { status: 400 });
   }
 
@@ -72,17 +74,19 @@ export async function POST(req: NextRequest, { params }: { params: { entrance: s
   const picked = pickReservation(candidates, { name, digits }, roomIds, now);
   if (!picked.ok) {
     if (picked.error === "BAD_CODE") await supabaseAdmin.from("pin_attempts").insert({ room_slug: ipKey });
-    await logEntrance({ entrance_id: entrance.id, guest_name: name, action: "verify_fail", success: false });
-    return NextResponse.json({ ok: false, error: picked.error }, { status: picked.error === "AMBIGUOUS" ? 409 : 401 });
+    await logEntrance({ entrance_id: entrance.id, guest_name: name || null, action: "verify_fail", success: false });
+    // 名前なしで決められない → 画面で名前を聞く (名前を入れても決まらなければサポートへ)
+    return NextResponse.json({ ok: false, error: picked.error, needName: picked.error === "AMBIGUOUS" && !name }, { status: picked.error === "AMBIGUOUS" ? 409 : 401 });
   }
 
   const r = picked.reservation;
   const room = rooms.find((x) => x.id === effectiveRoomId(r));
   await supabaseAdmin.from("pin_attempts").delete().eq("room_slug", ipKey);
+  // 名前を入力したとき (4桁が重なったとき) だけ保存する
   await supabaseAdmin.from("reservations")
-    .update({ entrance_name: name, entrance_verified_at: new Date().toISOString() })
+    .update(name ? { entrance_name: name, entrance_verified_at: new Date().toISOString() } : { entrance_verified_at: new Date().toISOString() })
     .eq("id", r.id);
-  await logEntrance({ entrance_id: entrance.id, room_id: room?.id ?? null, reservation_id: r.id, guest_name: name, action: "verify", success: true });
+  await logEntrance({ entrance_id: entrance.id, room_id: room?.id ?? null, reservation_id: r.id, guest_name: name || r.guest_name || r.entrance_name || null, action: "verify", success: true });
 
   const checkOut = new Date(r.check_out).getTime();
   const keyExp = checkOut + SESSION_GRACE_MS;

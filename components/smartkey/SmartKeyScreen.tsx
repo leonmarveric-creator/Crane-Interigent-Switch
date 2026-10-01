@@ -16,7 +16,7 @@ import { SK, SK_LANGS, SK_LANG_LABEL, fmtStay, fmtTime, type SkLang } from "@/li
 import type { GuestKeyData, KeyState, SmartKeySettings, LockMode } from "@/lib/smartkeyLogic";
 
 export type Door = "entrance" | "room";
-export type CmdResult = { ok: boolean; error?: string; distance?: number };
+export type CmdResult = { ok: boolean; error?: string; distance?: number; needName?: boolean };
 
 export interface SmartKeyScreenProps {
   data: GuestKeyData;
@@ -421,16 +421,22 @@ function HoldButton({
 function VerifyCard({ t, onVerify }: { t: (typeof SK)["ja"]; onVerify: SmartKeyScreenProps["onVerify"] }) {
   const [name, setName] = useState("");
   const [digits, setDigits] = useState("");
+  // 名前は聞かない。同じ4桁の予約が重なったときだけ出す
+  const [askName, setAskName] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || digits.length < 4 || busy) return;
+    if (digits.length < 4 || (askName && !name.trim()) || busy) return;
     setBusy(true); setErr(null);
-    const r = await onVerify(name.trim(), digits).catch(() => ({ ok: false, error: "NETWORK" }));
+    const r: CmdResult = await onVerify(askName ? name.trim() : "", digits).catch(() => ({ ok: false, error: "NETWORK" }));
     setBusy(false);
+    if (!r.ok && r.error === "AMBIGUOUS" && r.needName) {
+      setAskName(true); setErr(t.needName);
+      return;
+    }
     if (!r.ok) {
       setErr(r.error === "AMBIGUOUS" ? t.ambiguous : r.error === "LOCKED" ? t.lockedOut : r.error === "NETWORK" ? t.genericErr : t.badCode);
       setShake((s) => s + 1);
@@ -445,12 +451,6 @@ function VerifyCard({ t, onVerify }: { t: (typeof SK)["ja"]; onVerify: SmartKeyS
       <p className="text-sm leading-relaxed text-[#10213f]/70">{t.verifyDesc}</p>
 
       <label className="mt-5 block text-[13px] font-semibold text-[#10213f]/80">
-        <span className="flex items-center gap-1.5"><UserRound className="h-4 w-4 text-[#1253b8]" /> {t.nameLabel}</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.namePh} autoComplete="name" maxLength={60}
-          className="mt-2 w-full rounded-2xl border border-[#d6e2f5] bg-[#f6f9fe] px-4 py-3.5 text-base font-medium outline-none focus:border-[#1253b8] focus:bg-white" />
-      </label>
-
-      <label className="mt-4 block text-[13px] font-semibold text-[#10213f]/80">
         <span className="flex items-center gap-1.5"><Hash className="h-4 w-4 text-[#1253b8]" /> {t.digitsLabel}</span>
         <input value={digits} onChange={(e) => setDigits(e.target.value.replace(/\D/g, "").slice(0, 6))}
           inputMode="numeric" autoComplete="one-time-code" placeholder="••••" maxLength={6}
@@ -458,9 +458,17 @@ function VerifyCard({ t, onVerify }: { t: (typeof SK)["ja"]; onVerify: SmartKeyS
         <span className="mt-1.5 block text-xs font-normal text-[#10213f]/50">{t.digitsHint}</span>
       </label>
 
+      {askName && (
+        <label className="mt-4 block text-[13px] font-semibold text-[#10213f]/80">
+          <span className="flex items-center gap-1.5"><UserRound className="h-4 w-4 text-[#1253b8]" /> {t.nameLabel}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.namePh} autoComplete="name" maxLength={60} autoFocus
+            className="mt-2 w-full rounded-2xl border border-[#d6e2f5] bg-[#f6f9fe] px-4 py-3.5 text-base font-medium outline-none focus:border-[#1253b8] focus:bg-white" />
+        </label>
+      )}
+
       {err && <p className="mt-4 flex items-start gap-1.5 text-[13px] text-rose-600"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{err}</p>}
 
-      <button type="submit" disabled={busy || !name.trim() || digits.length < 4}
+      <button type="submit" disabled={busy || (askName && !name.trim()) || digits.length < 4}
         className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0b2f6e] to-[#1d6fe0] py-4 text-base font-bold text-white shadow-lg transition disabled:opacity-40">
         {busy ? <><Loader2 className="h-5 w-5 animate-spin" /> {t.verifying}</> : t.verifyBtn}
       </button>

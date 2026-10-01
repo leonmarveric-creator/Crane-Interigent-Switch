@@ -18,9 +18,6 @@ export default function PinGate({
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
   const gx = GX[lang];
-  const [name, setName] = useState("");
-  const [nameErr, setNameErr] = useState(false);
-  const nameRef = useRef<HTMLInputElement | null>(null);
   const [digits, setDigits] = useState<string[]>(Array(PIN_LEN).fill(""));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
@@ -42,10 +39,7 @@ export default function PinGate({
     setErr(false);
     if (d) keyTick(); // 1桁ごとのホロタイプ音
     if (d && i < PIN_LEN - 1) refs.current[i + 1]?.focus();
-    if (next.every((x) => x !== "")) {
-      if (name.trim()) submit(next.join(""));
-      else { setNameErr(true); nameRef.current?.focus(); }
-    }
+    if (next.every((x) => x !== "")) submit(next.join(""));
   };
 
   const onKey = (i: number, e: React.KeyboardEvent) => {
@@ -53,13 +47,12 @@ export default function PinGate({
   };
 
   const submit = async (pin: string) => {
-    if (!name.trim()) { setNameErr(true); nameRef.current?.focus(); return; }
     primeVoice(); // タップ操作内で音声を先行起動 (iOSで起動音声を鳴らすため)
     setBusy(true); setErr(false);
     const res = await fetch(`/api/room/${roomSlug}/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, name: name.trim() }),
+      body: JSON.stringify({ pin }), // 名前は聞かない (チェックインのパスポート登録で入る)
     });
     setBusy(false);
     if (res.ok) {
@@ -199,22 +192,8 @@ export default function PinGate({
           <h1 className="mt-1.5 text-xl font-medium tracking-wide">{roomName}</h1>
           <p className="mt-2 text-sm text-white/50">{t.pinPrompt}</p>
 
-          {/* お名前 (部屋画面の「ようこそ、◯◯様」に表示) */}
           <div className="mt-6 text-left">
-            <label className="font-mono text-[10px] tracking-[0.25em] text-cyan-400/70">{gx.nameLabel}</label>
-            <input
-              ref={nameRef}
-              value={name}
-              onChange={(e) => { setName(e.target.value.slice(0, 60)); setNameErr(false); }}
-              placeholder={gx.namePh}
-              autoComplete="name"
-              autoFocus
-              disabled={locked}
-              className={`clip-bevel-sm mt-1.5 w-full border bg-black/50 px-4 py-3 text-base text-cyan-50 placeholder:text-white/25 focus:outline-none disabled:opacity-40
-                ${nameErr ? "border-rose-500/70" : name ? "border-cyan-400/60" : "border-white/15 focus:border-cyan-400/60"}`}
-            />
-            {nameErr && <p className="mt-1 text-[11px] text-rose-400">{gx.nameRequired}</p>}
-            <p className="mt-4 font-mono text-[10px] tracking-[0.25em] text-cyan-400/70">{gx.pinLabel}</p>
+            <p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400/70">{gx.pinLabel}</p>
           </div>
 
           {/* PIN 入力 (スキャンビーム付き) */}
@@ -234,6 +213,7 @@ export default function PinGate({
                   onKeyDown={(e) => onKey(i, e)}
                   inputMode="numeric"
                   maxLength={1}
+                  autoFocus={i === 0}
                   disabled={locked}
                   className={`clip-bevel-sm h-16 w-12 border bg-black/50 text-center font-mono text-2xl text-cyan-100
                     focus:outline-none disabled:opacity-40 ${d ? "anim-digitpop" : ""}

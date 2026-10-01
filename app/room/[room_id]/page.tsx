@@ -9,6 +9,7 @@ import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
+import { passportNameFor } from "@/lib/passportName";
 
 export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 
@@ -70,9 +71,14 @@ export default async function RoomPage({
 
   // 「ようこそ、◯◯様」用の名前と、同じ棟のエントランス鍵画面へのリンク
   // (スマートキーのSQLが未実行でも部屋画面は表示できるよう、エラーは無視)
-  const { data: nameRow } = await supabaseAdmin.from("reservations").select("guest_name, entrance_name").eq("id", matched.id).maybeSingle();
+  const { data: nameRow } = await supabaseAdmin.from("reservations").select("id, guest_name, entrance_name, check_out, guest_token").eq("id", matched.id).maybeSingle();
+  // 名前がまだ無ければ、パスポート登録 (チェックイン) の名前を入れる
+  if (nameRow && !String((nameRow as any).guest_name ?? "").trim()) {
+    const pn = await passportNameFor(nameRow, stays.room);
+    if (pn) (nameRow as any).guest_name = pn;
+  }
   const ent = ((entRes as any)?.data ?? []).find((e: any) => e.building === (stays.room.building || "Crane Nest")) ?? null;
-  const guestName = (nameRow as any)?.entrance_name || (nameRow as any)?.guest_name || null;
+  const guestName = (nameRow as any)?.guest_name || (nameRow as any)?.entrance_name || null;
   const entranceHref = ent?.slug ? `/key/${ent.slug}` : null;
 
   return (

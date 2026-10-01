@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { runIcalSync } from "@/lib/syncIcal";
+import { backfillPassportNames } from "@/lib/passportName";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +20,8 @@ export async function GET(req: NextRequest) {
 
   // 全部屋を並列同期 + チェックアウト自動OFF
   const { summary, cleanedRooms } = await runIcalSync();
+  // パスポート登録 (チェックイン) が済んだ予約に名前を入れる (Airbnb の iCal には名前が無いため)
+  const namesFilled = await backfillPassportNames().catch(() => 0);
 
   // 古いログ削除 (並列)
   const retentionDays = Number(process.env.LOG_RETENTION_DAYS || "90");
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   return NextResponse.json({
-    ok: true, summary, cleanedRooms,
+    ok: true, summary, cleanedRooms, namesFilled,
     purgedLogs: (purgeRes as any)?.count ?? null,
     ranAt: new Date().toISOString(),
   });

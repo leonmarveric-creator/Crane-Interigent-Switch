@@ -15,7 +15,7 @@ export const viewport: Viewport = { themeColor: "#0b2f6e" };
 /**
  * エントランスのスマートキー (エントランスに貼るQRから開く)。
  *   /key/[entrance]?lang=ja
- *   未確認 → 本人確認 (名前 + 電話番号の下4桁)
+ *   未確認 → 本人確認 (電話番号の下4桁。同じ番号の予約が重なったときだけ名前も)
  *   確認済 → エントランス / お部屋 の鍵画面
  */
 export default async function EntranceKeyPage({

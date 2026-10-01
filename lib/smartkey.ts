@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { verifyScopedSession } from "./roomSession";
 import { withEffectiveTimes, isMissingColumn } from "./stayTimes";
+import { passportNameFor } from "./passportName";
 import {
   DEFAULT_SMARTKEY_SETTINGS, sanitizeSettings, keyStateFor, reservationCode, hasGeofence,
   type SmartKeySettings, type GuestKeyData, type KeyState,
@@ -91,7 +92,7 @@ export async function resolveGuestKey(slug: string): Promise<GuestKeyContext | n
   const v = verifyScopedSession(ENTRANCE_SCOPE, cookies().get(entranceCookieName(slug))?.value);
   if (!v) return { entrance, settings, state: "verify", reservation: null, room: null, data: base };
 
-  const cols = "id, room_id, assigned_room_id, status, check_in, check_out, guest_name, entrance_name, welcomed_at, guest_lang";
+  const cols = "id, room_id, assigned_room_id, status, check_in, check_out, guest_name, entrance_name, welcomed_at, guest_lang, guest_token";
   let rr: any = await supabaseAdmin.from("reservations").select(`${cols}, early_checkin_at, late_checkout_at`).eq("id", v.reservationId).maybeSingle();
   if (isMissingColumn(rr.error)) rr = await supabaseAdmin.from("reservations").select(cols).eq("id", v.reservationId).maybeSingle();
   // 早期チェックイン / レイトチェックアウトを反映 (以降の check_in / check_out は実際に使える時間)
@@ -105,13 +106,19 @@ export async function resolveGuestKey(slug: string): Promise<GuestKeyContext | n
     return { entrance, settings, state: "verify", reservation: null, room: null, data: base };
   }
 
+  // 名前がまだ無い (Airbnb の予約) → パスポート登録が済んでいれば、その名前を予約に入れる
+  if (!String(reservation.guest_name ?? "").trim()) {
+    const pn = await passportNameFor(reservation, room);
+    if (pn) reservation.guest_name = pn;
+  }
+
   const state = keyStateFor(reservation, Date.now());
   const showSecrets = state === "active" || state === "before";
   return {
     entrance, settings, state, reservation, room,
     data: {
       ...base,
-      guestName: reservation.entrance_name || reservation.guest_name || "",
+      guestName: reservation.guest_name || reservation.entrance_name || "",
       roomName: room.display_name,
       roomSlug: room.slug,
       roomHasLock: !!(room.sesame_device_uuid && room.sesame_secret_key && room.sesame_api_key),

@@ -156,14 +156,20 @@ export default async function AdminPage() {
   const entranceMap = new Map(entrances.map((e) => [e.id, e]));
   const { data: elogRows } = await supabaseAdmin
     .from("entrance_logs")
-    .select("id, entrance_id, room_id, guest_name, action, source, success, created_at")
+    .select("id, entrance_id, room_id, reservation_id, guest_name, action, source, success, created_at")
     .order("created_at", { ascending: false })
     .limit(80);
+  // 名前の無いログ (チェックイン前に入った分) は、予約の名前 (あとでパスポートから入る) を出す
+  const noNameIds = [...new Set((elogRows ?? []).filter((l: any) => !l.guest_name && l.reservation_id).map((l: any) => l.reservation_id as string))];
+  const { data: logResRows } = noNameIds.length
+    ? await supabaseAdmin.from("reservations").select("id, guest_name, entrance_name").in("id", noNameIds)
+    : { data: [] as any[] };
+  const logResName = new Map<string, string>(((logResRows ?? []) as any[]).map((r) => [r.id, r.guest_name || r.entrance_name || ""]));
   const entranceLogs: EntranceLog[] = (elogRows ?? []).map((l) => ({
     id: l.id,
     entrance_name: l.entrance_id ? entranceMap.get(l.entrance_id)?.display_name ?? "—" : null,
     room_name: l.room_id ? roomMap.get(l.room_id)?.display_name ?? "—" : null,
-    guest_name: l.guest_name ?? null,
+    guest_name: l.guest_name || (l.reservation_id ? logResName.get(l.reservation_id) || null : null),
     action: l.action, source: l.source, success: l.success, created_at: l.created_at,
   }));
 

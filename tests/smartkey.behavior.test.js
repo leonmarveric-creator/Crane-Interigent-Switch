@@ -39,6 +39,21 @@ test("same digits in two rooms are disambiguated by name, otherwise AMBIGUOUS", 
   const r = pickReservation([a, b], { name: "CHEN", digits: "5678" }, rooms, NOW);
   assert.equal(r.ok && r.reservation.id, "a");
   assert.deepEqual(pickReservation([a, b], { name: "Tanaka", digits: "5678" }, rooms, NOW), { ok: false, error: "AMBIGUOUS" });
+  // 名前なし (エントランスでは最初は聞かない): 1 件なら通る / 重なれば AMBIGUOUS → 画面で名前を聞く
+  assert.equal(pickReservation([a], { name: "", digits: "5678" }, rooms, NOW).ok, true);
+  assert.deepEqual(pickReservation([a, b], { name: "", digits: "5678" }, rooms, NOW), { ok: false, error: "AMBIGUOUS" });
+});
+
+test("entrance asks only the last 4 digits; name only when bookings collide", () => {
+  const verify = read("app", "api", "key", "[entrance]", "verify", "route.ts");
+  assert.match(verify, /if \(digits\.length < 4\)/);
+  assert.match(verify, /needName: picked\.error === "AMBIGUOUS" && !name/);
+  const screen = read("components", "smartkey", "SmartKeyScreen.tsx");
+  assert.match(screen, /\{askName && \(/);
+  assert.match(screen, /r\.error === "AMBIGUOUS" && r\.needName/);
+  // パスポート登録の名前を予約に入れる
+  assert.match(read("lib", "smartkey.ts"), /passportNameFor\(reservation, room\)/);
+  assert.match(read("lib", "passportName.ts"), /\.is\("guest_name", null\)/);
 });
 
 test("key state follows the stay period", async () => {
@@ -82,9 +97,10 @@ test("lock mode is chosen per door: timer / door sensor / off", async () => {
   assert.match(read("supabase", "migration_smartkey_lockmode.sql"), /add column if not exists entrance_lock text/);
 });
 
-test("room PIN flow asks for a name, greets the guest, and links to the entrance key", () => {
+test("room PIN flow asks only the PIN, greets the guest, and links to the entrance key", () => {
   const gate = read("components", "PinGate.tsx");
-  assert.match(gate, /JSON\.stringify\(\{ pin, name: name\.trim\(\) \}\)/);
+  assert.match(gate, /JSON\.stringify\(\{ pin \}\)/);
+  assert.doesNotMatch(gate, /nameLabel/);
   const auth = read("app", "api", "room", "[room_id]", "auth", "route.ts");
   assert.match(auth, /entrance_name: name/);
   assert.match(auth, /signScopedSession\(ENTRANCE_SCOPE, match\.id, keyExp\)/);
