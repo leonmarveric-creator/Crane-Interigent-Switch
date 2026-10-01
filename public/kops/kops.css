@@ -239,6 +239,11 @@
 .skin-mi #alrt{cursor:pointer}.skin-mi #pC,.skin-mi #pP,.skin-mi #pA{cursor:pointer}.skin-mi #pAu{cursor:pointer;touch-action:none}
 .skin-mi .ctl span{cursor:pointer;padding:4px 8px}
 
+/* 字幕: 長いときは小さく / 2 行にして途切れないように */
+#pA .sj.lg{font-size:15.5px;top:16px}
+#pA .sj.xl{font-size:14px;top:8px;white-space:normal;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-overflow:clip}
+#pA.xl .se{display:none}
+
 
 .skin-ho{--h:#dff6ff;--h2:#9fd8ea;--hl:rgba(200,240,255,.55);--hd:rgba(200,240,255,.18);--y:#ffd23a;--o:#ff8a3a;--r:#ff4d4d;
  --mono:"Share Tech Mono",ui-monospace,Menlo,monospace;--f:"Rajdhani","Barlow Condensed","DejaVu Sans Condensed",sans-serif;--jp:"Hiragino Sans","Noto Sans JP",sans-serif;
@@ -545,6 +550,12 @@
 .skin-ho .hints span,.skin-ho .cru,.skin-ho .alrt,.skin-ho .np,.skin-ho #hpC,.skin-ho .hb2 span,.skin-ho .ast{cursor:pointer}
 .skin-ho .alrt{pointer-events:auto}
 
+/* 字幕: 長いときは 2 行にして小さく (途切れないように) */
+.ast .tx{right:330px}
+.ast canvas{width:300px}
+.ast b.lg{white-space:normal;font-size:15px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-overflow:clip;margin-top:1px}
+.ast b.xl{font-size:13px}
+
 .kpad{--g:#3cf2a6;--g2:#22d690;--t:#eafff6;--m:#86b9a5;--ln:rgba(70,245,175,.62);--ln2:rgba(60,242,166,.16);--a:#ffb020;--r:#ff5a5a;--pn:rgba(4,17,13,.88);
  --f:"Rajdhani","Barlow Condensed","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--fn:"Barlow Condensed","Rajdhani","DIN Condensed","Avenir Next Condensed","DejaVu Sans Condensed","Arial Narrow",sans-serif;--jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
 .kpad *{box-sizing:border-box}
@@ -793,6 +804,7 @@
 .skin-ho.port .note{left:460px;top:1046px!important;max-height:30px}
 .skin-ho.port .lang{left:460px;top:1086px}
 .skin-ho .por .st2{white-space:nowrap}.skin-ho.port .tv .hb2.g span{font-size:13px;white-space:nowrap}
+.skin-ho.port .ast .tx{right:190px}.skin-ho.port .ast canvas{width:160px}
 
 /* ===== HOLO: 自分の位置 (3D) ===== */
 .skin-ho #me{perspective:620px;perspective-origin:0 -30px}
