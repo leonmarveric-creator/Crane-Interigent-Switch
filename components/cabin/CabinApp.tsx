@@ -206,6 +206,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         e.setQuiet(!!t.aiQuiet); // AI の静かモード (お父さんのスマホで切り替え)
+        e.setHumor(j.humor === true); // ユーモアモード (お父さんのスマホ / AGENT KAKU で切り替え。全部の送迎で共通)
         // チェックイン QR: 予約つき (合言葉入り・その予約に自動で紐づく) があればそれ、無ければ全員共通の画像
         if (typeof j.checkinLink === "string") {
           if (ckLink.current?.link !== j.checkinLink) { const link = j.checkinLink; ckLink.current = { link, img: null }; QRCode.toDataURL(link, { margin: 2, width: 560, errorCorrectionLevel: "M" }).then((img) => { const c = ckLink.current; if (c && c.link === link) { c.img = img; eng.current?.setCheckin(img); } }).catch(() => {}); }

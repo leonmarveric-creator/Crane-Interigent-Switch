@@ -31,6 +31,8 @@ export interface KakuCabinApi {
   end(id: string): Promise<void>;
   /** お迎え: 回送 → ゲスト乗車 */
   board(id: string): Promise<void>;
+  /** 車内 iPad の ASTRAEA のユーモアモード (全部の送迎で共通) */
+  humor?: { get(): Promise<boolean>; set(on: boolean): Promise<boolean> };
 }
 interface CabLink { deviceId: string | null; resId: string | null; roomId: string | null; lang: string; placeKey: string; dir: "in" | "out"; leg: number }
 interface Leg { n: string; ll: LL; pts: LL[]; dur: number; home?: boolean; type?: string; real?: boolean }
@@ -367,6 +369,15 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   $("limIn").onchange = () => { const v = Math.max(30, Math.min(120, Number($("limIn").value) || 80)); cfg.limit = v; saveCfg(); $("limT").textContent = `LIMIT ${v}`; };
   $("qTg").onclick = () => { cfg.quiet = !cfg.quiet; saveCfg(); renderSet(); $("qm").classList.toggle("on", cfg.quiet); if (cfg.quiet) CQ = CQ.filter((x) => x.prio); void say(cfg.quiet ? "quiet_on" : "quiet_off"); };
   $("dTg").onclick = () => { cfg.demo = !cfg.demo; saveCfg(); renderSet(); };
+  // 😂 ユーモアモード: 設定はサーバーに 1 つ (お父さんのスマホと共通)
+  let humor = false;
+  const showHumor = () => { $("hTg").textContent = humor ? "ON" : "OFF"; $("hTg").classList.toggle("on", humor); };
+  void cab.humor?.get().then((h) => { humor = h; showHumor(); }).catch(() => {});
+  $("hTg").onclick = async () => {
+    if (!cab.humor) return; humor = !humor; showHumor();
+    if (!(await cab.humor.set(humor).catch(() => false))) { humor = !humor; showHumor(); flash("ユーモアモードには Supabase の SQL (migration_ai_humor.sql) が必要です"); }
+    else flash(humor ? "😂 ユーモアモード ON" : "ユーモアモード OFF");
+  };
   $("bTg").onclick = () => { cfg.bgm = !cfg.bgm; saveCfg(); renderSet(); applyBgm(); };
   async function upBgm(which: BgmMode, files: File[]) {
     const NM: Record<string, string> = { boot: "起動・ホーム", normal: "ノーマル", cruise: "クルーズ" };

@@ -69,6 +69,7 @@ export const KAKU_HTML = `<div class="kroot" id="kroot"><div class="stage" id="s
     <div class="sgm" id="bgMsg"></div>
     <div class="sg"><b>⚠ 制限速度の目安</b><span>超えると画面が琥珀色になり、ASTRAEA が注意します</span><input type="number" id="limIn" min="30" max="120" step="10" value="80"> <em>km/h</em></div>
     <div class="sg"><b>🤫 静かモード</b><span>案内と警告だけ話します</span><button class="tg" id="qTg">OFF</button></div>
+    <div class="sg"><b>😂 ユーモアモード</b><span>車内 iPad の ASTRAEA が、映画・アニメ・ゲームのネタも話します (お父さんのスマホと同じ設定)</span><button class="tg" id="hTg">OFF</button></div>
     <div class="sg"><b>🚗 デモ走行</b><span>GPS を使わず、ルートを自動で走ります (家で試すとき)</span><button class="tg" id="dTg">OFF</button></div>
     <div class="sg"><b>🔊 BGM</b><span>ミッション中の BGM</span><button class="tg on" id="bTg">ON</button></div>
     <div class="sgm" id="gpsSt">GPS: --</div>

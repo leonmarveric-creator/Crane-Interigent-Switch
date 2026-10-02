@@ -286,3 +286,41 @@ test("guest guide: GYUSEN / PETANKO menus (4 languages + point-to-order) open fr
   assert.match(g, /\/eat\/menu\.html\?shop=/, "menu button links to the menu page with the guest's language");
   assert.match(g, /xyz\/pale\//, "guest map uses the pale tiles, styled dark");
 });
+
+test("drop-off farewell: a line for the destination (film homages, with the film shown on the iPad), then the closing bye", async () => {
+  const A = await load("cabinAiLines.ts");
+  for (const id of ["byeAir", "byeShop", "byeTrain", "byeRain", "byeEarly", "byeNight"]) assert.ok(A.AI_LINES[id]?.v.length, id);
+  assert.ok(A.AI_LINES.byeAir.v.length >= 8 && A.AI_LINES.byeAir.v.every((v) => v.film), "airport lines are film homages");
+  const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /const dest: AiId \| null = air \? \(Math\.random\(\) < 0\.5 \? "byeLag" : "byeAir"\) : s\.placeKey === "r833" \? "byeShop" : s\.placeKey === "rinku" \|\| s\.placeKey === "hineno" \? "byeTrain" : null;/);
+  assert.match(ai, /if \(first && \(await say\(first, f\)\)\) await new Promise\(\(r\) => setTimeout\(r, 1200\)\);\s*await say\("bye", f\);/, "destination line, then the closing line");
+  assert.match(ai, /credit: line\.film \? `INSPIRED BY · \$\{line\.film\}` : undefined/);
+});
+
+test("Rinku Gate Tower fun fact: planned as two towers forming a gate, only one was built — said once when it comes into view", async () => {
+  const A = await load("cabinAiLines.ts");
+  assert.equal(A.AI_LINES.gatetower.v.length, 2, "the explanation, and the same explanation ending with the Detective Conan line");
+  assert.match(A.AI_LINES.gatetower.v[0].en, /planned as a pair.*only one was built/);
+  assert.match(A.AI_LINES.gatetower.v[1].en, /planned as a pair.*only one was built\. One truth prevails: the money ran out\./);
+  assert.match(read("components", "cabin", "cabinAi.ts"), /if \(toGate < 4000 && toGate > 800 && moving\) once\("gatetower", "gatetower"\);/);
+});
+
+test("humor mode: film / anime / game homages only when it's on (set from dad's phone or AGENT KAKU); subtitles in the guest's language", async () => {
+  const A = await load("cabinAiLines.ts");
+  assert.deepEqual(A.aiAllowed("byeAir", false), [], "airport homages are humor-only");
+  assert.deepEqual(A.aiAllowed("bye", false), [0, 1, 2], "the plain closing lines stay");
+  assert.equal(A.aiPick("byeAir", undefined, 0.5, false), -1, "nothing to say → skipped");
+  assert.ok(A.aiAllowed("depart", false).length >= 3 && A.aiAllowed("depart", true).length > A.aiAllowed("depart", false).length);
+  for (const id of ["bridgeIn", "lightsLate", "byeLag"]) assert.ok(A.AI_LINES[id].v.length && A.AI_LINES[id].v.every((v) => v.film), id);
+  const ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(ai, /aiPick\(id, last\[id\], Math\.random\(\), c\.humor\(\)\); if \(i < 0\) return false;/);
+  assert.match(ai, /if \(\(hh >= 22 \|\| hh < 5\) && \(await say\("lightsLate", f\)\)\) return;/, "late arrival: quiet like a ninja");
+  assert.match(ai, /air \? \(Math\.random\(\) < 0\.5 \? "byeLag" : "byeAir"\)/, "airport: arrival line or jet lag line");
+  assert.match(ai, /s\.dir === "in" && s\.placeKey\.startsWith\("kix"\) && s\.crossesBridge/, "bridge lines right after leaving the airport");
+  assert.match(ai, /\$\("aiSub"\)\.innerHTML = \[\.\.\.line\[lang\]\]/, "subtitles in the guest's language");
+  assert.match(read("app", "api", "cabin", "state", "route.ts"), /trip \? aiHumorOn\(\)\.catch\(\(\) => false\) : false/);
+  assert.match(read("components", "cabin", "CabinApp.tsx"), /e\.setHumor\(j\.humor === true\)/);
+  assert.match(read("components", "driver", "DriverCabin.tsx"), /cabinSetHumor\(h\)/);
+  assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="hTg"/);
+  assert.ok(read("supabase", "migration_ai_humor.sql").includes("ai_humor"));
+});

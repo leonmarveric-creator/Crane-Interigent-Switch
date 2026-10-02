@@ -127,6 +127,11 @@ export async function cabinRoomById(id: string | null): Promise<CabinRoom | null
   return room;
 }
 
+/** ASTRAEA のユーモアモード (映画・アニメ・ゲームのオマージュも話す)。全部の送迎で共通: app_settings.ai_humor (migration_ai_humor.sql) */
+export async function aiHumorOn(): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.from("app_settings").select("ai_humor").eq("id", 1).maybeSingle();
+  return !error && (data as any)?.ai_humor === true;
+}
 /** チェックイン QR の画像 (全員共通。app_settings.cabin_checkin_qr = Storage のパス) */
 export async function checkinQrUrl(): Promise<string | null> {
   const { data, error } = await supabaseAdmin.from("app_settings").select("cabin_checkin_qr").eq("id", 1).maybeSingle();

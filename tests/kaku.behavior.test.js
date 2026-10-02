@@ -54,7 +54,7 @@ test("AGENT KAKU drives the car iPad for the whole mission (deadhead → guest a
   assert.match(e, /else if \(M\.cab\?\.dir === "in" && cabTrip && leg === 1\) void cab\.board\(cabTrip\)/, "leaving the pickup = guest boarded");
   assert.match(e, /if \(M\.cab && cabTrip && l\.home\) \{/, "keeps sending until back at Crane Nest");
   assert.match(e, /cabStop\(true\)/, "abort ends the iPad trip");
-  assert.match(read("components", "kaku", "KakuApp.tsx"), /import \{ cabinStart, cabinPos, cabinEnd, cabinBoard \} from "@\/app\/driver\/actions"/);
+  assert.match(read("components", "kaku", "KakuApp.tsx"), /import \{ cabinStart, cabinPos, cabinEnd, cabinBoard[^}]*\} from "@\/app\/driver\/actions"/);
   assert.match(read("app", "staff", "login", "page.tsx"), /"\/kaku": "AGENT KAKU"/, "login returns to /kaku");
 });
 

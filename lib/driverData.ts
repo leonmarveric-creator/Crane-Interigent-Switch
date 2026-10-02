@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isMissingColumn } from "@/lib/stayTimes";
 import { langOf, monthKey, type DRoom, type DRes } from "@/lib/driverLogic";
 import { loadCraneNestDrops } from "@/lib/craneNest";
-import { activeTrip, checkinQrUrl, loadCabinDevices, toCabinRoom, type CabinDevice, type CabinRoom, type CabinTrip } from "@/lib/cabinData";
+import { activeTrip, aiHumorOn, checkinQrUrl, loadCabinDevices, toCabinRoom, type CabinDevice, type CabinRoom, type CabinTrip } from "@/lib/cabinData";
 
 export type DriverDesign = "hybrid" | "bike";
 export interface DriverSettings { design: DriverDesign; autoPrep: boolean; autoPrepMin: number; flightAuto: boolean }
@@ -20,7 +20,7 @@ export interface DriverData {
   battery: Record<string, { battery: number | null; checkedAt: string }>;
   entrances: EntranceInfo[]; setupMissing: boolean;
   /** 車内 iPad (migration_cabin.sql を実行していなければ missing) */
-  cabin: { devices: CabinDevice[]; trip: CabinTrip | null; rooms: CabinRoom[]; missing: boolean; checkinQr: string | null };
+  cabin: { devices: CabinDevice[]; trip: CabinTrip | null; rooms: CabinRoom[]; missing: boolean; checkinQr: string | null; /** ASTRAEA のユーモアモード */ humor: boolean };
 }
 
 export const DEFAULT_SETTINGS: DriverSettings = { design: "hybrid", autoPrep: true, autoPrepMin: 30, flightAuto: true };
@@ -114,6 +114,6 @@ export async function loadDriverData(nowMs = Date.now()): Promise<DriverData> {
   return {
     rooms, res, places, tracks, settings, alerts, flightUsed, battery, entrances,
     setupMissing: resR.missing,
-    cabin: { devices: cabinDev.devices, trip: cabinTrip, rooms: cabinRooms, missing: cabinDev.missing, checkinQr: await checkinQrUrl().catch(() => null) },
+    cabin: { devices: cabinDev.devices, trip: cabinTrip, rooms: cabinRooms, missing: cabinDev.missing, checkinQr: await checkinQrUrl().catch(() => null), humor: await aiHumorOn().catch(() => false) },
   };
 }

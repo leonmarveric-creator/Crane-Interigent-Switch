@@ -62,6 +62,8 @@ export interface Engine {
   nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void;
   /** AI (ASTRAEA) の静かモード */
   setQuiet(q: boolean): void;
+  /** ユーモアモード (映画・アニメ・ゲームのオマージュも話す) */
+  setHumor(on: boolean): void;
   setVoiceSeen(ageMs: number | null): void;
   /** 声をスマホから流すか (スマホが取りに来ているか) */
   remoteVoice(): boolean;
@@ -560,9 +562,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   });
 
   /* ---------- AI「ASTRAEA」: 状況に合わせて自分から話す ---------- */
-  let aiQuiet = false, startedAt = 0, npId: string | null = null;
+  let aiQuiet = false, aiHumor = false, startedAt = 0, npId: string | null = null;
   const ai = createAi({
-    root, stage, ac, quiet: () => aiQuiet, voiceBusy: () => voiceN > 0,
+    root, stage, ac, quiet: () => aiQuiet, humor: () => aiHumor, voiceBusy: () => voiceN > 0,
     duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
     remote, send: (url, text) => viaPhone(url, text),
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
@@ -750,6 +752,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       if (np && track && np.id === track.id && np.id !== npId) { if (npId) ai.event("song"); npId = np.id; }
     },
     setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); },
+    setHumor: (on) => { aiHumor = on; },
     /** スマホが声を取りに来ている (ageMs = 最後に来てからの時間) */
     remoteVoice: () => Date.now() - phoneSeen < 12000,
     setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },

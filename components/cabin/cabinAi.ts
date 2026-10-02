@@ -6,7 +6,7 @@
  *   話す前にお父さんのスマホの音楽を下げる (music_cmd "duck")。ゲストが光の玉を押すと、おまけのひと言。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AI_CHAT_MS, AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, AI_SPEED, aiAudio, aiPick, sunsetMin, zorome, type AiId } from "@/lib/cabinAiLines";
+import { AI_CHAT_MS, AI_FACT_MS, AI_GAP_MS, AI_LINES, AI_PRIORITY, AI_SPEED, aiAudio, aiPick, aiAllowed, sunsetMin, zorome, type AiId, type AiLine } from "@/lib/cabinAiLines";
 import { CAPTAIN, GUEST_Q, REPEAT, UNKNOWN, captainAudio, guestAudio, talkAudioUrls, weatherAnswer } from "@/lib/cabinAiTalk";
 
 const GUIDE_Q: Record<GLang, string> = { ja: "入り方を教えて", zh: "怎么进门？", en: "How do I get in?", ko: "들어가는 방법" };
@@ -35,6 +35,7 @@ export interface AiCtx {
   quiet: () => boolean;
   remote: () => boolean;           // 声はスマホから流す (iPad は音を消して長さだけ合わせる)
   send: (url: string, text: string) => Promise<boolean>; // スマホへ声を送る (スマホが鳴らし始めたら true)
+  humor: () => boolean;            // ユーモアモード (映画・アニメなどのオマージュも話す。お父さんのスマホ / AGENT KAKU で切り替え)
   hasCheckin: () => boolean;       // チェックイン QR が登録されているか
   checkin: () => void;             // チェックイン QR を出す
   guide: () => void;               // 入り方ガイドを流す
@@ -64,15 +65,16 @@ export function createAi(c: AiCtx): Ai {
     const prio = AI_PRIORITY.includes(id), spd = AI_SPEED.includes(id);
     if (!opt.force) {
       if (c.quiet() && id !== "tap" && id !== "tapmany") return false;
-      if (c.voiceBusy() || (s.boosting && id !== "bridge" && !spd)) return false;
+      if (c.voiceBusy() || (s.boosting && id !== "bridge" && id !== "bridgeIn" && !spd)) return false;
       if (!prio && !spd && now - lastAt < AI_GAP_MS) return false;
     }
-    const i = opt.i ?? aiPick(id, last[id]); last[id] = i;
+    const i = opt.i ?? aiPick(id, last[id], Math.random(), c.humor()); if (i < 0) return false; last[id] = i;
     if (!prio || id === "depart") lastAt = now;
-    return speak(aiAudio(id, i), AI_LINES[id].v[i] as Record<GLang, string>, { duck: opt.duck });
+    const line = AI_LINES[id].v[i] as AiLine;
+    return speak(aiAudio(id, i), line, { duck: opt.duck, credit: line.film ? `INSPIRED BY · ${line.film}` : undefined });
   }
-  /** 1 つのセリフを話す (声 + 字幕)。st = パネルの右上の小さな文字 */
-  async function speak(url: string, line: Record<GLang, string>, opt: { duck?: boolean; st?: string } = {}) {
+  /** 1 つのセリフを話す (声 + 字幕)。st = パネルの右上の小さな文字 / credit = 映画の元ネタ (字幕が消えるまで出しておく) */
+  async function speak(url: string, line: Record<GLang, string>, opt: { duck?: boolean; st?: string; credit?: string } = {}) {
     if (speaking) return false;
     speaking = true; lastAny = Date.now();
     // お父さんのスマホの音楽を先に下げる (届くまで 3 秒ほど)
@@ -82,7 +84,7 @@ export function createAi(c: AiCtx): Ai {
     const lang = c.state().lang;
     $("aiSub").innerHTML = [...line[lang]].map((ch, k) => `<span style="animation-delay:${k * 26}ms">${ch.replace(/[<&>]/g, "")}</span>`).join("");
     $("aiEn").textContent = lang === "en" ? "" : line.en;
-    c.stage.classList.add("ai-talk"); $("aiSt").textContent = opt.st ?? "SPEAKING";
+    c.stage.classList.add("ai-talk"); $("aiSt").textContent = opt.credit ?? opt.st ?? "SPEAKING";
     try {
       const ctx = c.ac(); if (ctx && !src) { src = ctx.createMediaElementSource(el); an = ctx.createAnalyser(); an.fftSize = 128; src.connect(an); }
       // スマホから流すときは iPad からは鳴らさない (波形の動きだけ使う)
@@ -94,8 +96,8 @@ export function createAi(c: AiCtx): Ai {
     });
     // 字幕は話し終わってもしばらく残す (読むのがゆっくりな人のために・長い文ほど長く)
     const my = ++subTok, hold = Math.min(9000, 3500 + [...line[lang]].length * (lang === "en" ? 25 : 60));
-    $("aiSt").textContent = "ONLINE";
-    setTimeout(() => { if (subTok === my) c.stage.classList.remove("ai-talk"); }, hold);
+    if (!opt.credit) $("aiSt").textContent = "ONLINE";
+    setTimeout(() => { if (subTok === my) { c.stage.classList.remove("ai-talk"); $("aiSt").textContent = "ONLINE"; } }, hold);
     speaking = false; return true;
   }
   const once = (key: string, id: AiId, opt?: { force?: boolean; duck?: boolean }) => { if (done.has(key)) return; void say(id, opt).then((ok) => { if (ok) done.add(key); }); };
@@ -146,6 +148,10 @@ export function createAi(c: AiCtx): Ai {
         if (toBridge < 1300 && toBridge > 500 && moving) once("bridge", "bridge", { force: true });
       }
       if (Math.hypot((la - 34.4125) * 111000, (lo - 135.2935) * 91500) < 1500) once("sea", "sea");
+      // お迎えで空港から橋に入ってすぐ (海王類・クラーケンなど。ユーモアモードのときだけ)
+      if (s.dir === "in" && s.placeKey.startsWith("kix") && s.crossesBridge && Math.hypot((la - 34.4260) * 111000, (lo - 135.2792) * 91500) < 1700) once("bridgeIn", "bridgeIn");
+      // りんくうゲートタワー (2 本建てて「門」にする予定が、バブル崩壊で 1 本だけ) が見えるあたりで 1 回
+      { const toGate = Math.hypot((la - 34.4096) * 111000, (lo - 135.2957) * 91500); if (toGate < 4000 && toGate > 800 && moving) once("gatetower", "gatetower"); }
       if (!s.hasIzumiPoi && lo > 135.305 && s.dir === "in") once("izumi", "izumi");
       // 泉佐野に入ったら「タオル発祥の地」(お迎えのとき。お見送りは静かな時間の豆知識で)
       if (lo > 135.305 && s.dir === "in") once("fact:towel", "towel");
@@ -169,7 +175,7 @@ export function createAi(c: AiCtx): Ai {
     if (now - Math.max(chatAt, s.started) > AI_CHAT_MS && now - lastAny > AI_FACT_MS && now - lastAt > AI_GAP_MS) {
       const facts: AiId[] = [...(s.dir === "in" ? [] : (["towel"] as AiId[])), "nasu", ...(s.placeKey.startsWith("kix") ? (["kix"] as AiId[]) : []), ...(s.crossesBridge ? (["bridgefact"] as AiId[]) : [])];
       const left = facts.filter((f) => !done.has("fact:" + f));
-      const chatLeft = AI_LINES.chat.v.map((_, i) => i).filter((i) => !chatUsed.has(i));
+      const chatLeft = aiAllowed("chat", c.humor()).filter((i) => !chatUsed.has(i));
       // 地元の豆知識と、おしゃべりを交互に
       if (left.length && (done.has("lastChat") || !chatLeft.length)) { const f = left[Math.floor(Math.random() * left.length)]; void say(f).then((ok) => { if (ok) { done.add("fact:" + f); done.delete("lastChat"); chatAt = Date.now(); } }); }
       else if (chatLeft.length) { const i = chatLeft[Math.floor(Math.random() * chatLeft.length)]; void say("chat", { i }).then((ok) => { if (ok) { chatUsed.add(i); done.add("lastChat"); chatAt = Date.now(); } }); }
@@ -178,9 +184,28 @@ export function createAi(c: AiCtx): Ai {
 
   function event(e: "arrive" | "song" | "boostEnd") {
     const s = c.state(); if (!s.tripId) return;
-    if (e === "arrive") setTimeout(() => void say(s.dir === "in" ? "lights" : "bye", { force: !c.quiet() }), 7000);
+    if (e === "arrive") setTimeout(() => void (s.dir === "in" ? arrival() : farewell()), 7000);
     if (e === "song" && Date.now() - s.started > 60000) void say("song");
     if (e === "boostEnd") boostEndAt = Date.now();
+  }
+
+  /** お見送りの到着: 行き先に合わせたひと言 (映画のオマージュ) → 少し間をおいて締め (bye)。
+   *  オマージュはユーモアモードのときだけ (オフなら締めのふつうのひと言だけ)。
+   *  空港 = byeAir か byeLag (時差ぼけ) を半々 / りんくう往来北 (アウトレット) = byeShop / 駅 (りんくうタウン・日根野) = byeTrain。
+   *  雨・朝 7 時前・夜 9 時以降の空港 は、半分くらいの確率でそちらのひと言にする */
+  /** お迎えの到着: 照明のひと言。夜 10 時〜朝 5 時は「忍者のように静かに」(ユーモアモードのとき) */
+  async function arrival() {
+    const f = { force: !c.quiet() }, hh = JST(Date.now()).getUTCHours();
+    if ((hh >= 22 || hh < 5) && (await say("lightsLate", f))) return;
+    await say("lights", f);
+  }
+  async function farewell() {
+    const s = c.state(), f = { force: !c.quiet() }, hh = JST(Date.now()).getUTCHours(), air = s.placeKey.startsWith("kix");
+    const dest: AiId | null = air ? (Math.random() < 0.5 ? "byeLag" : "byeAir") : s.placeKey === "r833" ? "byeShop" : s.placeKey === "rinku" || s.placeKey === "hineno" ? "byeTrain" : null;
+    const extra: AiId[] = [...(s.weather && rainy(s.weather.code) ? (["byeRain"] as AiId[]) : []), ...(hh < 7 ? (["byeEarly"] as AiId[]) : []), ...(air && hh >= 21 ? (["byeNight"] as AiId[]) : [])];
+    const first = extra.length && (!dest || Math.random() < 0.5) ? extra[Math.floor(Math.random() * extra.length)] : dest;
+    if (first && (await say(first, f))) await new Promise((r) => setTimeout(r, 1200));
+    await say("bye", f);
   }
 
   /* ---------- ゲストが光の玉を押す → 質問メニュー ---------- */

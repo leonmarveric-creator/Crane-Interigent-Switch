@@ -10,7 +10,7 @@ import { createKaku, type KakuCabinInfo, type KakuEngine, type KakuState, type K
 import { LyricsSheet } from "@/components/driver/DriverMusic";
 import type { DriverTrack } from "@/lib/driverData";
 import { makeT } from "@/lib/driverI18n";
-import { cabinStart, cabinPos, cabinEnd, cabinBoard } from "@/app/driver/actions";
+import { cabinStart, cabinPos, cabinEnd, cabinBoard, cabinGetHumor, cabinSetHumor } from "@/app/driver/actions";
 
 function loadLeaflet(): Promise<void> {
   const w = window as any;
@@ -48,6 +48,7 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
           pos: async (id, lat, lng, kmh) => { const r = await cabinPos(id, lat, lng, kmh, null).catch(() => null); return { ok: !!r?.ok, active: r?.ok ? r.active : true }; },
           end: async (id) => { await cabinEnd(id).catch(() => null); },
           board: async (id) => { await cabinBoard(id).catch(() => null); },
+          humor: { get: () => cabinGetHumor(), set: async (on) => !!(await cabinSetHumor(on).catch(() => null))?.ok },
         }, { lyrics: (tr, save) => setLy({ tr, save }) });
       } catch (e) { setErr(String((e as Error)?.message || e)); }
     })();

@@ -7,7 +7,7 @@ import { fetchFlight, normFlightNo } from "@/lib/flight";
 import { FLIGHT_REUSE_MS, type FlightInfo } from "@/lib/driverLogic";
 import { loadDriverData, type DriverData, type DriverDesign } from "@/lib/driverData";
 import { langOf } from "@/lib/driverLogic";
-import { toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
+import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
@@ -297,6 +297,17 @@ export async function cabinSetCheckinQr(path: string | null): Promise<R<{ url: s
   if (error) { if (path) await supabaseAdmin.storage.from("driver-music").remove([path]).catch(() => null); return fail(/cabin_checkin_qr/.test(error.message) ? "SETUP_AI" : error.message); }
   const prev = (old as any)?.cabin_checkin_qr; if (prev && prev !== path) await supabaseAdmin.storage.from("driver-music").remove([prev]).catch(() => null);
   return { ok: true, url: path ? supabaseAdmin.storage.from("driver-music").getPublicUrl(path).data.publicUrl : null };
+}
+/** ASTRAEA のユーモアモード (映画・アニメ・ゲームのオマージュも話す)。全部の送迎で共通。お父さんのスマホ / AGENT KAKU から */
+export async function cabinSetHumor(on: boolean): Promise<R> {
+  const g = guard(); if (g) return g;
+  const { error } = await supabaseAdmin.from("app_settings").update({ ai_humor: !!on }).eq("id", 1);
+  if (error) return fail(/ai_humor/.test(error.message) ? "SETUP_HUMOR" : error.message);
+  return { ok: true };
+}
+export async function cabinGetHumor(): Promise<boolean> {
+  if (guard()) return false;
+  return aiHumorOn().catch(() => false);
 }
 /** 車内 iPad の AI の静かモード (ひと言を止める) */
 export async function cabinSetQuiet(tripId: string, quiet: boolean): Promise<R> {

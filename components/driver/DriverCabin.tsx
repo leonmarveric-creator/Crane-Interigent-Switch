@@ -13,7 +13,7 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
 import { compressRoomPhoto } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
@@ -207,9 +207,17 @@ export function CabinBar({ cab, data, t, ui }: { cab: Cabin; data: DriverData; t
   const tr = cab.trip; if (!tr) return null;
   const dev = data.cabin.devices.find((d) => d.id === tr.deviceId);
   const pn = tr.placeKey === "other" ? tr.placeName || t("その他") : (PLACES as any)[tr.placeKey]?.name[ui] ?? tr.placeKey;
-  return <CabinBarIn key={tr.id} tr={tr} dev={dev?.name ?? t("全部の iPad")} pn={pn} cab={cab} t={t} ui={ui} />;
+  return <CabinBarIn key={tr.id} tr={tr} dev={dev?.name ?? t("全部の iPad")} pn={pn} cab={cab} t={t} ui={ui} humor0={data.cabin.humor} />;
 }
-function CabinBarIn({ tr, dev, pn, cab, t, ui }: { tr: CabinTrip; dev: string; pn: string; cab: Cabin; t: T; ui: "zh" | "ja" }) {
+function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: string; pn: string; cab: Cabin; t: T; ui: "zh" | "ja"; humor0: boolean }) {
+  // 😂 ユーモアモード: ASTRAEA が映画・アニメ・ゲームのオマージュも話す (全部の送迎で共通・AGENT KAKU と同じ設定)
+  const [humor, setHumor] = useState(humor0);
+  const toggleHumor = async () => {
+    const h = !humor; setHumor(h); sfx.tick();
+    const r = await cabinSetHumor(h);
+    if (!r.ok) { setHumor(!h); toastQ(r.error === "SETUP_HUMOR" ? t("ユーモアモードには Supabase の SQL（migration_ai_humor.sql）が必要です") : t("切り替えられませんでした")); }
+    else toastQ(h ? t("😂 ユーモアモード ON：映画やアニメのネタも話します") : t("ユーモアモード OFF"));
+  };
   // 🤫 静かモード: 車内 iPad の AI (ASTRAEA) のひと言を止める (道案内はそのまま)
   const [quiet, setQuiet] = useState(!!tr.aiQuiet);
   const toggleQuiet = async () => {
@@ -225,6 +233,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui }: { tr: CabinTrip; dev: string; p
       <span className="tx"><b>🚗 {dev}</b><small>{tr.phase === "dead" ? (tr.dir === "in" ? `${t("回送")} · ${t("お宿")} → ${pn}` : `${t("帰り道")} · ${pn} → ${t("お宿")}`) : tr.dir === "in" ? `${pn} → ${t("お宿")}` : `${t("お宿")} → ${pn}`} · {cab.sending === "ok" ? "📡 " + t("位置を送信中") : cab.sending === "ng" ? "⚠ " + t("位置を送れません") : "…"}</small></span>
       {tr.phase === "dead" && tr.dir === "in" && <button className="board" onClick={() => void cab.board()}>🧳<small>{t("ゲスト乗車")}</small></button>}
       <button className="abtn" onClick={() => { sfx.tick(); setTalk(true); }}>🎙<small>ASTRAEA</small></button>
+      <button className={`qbtn ${humor ? "on" : ""}`} title={t("ユーモアモード")} onClick={() => void toggleHumor()}>{humor ? "😂" : "🙂"}<small>{humor ? t("ユーモア") : t("ふつう")}</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
