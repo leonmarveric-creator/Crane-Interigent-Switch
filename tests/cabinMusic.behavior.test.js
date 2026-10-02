@@ -321,6 +321,8 @@ test("humor mode: film / anime / game homages only when it's on (set from dad's 
   assert.match(read("app", "api", "cabin", "state", "route.ts"), /trip \? aiHumorOn\(\)\.catch\(\(\) => false\) : false/);
   assert.match(read("components", "cabin", "CabinApp.tsx"), /e\.setHumor\(j\.humor === true\)/);
   assert.match(read("components", "driver", "DriverCabin.tsx"), /cabinSetHumor\(h\)/);
+  const dc = read("components", "driver", "DriverCabin.tsx");
+  assert.equal((dc.match(/<HumorPick initial=\{data\.cabin\.humor\} t=\{t\} \/>/g) || []).length, 2, "switch on the departure sheet and in the car iPad settings, not only during a trip");
   assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="hTg"/);
   assert.ok(read("supabase", "migration_ai_humor.sql").includes("ai_humor"));
 });

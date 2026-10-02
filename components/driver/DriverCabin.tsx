@@ -117,6 +117,30 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
 export type Cabin = ReturnType<typeof useCabin>;
 
 /* ================= 出発のシート ================= */
+/* ================= 😂 ユーモアモード (ASTRAEA が映画・アニメ・ゲームのネタも話す) =================
+   全部の送迎で共通の設定 (AGENT KAKU と同じ)。出発の画面・車内 iPad の設定・送迎中のバーのどこからでも切り替えられる */
+let humorNow: boolean | null = null; // このスマホで最後に切り替えた値 (画面を開き直すまで、ほかの場所にも反映)
+export function HumorPick({ initial, t }: { initial: boolean; t: T }) {
+  const [on, setOn] = useState(humorNow ?? initial);
+  const [msg, setMsg] = useState("");
+  const pick = async (h: boolean) => {
+    if (h === on) return; sfx.tick(); setOn(h); setMsg("");
+    const r = await cabinSetHumor(h);
+    if (r.ok) humorNow = h;
+    else { setOn(!h); setMsg(r.error === "SETUP_HUMOR" ? t("ユーモアモードには Supabase の SQL（migration_ai_humor.sql）が必要です") : t("切り替えられませんでした")); }
+  };
+  return (
+    <>
+      <div className="csec">{t("ASTRAEA の話し方")}</div>
+      <div className="cchips">
+        <button className={!on ? "on" : ""} onClick={() => void pick(false)}><b>🙂 {t("ふつう")}</b><small>{t("案内とふつうのひと言")}</small></button>
+        <button className={on ? "on" : ""} onClick={() => void pick(true)}><b>😂 {t("ユーモアモード")}</b><small>{t("映画・アニメ・ゲームのネタも話す")}</small></button>
+      </div>
+      {msg ? <p className="note warn">{msg}</p> : null}
+    </>
+  );
+}
+
 export function CabinSheet({ open, onClose, res, dir0, data, cab, t, roomName, ui }: {
   ui: "zh" | "ja"; open: boolean; onClose: () => void; res: DRes | null; dir0: "in" | "out"; data: DriverData; cab: Cabin; t: T; roomName: (id: string) => string;
 }) {
@@ -192,6 +216,7 @@ export function CabinSheet({ open, onClose, res, dir0, data, cab, t, roomName, u
           <div><div className="csec">{t("画面の言語")}</div><div className="cchips sm">{LANGS.map(([k, n]) => <button key={k} className={lang === k ? "on" : ""} onClick={() => setLang(k)}>{n}</button>)}</div></div>
           <div><div className="csec">{t("エアコン")}</div><div className="cchips sm">{(["cool", "heat", "none"] as const).map((k) => <button key={k} className={ac === k ? "on" : ""} onClick={() => setAc(k)}>{k === "cool" ? "❄ " + t("冷房") : k === "heat" ? "🔥 " + t("暖房") : t("なし")}</button>)}</div></div>
         </div>
+        <HumorPick initial={data.cabin.humor} t={t} />
         <p className="note">{t("声はすべて英語です。送迎中はこのスマホの画面をつけたままにしてください（GPS の無い iPad にスマホの位置を送ります）。")}</p>
         <div className="acts">
           <button onClick={onClose}>{t("やめる")}</button>
@@ -211,10 +236,11 @@ export function CabinBar({ cab, data, t, ui }: { cab: Cabin; data: DriverData; t
 }
 function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: string; pn: string; cab: Cabin; t: T; ui: "zh" | "ja"; humor0: boolean }) {
   // 😂 ユーモアモード: ASTRAEA が映画・アニメ・ゲームのオマージュも話す (全部の送迎で共通・AGENT KAKU と同じ設定)
-  const [humor, setHumor] = useState(humor0);
+  const [humor, setHumor] = useState(humorNow ?? humor0);
   const toggleHumor = async () => {
     const h = !humor; setHumor(h); sfx.tick();
     const r = await cabinSetHumor(h);
+    if (r.ok) humorNow = h;
     if (!r.ok) { setHumor(!h); toastQ(r.error === "SETUP_HUMOR" ? t("ユーモアモードには Supabase の SQL（migration_ai_humor.sql）が必要です") : t("切り替えられませんでした")); }
     else toastQ(h ? t("😂 ユーモアモード ON：映画やアニメのネタも話します") : t("ユーモアモード OFF"));
   };
@@ -299,6 +325,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
   return (
     <div className="card" id="cabinSet">
       <div className="ctitle">🚗 {t("車内 iPad")}</div>
+      <HumorPick initial={data.cabin.humor} t={t} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
       {data.cabin.devices.map((d) => (
