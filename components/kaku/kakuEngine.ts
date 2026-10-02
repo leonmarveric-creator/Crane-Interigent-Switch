@@ -304,6 +304,8 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
           <div class="gpk">${LANGS.map(([k, n]) => `<button data-l="${k}" class="${G.lang === k ? "on" : ""}">${n}</button>`).join("")}</div>`}
         <div class="gsec">車内 iPad</div>
         <div class="gpk">${inf.missing || !inf.devices.length ? `<span class="gno">${inf.missing ? "車内 iPad の SQL が未実行です" : "登録された iPad がありません"}</span>` : `<button data-i="1" class="${G.ipad ? "on" : ""}">📺 iPad にも表示する</button>${inf.devices.length > 1 ? inf.devices.map((d) => `<button data-v="${d.id}" class="${G.dev === d.id ? "on" : ""}">${esc(d.name)}</button>`).join("") : ""}`}</div>
+        ${cab.humor ? `<div class="gsec">ASTRAEA の話し方 (車内 iPad)</div>
+        <div class="gdir"><button data-h="0" class="${humor ? "" : "on"}">🙂 ふつう<small style="display:block;font-size:13px;font-weight:600;color:#9cb">案内とふつうのひと言</small></button><button data-h="1" class="${humor ? "on" : ""}">😂 ユーモアモード<small style="display:block;font-size:13px;font-weight:600;color:#9cb">映画・アニメ・ゲームのネタも</small></button></div>` : ""}
         <button class="go2" id="gGo">ミッション開始 ▸</button>`;
       $("gpl").querySelectorAll("[data-r]").forEach((b: HTMLElement) => (b.onclick = () => { const i = Number(b.dataset.r); pickRes(i >= 0 ? inf.res[i] : null); render(); }));
       $("gpl").querySelectorAll("[data-d]").forEach((b: HTMLElement) => (b.onclick = () => { G.dir = b.dataset.d as "in" | "out"; render(); }));
@@ -312,6 +314,8 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
       $("gpl").querySelectorAll("[data-l]").forEach((b: HTMLElement) => (b.onclick = () => { G.lang = b.dataset.l!; render(); }));
       $("gpl").querySelectorAll("[data-i]").forEach((b: HTMLElement) => (b.onclick = () => { G.ipad = !G.ipad; render(); }));
       $("gpl").querySelectorAll("[data-v]").forEach((b: HTMLElement) => (b.onclick = () => { G.dev = b.dataset.v!; render(); }));
+      // 😂 ユーモアモード (設定画面のスイッチ・お父さんのスマホと同じ設定)
+      $("gpl").querySelectorAll("[data-h]").forEach((b: HTMLElement) => (b.onclick = () => { const h = b.dataset.h === "1"; if (h !== humor) void setHumor(h); render(); }));
       $("gGo").onclick = () => {
         ov("gp", false); const k = G.place, P = PLACES[k], d = 38 / 3.6;
         const out = rt(`${k}_out`) || [HOME, P.ll], back = rt(`${k}_in`) || [P.ll, HOME];
@@ -373,11 +377,12 @@ export function createKaku(root: HTMLElement, routes: Record<string, [number, nu
   let humor = false;
   const showHumor = () => { $("hTg").textContent = humor ? "ON" : "OFF"; $("hTg").classList.toggle("on", humor); };
   void cab.humor?.get().then((h) => { humor = h; showHumor(); }).catch(() => {});
-  $("hTg").onclick = async () => {
-    if (!cab.humor) return; humor = !humor; showHumor();
-    if (!(await cab.humor.set(humor).catch(() => false))) { humor = !humor; showHumor(); flash("ユーモアモードには Supabase の SQL (migration_ai_humor.sql) が必要です"); }
-    else flash(humor ? "😂 ユーモアモード ON" : "ユーモアモード OFF");
-  };
+  async function setHumor(h: boolean) {
+    if (!cab.humor) return; humor = h; showHumor(); tone(h ? 1320 : 880, 0, 0.08, 0.05);
+    if (!(await cab.humor.set(h).catch(() => false))) { humor = !h; showHumor(); flash("ユーモアモードには Supabase の SQL (migration_ai_humor.sql) が必要です"); }
+    else flash(h ? "😂 ユーモアモード ON" : "ユーモアモード OFF");
+  }
+  $("hTg").onclick = () => void setHumor(!humor);
   $("bTg").onclick = () => { cfg.bgm = !cfg.bgm; saveCfg(); renderSet(); applyBgm(); };
   async function upBgm(which: BgmMode, files: File[]) {
     const NM: Record<string, string> = { boot: "起動・ホーム", normal: "ノーマル", cruise: "クルーズ" };

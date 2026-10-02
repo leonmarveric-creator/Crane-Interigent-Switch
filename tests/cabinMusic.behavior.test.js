@@ -324,5 +324,6 @@ test("humor mode: film / anime / game homages only when it's on (set from dad's 
   const dc = read("components", "driver", "DriverCabin.tsx");
   assert.equal((dc.match(/<HumorPick initial=\{data\.cabin\.humor\} t=\{t\} \/>/g) || []).length, 2, "switch on the departure sheet and in the car iPad settings, not only during a trip");
   assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="hTg"/);
+  assert.match(read("components", "kaku", "kakuEngine.ts"), /ASTRAEA の話し方 \(車内 iPad\)/, "AGENT KAKU: the switch is also on the guest-pickup screen, right before starting");
   assert.ok(read("supabase", "migration_ai_humor.sql").includes("ai_humor"));
 });
