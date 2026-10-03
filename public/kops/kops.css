@@ -990,3 +990,7 @@
 .kpad .kagq b{font:700 17px "Rajdhani","Hiragino Sans",sans-serif;letter-spacing:.06em;flex:1}
 .kpad .kagq small{font-size:11px;opacity:.8}
 .kpad .kagq.on{border-color:var(--g);color:var(--t);background:rgba(60,242,166,.14)}.kpad .kagq.on i{background:var(--g);box-shadow:0 0 10px var(--g)}
+/* ===== 着信の効果音を選ぶ ===== */
+.kops .ksf{margin-top:8px;align-items:stretch}.kops .ksf label.kt{flex:3 1 180px;position:relative;overflow:hidden;cursor:pointer}
+.kops .ksf label.kt input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.kops .ksf button.kt{flex:1 1 76px;text-align:center}.kops .ksf button.kt b{font-size:14px}
