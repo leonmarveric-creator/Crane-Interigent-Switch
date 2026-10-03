@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import ConciergeLink from "@/components/ConciergeLink";
 import { getActiveStays } from "@/lib/auth";
 import { verifySession, roomCookieName } from "@/lib/roomSession";
 import { isLang, type Lang } from "@/lib/i18n";
@@ -82,6 +83,7 @@ export default async function RoomPage({
   const entranceHref = ent?.slug ? `/key/${ent.slug}` : null;
 
   return (
+    <>
     <RoomModeSwitch
       guestName={guestName}
       entranceHref={entranceHref}
@@ -99,5 +101,7 @@ export default async function RoomPage({
       hasWafu={!!stays.room.switchbot_wafu_device_id}
       bootVoice={bootVoice}
     />
+    <ConciergeLink room={params.room_id} lang={lang} />
+    </>
   );
 }

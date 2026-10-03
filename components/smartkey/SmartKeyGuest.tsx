@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import SmartKeyScreen, { type Door, type CmdResult } from "./SmartKeyScreen";
 import type { GuestKeyData, KeyState, SmartKeySettings } from "@/lib/smartkeyLogic";
 import { SK, type SkLang } from "@/lib/smartkeyI18n";
+import ConciergeLink from "@/components/ConciergeLink";
 
 type Pos = { lat: number; lng: number; acc: number };
 
@@ -107,6 +108,7 @@ export default function SmartKeyGuest({
           router.refresh();
         }}
       />
+      <ConciergeLink room={data.roomSlug ?? null} lang={lang} />
       {ask && <GeoExplain t={t} onOk={() => reply(true)} onCancel={() => reply(false)} />}
     </>
   );
