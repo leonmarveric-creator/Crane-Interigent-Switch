@@ -8,6 +8,7 @@
  *   ・右下の ⚙: この iPad に保存 (声・効果音・写真・地図) / テスト走行 / 名前の変更
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWake, wakeBadge, WakeSheet } from "@/components/cabin/CabinWake";
 import QRCode from "qrcode";
 import { TRIP_HTML } from "@/components/cabin/cabinMarkup";
 import { createEngine, tileCount, type Engine } from "@/components/cabin/cabinEngine";
@@ -281,6 +282,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const [mRoom, setMRoom] = useState<string | null>(rooms[0]?.id ?? null);
   const [mLang, setMLang] = useState<GLang>(() => { try { const v = localStorage.getItem("cab.mlang"); if (v === "en" || v === "zh" || v === "ko" || v === "ja") return v; } catch { /* ignore */ } return "en"; });
   const [mMsg, setMMsg] = useState("");
+  const wake = useWake(menu);
+  const [wkOpen, setWkOpen] = useState(false);
   function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "keyqr") {
     const e = eng.current; if (!e) return;
     if (inTrip) { setMMsg("送迎中は使えません（到着画面のボタンを使ってください）"); return; }
@@ -324,18 +327,23 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           {prog && <><small>{prog.label}… {Math.round(prog.p * 100)}%</small><div className="bar"><i style={{ width: `${prog.p * 100}%` }} /></div></>}
           <small>家の Wi-Fi で 1 回押してください。保存すると、走行中は通信なし・待ち時間なしで表示と音が出ます（地図 {saved} 枚保存済み）。</small>
           <h4>手動ガイド（押したときだけ流れます）</h4>
-          <div className="row gsel">{rooms.map((r) => <button key={r.id} className={mRoom === r.id ? "on" : ""} onClick={() => setMRoom(r.id)}>{r.kanji}</button>)}</div>
+          <div className="row gsel">{rooms.map((r) => { const b = wakeBadge(wake.map[r.id]); return <button key={r.id} className={mRoom === r.id ? "on" : ""} onClick={() => setMRoom(r.id)}>{r.kanji}{b && <i className={`wkb ${b.cls}`}>{b.text}</i>}</button>; })}</div>
           <div className="row gsel">{(["en", "zh", "ko", "ja"] as GLang[]).map((l) => <button key={l} className={mLang === l ? "on" : ""} onClick={() => { setMLang(l); try { localStorage.setItem("cab.mlang", l); } catch { /* ignore */ } }}>{({ en: "English", zh: "中文", ko: "한국어", ja: "日本語" } as const)[l]}</button>)}</div>
           <div className="row"><button onClick={() => manual("toilet")}>🚻 トイレの使い方</button><button onClick={() => manual("ent")}>🚪 エントランス</button></div>
           <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button><button onClick={() => manual("keyqr")}>🔑 エントランスの鍵の QR</button></div>
           <div className="row"><button onClick={() => manual("room")} disabled={!eng.current?.hasRoomGuide(rooms.find((r) => r.id === mRoom) ?? null)}>🔑 お部屋の開け方・鍵</button><button onClick={() => manual("ck")}>🛂 チェックイン</button></div>
           {mMsg && <small style={{ color: "#ffd199" }}>{mMsg}</small>}
+          <button className="wk-open" disabled={!mRoom} onClick={() => setWkOpen(true)}>⏰ 「{rooms.find((r) => r.id === mRoom)?.kanji ?? ""}」の光目覚ましを設定・確認</button>
+          <small>{wake.err ? "光目覚ましの状態を読めませんでした（通信・ログインを確認）" : "部屋の印： 7:00 H ＝設定中 ／ ✓ ＝今朝動いた ／ ✕ ＝動かなかった"}</small>
           <h4>テスト走行（スマホなしで動きを確認）</h4>
           <div className="row"><button onClick={() => void testRun("kix", "in")}>✈ 関空T1 → 住まい</button><button onClick={() => void testRun("rinku", "out")}>住まい → りんくう</button></div>
           <h4>設定</h4>
           <div className="row"><button onClick={() => void rename()}>✎ 名前を変える</button><button onClick={() => { setMenu(false); }}>閉じる</button></div>
           <small>GPS: {gpsState === "yes" ? "この iPad の GPS を使います" : gpsState === "no" ? "GPS が無いので、お父さんのスマホの位置を使います" : "確認中…"}</small>
         </div>
+        {wkOpen && rooms.find((r) => r.id === mRoom) && (
+          <WakeSheet key={mRoom} room={rooms.find((r) => r.id === mRoom)!} info={mRoom ? wake.map[mRoom] : undefined} onClose={() => setWkOpen(false)} onChanged={wake.reload} />
+        )}
         {needSetup && (
           <div className="setup" onClick={(ev) => ev.stopPropagation()}>
             <h2>この iPad を登録</h2>
