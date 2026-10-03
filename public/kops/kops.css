@@ -971,3 +971,16 @@
 .kpad .kcall .kcb button{flex:1;height:78px;border-radius:14px;border:1px solid var(--r);background:rgba(255,90,90,.12);color:#fff;font:700 21px "Rajdhani","Hiragino Sans",sans-serif}
 .kpad .kcall .kcb button.y{border-color:var(--g);background:rgba(60,242,166,.22);box-shadow:0 0 18px rgba(60,242,166,.35)}
 .kpad .kcall .kcb small{display:block;font:400 10px "Share Tech Mono",monospace;letter-spacing:.24em;opacity:.8;margin-top:2px}
+/* ===== 地図で場所を指す ===== */
+.kops .kmb{border-color:rgba(60,242,166,.6);background:rgba(60,242,166,.12)}
+.kops .kcp .kcm{display:block;margin-top:8px;padding:8px 12px;border:1px solid rgba(60,242,166,.6);border-radius:6px;background:rgba(4,20,14,.7);color:#e8fff4;font:600 13px "Hiragino Sans",sans-serif}
+.kops .kmp{position:absolute;inset:0;z-index:130;display:flex;flex-direction:column;background:#02100a;padding:max(10px,env(safe-area-inset-top)) 0 max(12px,env(safe-area-inset-bottom))}
+.kops .kmph{display:flex;justify-content:space-between;align-items:center;padding:4px 14px 10px;color:#e8fff4;font:700 17px "Hiragino Sans",sans-serif}
+.kops .kmpm{position:relative;flex:1;min-height:0}.kops .kmpc{position:absolute;inset:0;background:#0a1a14}
+.kops .kmpx{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;pointer-events:none;z-index:500;border:2px solid #3cf2a6;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 14px rgba(60,242,166,.7)}
+.kops .kmpx::before,.kops .kmpx::after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
+.kops .kmpx::before{left:50%;top:-14px;bottom:-14px;width:2px;margin-left:-1px}.kops .kmpx::after{top:50%;left:-14px;right:-14px;height:2px;margin-top:-1px}
+.kops .kmpz{position:absolute;right:10px;top:10px;z-index:600;display:flex;flex-direction:column;gap:6px}
+.kops .kmpz button{width:52px;height:48px;border-radius:8px;border:1px solid rgba(60,242,166,.6);background:rgba(2,16,10,.88);color:#e8fff4;font:700 16px "Hiragino Sans",sans-serif}
+.kops .kmpf{padding:10px 14px 0;color:#9fd6c0}.kops .kmpf>small{display:block;font-size:12px}
+.kops .kmpf em{display:block;font-style:normal;font:600 14px "Share Tech Mono",monospace;color:#3cf2a6;margin-top:2px}.kops .kmpf .kgo{margin-top:10px}

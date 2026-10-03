@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  *   GET  (op なし)                                      … 記録・お気に入り・BGM
  *   POST {op:"log"|"fav"|"bgmUrl"|"bgmSet"}
  */
+import { gmapParse } from "@/lib/gmapLink";
 export const dynamic = "force-dynamic";
 const J = (v: any, status = 200) => NextResponse.json(v, { status, headers: { "cache-control": "no-store" } });
 const UA = { "user-agent": "CraneNest-AgentKaku/1.0 (guesthouse car display)", "accept-language": "ja" };
@@ -19,6 +20,25 @@ async function get(url: string, sec: number, json = true): Promise<any> {
   const r = await fetch(url, { headers: UA, next: { revalidate: sec } } as any);
   if (!r.ok) throw new Error(String(r.status));
   return json ? r.json() : r.text();
+}
+
+/** Google マップのリンク → 位置。Google のドメインだけを開く (ほかの行き先には行かない)。位置が読めなければ null */
+const GHOST = /^(maps\.app\.goo\.gl|goo\.gl|g\.co|(www\.|maps\.)?google\.[a-z.]{2,6})$/i;
+async function gmapLink(link: string): Promise<any | null> {
+  let url = link.replace(/[)）。、]+$/, "");
+  for (let i = 0; i < 5; i++) {
+    let host = ""; try { host = new URL(url).hostname; } catch { return null; }
+    if (!GHOST.test(host)) return null;
+    const p = gmapParse(url); if (p) return { n: p.n || "Google マップの地点", sub: `Google マップのリンク · ${p.ll[0].toFixed(5)}, ${p.ll[1].toFixed(5)}`, ll: p.ll, exact: true };
+    const r = await fetch(url, { headers: { ...UA, "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" }, redirect: "manual", cache: "no-store" } as any);
+    const loc = r.headers.get("location");
+    if (loc) { try { url = new URL(loc, url).href; } catch { return null; } continue; }
+    // 転送が終わっても URL に位置が無いとき: ページの中の位置を探す
+    const t = (await r.text().catch(() => "")).slice(0, 400000);
+    const p2 = gmapParse(t.replace(/\\u003d/g, "=").replace(/\\u0026/g, "&")); if (p2) return { n: p2.n || "Google マップの地点", sub: `Google マップのリンク · ${p2.ll[0].toFixed(5)}, ${p2.ll[1].toFixed(5)}`, ll: p2.ll, exact: true };
+    return null;
+  }
+  return null;
 }
 
 /** 外の情報。取れなければ例外 (呼ぶ側で ok:false) */
@@ -43,9 +63,29 @@ async function ext(k: string, q: URLSearchParams): Promise<any> {
     return [...x.matchAll(/<item>[\s\S]*?<title>([\s\S]*?)<\/title>/g)].map((m) => m[1].replace(/<!\[CDATA\[|\]\]>/g, "").trim()).slice(0, 8);
   }
   if (k === "geo") {
-    const s = (q.get("q") || "").slice(0, 80); if (!s.trim()) return [];
-    const d = await get(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=jp&accept-language=ja&q=${encodeURIComponent(s)}`, 86400);
-    return (d || []).map((r: any) => ({ n: String(r.display_name).split(",")[0].trim(), sub: String(r.display_name).split(",").slice(1, 4).join(",").trim(), ll: [Number(r.lat), Number(r.lon)] }));
+    const s = (q.get("q") || "").trim().slice(0, 400); if (!s) return [];
+    // (1) 緯度,経度 をそのまま貼った
+    const mll = s.match(/^\s*(-?\d{1,2}\.\d{3,})\s*[,、 ]\s*(-?\d{2,3}\.\d{3,})\s*$/);
+    if (mll) { const la = Number(mll[1]), lo = Number(mll[2]); if (la >= 20 && la <= 50 && lo >= 120 && lo <= 155) return [{ n: "指定した地点", sub: `${la.toFixed(5)}, ${lo.toFixed(5)}`, ll: [la, lo], exact: true }]; return []; }
+    // (2) Google マップのリンク (共有リンク・短いリンク) → 正確な位置
+    const mu = s.match(/https?:\/\/[^\s]+/);
+    if (mu) { const g = await gmapLink(mu[0]); return g ? [g] : []; }
+    // (3) 住所・名前: 国土地理院の住所検索 (番地まで) と OpenStreetMap の地名検索を合わせる。住所らしければ住所検索を先に
+    const s80 = s.slice(0, 80);
+    const [gsi, osm] = await Promise.all([
+      get(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(s80)}`, 86400).catch(() => []),
+      get(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=jp&accept-language=ja&q=${encodeURIComponent(s80)}`, 86400).catch(() => []),
+    ]);
+    const A = ((gsi || []) as any[]).filter((r) => r?.geometry?.coordinates && r?.properties?.title).slice(0, 5)
+      .map((r) => ({ n: String(r.properties.title), sub: "住所（国土地理院）", ll: [Number(r.geometry.coordinates[1]), Number(r.geometry.coordinates[0])] }));
+    const N = ((osm || []) as any[]).map((r) => ({ n: String(r.display_name).split(",")[0].trim(), sub: String(r.display_name).split(",").slice(1, 4).join(",").trim(), ll: [Number(r.lat), Number(r.lon)] }));
+    const addr = /[0-9０-９]|丁目|番地|[都道府県市区町村郡]/.test(s80);
+    return (addr ? [...A, ...N] : [...N, ...A]).filter((x) => isFinite(x.ll[0]) && isFinite(x.ll[1])).slice(0, 9);
+  }
+  if (k === "rgeo") { // 地図で指した地点の町名 (国土地理院)
+    const la = num(q.get("lat"), 20, 50), lo = num(q.get("lng"), 120, 155); if (la == null || lo == null) return null;
+    const d = await get(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${la}&lon=${lo}`, 86400).catch(() => null);
+    return { n: d?.results?.lv01Nm ? String(d.results.lv01Nm) : null };
   }
   if (k === "route") {
     const a = [num(q.get("alat"), 20, 50), num(q.get("alng"), 120, 155)], b = [num(q.get("blat"), 20, 50), num(q.get("blng"), 120, 155)];
