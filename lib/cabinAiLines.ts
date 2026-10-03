@@ -363,6 +363,44 @@ export const AI_LINES = {
     { en: "Thank you for staying with us. Safe skies.", ja: "ご滞在ありがとうございました。よい空の旅を。", zh: "感谢您的入住。祝您一路平安。", ko: "머물러 주셔서 감사합니다. 편안한 비행 되세요." },
     { en: "We've arrived early. I'd take the credit, but the driver did most of the work.", ja: "早めに到着しました。私の手柄にしたいところですが、ほぼ運転手の仕事です。", zh: "我们提前到了。我很想把功劳算在自己头上，但大部分是司机的功劳。", ko: "일찍 도착했습니다. 제 공으로 돌리고 싶지만, 대부분 기사님이 하신 일입니다." },
   ] },
+  "lateIn": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・走り出して少しあと", v: [
+    { en: "Welcome to Japan. It's late, so I'll keep this short: sit back, we'll take it from here.", ja: "ようこそ日本へ。夜遅いので手短に。あとはお任せください。", zh: "欢迎来到日本。已经很晚了，我长话短说：请坐好，接下来交给我们。", ko: "일본에 오신 걸 환영합니다. 늦은 시간이라 짧게 말씀드릴게요. 편히 앉으세요, 이제부터는 저희가 맡겠습니다." },
+    { en: "Good evening. Or good morning. At this hour, even I'm not sure.", ja: "こんばんは。あるいは、おはようございます。この時間は私にも判断がつきません。", zh: "晚上好。或者说，早上好。这个时间，连我也说不准。", ko: "안녕하세요. 아니, 좋은 아침일까요. 이 시간엔 저도 잘 모르겠습니다." },
+    { en: "Welcome. Your body thinks it's another time zone. I recommend not arguing with it tonight.", ja: "ようこそ。お体はまだ別の時間帯にいるつもりのようです。今夜は言い争わないことをお勧めします。", zh: "欢迎。您的身体还以为在另一个时区。今晚建议别和它争论。", ko: "환영합니다. 몸은 아직 다른 시간대에 있다고 생각하네요. 오늘 밤은 다투지 않는 걸 권합니다." },
+  ] },
+  "lateInAir": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・走り出して少しあと (空港からのお迎え)", v: [
+    { en: "You've crossed an ocean to get here. The last few kilometers are on us.", ja: "海を越えてここまでいらっしゃいました。最後の数キロは、私たちが引き受けます。", zh: "您漂洋过海来到这里。最后这几公里，交给我们。", ko: "바다를 건너 여기까지 오셨습니다. 마지막 몇 킬로미터는 저희가 맡겠습니다." },
+    { en: "Passport control, baggage claim, customs. You've survived all three. Congratulations.", ja: "入国審査、荷物の受け取り、税関。三つとも乗り越えましたね。おめでとうございます。", zh: "入境审查、取行李、海关。三关都过了。恭喜您。", ko: "입국 심사, 수하물 찾기, 세관. 세 가지를 모두 통과하셨네요. 축하합니다." },
+  ] },
+  "lateRoad": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・道の途中 (2 回まで)", v: [
+    { en: "Your room is ready: lights on, air conditioning running. You only need to walk in.", ja: "お部屋の準備はできています。照明も空調もオン。入るだけで結構です。", zh: "您的房间已经准备好了：灯开着，空调也开着。您只要走进去就行。", ko: "객실 준비가 끝났습니다. 조명도 에어컨도 켜 두었어요. 들어가기만 하시면 됩니다." },
+    { en: "Check-in takes a minute, and it can wait until you've put your bags down.", ja: "チェックインは1分で済みます。荷物を置いてからで構いません。", zh: "办理入住只要一分钟，放下行李之后再办也可以。", ko: "체크인은 1분이면 됩니다. 짐을 내려놓은 뒤에 하셔도 괜찮아요." },
+    { en: "The streets are empty. Either everyone is asleep, or they heard you were coming.", ja: "通りには誰もいません。皆さんお休みか、あるいは、いらっしゃると聞いて道を空けたか。", zh: "街上空无一人。要么大家都睡了，要么是听说您要来。", ko: "거리에 아무도 없습니다. 모두 잠들었거나, 오신다는 소식을 들었거나요." },
+    { en: "I've checked the route twice. Nothing but quiet roads and one very sleepy traffic light.", ja: "ルートは二回確認しました。静かな道と、とても眠そうな信号がひとつあるだけです。", zh: "路线我检查了两遍。只有安静的道路，和一个非常困的红绿灯。", ko: "경로를 두 번 확인했습니다. 조용한 길과 아주 졸린 신호등 하나뿐이에요." },
+    { en: "If you fall asleep, I won't take it personally. I'm told I have a soothing voice.", ja: "お休みになっても、気を悪くしたりしません。私の声は眠気を誘うと言われていますので。", zh: "您睡着了我也不会介意。听说我的声音很催眠。", ko: "잠드셔도 서운해하지 않을게요. 제 목소리가 잠이 잘 온다고들 하거든요." },
+    { en: "Japan at night is very quiet. Please don't be alarmed. It's a feature.", ja: "日本の夜はとても静かです。驚かないでください。仕様です。", zh: "日本的夜晚非常安静。请不要惊慌。这是特色功能。", ko: "일본의 밤은 아주 조용합니다. 놀라지 마세요. 원래 그런 기능입니다." },
+    { en: "Your suitcase has travelled further today than most people do in a year. It deserves a rest too.", ja: "お客様のスーツケースは、今日だけで普通の人の一年分より遠くへ旅しました。荷物にも休息が必要です。", zh: "您的行李箱今天走的路，比大多数人一年走的还远。它也该休息了。", ko: "손님의 캐리어는 오늘 하루에 보통 사람의 일 년치보다 더 멀리 여행했어요. 캐리어도 쉴 자격이 있습니다." },
+  ] },
+  "lateTip": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・道の途中の案内 (コンビニ・静かに・光目覚まし。2 回まで)", v: [
+    { en: "If you're hungry, there's a convenience store one minute from the house, open all night.", ja: "お腹が空いていたら、宿から徒歩1分のコンビニが一晩中開いています。", zh: "如果饿了，离住处一分钟的地方有便利店，通宵营业。", ko: "배가 고프시면 숙소에서 1분 거리에 밤새 여는 편의점이 있습니다." },
+    { en: "Most restaurants nearby are closed at this hour. The convenience store is surprisingly good. Trust me on the egg sandwich.", ja: "この時間、近くの飲食店はほぼ閉まっています。コンビニは意外とおいしいですよ。たまごサンドは保証します。", zh: "这个时间附近的餐厅大多关门了。便利店出乎意料地好吃。鸡蛋三明治，相信我。", ko: "이 시간엔 근처 식당이 대부분 문을 닫았어요. 편의점이 의외로 맛있습니다. 계란 샌드위치는 제가 보증해요." },
+    { en: "The neighbors are asleep. Please keep voices and suitcase wheels low when we arrive. Ninja mode, if you will.", ja: "ご近所は就寝中です。到着したら、声とスーツケースの音は控えめに。忍者モードでお願いします。", zh: "邻居们都睡了。到达后请放低声音，行李箱轮子也轻一点。忍者模式，拜托了。", ko: "이웃들은 자고 있습니다. 도착하면 목소리와 캐리어 바퀴 소리를 낮춰 주세요. 닌자 모드로 부탁드립니다." },
+    { en: "There's no need to set an alarm tonight. But if you'd like a gentle wake-up, the room can do it with light.", ja: "今夜はアラームは不要です。でも、やさしく起きたいなら、お部屋が光で起こしてくれます。", zh: "今晚不用设闹钟。不过如果想被温柔地叫醒，房间可以用灯光叫您起床。", ko: "오늘 밤은 알람을 맞출 필요가 없어요. 다만 부드럽게 일어나고 싶다면, 객실이 빛으로 깨워 드립니다." },
+  ] },
+  "lateNear": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・到着の手前", v: [
+    { en: "We'll be at Crane Nest shortly. The roads are empty, which is the one advantage of arriving this late.", ja: "まもなく Crane Nest です。道は空いています。深夜到着の唯一の利点です。", zh: "马上就到 Crane Nest 了。路上空荡荡的，这是深夜到达唯一的好处。", ko: "곧 Crane Nest입니다. 도로가 텅 비었네요. 늦게 도착하는 유일한 장점입니다." },
+    { en: "Almost there. Shoes off at the entrance. Your feet have earned it.", ja: "もうすぐです。玄関で靴を脱いでください。足もそれを望んでいるはずです。", zh: "快到了。请在玄关脱鞋。您的双脚值得休息。", ko: "거의 다 왔습니다. 현관에서 신발을 벗어 주세요. 발도 쉴 자격이 있어요." },
+    { en: "One minute to go. The door opens from your phone, so no keys to find in the dark.", ja: "あと1分です。ドアはスマホで開きます。暗い中で鍵を探す必要はありません。", zh: "还有一分钟。门用手机就能开，不用在黑暗里找钥匙。", ko: "1분 남았습니다. 문은 휴대폰으로 열리니, 어둠 속에서 열쇠를 찾을 필요가 없어요." },
+  ] },
+  "lateArr": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・到着して、照明のひと言のあと", v: [
+    { en: "We've arrived. Quietly, please. And welcome home.", ja: "到着しました。お静かに。そして、おかえりなさい。", zh: "我们到了。请轻一点。欢迎回家。", ko: "도착했습니다. 조용히 부탁드려요. 그리고, 어서 오세요." },
+    { en: "Sleep well. Tomorrow, Japan will still be here.", ja: "ゆっくりお休みください。日本は、明日もここにあります。", zh: "好好休息。明天，日本还在这里。", ko: "푹 주무세요. 내일도 일본은 여기 있습니다." },
+    { en: "We've arrived. The house is asleep, so we'll enter like polite ghosts.", ja: "到着しました。家は眠っていますので、礼儀正しい幽霊のように入りましょう。", zh: "我们到了。房子已经睡了，让我们像有礼貌的幽灵一样进去吧。", ko: "도착했습니다. 집이 잠들어 있으니, 예의 바른 유령처럼 들어가죠." },
+    { en: "Welcome to Crane Nest. Tomorrow you explore. Tonight, your only mission is a pillow.", ja: "Crane Nest へようこそ。探検は明日です。今夜の任務は、枕だけ。", zh: "欢迎来到 Crane Nest。探索留到明天。今晚唯一的任务是枕头。", ko: "Crane Nest에 오신 걸 환영합니다. 탐험은 내일. 오늘 밤 임무는 베개뿐입니다." },
+  ] },
+  "lateArrWa": { cat: "深夜の到着", when: "深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え)・到着して、照明のひと言のあと (和室のときだけ・お布団)", v: [
+    { en: "You're here. The futon has been waiting all evening. It's very patient, but please don't keep it any longer.", ja: "着きました。お布団は夕方からずっとお待ちしていました。辛抱強いほうですが、これ以上は待たせないでください。", zh: "您到了。被褥从傍晚就一直在等您。它很有耐心，但请别再让它等了。", ko: "도착했습니다. 이불이 저녁부터 계속 기다리고 있었어요. 참을성은 많지만, 더는 기다리게 하지 마세요." },
+  ] },
 } satisfies Record<string, AiScene>;
 export type AiId = keyof typeof AI_LINES;
 
@@ -371,7 +409,9 @@ export const AI_PRIORITY: AiId[] = ["depart", "lights", "lightsLate", "bye", "br
   // 大事な地点 (時間に関係なく必ず話す)
   "half", "km5", "km1", "soon", "sea", "izumi", "towel", "topspeed",
   // 空港行き: ターミナルの確認・持ち物・案内 (必ず話す)
-  "term1ok", "term2ok", "outCheck", "term1info", "term2info", "outSeat"];
+  "term1ok", "term2ok", "outCheck", "term1info", "term2info", "outSeat",
+  // 深夜の到着: 乗ってすぐ・到着の手前 (必ず話す)
+  "lateIn", "lateInAir", "lateNear"];
 /** 1 分に 1 回まで (優先の場面は別) */
 export const AI_GAP_MS = 60000;
 /** 豆知識・おしゃべりは、ほかのひと言のあと少なくともこれだけ静かなときに */

@@ -315,7 +315,8 @@ test("humor mode: film / anime / game homages only when it's on (set from dad's 
   for (const id of ["bridgeIn", "lightsLate", "byeLag"]) assert.ok(A.AI_LINES[id].v.length && A.AI_LINES[id].v.every((v) => v.film), id);
   const ai = read("components", "cabin", "cabinAi.ts");
   assert.match(ai, /aiPick\(id, last\[id\], Math\.random\(\), c\.humor\(\)\); if \(i < 0\) return false;/);
-  assert.match(ai, /if \(\(hh >= 22 \|\| hh < 5\) && \(await say\("lightsLate", f\)\)\) return;/, "late arrival: quiet like a ninja");
+  assert.match(ai, /\(\(hh >= 22 \|\| hh < 5\) && \(await say\("lightsLate", f\)\)\) \|\| \(await say\("lights", f\)\)/, "late arrival: quiet like a ninja");
+  assert.match(ai, /isLate = \(ms: number\) => \{ const h = JST\(ms\)\.getUTCHours\(\); return h >= 22 \|\| h < 2; \}/, "late-night pickup = started 22:00-02:00 JST");
   assert.match(ai, /air \? \(Math\.random\(\) < 0\.5 \? "byeLag" : "byeAir"\)/, "airport: arrival line or jet lag line");
   assert.match(ai, /s\.dir === "in" && s\.placeKey\.startsWith\("kix"\) && s\.crossesBridge/, "bridge lines right after leaving the airport");
   assert.match(ai, /\$\("aiSub"\)\.innerHTML = \[\.\.\.line\[lang\]\]/, "subtitles in the guest's language");

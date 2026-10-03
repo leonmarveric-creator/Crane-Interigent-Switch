@@ -24,6 +24,7 @@ export interface AiState {
   arrived: boolean; offroute: boolean;
   boosting: boolean;               // 高速モードの演出中
   crossesBridge: boolean; hasIzumiPoi: boolean;
+  wa?: boolean;                    // 和室 (春・夏・秋・冬) のお部屋か
   weather: { temp: number; code: number; days?: { code: number; max: number }[] } | null;
 }
 export interface AiCtx {
@@ -46,6 +47,8 @@ export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出�
 
 const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 const JST = (ms: number) => new Date(ms + 9 * 3600e3);
+/** 深夜 (夜 10 時〜朝 2 時) に始まった送迎か */
+const isLate = (ms: number) => { const h = JST(ms).getUTCHours(); return h >= 22 || h < 2; };
 
 export function createAi(c: AiCtx): Ai {
   const $ = (id: string) => c.root.querySelector("#" + id) as HTMLElement;
@@ -114,6 +117,15 @@ export function createAi(c: AiCtx): Ai {
     if (el2 > 40 && s.lang !== "en" && done.has("depart")) once("subs", "subs");
     if (s.dir === "in" && el2 > 70) once("stay", "stay");
     if (s.dir === "out" && el2 > 80) once("review", "review");
+    // 深夜の到着 (夜 10 時〜朝 2 時に出発したお迎え): 手短なあいさつ → 道の途中のひと言・案内 → 到着の手前
+    if (s.dir === "in" && isLate(s.started)) {
+      if (el2 > 26) once("lateIn", s.placeKey.startsWith("kix") && Math.random() < 0.4 ? "lateInAir" : "lateIn");
+      if (el2 > 150) once("lateRoad", "lateRoad");
+      if (u >= 0.35) once("lateTip", "lateTip");
+      if (u >= 0.55 && done.has("lateRoad")) once("lateRoad2", "lateRoad");
+      if (u >= 0.75 && done.has("lateTip")) once("lateTip2", "lateTip");
+      if (rem < 1500 && s.total > 4000) once("lateNear", "lateNear");
+    }
     // 空港へのお見送り: ターミナルの確認 → (朝 8 時前に出発なら) 早朝のひと言 → 持ち物 → ターミナルの案内
     const air = s.dir === "out" && s.placeKey.startsWith("kix"), dawn = air && JST(s.started).getUTCHours() < 8, t2 = s.placeKey === "kix2";
     if (air) {
@@ -208,8 +220,10 @@ export function createAi(c: AiCtx): Ai {
   /** お迎えの到着: 照明のひと言。夜 10 時〜朝 5 時は「忍者のように静かに」(ユーモアモードのとき) */
   async function arrival() {
     const f = { force: !c.quiet() }, hh = JST(Date.now()).getUTCHours();
-    if ((hh >= 22 || hh < 5) && (await say("lightsLate", f))) return;
-    await say("lights", f);
+    const s = c.state(), late = isLate(s.started);
+    const ok = ((hh >= 22 || hh < 5) && (await say("lightsLate", f))) || (await say("lights", f));
+    // 深夜の到着: 照明のひと言のあとに、静かなおやすみのひと言 (和室ならときどきお布団の話)
+    if (late) { if (ok) await new Promise((r) => setTimeout(r, 1200)); await say(s.wa && Math.random() < 0.3 ? "lateArrWa" : "lateArr", f); }
   }
   async function farewell() {
     const s = c.state(), f = { force: !c.quiet() }, hh = JST(Date.now()).getUTCHours(), air = s.placeKey.startsWith("kix");

@@ -593,6 +593,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
       arrived, offroute, boosting: bs.phase === "on" || warpOn || prepSt > 0, // "done" (橋を渡り終えた直後) は話してよい
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
+      wa: !!room && /[春夏秋冬]/.test(room.kanji),
     }),
   });
   setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on()) ai.tick(); }, 1000);
