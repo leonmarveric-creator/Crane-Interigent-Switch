@@ -10,6 +10,7 @@ import { langOf } from "@/lib/driverLogic";
 import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
+import { iconPrefix, isIconPath, roomIcon, uploadedIcons } from "@/lib/roomIcon";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (e: any): { ok: false; error: string } => ({ ok: false, error: String(e?.message || e || "ERROR") });
@@ -343,6 +344,32 @@ export async function cabinPhotoUploadUrl(roomId: string, ext: "webp" | "jpg"): 
   const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
   if (error || !data) return fail(error?.message || "UPLOAD_URL");
   return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** 部屋のイラスト (NFC / QR のゲスト用ガイドの左上)。今の絵の一覧: { 部屋 ID: { url, custom } } */
+export async function cabinRoomIcons(rooms: { id: string; kanji: string }[]): Promise<R<{ icons: Record<string, { url: string | null; custom: boolean }> }>> {
+  const g = guard(); if (g) return g;
+  const icons: Record<string, { url: string | null; custom: boolean }> = {};
+  await Promise.all(rooms.filter((r) => isId(r.id)).slice(0, 40).map(async (r) => { icons[r.id] = await roomIcon(r.id, String(r.kanji || "")); }));
+  return { ok: true, icons };
+}
+/** イラストのアップロード先。ブラウザで 512px の正方形 (WebP) に縮めてから直接送る */
+export async function cabinIconUploadUrl(roomId: string, ext: "webp" | "jpg"): Promise<R<{ path: string; signedUrl: string }>> {
+  const g = guard(); if (g) return g;
+  if (!isId(roomId)) return fail("BAD");
+  const path = `rooms/${iconPrefix(roomId)}${Date.now().toString(36)}.${ext === "webp" ? "webp" : "jpg"}`;
+  const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
+  if (error || !data) return fail(error?.message || "UPLOAD_URL");
+  return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** イラストを決める: path = アップロードしたもの (前のものは消す) / null = アップロードしたものを全部消して、最初の絵 (無ければ漢字) に戻す */
+export async function cabinSetRoomIcon(roomId: string, path: string | null): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(roomId) || (path != null && !isIconPath(roomId, path))) return fail("BAD");
+  try {
+    const gone = (await uploadedIcons(roomId)).filter((p) => p !== path);
+    if (gone.length) await supabaseAdmin.storage.from("driver-music").remove(gone);
+  } catch (e) { return fail(String((e as Error)?.message || e)); }
+  return { ok: true };
 }
 /** 部屋の写真を決める (photo: 'builtin:r1'〜'r4' / アップロードした 'rooms/…' / null = 最初の写真) と 位置 */
 export async function cabinSetRoomPhoto(roomId: string, photo: string | null, spots: CabinSpots | null): Promise<R> {

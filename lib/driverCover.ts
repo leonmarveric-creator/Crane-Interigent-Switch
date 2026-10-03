@@ -113,3 +113,26 @@ export async function compressRoomPhoto(img: Blob, maxW = 1280): Promise<{ blob:
     return jpg ? { blob: jpg, ext: "jpg" } : null;
   } catch { return null; }
 }
+
+/** 部屋のイラスト (ゲスト用ガイドのアイコン) を 真ん中で正方形に切り抜いて 512px まで縮める。WebP → だめなら JPEG */
+export async function compressRoomIcon(img: Blob, size = 512): Promise<{ blob: Blob; ext: "webp" | "jpg" } | null> {
+  try {
+    let src: CanvasImageSource & { width: number; height: number };
+    try { src = await createImageBitmap(img); }
+    catch {
+      const url = URL.createObjectURL(img);
+      src = await new Promise<HTMLImageElement>((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = url; });
+    }
+    const w = src.width, h = src.height; if (!w || !h) return null;
+    const sq = Math.min(w, h), o = Math.min(size, sq);
+    const c = document.createElement("canvas"); c.width = o; c.height = o;
+    const g = c.getContext("2d"); if (!g) return null;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(src, (w - sq) / 2, (h - sq) / 2, sq, sq, 0, 0, o, o);
+    const to = (type: string, q: number) => new Promise<Blob | null>((ok) => c.toBlob(ok, type, q));
+    const webp = await to("image/webp", 0.82);
+    if (webp && webp.type === "image/webp") return { blob: webp, ext: "webp" };
+    const jpg = await to("image/jpeg", 0.85);
+    return jpg ? { blob: jpg, ext: "jpg" } : null;
+  } catch { return null; }
+}

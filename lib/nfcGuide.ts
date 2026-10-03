@@ -12,14 +12,15 @@ import { TOILET_T } from "@/lib/cabinToilet";
 import { CHECKIN_DEFAULT_URL, roomGuideOf } from "@/lib/cabinAiTalk";
 import { jstDay } from "@/lib/driverLogic";
 import { NFC_HTML } from "@/lib/nfcPage";
+import { roomIcon } from "@/lib/roomIcon";
 
 export interface NfcData {
-  room: { kanji: string; en: string } | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
+  room: { kanji: string; en: string } | null; /** 部屋のイラスト (無ければ漢字を出す) */ icon: string | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
 }
 
 export async function nfcData(key: string): Promise<NfcData> {
-  const out: NfcData = { room: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, G: { LOCK_T, TOILET_T } };
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, G: { LOCK_T, TOILET_T } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([
@@ -33,7 +34,7 @@ export async function nfcData(key: string): Promise<NfcData> {
     const rooms = ((data ?? []) as any[]).map((r) => ({ raw: r, c: toCabinRoom(r) }));
     const hit = rooms.find((r) => String(r.raw.slug || "").toLowerCase() === k || r.c.kanji === k || r.c.slug === k);
     if (!hit) return out;
-    out.room = { kanji: hit.c.kanji, en: hit.c.en || "" }; out.slug = String(hit.raw.slug); out.roomKey = `/room/${encodeURIComponent(hit.raw.slug)}`;
+    out.room = { kanji: hit.c.kanji, en: hit.c.en || "" }; out.icon = (await roomIcon(String(hit.raw.id), hit.c.kanji)).url; out.slug = String(hit.raw.slug); out.roomKey = `/room/${encodeURIComponent(hit.raw.slug)}`;
     { const e = entOf(hit.c.building || hit.raw.building || "Crane Nest"); out.entKey = e ? `/key/${encodeURIComponent(e.slug)}` : out.entKey; } out.knob = hasRoomLock(hit.raw.slug); out.natsu = roomGuideOf(hit.raw.slug) === "natsu";
     const now = Date.now(), today = jstDay(now), tomorrow = jstDay(now + 86400e3);
     const { res, tokens } = await loadReservations(now - 2 * 86400e3, now + 2 * 86400e3);

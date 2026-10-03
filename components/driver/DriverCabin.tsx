@@ -13,8 +13,8 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
-import { compressRoomPhoto } from "@/lib/driverCover";
+import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
+import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
 import type { Music } from "@/components/driver/DriverMusic";
@@ -354,6 +354,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
           </button>
         ))}
       </div>
+      <RoomIcons rooms={data.cabin.rooms} t={t} toast={toast} />
       {edit && <PhotoEditor room={edit} t={t} toast={toast} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void refresh(); }} />}
     </div>
   );
@@ -390,6 +391,45 @@ function CheckinQr({ url, t, toast, refresh }: { url: string | null; t: T; toast
         <label className="btn">{busy ? t("保存中…") : "🖼 " + (url ? t("変える") : t("QR 画像を選ぶ"))}<input type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void up(f); }} /></label>
         {url ? <button onClick={async () => { if (!confirm(t("チェックイン QR を外しますか？"))) return; const r = await cabinSetCheckinQr(null); if (r.ok) { toast(t("外しました")); await refresh(); } }}>{t("外す")}</button> : null}
       </div>
+    </>
+  );
+}
+
+/* 部屋のイラスト: NFC / QR で開くゲスト用ガイド (/g/[部屋]) の左上に出る絵。春夏秋冬は最初から入っていて、ここで好きな絵に変えられる */
+function RoomIcons({ rooms, t, toast }: { rooms: CabinRoom[]; t: T; toast: (s: string) => void }) {
+  const [icons, setIcons] = useState<Record<string, { url: string | null; custom: boolean }>>({});
+  const [busy, setBusy] = useState("");
+  const key = rooms.map((r) => r.id).join(",");
+  const load = useCallback(async () => { const r = await cabinRoomIcons(rooms.map((x) => ({ id: x.id, kanji: x.kanji }))).catch(() => null); if (r?.ok) setIcons(r.icons); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [load]);
+  const up = async (room: CabinRoom, f: File) => {
+    setBusy(room.id);
+    const c = await compressRoomIcon(f); if (!c) { setBusy(""); toast(t("画像を読み込めませんでした")); return; }
+    const u = await cabinIconUploadUrl(room.id, c.ext); if (!u.ok) { setBusy(""); toast(t("アップロードできませんでした")); return; }
+    const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": c.blob.type, "x-upsert": "false" }, body: c.blob }).catch(() => null);
+    if (!put?.ok) { setBusy(""); toast(t("アップロードできませんでした")); return; }
+    const r = await cabinSetRoomIcon(room.id, u.path); setBusy("");
+    if (!r.ok) { toast(t("保存できませんでした")); return; }
+    sfx.chord(); toast(t("保存しました")); await load();
+  };
+  const back = async (room: CabinRoom) => {
+    if (!confirm(t("アップロードした絵を外しますか？"))) return;
+    setBusy(room.id); const r = await cabinSetRoomIcon(room.id, null); setBusy("");
+    if (r.ok) { toast(t("外しました")); await load(); } else toast(t("保存できませんでした"));
+  };
+  return (
+    <>
+      <div className="ctitle" style={{ marginTop: 14 }}>🐰 {t("部屋のイラスト（ゲスト用ガイド）")}</div>
+      <div className="cnote">{t("お部屋の NFC・QR から開くガイドの左上に出る絵です。画像を選ぶと、真ん中を正方形に切り抜いて自動で小さくします。外すと最初の絵（無い部屋は漢字）に戻ります。")}</div>
+      {rooms.map((r) => { const ic = icons[r.id]; return (
+        <div className="ckrow" key={r.id}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {ic?.url ? <img src={ic.url} alt="" /> : <span className="ckempty">{r.kanji}</span>}
+          <b style={{ minWidth: 64 }}>{r.kanji} {r.en}</b>
+          <label className="btn">{busy === r.id ? t("保存中…") : "🖼 " + t("変える")}<input type="file" accept="image/*" disabled={!!busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void up(r, f); }} /></label>
+          {ic?.custom ? <button disabled={!!busy} onClick={() => void back(r)}>{t("外す")}</button> : null}
+        </div>
+      ); })}
     </>
   );
 }
