@@ -1143,3 +1143,7 @@
 .cab .wk-log em{font-style:normal;flex:0 0 76px;font-size:12px;text-align:center;border-radius:8px;padding:3px 0;background:#2a2410;color:#ffd58a}
 .cab .wk-log em.ok{background:#0c2418;color:#7ee0a3}.cab .wk-log em.ng{background:#2a1010;color:#ff9b9b}
 .cab .wk-log .none{color:#6f85a6}
+
+/* ---- 到着画面: コンシェルジュの QR (金色。鍵・お部屋・地図の入口) ---- */
+.cab .aq button.con{background:linear-gradient(135deg,#caa04a,#8f6a1f);border-color:#ffe6a8;box-shadow:0 0 26px rgba(230,198,117,.55),inset 0 1px 0 rgba(255,255,255,.2)}
+.cab .aq button.con small{color:#fff3d2}

@@ -43,9 +43,10 @@ test("cabin music: iPad buttons → phone commands (only known ones, seek needs 
 
 test("cabin: arrival screen QR → the usual entrance key / room pages in the guest's language (no secrets in the QR)", async () => {
   const M = await load("cabinMusic.ts");
-  assert.deepEqual(M.qrUrls("https://x.app/", { roomSlug: "room-autumn", entrance: "crane-nest" }, "zh"), { key: "https://x.app/key/crane-nest?lang=zh", room: "https://x.app/room/room-autumn?lang=zh" });
-  assert.deepEqual(M.qrUrls("https://x.app", { roomSlug: "r", entrance: null }, "en"), { key: null, room: "https://x.app/room/r?lang=en" });
-  assert.deepEqual(M.qrUrls("https://x.app", null, "en"), { key: null, room: null });
+  assert.deepEqual(M.qrUrls("https://x.app/", { roomSlug: "room-autumn", entrance: "crane-nest" }, "zh"), { key: "https://x.app/key/crane-nest?lang=zh", room: "https://x.app/room/room-autumn?lang=zh", con: "https://x.app/g/room-autumn?lang=zh" });
+  assert.deepEqual(M.qrUrls("https://x.app", { roomSlug: "r", entrance: null }, "en"), { key: null, room: "https://x.app/room/r?lang=en", con: "https://x.app/g/r?lang=en" });
+  assert.deepEqual(M.qrUrls("https://x.app", null, "en"), { key: null, room: null, con: "https://x.app/g/lounge?lang=en" });
+  for (const l of ["ja", "zh", "en", "ko"]) assert.equal(M.CON_T[l].steps.length, 3);
   for (const l of ["ja", "zh", "en", "ko"]) { const T = M.MUSIC_T[l]; assert.equal(T.qSteps.key.length, 3); assert.ok(T.qKey && T.qRoom && T.toastCmd); }
   const eng = read("components", "cabin", "cabinEngine.ts");
   assert.match(eng, /trip\?\.dir === "out"[^;]*"none"/, "not shown when seeing guests off");

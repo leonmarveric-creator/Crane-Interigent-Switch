@@ -284,7 +284,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const [mMsg, setMMsg] = useState("");
   const wake = useWake(menu);
   const [wkOpen, setWkOpen] = useState(false);
-  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "keyqr") {
+  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "keyqr" | "conqr") {
     const e = eng.current; if (!e) return;
     if (inTrip) { setMMsg("送迎中は使えません（到着画面のボタンを使ってください）"); return; }
     const ok = e.manual(k, rooms.find((r) => r.id === mRoom) ?? null, mLang);
@@ -330,6 +330,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <div className="row gsel">{rooms.map((r) => { const b = wakeBadge(wake.map[r.id]); return <button key={r.id} className={mRoom === r.id ? "on" : ""} onClick={() => setMRoom(r.id)}>{r.kanji}{b && <i className={`wkb ${b.cls}`}>{b.text}</i>}</button>; })}</div>
           <div className="row gsel">{(["en", "zh", "ko", "ja"] as GLang[]).map((l) => <button key={l} className={mLang === l ? "on" : ""} onClick={() => { setMLang(l); try { localStorage.setItem("cab.mlang", l); } catch { /* ignore */ } }}>{({ en: "English", zh: "中文", ko: "한국어", ja: "日本語" } as const)[l]}</button>)}</div>
           <div className="row"><button onClick={() => manual("toilet")}>🚻 トイレの使い方</button><button onClick={() => manual("ent")}>🚪 エントランス</button></div>
+          <div className="row"><button className="wk-open" onClick={() => manual("conqr")}>🛎 コンシェルジュの QR（鍵・お部屋・地図の入口）</button></div>
           <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button><button onClick={() => manual("keyqr")}>🔑 エントランスの鍵の QR</button></div>
           <div className="row"><button onClick={() => manual("room")} disabled={!eng.current?.hasRoomGuide(rooms.find((r) => r.id === mRoom) ?? null)}>🔑 お部屋の開け方・鍵</button><button onClick={() => manual("ck")}>🛂 チェックイン</button></div>
           {mMsg && <small style={{ color: "#ffd199" }}>{mMsg}</small>}

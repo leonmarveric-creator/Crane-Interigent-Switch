@@ -64,6 +64,8 @@ export function qrUrls(origin: string, room: { roomSlug: string | null; entrance
   const o = origin.replace(/\/+$/, "");
   return {
     key: room?.entrance ? `${o}/key/${encodeURIComponent(room.entrance)}?lang=${lang}` : null,
+    /** コンシェルジュ (ゲスト用ガイド): 鍵・お部屋・地図の入口。部屋が分からなければ共用のガイド */
+    con: `${o}/g/${encodeURIComponent(room?.roomSlug || "lounge")}?lang=${lang}`,
     room: room?.roomSlug ? `${o}/room/${encodeURIComponent(room.roomSlug)}?lang=${lang}` : null,
   };
 }
@@ -103,4 +105,12 @@ export const MUSIC_T: Record<GLang, MusicText> = {
     qTitle: { key: "휴대폰으로 스캔 · 입구", room: "휴대폰으로 스캔 · 객실" },
     qSteps: { key: ["휴대폰 카메라로 QR 스캔", "이름과 전화번호 뒤 4자리 입력", "입구에서 「열기」를 누르기"], room: ["휴대폰 카메라로 QR 스캔", "전화번호 뒤 4자리 입력", "잠금·에어컨·조명을 휴대폰으로"] }, qClose: "닫기",
   },
+};
+
+/** 車内 iPad の「コンシェルジュの QR」(1 回読んで保存すれば、鍵もお部屋もそこから) */
+export const CON_T: Record<GLang, { btn: string; title: string; steps: string[]; tip: string }> = {
+  ja: { btn: "コンシェルジュ", title: "スマホで読む · コンシェルジュ", steps: ["スマホのカメラ（または WeChat）で QR を読む", "案内にそって、このページを保存する", "エントランスの鍵・お部屋・地図は、ここから開けます"], tip: "まず 🛎 コンシェルジュを読むと、鍵もお部屋もそこから開けます" },
+  zh: { btn: "礼宾服务", title: "用手机扫码 · 礼宾服务", steps: ["用手机相机或微信扫描二维码", "按页面提示保存此页面", "大门钥匙、房间、地图都从这里打开"], tip: "先扫 🛎 礼宾服务，钥匙和房间都能从那里打开" },
+  en: { btn: "Concierge", title: "Scan with your phone · Concierge", steps: ["Scan with your phone camera (or WeChat)", "Follow the prompt to save the page", "Entrance key, room and map all open from there"], tip: "Scan 🛎 Concierge first — your keys and room open from there" },
+  ko: { btn: "컨시어지", title: "휴대폰으로 스캔 · 컨시어지", steps: ["휴대폰 카메라(또는 WeChat)로 QR 스캔", "안내에 따라 이 페이지를 저장", "현관 열쇠·객실·지도를 모두 여기서 열 수 있어요"], tip: "먼저 🛎 컨시어지를 스캔하면 열쇠와 객실을 거기서 열 수 있어요" },
 };
