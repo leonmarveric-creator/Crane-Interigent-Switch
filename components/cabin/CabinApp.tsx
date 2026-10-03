@@ -281,11 +281,11 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const [mRoom, setMRoom] = useState<string | null>(rooms[0]?.id ?? null);
   const [mLang, setMLang] = useState<GLang>(() => { try { const v = localStorage.getItem("cab.mlang"); if (v === "en" || v === "zh" || v === "ko" || v === "ja") return v; } catch { /* ignore */ } return "en"; });
   const [mMsg, setMMsg] = useState("");
-  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi") {
+  function manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "keyqr") {
     const e = eng.current; if (!e) return;
     if (inTrip) { setMMsg("送迎中は使えません（到着画面のボタンを使ってください）"); return; }
     const ok = e.manual(k, rooms.find((r) => r.id === mRoom) ?? null, mLang);
-    if (!ok) { setMMsg(k === "ck" ? "チェックインの QR がまだ登録されていません（お父さんのスマホで登録）" : "このお部屋のガイドはまだありません"); return; }
+    if (!ok) { setMMsg(k === "ck" ? "チェックインの QR がまだ登録されていません（お父さんのスマホで登録）" : k === "keyqr" ? "このお部屋のエントランスの鍵（スマートキー）がまだ登録されていません" : "このお部屋のガイドはまだありません"); return; }
     setMMsg(""); setMenu(false);
   }
   /* ---------- テスト走行 (スマホなしで動きを確認) ---------- */
@@ -327,7 +327,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <div className="row gsel">{rooms.map((r) => <button key={r.id} className={mRoom === r.id ? "on" : ""} onClick={() => setMRoom(r.id)}>{r.kanji}</button>)}</div>
           <div className="row gsel">{(["en", "zh", "ko", "ja"] as GLang[]).map((l) => <button key={l} className={mLang === l ? "on" : ""} onClick={() => { setMLang(l); try { localStorage.setItem("cab.mlang", l); } catch { /* ignore */ } }}>{({ en: "English", zh: "中文", ko: "한국어", ja: "日本語" } as const)[l]}</button>)}</div>
           <div className="row"><button onClick={() => manual("toilet")}>🚻 トイレの使い方</button><button onClick={() => manual("ent")}>🚪 エントランス</button></div>
-          <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button></div>
+          <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button><button onClick={() => manual("keyqr")}>🔑 エントランスの鍵の QR</button></div>
           <div className="row"><button onClick={() => manual("room")} disabled={!eng.current?.hasRoomGuide(rooms.find((r) => r.id === mRoom) ?? null)}>🔑 お部屋の開け方・鍵</button><button onClick={() => manual("ck")}>🛂 チェックイン</button></div>
           {mMsg && <small style={{ color: "#ffd199" }}>{mMsg}</small>}
           <h4>テスト走行（スマホなしで動きを確認）</h4>
