@@ -916,3 +916,58 @@
 .kpad.land .btn{padding:12px}
 .kpad.land .top canvas{flex:0 1 240px}.kpad.land .top .mnu{margin-left:auto}
 
+
+/* ===== エージェント通信の細いバー (話している間だけ) ===== */
+
+.kops .agc{position:absolute;left:96px;top:174px;width:560px;height:46px;z-index:45;pointer-events:none;font-family:"Share Tech Mono",ui-monospace,monospace;color:#dff6ff;display:flex;align-items:stretch;
+ background:linear-gradient(90deg,rgba(6,14,20,.86),rgba(6,14,20,.62) 70%,rgba(6,14,20,.2));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+ border-top:1px solid rgba(215,242,255,.5);border-bottom:1px solid rgba(215,242,255,.22);clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%)}
+.kops .agc::after{content:"";position:absolute;top:0;bottom:0;width:90px;left:-90px;background:linear-gradient(90deg,transparent,rgba(220,245,255,.14),transparent);animation:agks 2.2s linear infinite}
+@keyframes agks{to{left:560px}}
+.kops .agc>div{position:relative;display:flex;flex-direction:column;justify-content:center;padding:0 14px;border-right:1px solid rgba(215,242,255,.16);white-space:nowrap}
+.kops .agc small{font-size:8.5px;letter-spacing:.2em;color:#8fb4c6;line-height:1.5}.agc b{font-weight:400;font-size:14px;letter-spacing:.16em;line-height:1.25}
+.kops .agc .agc-k{padding-left:16px;border-left:3px solid var(--c)}.agc .agc-k b{font:700 20px "Rajdhani",sans-serif;letter-spacing:.34em;color:#fff}.agc .agc-k b i{font-style:normal;color:var(--c);animation:agkb .8s steps(2) infinite}
+@keyframes agkb{50%{opacity:.2}}
+.kops .agc .agc-n b{color:var(--c);font-size:16px;letter-spacing:.24em}
+.kops .agc .agc-w{flex:1 1 auto;min-width:120px;flex-direction:row;align-items:center;justify-content:space-between;padding:0 12px}.agc .agc-w i{display:block;flex:0 0 2px;width:2px;height:22px;background:var(--c);transform:scaleY(.08);animation:agkq .5s ease-in-out infinite alternate}
+@keyframes agkq{to{transform:scaleY(1)}}
+.kops .agc .agc-s b{color:var(--c)}.agc .agc-s{border-right:0;padding-right:26px}.agc .agc-a{border-right:0;padding-right:26px}.agc .agc-a b{color:#fff}
+.kops .agcx{position:absolute;left:96px;top:174px;width:560px;height:46px;z-index:46;pointer-events:none}
+.kops .agcx i{position:absolute;background:var(--c);box-shadow:0 0 6px var(--c)}.agcx .t{left:0;top:-4px;width:54px;height:1.5px}.agcx .b{right:14px;bottom:-4px;width:120px;height:1.5px;animation:agkb 1s steps(2) infinite}
+.kops .agcx u{position:absolute;left:0;top:-15px;text-decoration:none;font:8.5px "Share Tech Mono",monospace;letter-spacing:.22em;color:#8fb4c6}.agcx s{position:absolute;right:14px;top:-15px;text-decoration:none;font:8.5px "Share Tech Mono",monospace;letter-spacing:.16em;color:#8fb4c6}
+
+.kops .port .agc,.kops .port .agcx{left:70px;top:770px}
+.kops .skin-mi .agc,.kops .skin-mi .agcx{left:28px;top:70px}
+.kops .agcf{position:absolute;left:0;top:58px;width:112px;height:140px;border:1px solid var(--c);background:#04090e center/cover no-repeat;box-shadow:0 0 16px color-mix(in srgb,var(--c) 45%,transparent);overflow:hidden;clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%)}
+.kops .agcf::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.3) 0 1px,transparent 1px 3px);animation:agkfs 5s linear infinite}
+@keyframes agkfs{to{background-position:0 60px}}
+.kops .agcf em{position:absolute;inset:0;display:grid;place-items:center;font:700 58px "Rajdhani",sans-serif;font-style:normal;color:var(--c);opacity:.85}.kops .agcf.has em{display:none}
+.kops .agcf span{position:absolute;left:0;right:0;bottom:0;padding:3px 7px;background:rgba(4,9,14,.78);font:700 12px "Rajdhani",sans-serif;letter-spacing:.24em;color:var(--c);z-index:1}
+.kops .agcf b{position:absolute;right:5px;top:4px;font:400 8px "Share Tech Mono",monospace;letter-spacing:.14em;color:#ff6b6b;z-index:1;animation:agkb 1s steps(2) infinite}
+/* 色は画面のテーマに合わせる (HOLO = ホログラムの色 / MISSION = グリーン) */
+.kops .skin-ho .agc,.kops .skin-ho .agcx{--c:var(--h2)}.kops .skin-mi .agc,.kops .skin-mi .agcx{--c:var(--g)}
+.kops .skin-ho .agc{background:linear-gradient(90deg,rgba(8,20,28,.82),rgba(8,20,28,.55) 70%,rgba(8,20,28,.15));border-top-color:var(--hl);border-bottom-color:var(--hd);color:var(--h)}
+.kops .skin-ho .agc .agc-k b,.kops .skin-ho .agcf span{color:var(--h)}
+/* 呼び出し中・留守番電話 */
+.kops .agc.m-ring .agc-k b{animation:agkb .5s steps(2) infinite}.kops .agc.m-ring .agc-w i{animation:none;transform:scaleY(.12)}
+.kops .agc.m-ring{box-shadow:0 0 0 1px var(--c),0 0 22px color-mix(in srgb,var(--c) 55%,transparent);animation:agkring 1.7s ease-in-out infinite}
+@keyframes agkring{0%,100%{filter:brightness(1)}8%,24%{filter:brightness(1.7)}16%{filter:brightness(1)}}
+.kops .agcx.m-ring .agcf{animation:agkring 1.7s ease-in-out infinite}
+.kops .agc.m-vm .agc-k b{color:var(--r,#ff6b6b)}
+.kops .agcx .agcb{position:absolute;left:124px;top:58px;display:flex;gap:10px;pointer-events:auto}
+.kops .agcx .agcb button{min-width:128px;height:62px;padding:0 16px;border:1px solid var(--c);background:rgba(6,14,20,.82);color:#fff;font:700 19px "Rajdhani","Hiragino Sans",sans-serif;letter-spacing:.08em;text-align:left;clip-path:polygon(0 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)}
+.kops .agcx .agcb button small{display:block;font:400 9px "Share Tech Mono",monospace;letter-spacing:.24em;color:var(--c);margin-top:2px}
+.kops .agcx .agcb button[data-c=ans]{background:color-mix(in srgb,var(--c) 30%,rgba(6,14,20,.82));box-shadow:0 0 14px color-mix(in srgb,var(--c) 50%,transparent)}
+/* ===== 操作パネル (スマホ) の着信画面 ===== */
+.kpad .kcall,.kpad .kcall *{box-sizing:border-box}
+.kpad .kcall{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;background:rgba(2,10,8,.94);text-align:center}
+.kpad .kcall.on{display:flex}
+.kpad .kcall>small{font:400 11px "Share Tech Mono",monospace;letter-spacing:.3em;color:var(--g);animation:agkb 1s steps(2) infinite}
+.kpad .kcall .kcf{width:150px;height:188px;border:1px solid var(--g);background:#03100c center/cover no-repeat;display:grid;place-items:center;box-shadow:0 0 26px rgba(60,242,166,.35);animation:agkring 1.7s ease-in-out infinite}
+.kpad .kcall .kcf em{font:700 76px "Rajdhani",sans-serif;font-style:normal;color:var(--g)}.kpad .kcall .kcf.has em{display:none}
+.kpad .kcall>b{font:700 34px "Rajdhani",sans-serif;letter-spacing:.3em;color:#fff}
+.kpad .kcall>i{font-style:normal;font-size:15px;color:var(--m)}
+.kpad .kcall .kcb{display:flex;gap:12px;width:100%;margin-top:14px}
+.kpad .kcall .kcb button{flex:1;height:78px;border-radius:14px;border:1px solid var(--r);background:rgba(255,90,90,.12);color:#fff;font:700 21px "Rajdhani","Hiragino Sans",sans-serif}
+.kpad .kcall .kcb button.y{border-color:var(--g);background:rgba(60,242,166,.22);box-shadow:0 0 18px rgba(60,242,166,.35)}
+.kpad .kcall .kcb small{display:block;font:400 10px "Share Tech Mono",monospace;letter-spacing:.24em;opacity:.8;margin-top:2px}
