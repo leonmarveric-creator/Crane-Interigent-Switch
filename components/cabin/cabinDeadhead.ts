@@ -52,6 +52,8 @@ const HTML = `<div class="dhs">
  <button class="ab" id="dhBoard">🧳 ゲスト乗車</button><div class="sm">※ ロビーで iPad を掲げてください · 画面をタップで地図に戻る</div></div>
 <div class="dhdone" id="dhDone"><b>MISSION COMPLETE</b><small id="dhDoneS"></small></div>`;
 
+/** 朝 8 時前 (日本時間) に出発したお見送りか */
+const dawnOut = (t: CabinTrip | null) => !!t && t.dir === "out" && new Date(Date.parse(t.startedAt) + 9 * 3600e3).getUTCHours() < 8;
 export function createDeadhead(c: DhCtx): Deadhead {
   const L = (window as any).L;
   const host = document.createElement("div"); host.className = "dh"; host.innerHTML = HTML; c.stage.appendChild(host);
@@ -230,10 +232,11 @@ export function createDeadhead(c: DhCtx): Deadhead {
     if (spdLv && kmh < 70 && Date.now() - spdAt > 180000) spdLv = 0;
     // ひと言は 3 分に 1 回くらい (ほかのセリフのあと 40 秒は静かに・同じものは 1 回だけ)
     if (!talking && Date.now() - idleAt > 180000 && Date.now() - quietAt > 40000) {
-      const pool = [...DH_IDLE.both, ...(back ? DH_IDLE.back : DH_IDLE.go)].filter((k) => !said[k]);
+      const pool = [...DH_IDLE.both, ...(back ? DH_IDLE.back : DH_IDLE.go), ...(back && dawnOut(trip) ? DH_IDLE.dawn : [])].filter((k) => !said[k]);
       if (pool.length) { const k = pool[Math.floor(Math.random() * pool.length)]; said[k] = 1; idleAt = quietAt = Date.now(); void say(k); }
     }
     if (!back) {
+      if (trip.placeKey === "kix2" && toEnd < 6000 && toEnd > 3500 && !said.pickT2) { said.pickT2 = 1; quietAt = Date.now(); void say("pickT2"); }
       if (toEnd < 3000 && !said.near) { said.near = 1; void say("near"); }
       if (toEnd < 400 && kmh < 15 && !welcomeShown) { welcomeShown = true; showBoard(); }
     } else if (toEnd < 150 && kmh < 10 && !said.home) { said.home = 1; void say("home"); const id = trip.id; setTimeout(() => { if (trip?.id === id) c.end(id); }, 45000); }

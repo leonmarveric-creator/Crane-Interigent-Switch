@@ -114,6 +114,17 @@ export function createAi(c: AiCtx): Ai {
     if (el2 > 40 && s.lang !== "en" && done.has("depart")) once("subs", "subs");
     if (s.dir === "in" && el2 > 70) once("stay", "stay");
     if (s.dir === "out" && el2 > 80) once("review", "review");
+    // 空港へのお見送り: ターミナルの確認 → (朝 8 時前に出発なら) 早朝のひと言 → 持ち物 → ターミナルの案内
+    const air = s.dir === "out" && s.placeKey.startsWith("kix"), dawn = air && JST(s.started).getUTCHours() < 8, t2 = s.placeKey === "kix2";
+    if (air) {
+      if (el2 > 28) once("termOk", t2 ? "term2ok" : "term1ok");
+      if (dawn && el2 > 55) once("earlyGo", "earlyGo");
+      if (el2 > 140) once("outCheck", "outCheck");
+      if (u >= 0.4) once("termInfo", t2 ? "term2info" : "term1info");
+      // 「橋の手前で起こします」があるので、橋より手前 (陸側) にいるときだけ
+      if (dawn && el2 > 220 && s.ll && s.ll[1] > 135.3) once("earlyRoad", "earlyRoad");
+      if (dawn && rem < 2500 && s.total > 8000) once("earlyNear", "earlyNear");
+    }
     // 止まった / 走り出した / 長い停車
     const moving = (s.kmh ?? 0) > 12;
     if (!moving && (s.kmh ?? 99) < 3 && s.toDest > 400) {
@@ -203,7 +214,8 @@ export function createAi(c: AiCtx): Ai {
   async function farewell() {
     const s = c.state(), f = { force: !c.quiet() }, hh = JST(Date.now()).getUTCHours(), air = s.placeKey.startsWith("kix");
     const dest: AiId | null = air ? (Math.random() < 0.5 ? "byeLag" : "byeAir") : s.placeKey === "r833" ? "byeShop" : s.placeKey === "rinku" || s.placeKey === "hineno" ? "byeTrain" : null;
-    const extra: AiId[] = [...(s.weather && rainy(s.weather.code) ? (["byeRain"] as AiId[]) : []), ...(hh < 7 ? (["byeEarly"] as AiId[]) : []), ...(air && hh >= 21 ? (["byeNight"] as AiId[]) : [])];
+    if (air && (await say("outSeat", f))) await new Promise((r) => setTimeout(r, 1200)); // 座席・足元の忘れ物
+    const extra: AiId[] = [...(s.weather && rainy(s.weather.code) ? (["byeRain"] as AiId[]) : []), ...(hh < 7 ? (["byeEarly"] as AiId[]) : []), ...(air && JST(s.started).getUTCHours() < 8 ? (["byeDawn"] as AiId[]) : []), ...(air && hh >= 21 ? (["byeNight"] as AiId[]) : [])];
     const first = extra.length && (!dest || Math.random() < 0.5) ? extra[Math.floor(Math.random() * extra.length)] : dest;
     if (first && (await say(first, f))) await new Promise((r) => setTimeout(r, 1200));
     await say("bye", f);

@@ -36,11 +36,16 @@ export const DH_LINES: Record<string, { en: string; ja: string }> = {
   done: { en: "Mission complete. Guests delivered safely. Nicely done, Captain.", ja: "任務完了。ゲストを無事にお送りしました。お見事でした、キャプテン。" },
   forgot: { en: "Before we head home, please check the back seats and the trunk for anything left behind.", ja: "帰る前に、後部座席とトランクに忘れ物がないか確認をお願いします。" },
   home: { en: "Welcome back to base, Captain. Rest well. I'll be here.", ja: "基地に帰還しました、キャプテン。ゆっくり休んでください。私はここにいます。" },
+  // 早朝 (朝 8 時前に出発) のお見送りの帰り道 / ターミナル 2 へお迎え
+  dawn1: { en: "Mission complete before breakfast. Well done.", ja: "朝食前に任務完了。お見事です。" },
+  dawn2: { en: "The day has barely started, and you've already finished a job.", ja: "一日が始まったばかりなのに、もう一仕事終えましたね。" },
+  dawn3: { en: "Mission complete before breakfast. I would applaud, but I lack hands.", ja: "朝食前に任務完了。拍手したいところですが、手がございません。" },
+  pickT2: { en: "Guest pickup at Terminal 2. Standing by at the arrival exit.", ja: "ターミナル2でお迎え。到着出口で待機します。" },
 };
 /** 速度のひと言。spd100b は迎えに行く途中だけ、spd100c は帰り道だけ */
 export const DH_SPD: Record<number, string[]> = { 80: ["spd80a", "spd80b"], 100: ["spd100a", "spd100b", "spd100c"], 120: ["spd120a", "spd120b"], 140: ["spd140a", "spd140b"] };
 export const dhSpdFor = (lv: number, back: boolean) => (DH_SPD[lv] ?? []).filter((k) => (back ? k !== "spd100b" : k !== "spd100c"));
-export const DH_IDLE = { both: ["idle1", "idle2", "idle3", "idle4"], go: ["go1", "go2", "go3"], back: ["back1", "back2"] };
+export const DH_IDLE = { both: ["idle1", "idle2", "idle3", "idle4"], go: ["go1", "go2", "go3"], back: ["back1", "back2"], dawn: ["dawn1", "dawn2", "dawn3"] };
 export const dhAudio = (k: string) => `/cabin/audio/dh/${k}.mp3`;
 /** 便名 (IATA: CI152) → 上空レーダーのコールサイン (ICAO: CAL152) */
 const ICAO: Record<string, string> = { CI: "CAL", BR: "EVA", CX: "CPA", UO: "HKE", HX: "CRK", JL: "JAL", NH: "ANA", MM: "APJ", GK: "JJP", IT: "TTW", KE: "KAL", OZ: "AAR", "7C": "JJA", TW: "TWB", LJ: "JNA", ZE: "ESR", JX: "SJX", CA: "CCA", MU: "CES", CZ: "CSN", HO: "DKH", FM: "CSH", SQ: "SIA", TR: "TGW", TG: "THA", VN: "HVN", VJ: "VJC", PR: "PAL", "5J": "CEB", MH: "MAS", D7: "XAX", AK: "AXM", FD: "AIQ", QF: "QFA", UA: "UAL", DL: "DAL", AA: "AAL", EK: "UAE", QR: "QTR", KL: "KLM", AF: "AFR", LH: "DLH", FI: "ICE", HA: "HAL", NZ: "ANZ", "9C": "CQH", "3K": "JSA", SL: "TLM", BX: "ABL" };

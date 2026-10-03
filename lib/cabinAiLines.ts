@@ -316,13 +316,62 @@ export const AI_LINES = {
   "tapmany": { cat: "おまけ (光の玉を押す)", when: "何度も押された", v: [
     { en: "Pressing more won't make more of me. There is only one Astraea.", ja: "それ以上押しても、私は増えません。ASTRAEA はひとりだけです。", zh: "再怎么按我也不会变多。ASTRAEA 只有一个。", ko: "더 눌러도 제가 늘어나진 않아요. ASTRAEA는 하나뿐이에요." },
   ] },
+  "earlyGo": { cat: "早朝の空港行き", when: "お見送り (空港行き) を朝 8 時前に出発して、少し走ったとき", v: [
+    { en: "Early departure confirmed. The roads are ours this morning.", ja: "早朝出発を確認。今朝の道は貸し切りです。", zh: "已确认清晨出发。今早的路全是我们的。", ko: "이른 아침 출발 확인. 오늘 아침 도로는 우리 차지입니다." },
+    { en: "Good morning. The sun isn't up yet, but we are.", ja: "おはようございます。太陽はまだですが、私たちは起きています。", zh: "早上好。太阳还没起床，但我们起来了。", ko: "좋은 아침입니다. 해는 아직 안 떴지만, 우리는 일어났네요." },
+    { en: "First flight of the day. Let's make it a smooth one.", ja: "本日の第一便です。滑らかに参りましょう。", zh: "今天的第一班航班。让我们平稳出发。", ko: "오늘의 첫 비행입니다. 부드럽게 가 보죠." },
+    { en: "The sun has not yet reported for duty. We shall proceed without it.", ja: "太陽はまだ出勤しておりません。先に始めましょう。", zh: "太阳还没来上班。我们先开始吧。", ko: "해는 아직 출근 전입니다. 먼저 시작하죠." },
+  ] },
+  "term1ok": { cat: "空港・ターミナル", when: "ターミナル 1 へ出発した直後 (念のための確認・1 回だけ)", v: [
+    { en: "We're heading to Terminal 1, as you told us. Just confirming. I do like to be certain.", ja: "伺っていたとおり、ターミナル1へ向かいます。念のための確認です。確実なのが好きでして。", zh: "按您之前告知的，我们前往 1 号航站楼。只是确认一下。我喜欢万无一失。", ko: "말씀하신 대로 제1터미널로 갑니다. 확인차 여쭙니다. 확실한 걸 좋아해서요." },
+    { en: "Destination: Terminal 1, as arranged. If anything has changed, the driver is listening.", ja: "目的地は、お約束どおりターミナル1です。変更があれば、運転手がお聞きします。", zh: "目的地：1 号航站楼，如约定。如有变动，请告诉司机。", ko: "목적지는 약속대로 제1터미널입니다. 변경이 있으면 기사님께 말씀해 주세요." },
+    { en: "Terminal 1, correct? I already know the answer, but it's polite to ask.", ja: "ターミナル1で、よろしいですね？ 答えは存じていますが、伺うのが礼儀ですので。", zh: "1 号航站楼，对吗？我已经知道答案了，但问一下比较礼貌。", ko: "제1터미널, 맞으시죠? 답은 이미 알지만, 여쭙는 게 예의라서요." },
+  ] },
+  "term2ok": { cat: "空港・ターミナル", when: "ターミナル 2 へ出発した直後 (念のための確認・1 回だけ)", v: [
+    { en: "We're heading to Terminal 2, as you told us. Just confirming. I do like to be certain.", ja: "伺っていたとおり、ターミナル2へ向かいます。念のための確認です。確実なのが好きでして。", zh: "按您之前告知的，我们前往 2 号航站楼。只是确认一下。我喜欢万无一失。", ko: "말씀하신 대로 제2터미널로 갑니다. 확인차 여쭙니다. 확실한 걸 좋아해서요." },
+    { en: "Destination: Terminal 2, as arranged. If anything has changed, the driver is listening.", ja: "目的地は、お約束どおりターミナル2です。変更があれば、運転手がお聞きします。", zh: "目的地：2 号航站楼，如约定。如有变动，请告诉司机。", ko: "목적지는 약속대로 제2터미널입니다. 변경이 있으면 기사님께 말씀해 주세요." },
+    { en: "Terminal 2, correct? I already know the answer, but it's polite to ask.", ja: "ターミナル2で、よろしいですね？ 答えは存じていますが、伺うのが礼儀ですので。", zh: "2 号航站楼，对吗？我已经知道答案了，但问一下比较礼貌。", ko: "제2터미널, 맞으시죠? 답은 이미 알지만, 여쭙는 게 예의라서요." },
+  ] },
+  "outCheck": { cat: "空港・ターミナル", when: "空港へ出発して少しあと (パスポート・お部屋の忘れ物)", v: [
+    { en: "Passport, phone, boarding pass. Check now. Turning back is far easier here than at the terminal.", ja: "パスポート、携帯、搭乗券。今ご確認を。引き返すなら、ターミナルよりここの方がずっと楽です。", zh: "护照、手机、登机牌。请现在确认。在这里掉头，比在航站楼容易得多。", ko: "여권, 휴대폰, 탑승권. 지금 확인해 주세요. 되돌아가기엔 터미널보다 여기가 훨씬 쉽습니다." },
+    { en: "Your room access ends at checkout, so there's nothing to hand back. Just yourselves, and your luggage.", ja: "お部屋の解錠はチェックアウトで終了しますので、返却するものはありません。お体とお荷物だけで結構です。", zh: "房间的开锁权限在退房时结束，所以没有需要归还的东西。带上您自己和行李就好。", ko: "객실 잠금 해제는 체크아웃과 함께 종료되니, 반납할 것은 없습니다. 몸과 짐만 챙기시면 됩니다." },
+    { en: "Did you leave anything in the room? Tell the driver now. I can still open the door for you. From the air, it's rather harder.", ja: "お部屋にお忘れ物はありませんか？ 今なら運転手へ。まだドアをお開けできます。上空からですと、少々難しくなります。", zh: "房间里有落下的东西吗？现在告诉司机，我还能为您开门。到了天上，就有点难了。", ko: "객실에 두고 온 물건은 없으신가요? 지금 기사님께 말씀하시면 아직 문을 열어 드릴 수 있어요. 하늘 위에서는 조금 어렵습니다." },
+  ] },
+  "earlyRoad": { cat: "早朝の空港行き", when: "朝 8 時前に出発した空港行きで、橋の手前を走っているとき", v: [
+    { en: "We'll arrive roughly two hours before departure. That's enough time to check in, and to regret not sleeping longer.", ja: "出発の約2時間前に到着します。手続きにも、もっと寝たかったと思うにも十分な時間です。", zh: "我们大约在起飞前两小时到达。足够办理登机，也足够后悔没多睡一会儿。", ko: "출발 약 두 시간 전에 도착합니다. 수속하기에도, 더 잘 걸 그랬다고 후회하기에도 충분한 시간이죠." },
+    { en: "Feel free to rest. I'll wake you before the bridge. The view is worth opening your eyes for.", ja: "お休みください。連絡橋の手前でお知らせします。目を開ける価値のある景色です。", zh: "请尽管休息。过桥之前我会叫醒您。那里的风景值得睁开眼睛。", ko: "편히 쉬세요. 다리 앞에서 깨워 드릴게요. 눈을 뜰 만한 풍경이거든요." },
+    { en: "Traffic is nonexistent. Apparently everyone else had the good sense to stay in bed.", ja: "渋滞はゼロです。他の皆さまは賢明にもまだ布団の中のようで。", zh: "路上完全不堵。看来其他人都很明智地还在被窝里。", ko: "정체가 전혀 없습니다. 다른 분들은 현명하게도 아직 이불 속인가 봅니다." },
+  ] },
+  "term1info": { cat: "空港・ターミナル", when: "ターミナル 1 へ向かう道の途中 (案内)", v: [
+    { en: "Destination: Terminal 1. International departures are on the fourth floor.", ja: "目的地はターミナル1。国際線の出発は4階です。", zh: "目的地：1 号航站楼。国际线出发在四楼。", ko: "목적지는 제1터미널. 국제선 출발은 4층입니다." },
+    { en: "Terminal 1: we'll stop at the departures level. Find your airline's letter on the signs overhead. It saves a great deal of walking.", ja: "ターミナル1は出発階でお降ろしします。頭上の案内で航空会社のカウンター記号を探してください。歩く距離がかなり減ります。", zh: "1 号航站楼：我们会停在出发层。请在头顶的指示牌上找到航空公司的柜台字母，可以少走很多路。", ko: "제1터미널은 출발층에 내려 드립니다. 머리 위 안내판에서 항공사 카운터 알파벳을 찾으세요. 걷는 거리가 훨씬 줄어듭니다." },
+  ] },
+  "term2info": { cat: "空港・ターミナル", when: "ターミナル 2 へ向かう道の途中 (案内)", v: [
+    { en: "Destination: Terminal 2. Small, simple, and quick to walk.", ja: "目的地はターミナル2。小さくてシンプル、歩く距離も短めです。", zh: "目的地：2 号航站楼。小巧、简单，走起来很快。", ko: "목적지는 제2터미널. 작고 단순해서 걷는 거리도 짧습니다." },
+    { en: "Low-cost airlines close check-in strictly on time. Please go to the counter first, souvenirs second.", ja: "LCC は締切時刻に厳格です。まずカウンター、お土産はその後で。", zh: "廉价航空会准时关闭值机柜台。请先去柜台，再买伴手礼。", ko: "저비용 항공사는 수속 마감 시간이 엄격합니다. 먼저 카운터, 기념품은 그 다음에요." },
+    { en: "Carry-on limits are enforced here. If your bag has grown during the trip, now is the time to rearrange.", ja: "機内持ち込みの重量は厳しく見られます。旅の間にかばんが成長していたら、今のうちに詰め替えを。", zh: "这里会严格检查随身行李限额。如果您的包在旅途中“长大”了，现在正是重新整理的时候。", ko: "이곳은 기내 수하물 제한을 엄격히 확인합니다. 여행 중에 가방이 자랐다면, 지금이 다시 정리할 때입니다." },
+    { en: "It's a fair distance from the main building. Fortunately, you hired the right people.", ja: "本館からは少々離れています。幸い、良い送迎をお選びになりました。", zh: "这里离主楼有一段距离。幸好，您选对了接送。", ko: "본관에서 꽤 떨어져 있습니다. 다행히 좋은 송영을 고르셨네요." },
+  ] },
+  "earlyNear": { cat: "早朝の空港行き", when: "朝 8 時前に出発した空港行きで、ターミナルの手前", v: [
+    { en: "We'll be at the airport shortly. Traffic is light, one of the few rewards of waking this early.", ja: "まもなく空港です。道は空いています。早起きの数少ないご褒美です。", zh: "马上就到机场了。路上很通畅，这是早起为数不多的奖励之一。", ko: "곧 공항입니다. 도로가 한산하네요. 일찍 일어난 몇 안 되는 보상입니다." },
+    { en: "Terminal ahead. You're early, exactly as planned.", ja: "ターミナルが見えました。早めの到着、計画どおりです。", zh: "航站楼就在前方。您到得很早，完全按计划。", ko: "터미널이 앞에 보입니다. 일찍 도착했네요. 계획대로입니다." },
+  ] },
+  "outSeat": { cat: "空港・ターミナル", when: "空港に着いたとき (座席・足元の忘れ物)", v: [
+    { en: "We've arrived. Please check the seat and the floor. Phones are remarkably good at hiding.", ja: "到着です。座席と足元をご確認ください。携帯電話は隠れるのが実に上手です。", zh: "我们到了。请检查座位和脚下。手机特别擅长躲起来。", ko: "도착했습니다. 좌석과 발밑을 확인해 주세요. 휴대폰은 숨는 데 아주 능숙하거든요." },
+  ] },
+  "byeDawn": { cat: "早朝の空港行き", when: "朝 8 時前に出発した空港行きの到着 (ときどき)", v: [
+    { en: "Thank you for staying with us. Safe skies.", ja: "ご滞在ありがとうございました。よい空の旅を。", zh: "感谢您的入住。祝您一路平安。", ko: "머물러 주셔서 감사합니다. 편안한 비행 되세요." },
+    { en: "We've arrived early. I'd take the credit, but the driver did most of the work.", ja: "早めに到着しました。私の手柄にしたいところですが、ほぼ運転手の仕事です。", zh: "我们提前到了。我很想把功劳算在自己头上，但大部分是司机的功劳。", ko: "일찍 도착했습니다. 제 공으로 돌리고 싶지만, 대부분 기사님이 하신 일입니다." },
+  ] },
 } satisfies Record<string, AiScene>;
 export type AiId = keyof typeof AI_LINES;
 
 /** 優先: 間隔の決まり (3 分に 1 回) を無視して話す場面 */
 export const AI_PRIORITY: AiId[] = ["depart", "lights", "lightsLate", "bye", "bridge", "bridgeIn", "tap", "tapmany", "restart",
   // 大事な地点 (時間に関係なく必ず話す)
-  "half", "km5", "km1", "soon", "sea", "izumi", "towel", "topspeed"];
+  "half", "km5", "km1", "soon", "sea", "izumi", "towel", "topspeed",
+  // 空港行き: ターミナルの確認・持ち物・案内 (必ず話す)
+  "term1ok", "term2ok", "outCheck", "term1info", "term2info", "outSeat"];
 /** 1 分に 1 回まで (優先の場面は別) */
 export const AI_GAP_MS = 60000;
 /** 豆知識・おしゃべりは、ほかのひと言のあと少なくともこれだけ静かなときに */
