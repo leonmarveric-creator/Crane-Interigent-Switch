@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DriverData } from "@/lib/driverData";
 import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
-import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
+import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
 import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto } from "@/app/driver/actions";
 import { compressRoomPhoto } from "@/lib/driverCover";
@@ -40,6 +40,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (kmh == null && last && Date.now() - last.t > 500) kmh = (dist(last.ll, ll) / ((Date.now() - last.t) / 1000)) * 3.6;
       last = { ll, kmh, t: Date.now() };
       const r = boostStep(bs, ll, kmh); bs = r.s;
+      // BOOST の準備 (曲をゆっくり止める) は iPad の合図 (boost-prep) で。iPad の声がスマホに来ていないときだけ、このスマホの GPS で
+      if (!r.event && !rv.ok() && boostPrepDue(bs, ll, kmh)) mRef.current.boostPrep();
       // BOOST の曲は iPad の「ブースト開始 / 完了」のセリフに合わせる (下の onPlay)。
       // セリフが来ないとき (iPad の声がスマホに来ていない) だけ、このスマホの GPS で始める / 終える
       if (r.event === "start") { clearTimeout(gT); gT = setTimeout(() => { if (live && !mRef.current.inBoost()) boosting = mRef.current.boostIn(0); }, rv.ok() ? 12000 : 5000); }
@@ -51,6 +53,9 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     const rv = startRemoteVoice(trip.id, {
       // ブースト開始のセリフと一緒に BOOST の曲を始め、完了のセリフと一緒にフェードアウト (元の曲へ)
       onPlay: (u) => {
+        // 準備の合図 → 曲をゆっくり止める。効果音 (起動) → 5.2 秒後の点火の瞬間に、BOOST の曲を普通の音量で始める (回送の BOOST は準備が無いので今までどおり)
+        if (/boost-prep\.mp3$/.test(u)) { mRef.current.boostPrep(); return; }
+        if (/boost-sfx\.mp3$/.test(u)) { if (mRef.current.prepped() && !mRef.current.inBoost()) { clearTimeout(gT); boosting = mRef.current.boostIn(5200, true); } return; }
         if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
         else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
       },
@@ -88,7 +93,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       live = false; clearTimeout(gT); rv.stop(); if (wid != null) geo?.clearWatch(wid); clearInterval(iv);
       document.removeEventListener("visibilitychange", wake); lock?.release?.().catch?.(() => {});
       document.removeEventListener("pointerdown", reUnlock, true);
-      if (mRef.current.inBoost()) mRef.current.boostOut();
+      if (mRef.current.inBoost()) mRef.current.boostOut(); else mRef.current.boostPrepCancel();
     };
   }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const tripRef2 = useRef(trip); tripRef2.current = trip;

@@ -86,6 +86,7 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
     if (!last) last = Number(r.now) - 3000; // 最初は 3 秒前より新しいものだけ (時計はサーバーのもの)
     for (const it of (r.items ?? []).filter((x: any) => Number(x.n) > last)) {
       last = Math.max(last, Number(it.n));
+      if (it.s === SFX_MARK) try { h.onPlay?.(String(it.u)); } catch { /* */ } // 何が鳴るかを知らせる (BOOST の準備の合図・起動の効果音)
       if (it.s === SFX_MARK) { void playFx(String(it.u)); continue; } // 効果音はすぐ鳴らす
       q.push({ u: String(it.u), n: Number(it.n) }); void load(String(it.u));
     }

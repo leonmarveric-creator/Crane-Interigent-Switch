@@ -151,6 +151,18 @@ export function boostStep(s: BoostState, p: LL, kmh: number | null): { s: BoostS
   return { s: n, event: null };
 }
 
+/** BOOST の準備 (曲を止める → 準備のセリフ → 効果音 → 点火) を始める距離: 点火がだいたい橋の入口に来るように、速さから逆算する */
+export const BOOST_PREP_MIN_M = 330, BOOST_PREP_MAX_M = 650, BOOST_PREP_LEAD_S = 16;
+/** boostStep のあとに呼ぶ (s は boostStep が返したもの)。橋に向かっていて、十分速く、準備を始める距離に入ったら true */
+export function boostPrepDue(s: BoostState, p: LL, kmh: number | null): boolean {
+  if (s.phase !== "off" || s.dir === 0) return false;
+  if (!(kmh == null || kmh >= BOOST_MIN_KMH)) return false;
+  const { t, lat } = bridgePos(p); if (lat >= 120) return false;
+  const before = (s.dir === 1 ? -t : t - 1) * BRIDGE.len; // 入口までの残り (m)
+  const need = Math.min(BOOST_PREP_MAX_M, Math.max(BOOST_PREP_MIN_M, ((kmh ?? 60) / 3.6) * BOOST_PREP_LEAD_S));
+  return before > 0 && before <= need;
+}
+
 /* ---------------- 観光案内 ---------------- */
 export type PoiKey = "bridge" | "rinku" | "izumi";
 export const POIS: Record<PoiKey, LL> = { bridge: [34.4260, 135.2792], rinku: [34.4107, 135.2976], izumi: [34.3990, 135.3120] };

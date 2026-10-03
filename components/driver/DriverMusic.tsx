@@ -46,6 +46,8 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const boost = useRef<{ url: string | null; pos: number; wasPlaying: boolean; bid?: string; at: number } | null>(null); // 高速モード中 (元の曲の位置)
   const switching = useRef(false); // BOOST の曲の入れ替え中 (この間は声で音量を下げない。下げるとフェードが途中で止まって曲が戻らなくなる)
   const boostSafety = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prep = useRef<{ url: string | null; pos: number; wasPlaying: boolean; at: number } | null>(null); // BOOST の準備中 (曲を止めて、準備のセリフと効果音を待っている)
+  const prepSafety = useRef<ReturnType<typeof setTimeout> | null>(null);
   const duckWanted = useRef(false); // 声が流れている (音楽を小さくしたい)
   /** 曲の入れ替えが終わったら、今の声の状態に合わせた音量へ */
   const settle = () => { switching.current = false; if (!el().paused) fadeTo(duckWanted.current ? vol.current * 0.2 : vol.current, 900); };
@@ -210,19 +212,40 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     prime,
     duck(on: boolean) { duckWanted.current = on; if (!playing || switching.current) return; fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900); },
     /** 高速モード (スカイゲートブリッジ): 今の曲を止めて「⚡ BOOST 用」の曲を開始位置から。iPad の点火に合わせて少し待つ */
-    boostIn(delayMs = 5000): boolean {
+    /** BOOST の準備: 今の曲をゆっくり (2.5 秒) 小さくして止める。準備のセリフと効果音は無音の中で鳴る。
+        40 秒たっても BOOST が始まらなければ (遅くなって起動しなかった)、元の曲に戻す */
+    boostPrep() {
+      if (boost.current || prep.current) return;
+      const a0 = el(); const p = { url: track?.url ?? null, pos: a0.currentTime, wasPlaying: playing, at: Date.now() }; prep.current = p;
+      if (playing) { switching.current = true; fadeTo(0, 2500); setTimeout(() => { if (prep.current === p && !boost.current) { p.pos = a0.currentTime; a0.pause(); } }, 2550); }
+      if (prepSafety.current) clearTimeout(prepSafety.current);
+      prepSafety.current = setTimeout(() => { if (prep.current === p) apiRef.current?.boostPrepCancel(); }, 40000);
+    },
+    prepped(): boolean { return !!prep.current; },
+    boostPrepCancel() {
+      const p = prep.current; if (!p) return; prep.current = null;
+      if (prepSafety.current) clearTimeout(prepSafety.current); prepSafety.current = null;
+      if (boost.current) return;
+      const a = el();
+      if (p.wasPlaying) { route(); setLevel(0.05); a.play().then(() => fadeTo(duckWanted.current ? vol.current * 0.2 : vol.current, 1500)).catch(() => {}); } else setLevel(vol.current);
+      setTimeout(settle, 1600);
+    },
+    /** full = true: 小さい音から上げずに、最初から普通の音量で始める (点火の瞬間に合わせる) */
+    boostIn(delayMs = 5000, full = false): boolean {
       // 前の BOOST が終わらずに残っていたら (10 分以上前) 片付けてから
       if (boost.current && Date.now() - boost.current.at > 600000) dropBoost();
       const B = tracks.filter((x) => x.purpose === "boost"); if (!B.length || boost.current) return false;
       const tr = B[Math.floor(Math.random() * B.length)]; const a0 = el();
-      const me = { url: track?.url ?? null, pos: a0.currentTime, wasPlaying: playing, bid: tr.id, at: Date.now() }; boost.current = me;
+      // 準備で曲を止めてあれば、戻る先 (曲・位置) は準備のときのもの
+      const p0 = prep.current; prep.current = null; if (prepSafety.current) clearTimeout(prepSafety.current); prepSafety.current = null;
+      const me = { url: p0 ? p0.url : track?.url ?? null, pos: p0 && a0.paused ? p0.pos : a0.currentTime, wasPlaying: p0 ? p0.wasPlaying : playing, bid: tr.id, at: Date.now() }; boost.current = me;
       switching.current = true;
       // 今の曲を小さくして止める (フェードの終わりを待たずに時間で)。ブースト開始のセリフに合わせるときは短く
       const outMs = Math.max(250, Math.min(900, delayMs - 50));
       if (playing) { fadeTo(0, outMs); setTimeout(() => { if (boost.current === me && !el().loop) a0.pause(); }, outMs + 20); }
       setTimeout(async () => {
         if (boost.current !== me) return; const a = el(); const src = await cachedUrl(tr.url);
-        a.loop = true; a.src = src; const go = () => { try { a.currentTime = tr.startSec || 0; } catch { /* ignore */ } route(); setLevel(0.05); a.play().then(() => fadeTo(duckWanted.current ? vol.current * 0.2 : vol.current, 1500)).catch(() => {}); setTimeout(settle, 1600); };
+        a.loop = true; a.src = src; const go = () => { try { a.currentTime = tr.startSec || 0; } catch { /* ignore */ } route(); if (full) { setLevel(duckWanted.current ? vol.current * 0.2 : vol.current); a.play().catch(() => {}); } else { setLevel(0.05); a.play().then(() => fadeTo(duckWanted.current ? vol.current * 0.2 : vol.current, 1500)).catch(() => {}); } setTimeout(settle, full ? 100 : 1600); };
         if (a.readyState >= 1) go(); else a.addEventListener("loadedmetadata", go, { once: true });
       }, Math.max(outMs + 30, delayMs));
       // 念のため: 橋の終わりが分からなくても 8 分で元の曲へ戻す
@@ -258,6 +281,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       // 車内 iPad の AI が話す間は音楽を下げる
       if (c === "duck") { if (!playing) return; api.duck(true); setTimeout(() => apiRef.current?.duck(false), Math.max(1, v ?? 10) * 1000); return; }
       if (boost.current) return; // 高速モード中は触らない
+      if (prep.current) return; // BOOST の準備中 (曲を止めている) も触らない
       if (c === "toggle") api.toggle(); else if (c === "next") api.next(); else if (c === "prev") api.prev(); else if (c === "seek" && v != null) api.seek(v);
     },
     /** 高速モード (BOOST の曲) の最中か */

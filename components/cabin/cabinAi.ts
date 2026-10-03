@@ -42,7 +42,7 @@ export interface AiCtx {
   roomLights: () => void;          // お部屋の照明をつける (ゲストの質問から)
   roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
 }
-export interface Ai { tick(): void; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
+export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出す (話し終わったら戻る) */ prep(): Promise<boolean>; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
 
 const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 const JST = (ms: number) => new Date(ms + 9 * 3600e3);
@@ -145,7 +145,8 @@ export function createAi(c: AiCtx): Ai {
       // 橋の手前 (高速モードの前に)
       if (s.crossesBridge) {
         const toBridge = Math.min(Math.hypot((la - 34.41475) * 111000, (lo - 135.29395) * 91500), Math.hypot((la - 34.43725) * 111000, (lo - 135.26445) * 91500));
-        if (toBridge < 1300 && toBridge > 500 && moving) once("bridge", "bridge", { force: true });
+        // 準備のセリフ ("bridge") は BOOST の流れが必ず出す (下の prep)。ここでは言わない
+        void toBridge;
       }
       if (Math.hypot((la - 34.4125) * 111000, (lo - 135.2935) * 91500) < 1500) once("sea", "sea");
       // お迎えで空港から橋に入ってすぐ (海王類・クラーケンなど。ユーモアモードのときだけ)
@@ -288,5 +289,11 @@ export function createAi(c: AiCtx): Ai {
   function preload() {
     void (async () => { for (const u of urls()) { if (blobs[u]) continue; try { const r = await fetch(u); if (r.ok) blobs[u] = URL.createObjectURL(await r.blob()); } catch { /* 次へ */ } } })();
   }
-  return { tick, event, reset, preload, urls, command, busy: () => speaking, closeMenu, unlock: () => unlockAudio(el, urls()[0]) };
+  /** BOOST の準備のセリフ (必ず出す): 話している途中なら止めて、音楽はもう止まっているので待たずに話す。話し終わったら戻る */
+  async function prep(): Promise<boolean> {
+    done.add("bridge");
+    if (speaking) { stopVoice(el); try { (el.onended as any)?.call(el, new Event("ended")); } catch { /* */ } for (let i = 0; i < 20 && speaking; i++) await new Promise((r) => setTimeout(r, 100)); }
+    return say("bridge", { force: true, duck: false });
+  }
+  return { tick, event, prep, reset, preload, urls, command, busy: () => speaking, closeMenu, unlock: () => unlockAudio(el, urls()[0]) };
 }

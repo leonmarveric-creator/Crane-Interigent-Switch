@@ -5,7 +5,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  BASE_MIN, BRIDGE, BOOST_INIT, CRANE_NEST, PLACES, POIS, boostStep, bridgePos, bufferMin, decodePolyline, dist, etaMin,
+  BASE_MIN, BRIDGE, BOOST_INIT, CRANE_NEST, PLACES, POIS, boostPrepDue, boostStep, bridgePos, bufferMin, decodePolyline, dist, etaMin,
   makeRoute, pointAt, poisFor, project, type BoostState, type GLang, type LL, type PoiKey, type Route,
 } from "@/lib/cabinGeo";
 import { CABIN_T, type CabinText } from "@/lib/cabinI18n";
@@ -152,7 +152,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   };
   // ブーストの効果音もスマホから (Bluetooth で車のスピーカー)。スマホが来ていなければ iPad から。音そのものは同じ
   const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", SFX_MARK); return; } const a = new Audio(src(k)); a.play().catch(() => {}); };
-  const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end",
+  const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end", "boost-prep",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
 
   /* ---------- 状態 ---------- */
@@ -306,8 +306,11 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     meter(offroute ? 1 - rem / R.total : d / R.total);
     // 高速モード (スカイゲートブリッジ)
     const b = boostStep(bs, ll, kmh); bs = b.s;
-    if (b.event === "start") boostOn(); else if (b.event === "end") boostOff();
-    if (bs.phase === "on") boostPanel(ll, kmh);
+    // 準備 (曲を止める → 準備のセリフ) が先。準備の途中で起動の場所に来たら、準備の流れがそのまま起動する
+    if (b.event === "start") { if (prepSt === 0) boostOn(); else if (prepSt === 2) { clearTimeout(prepT); prepSt = 0; boostOn(); } }
+    else if (b.event === "end") { prepTok++; prepSt = 0; clearTimeout(prepT); if (boostLive) boostOff(); }
+    else if (prepSt === 0 && boostPrepDue(bs, ll, kmh)) void boostPrep();
+    if (bs.phase === "on" && boostLive) boostPanel(ll, kmh);
     // 観光案内
     if (!offroute) for (const p of pois) {
       if (hit.has(p.k) || d < p.d - 30) continue;
@@ -460,8 +463,21 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     lines.forEach(([ms, txt, ok]) => T_(ms, () => { const x = document.createElement("div"); x.innerHTML = txt + (ok ? ` <b>${ok}</b>` : ""); el.appendChild(x); }));
   }
   const kmhStr = () => (kmhNow != null ? `${Math.round(kmhNow)} km/h` : "OK");
+  /* 準備: スマホの曲をゆっくり止める (boost-prep は無音の合図) → 準備のセリフ → 続けて起動 (効果音)。
+     起動の場所にまだ来ていなければ 20 秒だけ待つ (遅くなって起動しなかったら、スマホが自分で元の曲に戻す) */
+  let prepSt: 0 | 1 | 2 = 0, prepTok = 0, prepT: ReturnType<typeof setTimeout> | undefined, boostLive = false;
+  async function boostPrep() {
+    const my = ++prepTok; prepSt = 1;
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    sfx("boost-prep");
+    await wait(2500); if (my !== prepTok) return;
+    await ai.prep().catch(() => false); if (my !== prepTok) return;
+    await wait(500); if (my !== prepTok) return;
+    if (bs.phase === "on") { prepSt = 0; boostOn(); }
+    else { prepSt = 2; prepT = setTimeout(() => { if (my === prepTok && prepSt === 2) prepSt = 0; }, 20000); }
+  }
   function boostOn() {
-    const m = $("map"), h = $("bhud"); bMax = 0;
+    const m = $("map"), h = $("bhud"); bMax = 0; boostLive = true;
     hit.add("bridge");
     sfx("boost-sfx");
     setText("bmodeV", "NORMAL"); $("bmode").className = "bmode"; setText("bLbl", "CHARGE"); [0, 1, 2].forEach((i) => $("rg" + i).setAttribute("transform", "rotate(0)"));
@@ -488,6 +504,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const n = performance.now(); if (n - bTrivT > 6000) { bTrivT = n; bTrivI++; const e = $("bTriv"); e.classList.remove("in"); void e.offsetWidth; e.textContent = T.bTriv[bTrivI % 3]; e.classList.add("in"); }
   }
   function boostOff() {
+    boostLive = false;
     timers.forEach(clearTimeout); timers = []; if (chg) chg.stop = true;
     const m = $("map"), h = $("bhud");
     sfx("boost-end"); ai.event("boostEnd");
@@ -518,7 +535,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
   function countUp(el: HTMLElement, to: number, dec: number) { const t0 = performance.now(); const f = () => { const u = Math.min(1, (performance.now() - t0) / 900), e = 1 - Math.pow(1 - u, 3); el.textContent = (to * e).toFixed(dec); if (u < 1) requestAnimationFrame(f); }; f(); }
   function boostReset() {
-    bs = { ...BOOST_INIT }; warpOn = false; warpK = 1; if (chg) chg.stop = true;
+    bs = { ...BOOST_INIT }; warpOn = false; warpK = 1; if (chg) chg.stop = true; prepTok++; prepSt = 0; clearTimeout(prepT); boostLive = false;
     $("map").classList.remove("boost", "boost-charge", "punch"); $("boostT").className = "boostT"; $("boostP").classList.remove("on"); $("bhud").className = "bhud"; $("bdone").classList.remove("on");
   }
 
@@ -573,7 +590,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
-      arrived, offroute, boosting: bs.phase === "on" || warpOn, // "done" (橋を渡り終えた直後) は話してよい
+      arrived, offroute, boosting: bs.phase === "on" || warpOn || prepSt > 0, // "done" (橋を渡り終えた直後) は話してよい
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
     }),
   });

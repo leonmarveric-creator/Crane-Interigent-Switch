@@ -107,3 +107,37 @@ test("cabin: can be added to the home screen (own manifest opening /cabin, icons
   const lay = read("app", "cabin", "layout.tsx");
   assert.match(lay, /manifest: "\/cabin\/manifest\.webmanifest"/); assert.match(lay, /apple-touch-icon/); assert.match(lay, /capable: true/);
 });
+
+test("cabin: BOOST prep (music fades → prep line → charge sfx → ignition) always starts before the boost itself, never in traffic or on station routes", async () => {
+  const G = await load("cabinGeo.ts");
+  const run = (key, kmh) => {
+    const r = G.makeRoute(routes[key]); let s = { ...G.BOOST_INIT }; const ev = []; let prepped = false;
+    for (let d = 0; d <= r.total; d += 20) {
+      const p = G.pointAt(r, d); const x = G.boostStep(s, p, kmh); s = x.s;
+      const b = G.bridgePos(p), before = Math.round((s.dir === 1 ? -b.t : b.t - 1) * G.BRIDGE.len);
+      if (x.event) ev.push([x.event, before]);
+      else if (!prepped && G.boostPrepDue(s, p, kmh)) { prepped = true; ev.push(["prep", before]); }
+    }
+    return ev;
+  };
+  for (const key of ["kix_in", "kix2_in", "kix_out", "kix2_out"]) for (const kmh of [55, 60, 80, 100]) {
+    const ev = run(key, kmh);
+    assert.deepEqual(ev.map((e) => e[0]), ["prep", "start", "end"], `${key} @${kmh}`);
+    const need = Math.min(G.BOOST_PREP_MAX_M, Math.max(G.BOOST_PREP_MIN_M, (kmh / 3.6) * G.BOOST_PREP_LEAD_S));
+    assert.ok(ev[0][1] > G.BOOST_BEFORE_M && ev[0][1] <= need, `${key} @${kmh}: prep ${ev[0][1]} m before the entrance (need ≤ ${Math.round(need)})`);
+  }
+  assert.deepEqual(run("kix_in", 30), [], "no prep in a traffic jam (music keeps playing)");
+  assert.deepEqual(run("rinku_in", 80), [], "station routes never prep");
+  // 順番: iPad は 合図 → 2.5 秒 → 準備のセリフ → 効果音。スマホは 合図で曲を止め、効果音の 5.2 秒後 (点火) に BOOST の曲を普通の音量で
+  const eng = read("components", "cabin", "cabinEngine.ts"), ai = read("components", "cabin", "cabinAi.ts");
+  assert.match(eng, /sfx\("boost-prep"\);\s*await wait\(2500\);[^\n]*\n\s*await ai\.prep\(\)/, "cue → fade time → prep line");
+  assert.match(eng, /if \(bs\.phase === "on"\) \{ prepSt = 0; boostOn\(\); \}/, "then the charge sfx follows the line");
+  assert.doesNotMatch(ai, /once\("bridge", "bridge"/, "the prep line is not left to the chatter (it could be skipped)");
+  assert.match(ai, /done\.add\("bridge"\);[\s\S]{0,400}return say\("bridge", \{ force: true, duck: false \}\)/);
+  const cab = read("components", "driver", "DriverCabin.tsx"), mus = read("components", "driver", "DriverMusic.tsx");
+  assert.match(cab, /boost-prep\\\.mp3\$\/\.test\(u\)\) \{ mRef\.current\.boostPrep\(\); return; \}/);
+  assert.match(cab, /boost-sfx\\\.mp3\$\/\.test\(u\)\) \{ if \(mRef\.current\.prepped\(\) && !mRef\.current\.inBoost\(\)\) \{ clearTimeout\(gT\); boosting = mRef\.current\.boostIn\(5200, true\); \}/);
+  assert.match(mus, /fadeTo\(0, 2500\)/, "slow fade-out"); assert.match(mus, /apiRef\.current\?\.boostPrepCancel\(\); \}, 40000\)/, "music comes back if the boost never starts");
+  assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) try \{ h\.onPlay\?\.\(String\(it\.u\)\); \}/, "the phone hears which sfx / cue played");
+  assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "boost-prep.mp3")));
+});
