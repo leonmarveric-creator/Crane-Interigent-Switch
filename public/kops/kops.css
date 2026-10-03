@@ -984,3 +984,9 @@
 .kops .kmpz button{width:52px;height:48px;border-radius:8px;border:1px solid rgba(60,242,166,.6);background:rgba(2,16,10,.88);color:#e8fff4;font:700 16px "Hiragino Sans",sans-serif}
 .kops .kmpf{padding:10px 14px 0;color:#9fd6c0}.kops .kmpf>small{display:block;font-size:12px}
 .kops .kmpf em{display:block;font-style:normal;font:600 14px "Share Tech Mono",monospace;color:#3cf2a6;margin-top:2px}.kops .kmpf .kgo{margin-top:10px}
+/* ===== 操作パネル: エージェント通信のワンタップ切り替え ===== */
+.kpad .kagq{flex:none;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:0 14px;border-radius:10px;border:1px solid rgba(134,185,165,.4);background:rgba(4,17,13,.7);color:var(--m);text-align:left;box-sizing:border-box}
+.kpad .kagq i{width:12px;height:12px;border-radius:50%;background:#55685f;flex:none}
+.kpad .kagq b{font:700 17px "Rajdhani","Hiragino Sans",sans-serif;letter-spacing:.06em;flex:1}
+.kpad .kagq small{font-size:11px;opacity:.8}
+.kpad .kagq.on{border-color:var(--g);color:var(--t);background:rgba(60,242,166,.14)}.kpad .kagq.on i{background:var(--g);box-shadow:0 0 10px var(--g)}
