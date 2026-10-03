@@ -13,10 +13,12 @@ import KOpsLibrary from "@/components/kops/KOpsLibrary";
 export interface KOpsGuest {
   id: string; name: string; room: string; roomId: string; lang: string; cat: "out" | "in" | "stay"; place: string | null;
   pax: number; L: number; S: number; sp: number; nights: number; reg: boolean; dropId: string | null; note: string; nat: string;
+  /** ゲストの便の状態 (お迎えのとき。自動確認の結果) */
+  flt?: { st: string; delay: number | null } | null;
 }
 export interface KOpsData { guests: KOpsGuest[]; devices: { id: string; name: string }[]; rooms: { id: string; name: string; kanji: string }[]; cabinMissing: boolean }
 
-const V = "20";
+const V = "21";
 function load(src: string): Promise<void> {
   return new Promise((ok, ng) => {
     if (/\.css(\?|$)/.test(src)) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = src; l.onload = () => ok(); l.onerror = () => ng(new Error(src)); document.head.appendChild(l); return; }
