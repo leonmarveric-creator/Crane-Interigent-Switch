@@ -4,6 +4,7 @@ import { loadDriverData } from "@/lib/driverData";
 import { jstDay, jstTime } from "@/lib/driverLogic";
 import { placeFromText } from "@/lib/cabinGeo";
 import KOpsApp, { type KOpsData } from "@/components/kops/KOpsApp";
+import { invitesFor } from "@/lib/keepsake";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export default async function KOpsPage({ searchParams }: { searchParams?: { link
     data.devices = d.cabin.devices.map((x) => ({ id: x.id, name: x.name }));
     data.rooms = d.rooms.map((r) => ({ id: r.id, name: r.name, kanji: cabRoom.get(r.id)?.kanji ?? r.name.slice(0, 1) }));
     const nights = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400e3));
+    // 招待くじのある組 (まだ引いていない): お見送りのメモに印を出す
+    const inv = await invitesFor(d.res.map((r) => r.id));
     data.guests = d.res
       .filter((r) => jstDay(r.checkIn) === today || jstDay(r.checkOut) === today || (jstDay(r.checkIn) < today && jstDay(r.checkOut) > today))
       .map((r) => {
@@ -31,6 +34,8 @@ export default async function KOpsPage({ searchParams }: { searchParams?: { link
         const drop = r.drop ?? null;
         const place = leave ? (drop?.dest ? placeFromText(drop.dest, drop.terminal) : null) : placeFromText(r.pickupPlace, r.flightInfo?.terminal ?? null);
         const flt = r.flightNo ? `FLT ${r.flightNo}` : "";
+        const iv = inv[r.id]?.status === "invited" ? inv[r.id] : null;
+        const gift = iv ? `🎁 くじあり${iv.gifts.includes("card") && !iv.cardGivenAt ? " · 🃏 カードを用意" : ""}` : "";
         const note = leave
           ? [drop?.dest, drop?.terminal ? `T${drop.terminal}` : "", drop?.departAt ? `${drop.departAt.slice(0, 5)} 出発希望` : "", drop?.flightAt ? `FLT ${jstTime(drop.flightAt)} 発` : ""].filter(Boolean).join(" · ")
           : [r.pickupPlace, r.pickupAt ? `${jstTime(r.pickupAt)} お迎え` : "", flt].filter(Boolean).join(" · ");
@@ -39,7 +44,7 @@ export default async function KOpsPage({ searchParams }: { searchParams?: { link
           cat: (leave ? "out" : arrive ? "in" : "stay") as "out" | "in" | "stay",
           place: place && place !== "other" ? place : null,
           pax: drop?.pax ?? 0, L: drop?.large ?? 0, S: drop?.small ?? 0, sp: drop?.special ?? 0,
-          nights: nights(r.checkIn, r.checkOut), reg: !!drop?.names?.length, dropId: drop?.id ?? null, note: note || "—", nat: NAT[r.lang] ?? "",
+          nights: nights(r.checkIn, r.checkOut), reg: !!drop?.names?.length, dropId: drop?.id ?? null, note: [gift, note].filter(Boolean).join(" · ") || "—", nat: NAT[r.lang] ?? "",
           flt: !leave && r.flightInfo ? { st: String(r.flightInfo.status || ""), delay: r.flightInfo.delayMin ?? null } : null,
         };
       });

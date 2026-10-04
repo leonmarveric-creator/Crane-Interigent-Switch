@@ -75,6 +75,8 @@ export interface Engine {
   hasRoomGuide(room: CabinRoom | null): boolean;
   /** チェックイン QR の画像 (全員共通) */
   setCheckin(url: string | null): void;
+  /** 目的地に着いたか (お見送りの招待くじを出すタイミング) */
+  arrived(): boolean;
 }
 
 export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean }): Engine {
@@ -791,5 +793,6 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     remoteVoice: () => Date.now() - phoneSeen < 12000,
     setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },
     aiCommand: (cmd) => { if (trip) ai.command(cmd); },
+    arrived: () => !!trip && arrived,
     setCheckin: (u) => { ckSet = u; checkinUrl = u || ckDefault; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = checkinUrl ? "" : "none"; } };
 }

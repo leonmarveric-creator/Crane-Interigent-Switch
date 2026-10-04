@@ -48,6 +48,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const [name, setName] = useState("1号車");
   const [tapped, setTapped] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [gift, setGift] = useState<{ token: string; name: string | null; card: boolean } | null>(null);
+  const [giftOpen, setGiftOpen] = useState<string | null>(null);
+  const giftShown = useRef("");
   const [clock, setClock] = useState({ t: "--:--", d: "" });
   const [wx, setWx] = useState<{ temp: number; code: number } | null>(null);
   const [online, setOnline] = useState(true);
@@ -186,6 +189,10 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       if (t) {
         const first = e.tripId() !== t.id;
         tripRef.current = t;
+        // 招待くじ (お見送りの組・まだ引いていない): 着いたら自動で封筒の画面を出す。⚙ からも出せる
+        const gf = j.gift && typeof j.gift.token === "string" ? { token: j.gift.token as string, name: (j.gift.name as string | null) ?? null, card: j.gift.card === true } : null;
+        setGift((p) => (p?.token === gf?.token && p?.card === gf?.card ? p : gf));
+        if (gf && t.phase !== "dead" && e.tripId() === t.id && e.arrived() && giftShown.current !== gf.token) { giftShown.current = gf.token; const tk = gf.token; setTimeout(() => setGiftOpen((o) => o ?? tk), 7000); }
         // スマホが声を取りに来ているか (来ていれば声はスマホから)
         e.setVoiceSeen(t.voiceSeen && typeof j.now === "number" ? Math.max(0, j.now - Date.parse(t.voiceSeen)) : null);
         // 回送中 (ゲストなし) は父向けの画面。ゲスト乗車 (phase = guest) でいつもの送迎画面へ
@@ -218,7 +225,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }
         if (j.track) trackRef.current = j.track;
         e.nowPlaying(t.np ?? null, t.np && trackRef.current?.id === t.np.id ? trackRef.current : null, typeof j.now === "number" ? j.now - Date.now() : 0);
-      } else { dhRef.current?.hide(); if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); } }
+      } else { setGift(null); dhRef.current?.hide(); if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); } }
     } catch { setOnline(false); }
   }, [dev, toast]);
   useEffect(() => { if (!dev) return; void poll(); const id = setInterval(() => void poll(), POLL_MS); return () => clearInterval(id); }, [dev, poll]);
@@ -333,6 +340,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <div className="row"><button className="wk-open" onClick={() => manual("conqr")}>🛎 コンシェルジュの QR（鍵・お部屋・地図の入口）</button></div>
           <div className="row"><button onClick={() => manual("wifi")}>📶 Wi-Fi の QR</button><button onClick={() => manual("keyqr")}>🔑 エントランスの鍵の QR</button></div>
           <div className="row"><button onClick={() => manual("room")} disabled={!eng.current?.hasRoomGuide(rooms.find((r) => r.id === mRoom) ?? null)}>🔑 お部屋の開け方・鍵</button><button onClick={() => manual("ck")}>🛂 チェックイン</button></div>
+          {gift && <div className="row"><button className="wk-open" onClick={() => { setMenu(false); setGiftOpen(gift.token); }}>🎁 招待くじを出す（{gift.name ?? "Guest"}{gift.card ? " · 🃏 カードを用意" : ""}）</button></div>}
           {mMsg && <small style={{ color: "#ffd199" }}>{mMsg}</small>}
           <button className="wk-open" disabled={!mRoom} onClick={() => setWkOpen(true)}>⏰ 「{rooms.find((r) => r.id === mRoom)?.kanji ?? ""}」の光目覚ましを設定・確認</button>
           <small>{wake.err ? "光目覚ましの状態を読めませんでした（通信・ログインを確認）" : "部屋の印： 7:00 H ＝設定中 ／ ✓ ＝今朝動いた ／ ✕ ＝動かなかった"}</small>
@@ -342,6 +350,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <div className="row"><button onClick={() => void rename()}>✎ 名前を変える</button><button onClick={() => { setMenu(false); }}>閉じる</button></div>
           <small>GPS: {gpsState === "yes" ? "この iPad の GPS を使います" : gpsState === "no" ? "GPS が無いので、お父さんのスマホの位置を使います" : "確認中…"}</small>
         </div>
+        {giftOpen && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 3000, background: "#05070d" }} onClick={(ev) => ev.stopPropagation()}>
+            <iframe title="invitation" src={`/k/${giftOpen}?cabin=1`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="autoplay" />
+            <button onClick={() => setGiftOpen(null)} aria-label="close" style={{ position: "absolute", right: 14, top: 14, width: 44, height: 44, borderRadius: "50%", border: "1px solid rgba(255,213,138,.35)", background: "rgba(0,0,0,.45)", color: "#c9b88f", fontSize: 18 }}>✕</button>
+          </div>
+        )}
         {wkOpen && rooms.find((r) => r.id === mRoom) && (
           <WakeSheet key={mRoom} room={rooms.find((r) => r.id === mRoom)!} info={mRoom ? wake.map[mRoom] : undefined} onClose={() => setWkOpen(false)} onChanged={wake.reload} />
         )}

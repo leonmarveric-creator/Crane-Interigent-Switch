@@ -6,6 +6,7 @@ import { cleanCmd } from "@/lib/cabinMusic";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { aiHumorOn, checkinQrUrl } from "@/lib/cabinData";
 import { checkinLinkFor } from "@/lib/craneNest";
+import { pendingInviteFor } from "@/lib/keepsake";
 
 export const dynamic = "force-dynamic";
 const J = (v: any, status = 200) => NextResponse.json(v, { status, headers: { "cache-control": "no-store" } });
@@ -53,7 +54,9 @@ export async function GET(req: NextRequest) {
       };
     } catch { dh = {}; }
   }
-  return J({ ok: true, device, trip, room, track, checkin, checkinLink, humor, dh, now: Date.now() });
+  // お見送りの組に「招待くじ」があれば (まだ引いていない)、降りる直前に iPad に出す
+  const gift = trip?.dir === "out" && trip.resId ? await pendingInviteFor(trip.resId) : null;
+  return J({ ok: true, device, trip, room, track, checkin, checkinLink, humor, dh, gift, now: Date.now() });
 }
 
 /** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */
