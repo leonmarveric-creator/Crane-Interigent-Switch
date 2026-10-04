@@ -1,6 +1,6 @@
 /* K-OPS (AGENT KAKU の新しい画面): 画面の部品・字体・声・曲・地図の写真をこの端末に保存して、走行中のかくつきを防ぐ。
  * 対象: /kops/**・/cabin/leaflet/**・/cabin/routes.json・/cabin/bay.webp・国土地理院の地図・曲とカバー (driver-music: KAKU の曲・お父さんの曲)。ページ本体や API は保存しない。 */
-const VERSION = "kops-v22";
+const VERSION = "kops-v24";
 const TILES = "kops-tiles-v1";
 self.addEventListener("install", () => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
