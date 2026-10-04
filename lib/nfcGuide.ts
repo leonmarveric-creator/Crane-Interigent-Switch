@@ -16,11 +16,13 @@ import { roomIcon } from "@/lib/roomIcon";
 
 export interface NfcData {
   room: { kanji: string; en: string } | null; /** 部屋のイラスト (無ければ漢字を出す) */ icon: string | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
+  /** 手動で開けるための暗証番号 (本人確認が済んだゲストにだけ入れる) */
+  codes: { ent: string | null; room: string | null } | null;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
 }
 
-export async function nfcData(key: string): Promise<NfcData> {
-  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, G: { LOCK_T, TOILET_T } };
+export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null): Promise<NfcData> {
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, G: { LOCK_T, TOILET_T } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([

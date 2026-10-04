@@ -920,10 +920,10 @@
 /* ===== エージェント通信の細いバー (話している間だけ) ===== */
 
 .kops .agc{position:absolute;left:96px;top:174px;width:560px;height:46px;z-index:45;pointer-events:none;font-family:"Share Tech Mono",ui-monospace,monospace;color:#dff6ff;display:flex;align-items:stretch;
- background:linear-gradient(90deg,rgba(6,14,20,.86),rgba(6,14,20,.62) 70%,rgba(6,14,20,.2));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+ background:linear-gradient(90deg,rgba(6,14,20,.86),rgba(6,14,20,.62) 70%,rgba(6,14,20,.2));
  border-top:1px solid rgba(215,242,255,.5);border-bottom:1px solid rgba(215,242,255,.22);clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%)}
-.kops .agc::after{content:"";position:absolute;top:0;bottom:0;width:90px;left:-90px;background:linear-gradient(90deg,transparent,rgba(220,245,255,.14),transparent);animation:agks 2.2s linear infinite}
-@keyframes agks{to{left:560px}}
+.kops .agc::after{content:"";position:absolute;top:0;bottom:0;width:90px;left:0;background:linear-gradient(90deg,transparent,rgba(220,245,255,.14),transparent);transform:translateX(-90px);animation:agks 2.2s linear infinite;will-change:transform}
+@keyframes agks{to{transform:translateX(560px)}}
 .kops .agc>div{position:relative;display:flex;flex-direction:column;justify-content:center;padding:0 14px;border-right:1px solid rgba(215,242,255,.16);white-space:nowrap}
 .kops .agc small{font-size:8.5px;letter-spacing:.2em;color:#8fb4c6;line-height:1.5}.agc b{font-weight:400;font-size:14px;letter-spacing:.16em;line-height:1.25}
 .kops .agc .agc-k{padding-left:16px;border-left:3px solid var(--c)}.agc .agc-k b{font:700 20px "Rajdhani",sans-serif;letter-spacing:.34em;color:#fff}.agc .agc-k b i{font-style:normal;color:var(--c);animation:agkb .8s steps(2) infinite}
@@ -950,9 +950,9 @@
 .kops .skin-ho .agc .agc-k b,.kops .skin-ho .agcf span{color:var(--h)}
 /* 呼び出し中・留守番電話 */
 .kops .agc.m-ring .agc-k b{animation:agkb .5s steps(2) infinite}.kops .agc.m-ring .agc-w i{animation:none;transform:scaleY(.12)}
-.kops .agc.m-ring{box-shadow:0 0 0 1px var(--c),0 0 22px color-mix(in srgb,var(--c) 55%,transparent);animation:agkring 1.7s ease-in-out infinite}
-@keyframes agkring{0%,100%{filter:brightness(1)}8%,24%{filter:brightness(1.7)}16%{filter:brightness(1)}}
-.kops .agcx.m-ring .agcf{animation:agkring 1.7s ease-in-out infinite}
+.kops .agc.m-ring{box-shadow:0 0 0 1px var(--c)}.kops .agc.m-ring::before{content:"";position:absolute;inset:0;background:var(--c);opacity:0;animation:agkring 1.7s ease-in-out infinite;pointer-events:none;will-change:opacity}
+@keyframes agkring{0%,100%{opacity:0}8%,24%{opacity:.22}16%{opacity:.05}}
+.kops .agcx.m-ring .agcf{box-shadow:0 0 0 1px var(--c)}
 .kops .agc.m-vm .agc-k b{color:var(--r,#ff6b6b)}
 .kops .agcx .agcb{position:absolute;left:124px;top:58px;display:flex;gap:10px;pointer-events:auto}
 .kops .agcx .agcb button{min-width:128px;height:62px;padding:0 16px;border:1px solid var(--c);background:rgba(6,14,20,.82);color:#fff;font:700 19px "Rajdhani","Hiragino Sans",sans-serif;letter-spacing:.08em;text-align:left;clip-path:polygon(0 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)}
@@ -963,7 +963,7 @@
 .kpad .kcall{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;background:rgba(2,10,8,.94);text-align:center}
 .kpad .kcall.on{display:flex}
 .kpad .kcall>small{font:400 11px "Share Tech Mono",monospace;letter-spacing:.3em;color:var(--g);animation:agkb 1s steps(2) infinite}
-.kpad .kcall .kcf{width:150px;height:188px;border:1px solid var(--g);background:#03100c center/cover no-repeat;display:grid;place-items:center;box-shadow:0 0 26px rgba(60,242,166,.35);animation:agkring 1.7s ease-in-out infinite}
+.kpad .kcall .kcf{width:150px;height:188px;border:1px solid var(--g);background:#03100c center/cover no-repeat;display:grid;place-items:center;box-shadow:0 0 26px rgba(60,242,166,.35)}
 .kpad .kcall .kcf em{font:700 76px "Rajdhani",sans-serif;font-style:normal;color:var(--g)}.kpad .kcall .kcf.has em{display:none}
 .kpad .kcall>b{font:700 34px "Rajdhani",sans-serif;letter-spacing:.3em;color:#fff}
 .kpad .kcall>i{font-style:normal;font-size:15px;color:var(--m)}
@@ -994,3 +994,7 @@
 .kops .ksf{margin-top:8px;align-items:stretch}.kops .ksf label.kt{flex:3 1 180px;position:relative;overflow:hidden;cursor:pointer}
 .kops .ksf label.kt input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
 .kops .ksf button.kt{flex:1 1 76px;text-align:center}.kops .ksf button.kt b{font-size:14px}
+/* 軽くする: 通信バーは自分の層に置き、地図の描き直しに巻き込まれないようにする */
+.kops .agc,.kops .agcx{contain:layout style;transform:translateZ(0)}
+.kops .agc .agc-w i{will-change:transform}
+/* 地図のカメラを切り替えるときの演出 (パネル切り替えと同じ: いったん引いて、寄る) */
