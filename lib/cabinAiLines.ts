@@ -342,6 +342,20 @@ export const AI_LINES = {
     { en: "Feel free to rest. I'll wake you before the bridge. The view is worth opening your eyes for.", ja: "お休みください。連絡橋の手前でお知らせします。目を開ける価値のある景色です。", zh: "请尽管休息。过桥之前我会叫醒您。那里的风景值得睁开眼睛。", ko: "편히 쉬세요. 다리 앞에서 깨워 드릴게요. 눈을 뜰 만한 풍경이거든요." },
     { en: "Traffic is nonexistent. Apparently everyone else had the good sense to stay in bed.", ja: "渋滞はゼロです。他の皆さまは賢明にもまだ布団の中のようで。", zh: "路上完全不堵。看来其他人都很明智地还在被窝里。", ko: "정체가 전혀 없습니다. 다른 분들은 현명하게도 아직 이불 속인가 봅니다." },
   ] },
+  "hinenoInfo": { cat: "駅", when: "お見送りで日根野駅へ向かう道の途中 (ユーモアモードのとき。駅で役立つ話を映画のオマージュで・2 回まで)", v: [
+    { en: "Hineno Station. Small, but it connects everywhere. Think of it as a very polite hub in a galaxy not so far away.", ja: "日根野駅。小さいけれど、どこへでもつながります。そう遠くない銀河の、礼儀正しい中継地点です。", zh: "日根野站。虽然小，却四通八达。可以把它想成一个不太遥远的星系里、很有礼貌的中转站。", ko: "히네노역. 작지만 어디로든 이어집니다. 그리 멀지 않은 은하의, 예의 바른 환승 기지라고 생각하세요.", film: "STAR WARS" },
+    { en: "There is one ticket gate. No wall to run through. The platform numbers here are whole numbers.", ja: "改札はひとつです。突っ込む壁はありません。ここのホーム番号は、きちんとした整数です。", zh: "检票口只有一个。不需要冲向墙壁。这里的站台号都是整数。", ko: "개찰구는 하나뿐입니다. 벽으로 돌진할 필요는 없어요. 이곳 승강장 번호는 모두 정수입니다.", film: "HARRY POTTER" },
+    { en: "The ticket machine has an English button. No decoder ring or secret agent training required.", ja: "券売機には英語のボタンがあります。暗号解読器も、スパイの訓練も要りません。", zh: "售票机上有英文按钮。不需要解码器，也不需要特工训练。", ko: "발매기에는 영어 버튼이 있습니다. 암호 해독기도, 스파이 훈련도 필요 없어요.", film: "MISSION: IMPOSSIBLE" },
+    { en: "For Osaka, take the Rapid. It does not need eighty-eight miles per hour. It simply skips stations.", ja: "大阪へは快速を。時速88マイルは要りません。駅を飛ばすだけです。", zh: "去大阪请乘快速列车。不需要时速 88 英里，它只是跳过一些车站而已。", ko: "오사카로는 쾌속을 타세요. 시속 88마일은 필요 없습니다. 역을 몇 개 건너뛸 뿐이에요.", film: "BACK TO THE FUTURE" },
+    { en: "For Kyoto, the Haruka express stops here. Not quite a flying car, but you do get a reserved seat.", ja: "京都へは、特急はるかが停まります。空飛ぶ車ではありませんが、指定席があります。", zh: "去京都的话，特急 Haruka 会在这里停车。虽然不是会飞的车，但有指定座位。", ko: "교토로는 특급 하루카가 여기에 정차합니다. 하늘을 나는 차는 아니지만, 지정석이 있어요.", film: "BACK TO THE FUTURE" },
+    { en: "The airport is two stops away. About ten minutes. Even a certain agent couldn't run it faster.", ja: "空港は 2 駅、およそ 10 分です。あの有名なエージェントが走っても、これより速くは着きません。", zh: "到机场只有两站，大约 10 分钟。就算那位著名的特工用跑的，也不会更快。", ko: "공항까지는 두 정거장, 약 10분입니다. 그 유명한 요원이 달려도 이보다 빠르진 않아요.", film: "MISSION: IMPOSSIBLE" },
+    { en: "Check the sign on the front of the train. Trains here don't transform, but they do change destinations.", ja: "電車の正面の表示をご確認ください。ここの電車は変形しませんが、行き先は変わります。", zh: "请确认列车车头的显示。这里的列车不会变形，但目的地会变。", ko: "열차 앞면의 표시를 확인하세요. 이곳 열차는 변신하지 않지만, 행선지는 바뀝니다.", film: "TRANSFORMERS" },
+    { en: "There are elevators to the platforms. No need to lift your suitcase like a superhero.", ja: "ホームへはエレベーターがあります。スーパーヒーローのように、スーツケースを持ち上げる必要はありません。", zh: "去站台有电梯。不必像超级英雄那样举起行李箱。", ko: "승강장까지 엘리베이터가 있습니다. 슈퍼히어로처럼 캐리어를 들어 올릴 필요는 없어요.", film: "SUPERMAN" },
+    { en: "Large suitcases go at the end of the car. One suitcase to a corner. No ring required to find it.", ja: "大きなスーツケースは車両の端へ。ひとつの角に、ひとつの荷物。見つけるのに、指輪は要りません。", zh: "大行李箱请放在车厢两端。一个角落放一件行李。找它不需要戒指。", ko: "큰 캐리어는 객차 끝에 두세요. 한 구석에 짐 하나. 찾는 데 반지는 필요 없습니다.", film: "THE LORD OF THE RINGS" },
+    { en: "A shopping mall is a short walk away. Good for snacks. No dinosaurs in the parking lot. I checked.", ja: "少し歩くとショッピングモールがあります。おやつにどうぞ。駐車場に恐竜はいません。確認済みです。", zh: "走几步就有购物中心，适合买点零食。停车场里没有恐龙。我确认过了。", ko: "조금만 걸으면 쇼핑몰이 있습니다. 간식 사기 좋아요. 주차장에 공룡은 없습니다. 확인했어요.", film: "JURASSIC PARK" },
+    { en: "Trains in Japan leave exactly on time. Unlike in the movies, nobody holds the door for a dramatic entrance.", ja: "日本の電車は、時刻ぴったりに出ます。映画と違って、劇的な登場のためにドアは待ってくれません。", zh: "日本的列车准点发车。和电影不一样，没有人会为了帅气登场而替您挡住车门。", ko: "일본의 열차는 정시에 출발합니다. 영화와 달리, 극적인 등장을 위해 문을 잡아 주는 사람은 없어요.", film: "EVERY ACTION MOVIE" },
+    { en: "If you get lost, ask the station staff. No need to phone home. They're right at the gate.", ja: "迷ったら、駅員にお尋ねください。おうちに電話しなくても大丈夫。改札のすぐそこにいます。", zh: "如果迷路了，请问站务员。不用打电话回家。他们就在检票口。", ko: "길을 잃으면 역무원에게 물어보세요. 집에 전화할 필요는 없어요. 바로 개찰구에 있습니다.", film: "E.T." },
+  ] },
   "term1info": { cat: "空港・ターミナル", when: "ターミナル 1 へ向かう道の途中 (案内)", v: [
     { en: "Destination: Terminal 1. International departures are on the fourth floor.", ja: "目的地はターミナル1。国際線の出発は4階です。", zh: "目的地：1 号航站楼。国际线出发在四楼。", ko: "목적지는 제1터미널. 국제선 출발은 4층입니다." },
     { en: "Terminal 1: we'll stop at the departures level. Find your airline's letter on the signs overhead. It saves a great deal of walking.", ja: "ターミナル1は出発階でお降ろしします。頭上の案内で航空会社のカウンター記号を探してください。歩く距離がかなり減ります。", zh: "1 号航站楼：我们会停在出发层。请在头顶的指示牌上找到航空公司的柜台字母，可以少走很多路。", ko: "제1터미널은 출발층에 내려 드립니다. 머리 위 안내판에서 항공사 카운터 알파벳을 찾으세요. 걷는 거리가 훨씬 줄어듭니다." },
@@ -410,6 +424,8 @@ export const AI_PRIORITY: AiId[] = ["depart", "lights", "lightsLate", "bye", "br
   "half", "km5", "km1", "soon", "sea", "izumi", "towel", "topspeed",
   // 空港行き: ターミナルの確認・持ち物・案内 (必ず話す)
   "term1ok", "term2ok", "outCheck", "term1info", "term2info", "outSeat",
+  // 日根野駅へのお見送り: 駅で役立つ話 (ユーモアモードのとき)
+  "hinenoInfo",
   // 深夜の到着: 乗ってすぐ・到着の手前 (必ず話す)
   "lateIn", "lateInAir", "lateNear"];
 /** 1 分に 1 回まで (優先の場面は別) */

@@ -137,6 +137,11 @@ export function createAi(c: AiCtx): Ai {
       if (dawn && el2 > 220 && s.ll && s.ll[1] > 135.3) once("earlyRoad", "earlyRoad");
       if (dawn && rem < 2500 && s.total > 8000) once("earlyNear", "earlyNear");
     }
+    // 日根野駅へのお見送り (ユーモアモードのとき): 駅で役立つ話を 2 回まで。6〜8 分の道のりなので、口コミのお願いのあとと、道のりの 6 割で
+    if (s.dir === "out" && s.placeKey === "hineno" && c.humor()) {
+      if (el2 > 110) once("hinenoInfo1", "hinenoInfo");
+      if (u >= 0.6 && done.has("hinenoInfo1")) once("hinenoInfo2", "hinenoInfo");
+    }
     // 止まった / 走り出した / 長い停車
     const moving = (s.kmh ?? 0) > 12;
     if (!moving && (s.kmh ?? 99) < 3 && s.toDest > 400) {
