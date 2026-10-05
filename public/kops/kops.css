@@ -1189,3 +1189,92 @@
 /* TACTICAL: 待機・ブリーフィング・レポートなどは左の地図の中に収める */
 .skin-ho.tac .hstb,.skin-ho.tac .hov,.skin-ho.tac .alrt,.skin-ho.tac .recen,.skin-ho.tac #rrx{left:405px!important}
 .skin-ho.tac .hinc{right:369px}
+/* ===== スマホ操作パネルの色 (iPad のテーマに合わせる。自動生成) ===== */
+.kpad.pt-ta{--g:#41d1ed;--g2:#27b5d2;--t:#ebfbfe;--m:#87b0b8;--ln:rgba(74,213,241,.62);--ln2:rgba(65,209,237,.16);--pn:rgba(9,11,13,.88)}
+.kpad.pt-ta .pn{box-shadow:0 0 10px rgba(65,209,237,.22),0 0 28px rgba(65,209,237,.07),inset 0 0 36px rgba(65,209,237,.05)}
+.kpad.pt-ta .mapw{background:radial-gradient(ellipse at 70% 60%,#171b1f,#090a0b 70%);box-shadow:0 0 10px rgba(65,209,237,.22),0 0 28px rgba(65,209,237,.07);background-image:linear-gradient(rgba(65,209,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(65,209,237,.07) 1px,transparent 1px)}
+.kpad.pt-ta .mapw .leaflet-tile-pane{filter:grayscale(1) brightness(.6) contrast(1.45) contrast(1.1)}
+.kpad.pt-ta .mapw::after{background-image:linear-gradient(rgba(65,209,237,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(65,209,237,.06) 1px,transparent 1px)}
+.kpad.pt-ta .rtG{stroke:#41d1ed}
+.kpad.pt-ta .rtM{stroke:#80e7fc;filter:drop-shadow(0 0 4px #41d1ed) drop-shadow(0 0 10px rgba(65,209,237,.8))}
+.kpad.pt-ta .rtD{stroke:#ebfbfe}
+.kpad.pt-ta .lb small{color:#e9fbfe}
+.kpad.pt-ta .lb b.s{color:#c0e5ed}
+.kpad.pt-ta .lb .sea{color:#5abfd3}
+.kpad.pt-ta .car svg{filter:drop-shadow(0 0 6px #41d1ed)}
+.kpad.pt-ta .car .sw{background:conic-gradient(from 0deg,rgba(65,209,237,.35),transparent 60deg)}
+.kpad.pt-ta .mapw .comp i{background:#cdf6fe}
+.kpad.pt-ta .mapw .comp i::after{background:#cdf6fe}
+.kpad.pt-ta .mapw .scl{color:#cdf6fe}
+.kpad.pt-ta .mapw .src{color:rgba(221,249,254,.55)}
+.kpad.pt-ta{background:radial-gradient(ellipse at 50% 0%,#131619,#050506 60%)}
+.kpad.pt-ta .inm .rw em{color:#cdf6fe}
+.kpad.pt-ta #mP .hd{background:linear-gradient(180deg,rgba(5,6,7,.9),transparent)}
+.kpad.pt-ta .lnk .ea small{color:#cdf6fe}
+.kpad.pt-ta .btn{background:rgba(65,209,237,.1);box-shadow:0 0 18px rgba(65,209,237,.25)}
+.kpad.pt-ta.cru .rh .st{color:#caf5fe}
+.kpad.pt-ta .rh .km .e small{color:#cdf6fe}
+.kpad.pt-ta .cr small{color:#cdf6fe}
+.kpad.pt-ta .cr .tg2::after{background:#579aa8}
+.kpad.pt-ta.cru .cr{border-color:#b8f2fd;box-shadow:0 0 22px rgba(184,242,253,.35),inset 0 0 26px rgba(184,242,253,.12)}
+.kpad.pt-ta.cru .cr .tg2{background:rgba(65,209,237,.35)}
+.kpad.pt-ta.cru .cr .tg2::after{background:#ebfbfe}
+.kpad.pt-ta .sq small{color:#cdf6fe}
+.kpad.pt-ta .top .mnu{background:rgba(65,209,237,.08)}
+.kpad.pt-ta .thm button{background:rgba(65,209,237,.05);color:#cdf6fe}
+.kpad.pt-ta .thm button.on{background:rgba(65,209,237,.2)}
+.kpad.pt-ta .ly p{color:#effcff}
+.kpad.pt-ta .rs{color:#cdf6fe}
+.kpad.pt-ta .kcall{background:rgba(5,6,7,.94)}
+.kpad.pt-ta .kcall .kcf{background:#090a0b center/cover no-repeat;box-shadow:0 0 26px rgba(65,209,237,.35)}
+.kpad.pt-ta .kcall .kcb button.y{background:rgba(65,209,237,.22);box-shadow:0 0 18px rgba(65,209,237,.35)}
+.kpad.pt-ta .kagq{border:1px solid rgba(135,176,184,.4);background:rgba(9,11,13,.7)}
+.kpad.pt-ta .kagq.on{background:rgba(65,209,237,.14)}
+.kpad.pt-ho{--g:#8acee7;--g2:#63b4d1;--t:#f2fafd;--m:#b6c8ce;--ln:rgba(149,212,234,.62);--ln2:rgba(138,206,231,.16);--pn:rgba(6,13,15,.88)}
+.kpad.pt-ho .pn{box-shadow:0 0 10px rgba(138,206,231,.22),0 0 28px rgba(138,206,231,.07),inset 0 0 36px rgba(138,206,231,.05)}
+.kpad.pt-ho .mapw{background:radial-gradient(ellipse at 70% 60%,#0e2026,#050c0e 70%);box-shadow:0 0 10px rgba(138,206,231,.22),0 0 28px rgba(138,206,231,.07);background-image:linear-gradient(rgba(138,206,231,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(138,206,231,.07) 1px,transparent 1px)}
+.kpad.pt-ho .mapw .leaflet-tile-pane{filter:grayscale(1) brightness(.6) contrast(1.45) sepia(1) hue-rotate(150deg) saturate(1.4)}
+.kpad.pt-ho .mapw::after{background-image:linear-gradient(rgba(138,206,231,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(138,206,231,.06) 1px,transparent 1px)}
+.kpad.pt-ho .rtG{stroke:#8acee7}
+.kpad.pt-ho .rtM{stroke:#d0eef8;filter:drop-shadow(0 0 4px #8acee7) drop-shadow(0 0 10px rgba(138,206,231,.8))}
+.kpad.pt-ho .rtD{stroke:#f2fafd}
+.kpad.pt-ho .lb small{color:#f2fafd}
+.kpad.pt-ho .lb b.s{color:#f4f9fb}
+.kpad.pt-ho .lb .sea{color:#97c7d8}
+.kpad.pt-ho .car svg{filter:drop-shadow(0 0 6px #8acee7)}
+.kpad.pt-ho .car .sw{background:conic-gradient(from 0deg,rgba(138,206,231,.35),transparent 60deg)}
+.kpad.pt-ho .mapw .comp i{background:#f2fafd}
+.kpad.pt-ho .mapw .comp i::after{background:#f2fafd}
+.kpad.pt-ho .mapw .scl{color:#f2fafd}
+.kpad.pt-ho .mapw .src{color:rgba(242,250,253,.55)}
+.kpad.pt-ho{background:radial-gradient(ellipse at 50% 0%,#0a1a1f,#030607 60%)}
+.kpad.pt-ho .inm .rw em{color:#f2fafd}
+.kpad.pt-ho #mP .hd{background:linear-gradient(180deg,rgba(3,8,9,.9),transparent)}
+.kpad.pt-ho .lnk .ea small{color:#f2fafd}
+.kpad.pt-ho .btn{background:rgba(138,206,231,.1);box-shadow:0 0 18px rgba(138,206,231,.25)}
+.kpad.pt-ho.cru .rh .st{color:#f2fafd}
+.kpad.pt-ho .rh .km .e small{color:#f2fafd}
+.kpad.pt-ho .cr small{color:#f2fafd}
+.kpad.pt-ho .cr .tg2::after{background:#86a9b6}
+.kpad.pt-ho.cru .cr{border-color:#f2fafd;box-shadow:0 0 22px rgba(242,250,253,.35),inset 0 0 26px rgba(242,250,253,.12)}
+.kpad.pt-ho.cru .cr .tg2{background:rgba(138,206,231,.35)}
+.kpad.pt-ho.cru .cr .tg2::after{background:#f2fafd}
+.kpad.pt-ho .sq small{color:#f2fafd}
+.kpad.pt-ho .top .mnu{background:rgba(138,206,231,.08)}
+.kpad.pt-ho .thm button{background:rgba(138,206,231,.05);color:#f2fafd}
+.kpad.pt-ho .thm button.on{background:rgba(138,206,231,.2)}
+.kpad.pt-ho .ly p{color:#f2fafd}
+.kpad.pt-ho .rs{color:#f2fafd}
+.kpad.pt-ho .kcall{background:rgba(3,8,9,.94)}
+.kpad.pt-ho .kcall .kcf{background:#050c0e center/cover no-repeat;box-shadow:0 0 26px rgba(138,206,231,.35)}
+.kpad.pt-ho .kcall .kcb button.y{background:rgba(138,206,231,.22);box-shadow:0 0 18px rgba(138,206,231,.35)}
+.kpad.pt-ho .kagq{border:1px solid rgba(182,200,206,.4);background:rgba(6,13,15,.7)}
+.kpad.pt-ho .kagq.on{background:rgba(138,206,231,.14)}
+.kpad.pt-ta{--f:"Share Tech Mono","Rajdhani",ui-monospace,Menlo,monospace}
+.kpad.pt-ta .pn,.kpad.pt-ta .btn,.kpad.pt-ta .mapw{border-radius:0!important}
+.kpad.pt-ta .btn,.kpad.pt-ta .pn.cr,.kpad.pt-ta .pn.sq{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+.kpad.pt-ta::after,.kpad.pt-ho::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1500;background:repeating-linear-gradient(180deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px)}
+.kpad.pt-ho .pn,.kpad.pt-ho .btn,.kpad.pt-ho .mapw{border-radius:0!important}
+/* 走行中: 地図を上に大きく、ボタンは親指の届く下に */
+.kpad.pt-ta:not(.land) #mQ,.kpad.pt-ho:not(.land) #mQ{order:0;flex:1 1 200px!important;min-height:190px!important}
+.kpad.pt-ta:not(.land) #bCr,.kpad.pt-ho:not(.land) #bCr{min-height:78px}.kpad.pt-ta:not(.land) #vR .sq,.kpad.pt-ho:not(.land) #vR .sq{min-height:78px}
