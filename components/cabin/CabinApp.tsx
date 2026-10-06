@@ -21,7 +21,7 @@ import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL, type GLang } from "@/lib/cabinGeo";
 import { SFX_MARK } from "@/lib/remoteVoice";
-import { rtJoin, CABIN_CH } from "@/lib/rtKick";
+import { rtJoinMsg, rtKick, rtSend, rtOn, CABIN_CH } from "@/lib/rtKick";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
 const POLL_MS = 3000;
@@ -68,6 +68,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const own = useRef<{ ll: LL; kmh: number | null; t: number } | null>(null);
   const gps = useRef<{ has: boolean | null; since: number }>({ has: null, since: Date.now() });
   const phoneAt = useRef<string>("");
+  // お父さんのスマホと直接 (Supabase Realtime): 位置・「声を鳴らせます」の印・声の返事が届いた時刻
+  const rtx = useRef({ posAt: 0, prAt: 0, ack: 0 });
+  const direct = () => rtOn() && Date.now() - rtx.current.posAt < 6000 && Date.now() - rtx.current.prAt < 6000;
   const tripRef = useRef<CabinTrip | null>(null);
   const trackRef = useRef<CabinTrack | null>(null);
   const phoneMissUntil = useRef(0); // スマホが声の返事をしなかった → この時刻までは iPad が鳴らす
@@ -91,12 +94,17 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
            返事が無ければ false (iPad が自分で鳴らす)。そのあと 8 秒はスマホに任せない (毎回待たないように) */
         const sendVoice = async (id: string, u: string, s: string): Promise<boolean> => {
           const r = await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "say", trip: id, u, s }) }).then((x) => x.json()).catch(() => null);
-          if (s === SFX_MARK) return true; // 効果音は返事を待たない
+          if (s === SFX_MARK) { if (r?.ok && Number(r?.n)) rtSend(CABIN_CH, "v", { t: id, u, s, n: Number(r.n) }); return true; } // 効果音は返事を待たない
           const n = Number(r?.n || 0);
           if (!r?.ok || !n) { phoneMissUntil.current = Date.now() + 8000; return false; }
-          const until = Date.now() + 5000;
+          rtSend(CABIN_CH, "v", { t: id, u, s, n }); // スマホへ直接 (サーバー経由の分は、届かなかったときの控え)
+          const until = Date.now() + 5000; let peekAt = Date.now();
           while (Date.now() < until) {
-            await new Promise((ok) => setTimeout(ok, 400));
+            await new Promise((ok) => setTimeout(ok, 100));
+            if (rtx.current.ack >= n) return true; // 返事が直接届いた
+            // サーバーへの確認: 今までは 0.4 秒ごと。スマホの印が届いている間は 1.5 秒ごと
+            if (Date.now() - peekAt < (rtOn() && Date.now() - rtx.current.prAt < 6000 ? 1500 : 400)) continue;
+            peekAt = Date.now();
             const a = await fetch(`/api/cabin/voice?t=${id}&peek=1`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
             if (a?.ok && Number(a.ack) >= n) return true;
             // 返事の列がまだ無い (migration_cabin_voice_ack.sql 未実行) → 今までどおりスマホに任せる
@@ -109,7 +117,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         eng.current = createEngine(root.current, routes, {
           onEnd: (id) => void endTrip(id),
           // 全画面の再生ボタン → お父さんのスマホへ
-          onCmd: (id, c, v) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "cmd", trip: id, c, v }) }).catch(() => {}),
+          onCmd: (id, c, v) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "cmd", trip: id, c, v }) }).then(() => rtKick(CABIN_CH)).catch(() => {}),
           // ゲストの「お部屋の明かりをつけて」→ 本物の照明
           onLights: (id) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "lights", trip: id }) }).catch(() => {}),
           // 声はスマホ (Bluetooth) から流す
@@ -122,7 +130,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           stage: root.current.querySelector(".stage") as HTMLElement, routes, ac: () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); void w.__dhAc.resume(); return w.__dhAc; } catch { return null; } },
           remote: () => !!eng.current?.remoteVoice() && phoneOk(),
           say: (u, s) => { const id = tripRef.current?.id; return id ? sendVoice(id, u, s) : Promise.resolve(false); },
-          board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else void poll(); },
+          board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else { rtKick(CABIN_CH); void poll(); } },
           end: (id) => void endTrip(id, true),
         });
         eng.current.resize();
@@ -203,7 +211,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           setInTrip(true); setMenu(false);
           dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string" || typeof j.checkinLink === "string");
           const ownF = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
-          if (!ownF && t.phone && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) { phoneAt.current = t.phone.at; dh.feed(t.phone.ll, t.phone.kmh); }
+          if (!ownF && t.phone && Date.now() - rtx.current.posAt > 6000 && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) { phoneAt.current = t.phone.at; dh.feed(t.phone.ll, t.phone.kmh); }
           else if (ownF) dh.feed(own.current!.ll, own.current!.kmh);
           return;
         }
@@ -211,7 +219,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (first) { setInTrip(true); setMenu(false); await e.start(t, j.room); phoneAt.current = ""; if (own.current && Date.now() - own.current.t < OWN_FRESH_MS) e.feed(own.current.ll, own.current.kmh, "ipad"); }
         // iPad の GPS が新しくなければ、お父さんのスマホの位置で
         const ownFresh = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
-        if (!ownFresh && t.phone && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) {
+        if (!ownFresh && t.phone && Date.now() - rtx.current.posAt > 6000 && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         e.setQuiet(!!t.aiQuiet); // AI の静かモード (お父さんのスマホで切り替え)
@@ -229,29 +237,49 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       } else { setGift(null); dhRef.current?.hide(); if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); } }
     } catch { setOnline(false); }
   }, [dev, toast]);
-  /* 問い合わせの間隔 (サーバーへの回数を減らす): 送迎中は 3 秒ごと。待機中は 12 秒ごと、画面を閉じている間は 60 秒ごと。
-     画面に触れたとき・画面が戻ったときは、すぐに 1 回聞く */
+  /* 問い合わせの間隔 (サーバーへの回数を減らす): 送迎中は 3 秒ごと。
+     待機中は、合図の回線 (Supabase Realtime) がつながっていれば 60 秒ごと (閉じている間は 2 分ごと)。出発などは合図ですぐ届く。
+     回線が切れている間は今までどおり 12 秒ごと (閉じている間は 60 秒ごと)。回線がつながり直したときは、取りこぼしに備えてすぐ 1 回聞く。
+     画面に触れたとき・画面が戻ったときも、すぐに 1 回聞く */
   useEffect(() => {
     if (!dev) return;
-    let live = true, id: ReturnType<typeof setTimeout> | undefined, lastAt = 0;
-    const loop = async () => { lastAt = Date.now(); await poll(); if (!live) return; id = setTimeout(loop, tripRef.current ? POLL_MS : document.hidden ? 60000 : 12000); };
+    let live = true, id: ReturnType<typeof setTimeout> | undefined, lastAt = 0, wasOn = false;
+    // 送迎中: スマホの位置と印が直接届いている間は 10 秒ごと (乗車・終わり・設定・曲の変更は合図ですぐ届く)。届かなくなったら 3 秒ごとに戻る
+    const gap = () => { if (tripRef.current) return direct() ? 10000 : POLL_MS; const on = rtOn(); return document.hidden ? (on ? 120000 : 60000) : on ? 60000 : 12000; };
+    const loop = async () => { lastAt = Date.now(); await poll(); if (!live) return; id = setTimeout(loop, gap()); };
+    // 回線の様子を 5 秒ごとに見る (通信はしない): つながり直したらすぐ 1 回聞く。切れたら 12 秒ごとの間隔に戻す
+    const watch = setInterval(() => { const on = rtOn(); if (on === wasOn) return; wasOn = on; if (!live || tripRef.current) return; if (id) clearTimeout(id); if (on) void loop(); else id = setTimeout(loop, Math.max(0, 12000 - (Date.now() - lastAt))); }, 5000);
     const now = () => { if (!live || tripRef.current || Date.now() - lastAt < 2500) return; if (id) clearTimeout(id); void loop(); };
     // お父さんのスマホからの合図 (出発・乗車・終わり・設定の切り替え) が来たら、すぐ聞きに行く
-    rtJoin(CABIN_CH, () => { if (!live || Date.now() - lastAt < 1200) return; if (id) clearTimeout(id); void loop(); });
+    rtJoinMsg(CABIN_CH, () => { if (!live || Date.now() - lastAt < 1200) return; if (id) clearTimeout(id); void loop(); }, (ev, p) => {
+      const t = tripRef.current; if (!live || !t || !p || p.t !== t.id) return;
+      if (ev === "a") { rtx.current.ack = Math.max(rtx.current.ack, Number(p.n) || 0); return; }
+      if (ev === "pr") { rtx.current.prAt = Date.now(); if (p.ready) eng.current?.setVoiceSeen(0); return; }
+      if (ev === "pos" && Array.isArray(p.ll) && isFinite(p.ll[0]) && isFinite(p.ll[1])) {
+        rtx.current.posAt = Date.now();
+        if (own.current && Date.now() - own.current.t < OWN_FRESH_MS) return; // iPad の GPS が新しければそちらで
+        const ll: LL = [Number(p.ll[0]), Number(p.ll[1])], kmh = typeof p.kmh === "number" ? p.kmh : null;
+        phoneAt.current = new Date().toISOString();
+        const dh = dhRef.current, e = eng.current;
+        if (t.phase === "dead") { if (dh?.on()) dh.feed(ll, kmh); } else if (e && e.tripId() === t.id) e.feed(ll, kmh, "phone");
+      }
+    });
+    // スマホへ「iPad はここにいます」の印 (3 秒ごと・送迎中だけ)。スマホはこれが届いている間、サーバーへの問い合わせを減らす
+    const hb = setInterval(() => { const t = tripRef.current; if (live && t && !t.id.startsWith("demo")) rtSend(CABIN_CH, "hb", { t: t.id }); }, 3000);
     const onVis = () => { if (!document.hidden) now(); };
     document.addEventListener("visibilitychange", onVis); document.addEventListener("pointerdown", now, true);
     void loop();
-    return () => { live = false; if (id) clearTimeout(id); document.removeEventListener("visibilitychange", onVis); document.removeEventListener("pointerdown", now, true); };
+    return () => { live = false; clearInterval(watch); clearInterval(hb); if (id) clearTimeout(id); document.removeEventListener("visibilitychange", onVis); document.removeEventListener("pointerdown", now, true); };
   }, [dev, poll]);
 
   async function endTrip(id: string, force = false) {
     // お見送りの到着のあとは、終わりにせず「帰り道 (回送)」へ (SQL がまだなら今までどおり終わり)
     if (!force && !id.startsWith("demo") && tripRef.current?.id === id && tripRef.current.dir === "out") {
       const r = await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "deadhead", trip: id }) }).then((x) => x.json()).catch(() => null);
-      if (r?.ok) { eng.current?.stop(); void poll(); return; }
+      if (r?.ok) { rtKick(CABIN_CH); eng.current?.stop(); void poll(); return; }
     }
     dhRef.current?.hide();
-    if (!id.startsWith("demo")) await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "end", trip: id }) }).catch(() => {});
+    if (!id.startsWith("demo")) await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "end", trip: id }) }).then(() => rtKick(CABIN_CH)).catch(() => {});
     eng.current?.stop(); tripRef.current = null; setInTrip(false);
   }
 

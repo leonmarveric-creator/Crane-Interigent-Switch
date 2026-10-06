@@ -11,7 +11,8 @@
  *   - 鳴らせない (iPhone が音を止めた) ときは、その声を捨てて onBlocked で知らせる (iPad が代わりに鳴らす)。
  *   - 届くのが遅れた古い声 (STALE_MS より前) は鳴らさない (もう iPad が鳴らしている)。
  */
-export interface RemoteVoice { stop(): void; busy(): boolean; /** iPad の声を受け取れている (最近の問い合わせが成功) */ ok(): boolean }
+import { rtJoinMsg, rtSend, rtOn, CABIN_CH } from "@/lib/rtKick";
+export interface RemoteVoice { stop(): void; busy(): boolean; /** iPad の声を受け取れている (最近の問い合わせが成功) */ ok(): boolean; /** iPad と直接つながっている (回線がつながり、iPad の印が最近届いた) */ direct(): boolean }
 /** 効果音の印 (声の順番待ちに入れず、すぐ重ねて鳴らす・音楽も下げない) */
 export const SFX_MARK = "#sfx";
 /** これより古い声は鳴らさない。iPad は返事を最大 5 秒待ってから自分で鳴らすので、それより手前で打ち切る (両方から鳴らないように) */
@@ -39,7 +40,10 @@ function load(u: string): Promise<AudioBuffer | null> {
   return cache.get(u)!;
 }
 export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEnd?: () => void; onSetup?: () => void; /** 声を鳴らす直前 (どの声か) */ onPlay?: (u: string) => void; /** iPhone が音を止めていて鳴らせなかった (指で画面に触れると戻る) */ onBlocked?: () => void } = {}): RemoteVoice {
-  let okAt = 0;
+  let okAt = 0, heardAt = 0, pollAt = 0;
+  /* iPad と直接 (Supabase Realtime): 声・返事・「鳴らせます」の印を回線でやり取りし、サーバーへは 5 秒に 1 回の確認だけにする。
+     iPad の印が 10 秒届かなければ、今までどおり 1 秒ごとにサーバーへ聞く */
+  const direct = () => rtOn() && Date.now() - heardAt < 10000;
   let live = true, last = 0, playing = 0, busy = false, setupSaid = false;
   let ack = 0, ackSent = 0, skew = 0; // ack: 鳴らし始めた声の番号 / skew: サーバーの時計 − このスマホの時計
   const q: { u: string; n: number }[] = [];
@@ -59,6 +63,7 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
         if (buf && live && fresh(it.n)) {
           ack = Math.max(ack, it.n); // 鳴らし始めた (iPad はこれを見て自分の声を消す)
           // 返事は次の 1 秒ごとの問い合わせを待たずに、すぐ送る (遅れると iPad が自分で鳴らしてしまう)。after を大きくして声は受け取らない
+          rtSend(CABIN_CH, "a", { t: tripId, n: ack });
           { const a0 = ack; void fetch(`/api/cabin/voice?t=${tripId}&after=9999999999999999&ready=1&ack=${a0}`, { cache: "no-store" }).then((x) => x.json()).then((r) => { if (r?.ok) ackSent = Math.max(ackSent, a0); }).catch(() => {}); }
           playing++; try { h.onPlay?.(it.u); } catch { /* */ } h.onStart?.();
           await new Promise<void>((ok) => { const s = AC!.createBufferSource(), g = AC!.createGain(); g.gain.value = 1; s.buffer = buf; s.connect(g); g.connect(AC!.destination); s.onended = () => ok(); s.start(); setTimeout(ok, buf.duration * 1000 + 500); });
@@ -78,25 +83,37 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
   // 画面が戻ったら音も戻す (指で押したあとなら、iPhone は resume を許す)
   const onVis = () => { if (document.visibilityState === "visible") void resume(); };
   document.addEventListener("visibilitychange", onVis);
-  const iv = setInterval(async () => {
-    if (!live) return;
-    const a = ack > ackSent ? `&ack=${ack}` : "";
-    const r = await fetch(`/api/cabin/voice?t=${tripId}&after=${last}&ready=${voiceReady() ? 1 : 0}${a}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) { okAt = Date.now(); if (a) ackSent = Math.max(ackSent, ack); }
-    if (!r?.ok) { if (r?.error === "SETUP" && !setupSaid) { setupSaid = true; h.onSetup?.(); } return; }
-    if (typeof r.now === "number") skew = Number(r.now) - Date.now();
-    if (!last) last = Number(r.now) - 3000; // 最初は 3 秒前より新しいものだけ (時計はサーバーのもの)
-    for (const it of (r.items ?? []).filter((x: any) => Number(x.n) > last)) {
+  function take(items: any[]) {
+    for (const it of items.filter((x: any) => Number(x.n) > last)) {
       last = Math.max(last, Number(it.n));
       if (it.s === SFX_MARK) try { h.onPlay?.(String(it.u)); } catch { /* */ } // 何が鳴るかを知らせる (BOOST の準備の合図・起動の効果音)
       if (it.s === SFX_MARK) { void playFx(String(it.u)); continue; } // 効果音はすぐ鳴らす
       q.push({ u: String(it.u), n: Number(it.n) }); void load(String(it.u));
     }
     void pump();
+  }
+  rtJoinMsg(CABIN_CH, () => {}, (ev, p) => {
+    if (!live || !p || p.t !== tripId) return;
+    if (ev === "hb") { heardAt = Date.now(); return; }
+    if (ev === "v" && p.u && Number(p.n) > 0) { heardAt = Date.now(); take([{ u: p.u, s: p.s, n: Number(p.n) }]); }
+  });
+  const pr = setInterval(() => { if (live) rtSend(CABIN_CH, "pr", { t: tripId, ready: voiceReady() }); }, 2000);
+  const iv = setInterval(async () => {
+    if (!live) return;
+    const a = ack > ackSent ? `&ack=${ack}` : "";
+    if (direct() && !a && Date.now() - pollAt < 4800) return; // 直接つながっている間は 5 秒に 1 回だけ
+    pollAt = Date.now();
+    const r = await fetch(`/api/cabin/voice?t=${tripId}&after=${last}&ready=${voiceReady() ? 1 : 0}${a}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { okAt = Date.now(); if (a) ackSent = Math.max(ackSent, ack); }
+    if (!r?.ok) { if (r?.error === "SETUP" && !setupSaid) { setupSaid = true; h.onSetup?.(); } return; }
+    if (typeof r.now === "number") skew = Number(r.now) - Date.now();
+    if (!last) last = Number(r.now) - 3000; // 最初は 3 秒前より新しいものだけ (時計はサーバーのもの)
+    take(r.items ?? []);
   }, 1000);
   return {
-    stop() { live = false; clearInterval(iv); q.length = 0; document.removeEventListener("visibilitychange", onVis); },
+    stop() { live = false; clearInterval(iv); clearInterval(pr); q.length = 0; document.removeEventListener("visibilitychange", onVis); },
     busy: () => busy || q.length > 0,
-    ok: () => Date.now() - okAt < 6000,
+    ok: () => Date.now() - okAt < 6000 || (direct() && Date.now() - okAt < 12000),
+    direct,
   };
 }

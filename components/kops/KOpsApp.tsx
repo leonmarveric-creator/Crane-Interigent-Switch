@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { cabinStart, cabinPos, cabinEnd, cabinBoard } from "@/app/driver/actions";
+import { rtJoin, rtKick, CABIN_CH } from "@/lib/rtKick";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
 import KOpsLibrary from "@/components/kops/KOpsLibrary";
 
@@ -33,12 +34,13 @@ export default function KOpsApp({ data }: { data: KOpsData }) {
   const [lib, setLib] = useState<{ onChange: () => void } | null>(null);
   useEffect(() => {
     const w = window as any;
+    rtJoin(CABIN_CH, () => {}); // 車内 iPad への合図の回線を先に開いておく
     w.KOPS_DATA = data;
     w.KOPS_API = {
-      cabinStart: (v: any) => cabinStart(v).catch((e) => ({ ok: false, error: String(e) })),
+      cabinStart: (v: any) => cabinStart(v).catch((e) => ({ ok: false, error: String(e) })).then((r) => { rtKick(CABIN_CH); return r; }),
       cabinPos: (id: string, lat: number | null, lng: number | null, kmh: number | null) => cabinPos(id, lat, lng, kmh, null).catch(() => null),
-      cabinEnd: (id: string) => cabinEnd(id).catch(() => null),
-      cabinBoard: (id: string) => cabinBoard(id).catch(() => null),
+      cabinEnd: (id: string) => cabinEnd(id).catch(() => null).then((r) => { rtKick(CABIN_CH); return r; }),
+      cabinBoard: (id: string) => cabinBoard(id).catch(() => null).then((r) => { rtKick(CABIN_CH); return r; }),
       remoteVoice: (id: string, h: any) => startRemoteVoice(id, h),
       unlockVoice: () => unlockRemoteVoice(),
       openLibrary: (o: { onChange: () => void }) => setLib(o),

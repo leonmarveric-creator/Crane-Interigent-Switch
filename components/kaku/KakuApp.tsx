@@ -11,6 +11,7 @@ import { LyricsSheet } from "@/components/driver/DriverMusic";
 import type { DriverTrack } from "@/lib/driverData";
 import { makeT } from "@/lib/driverI18n";
 import { cabinStart, cabinPos, cabinEnd, cabinBoard, cabinGetHumor, cabinSetHumor } from "@/app/driver/actions";
+import { rtJoin, rtKick, CABIN_CH } from "@/lib/rtKick";
 
 function loadLeaflet(): Promise<void> {
   const w = window as any;
@@ -32,6 +33,7 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
   const [msg, setMsg] = useState("");
   const toast = (s: string) => { setMsg(s); setTimeout(() => setMsg((x) => (x === s ? "" : x)), 2600); };
   useEffect(() => {
+    rtJoin(CABIN_CH, () => {}); // 車内 iPad への合図の回線を先に開いておく
     let eng: KakuEngine | null = null, live = true;
     void (async () => {
       try {
@@ -44,11 +46,11 @@ export default function KakuApp({ cabin }: { cabin: KakuCabinInfo }) {
         eng = createKaku(root.current, routes, st?.ok ? { ...EMPTY, ...st } : EMPTY, {
           info: cabin,
           // 車内 iPad (ゲスト用の画面) をこの端末から動かす: 父のスマホと同じ仕組み
-          start: async (v) => { const r = await cabinStart(v).catch((e) => ({ ok: false as const, error: String(e) })); return r.ok ? { ok: true, id: r.trip.id } : { ok: false, error: (r as any).error }; },
+          start: async (v) => { const r = await cabinStart(v).catch((e) => ({ ok: false as const, error: String(e) })); rtKick(CABIN_CH); return r.ok ? { ok: true, id: r.trip.id } : { ok: false, error: (r as any).error }; },
           pos: async (id, lat, lng, kmh) => { const r = await cabinPos(id, lat, lng, kmh, null).catch(() => null); return { ok: !!r?.ok, active: r?.ok ? r.active : true }; },
-          end: async (id) => { await cabinEnd(id).catch(() => null); },
-          board: async (id) => { await cabinBoard(id).catch(() => null); },
-          humor: { get: () => cabinGetHumor(), set: async (on) => !!(await cabinSetHumor(on).catch(() => null))?.ok },
+          end: async (id) => { await cabinEnd(id).catch(() => null); rtKick(CABIN_CH); },
+          board: async (id) => { await cabinBoard(id).catch(() => null); rtKick(CABIN_CH); },
+          humor: { get: () => cabinGetHumor(), set: async (on) => { const ok = !!(await cabinSetHumor(on).catch(() => null))?.ok; rtKick(CABIN_CH); return ok; } },
         }, { lyrics: (tr, save) => setLy({ tr, save }) });
       } catch (e) { setErr(String((e as Error)?.message || e)); }
     })();

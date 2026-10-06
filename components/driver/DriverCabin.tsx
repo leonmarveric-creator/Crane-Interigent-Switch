@@ -17,7 +17,7 @@ import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumo
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
-import { rtJoin, rtKick, CABIN_CH } from "@/lib/rtKick";
+import { rtJoin, rtJoinMsg, rtKick, rtSend, CABIN_CH } from "@/lib/rtKick";
 import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
@@ -35,13 +35,15 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
 
   useEffect(() => {
     if (!trip) { setSending(""); return; }
-    let live = true, last: { ll: LL; kmh: number | null; t: number } | null = null, bs = { ...BOOST_INIT }, boosting = false, gT: ReturnType<typeof setTimeout> | undefined;
+    let live = true, posRt = 0, last: { ll: LL; kmh: number | null; t: number } | null = null, bs = { ...BOOST_INIT }, boosting = false, gT: ReturnType<typeof setTimeout> | undefined;
     const geo = navigator.geolocation;
     const wid = geo?.watchPosition((p) => {
       const ll: LL = [p.coords.latitude, p.coords.longitude]; if (p.coords.accuracy > 80) return;
       let kmh = p.coords.speed != null && p.coords.speed >= 0 ? p.coords.speed * 3.6 : null;
       if (kmh == null && last && Date.now() - last.t > 500) kmh = (dist(last.ll, ll) / ((Date.now() - last.t) / 1000)) * 3.6;
       last = { ll, kmh, t: Date.now() };
+      // iPad へ直接 (1 秒に 1 回まで)。サーバーへは下の間隔で
+      if (Date.now() - posRt > 900) { posRt = Date.now(); rtSend(CABIN_CH, "pos", { t: trip.id, ll: [+ll[0].toFixed(6), +ll[1].toFixed(6)], kmh: kmh == null ? null : Math.round(kmh * 10) / 10 }); }
       const r = boostStep(bs, ll, kmh); bs = r.s;
       // BOOST の準備 (曲をゆっくり止める) は iPad の合図 (boost-prep) で。iPad の声がスマホに来ていないときだけ、このスマホの GPS で
       if (!r.event && !rv.ok() && boostPrepDue(bs, ll, kmh)) mRef.current.boostPrep();
@@ -71,11 +73,23 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     document.addEventListener("pointerdown", reUnlock, true);
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     let warned = false;
+    /* サーバーへ位置と曲を送る: 今までは 3 秒ごと。iPad と直接つながっている間は 9 秒ごと (位置は上で直接送っている)。
+       曲が変わったとき・iPad から合図が来たとき (乗車・終わり・再生ボタン) は、すぐ送る */
+    let sentAt = 0, busyPos = false, npId = "", force = false, npPos: { pos: number; t: number } | null = null;
+    rtJoinMsg(CABIN_CH, () => { force = true; }, () => {});
     const iv = setInterval(async () => {
-      if (!live) return;
+      if (!live || busyPos) return;
       const np = mRef.current.nowPlaying(); // 再生中の曲 (iPad の歌詞用)。位置がまだ取れていなくても送る
       if (!last && !np) return;
+      const nid = np ? `${np.id}:${np.on}` : "";
+      // 曲・再生/停止が変わった、または早送りなどで位置が 3 秒以上ずれた
+      const jump = !!np && !!npPos && np.on && Math.abs(np.pos - (npPos.pos + (Date.now() - npPos.t) / 1000)) > 3;
+      const changed = nid !== npId || jump;
+      if (!force && !changed && Date.now() - sentAt < (rv.direct() ? 8800 : 2800)) return;
+      force = false; npId = nid; npPos = np ? { pos: np.pos, t: Date.now() } : null; sentAt = Date.now(); busyPos = true; setTimeout(() => { busyPos = false; }, 8000);
+      if (changed) setTimeout(() => rtKick(CABIN_CH), 600); // iPad に「曲が変わった」と知らせる (歌詞)
       const r = await cabinPos(trip.id, last?.ll[0] ?? null, last?.ll[1] ?? null, last?.kmh ?? null, np).catch(() => null);
+      busyPos = false;
       if (!live) return;
       if (r?.ok) {
         if (last) setSending("ok");
@@ -87,7 +101,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
         if (lastCmd == null) lastCmd = r.cmd?.n ?? 0;
         else if (r.cmd && r.cmd.n > lastCmd) { lastCmd = r.cmd.n; mRef.current.remote(r.cmd.c, r.cmd.v); }
       } else setSending("ng");
-    }, 3000);
+    }, 1000);
     // 送迎中はスマホの画面を消さない (iPhone は画面が消えると位置を送れないため)
     let lock: any = null;
     const wake = () => { if ("wakeLock" in navigator && document.visibilityState === "visible") (navigator as any).wakeLock.request("screen").then((l: any) => { lock = l; }).catch(() => {}); };
