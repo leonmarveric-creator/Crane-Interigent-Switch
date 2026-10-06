@@ -17,6 +17,7 @@ import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumo
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
+import { rtJoin, rtKick, CABIN_CH } from "@/lib/rtKick";
 import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
@@ -29,6 +30,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const [sending, setSending] = useState<"" | "ok" | "ng">("");
   const mRef = useRef(music); mRef.current = music;
   useEffect(() => { setTrip(initial); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 合図の回線を先につないでおく (出発を押した瞬間に iPad へ届くように)
+  useEffect(() => { rtJoin(CABIN_CH, () => {}); }, []);
 
   useEffect(() => {
     if (!trip) { setSending(""); return; }
@@ -100,18 +103,18 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
     unlockRemoteVoice(); // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
-    const r = await cabinStart(v);
+    const r = await cabinStart(v); rtKick(CABIN_CH);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));
     return true;
   }, [toast, t]);
   const end = useCallback(async () => {
-    if (!trip) return; const id = trip.id; setTrip(null); sfx.down(); await cabinEnd(id); toast(t("送迎を終わりにしました"));
+    if (!trip) return; const id = trip.id; setTrip(null); sfx.down(); await cabinEnd(id); rtKick(CABIN_CH); toast(t("送迎を終わりにしました"));
   }, [trip, toast, t]);
   /** ゲスト乗車: 回送 (父向けの画面) → ゲスト用の送迎画面 */
   const board = useCallback(async () => {
     const tr = tripRef2.current; if (!tr) return; sfx.chord(); vib(30);
-    const r = await cabinBoard(tr.id);
+    const r = await cabinBoard(tr.id); rtKick(CABIN_CH);
     if (!r.ok) { toast(r.error === "SETUP_VOICE" ? t("回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です") : t("切り替えられませんでした")); return; }
     setTrip({ ...tr, phase: "guest" }); toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
   }, [toast, t]);
@@ -130,7 +133,7 @@ export function HumorPick({ initial, t }: { initial: boolean; t: T }) {
   const [msg, setMsg] = useState("");
   const pick = async (h: boolean) => {
     if (h === on) return; sfx.tick(); setOn(h); setMsg("");
-    const r = await cabinSetHumor(h);
+    const r = await cabinSetHumor(h); rtKick(CABIN_CH);
     if (r.ok) humorNow = h;
     else { setOn(!h); setMsg(r.error === "SETUP_HUMOR" ? t("ユーモアモードには Supabase の SQL（migration_ai_humor.sql）が必要です") : t("切り替えられませんでした")); }
   };
@@ -244,7 +247,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
   const [humor, setHumor] = useState(humorNow ?? humor0);
   const toggleHumor = async () => {
     const h = !humor; setHumor(h); sfx.tick();
-    const r = await cabinSetHumor(h);
+    const r = await cabinSetHumor(h); rtKick(CABIN_CH);
     if (r.ok) humorNow = h;
     if (!r.ok) { setHumor(!h); toastQ(r.error === "SETUP_HUMOR" ? t("ユーモアモードには Supabase の SQL（migration_ai_humor.sql）が必要です") : t("切り替えられませんでした")); }
     else toastQ(h ? t("😂 ユーモアモード ON：映画やアニメのネタも話します") : t("ユーモアモード OFF"));
@@ -253,7 +256,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
   const [quiet, setQuiet] = useState(!!tr.aiQuiet);
   const toggleQuiet = async () => {
     const q = !quiet; setQuiet(q); sfx.tick();
-    const r = await cabinSetQuiet(tr.id, q);
+    const r = await cabinSetQuiet(tr.id, q); rtKick(CABIN_CH);
     if (!r.ok) { setQuiet(!q); toastQ(r.error === "SETUP_AI" ? t("静かモードには Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("切り替えられませんでした")); }
   };
   const [qMsg, toastQ] = useState("");
@@ -280,7 +283,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
   const rec = useRef<any>(null);
   const send = async (c: CaptainCmdId, label: string) => {
     sfx.tick(); vib(15);
-    const r = await cabinAiCmd(tr.id, c);
+    const r = await cabinAiCmd(tr.id, c); rtKick(CABIN_CH);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP_AI" ? t("ASTRAEA の指示には Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("送れませんでした")); return; }
     setSent("📡 " + label); setTimeout(() => setSent(""), 2500);
     if (c !== "unknown") setTimeout(onClose, 900);

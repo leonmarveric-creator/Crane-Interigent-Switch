@@ -21,6 +21,7 @@ import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL, type GLang } from "@/lib/cabinGeo";
 import { SFX_MARK } from "@/lib/remoteVoice";
+import { rtJoin, CABIN_CH } from "@/lib/rtKick";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
 const POLL_MS = 3000;
@@ -228,7 +229,20 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       } else { setGift(null); dhRef.current?.hide(); if (e.tripId() && !e.tripId()!.startsWith("demo")) { e.stop(); tripRef.current = null; setInTrip(false); } }
     } catch { setOnline(false); }
   }, [dev, toast]);
-  useEffect(() => { if (!dev) return; void poll(); const id = setInterval(() => void poll(), POLL_MS); return () => clearInterval(id); }, [dev, poll]);
+  /* 問い合わせの間隔 (サーバーへの回数を減らす): 送迎中は 3 秒ごと。待機中は 12 秒ごと、画面を閉じている間は 60 秒ごと。
+     画面に触れたとき・画面が戻ったときは、すぐに 1 回聞く */
+  useEffect(() => {
+    if (!dev) return;
+    let live = true, id: ReturnType<typeof setTimeout> | undefined, lastAt = 0;
+    const loop = async () => { lastAt = Date.now(); await poll(); if (!live) return; id = setTimeout(loop, tripRef.current ? POLL_MS : document.hidden ? 60000 : 12000); };
+    const now = () => { if (!live || tripRef.current || Date.now() - lastAt < 2500) return; if (id) clearTimeout(id); void loop(); };
+    // お父さんのスマホからの合図 (出発・乗車・終わり・設定の切り替え) が来たら、すぐ聞きに行く
+    rtJoin(CABIN_CH, () => { if (!live || Date.now() - lastAt < 1200) return; if (id) clearTimeout(id); void loop(); });
+    const onVis = () => { if (!document.hidden) now(); };
+    document.addEventListener("visibilitychange", onVis); document.addEventListener("pointerdown", now, true);
+    void loop();
+    return () => { live = false; if (id) clearTimeout(id); document.removeEventListener("visibilitychange", onVis); document.removeEventListener("pointerdown", now, true); };
+  }, [dev, poll]);
 
   async function endTrip(id: string, force = false) {
     // お見送りの到着のあとは、終わりにせず「帰り道 (回送)」へ (SQL がまだなら今までどおり終わり)
