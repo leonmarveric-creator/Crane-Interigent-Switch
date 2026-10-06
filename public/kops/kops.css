@@ -1303,3 +1303,40 @@
 .skin-ho.jv .tpn .sy{margin-top:12px;padding-top:8px;border-top-color:rgba(255,179,71,.4)}
 .skin-ho.jv .tpn .sy small{color:#ffb347}.skin-ho.jv .tpn .sy p{font-size:16px;line-height:1.45}
 .skin-ho.jv.lite .jvv{background:none}
+
+/* JARVIS: 丸いメーター・情報パネル・声のコア・起動の演出 */
+.skin-ho.jv .tpn{padding:18px 20px}
+.skin-ho.jv .tpn .prg{margin:8px 4px 12px}
+.skin-ho.jv .gz{display:flex;align-items:center;justify-content:space-between;height:132px}
+.skin-ho.jv .gz .g{position:relative;width:92px;height:92px}.skin-ho.jv .gz .g.lg{width:132px;height:132px}
+.skin-ho.jv .gz .g svg{width:100%;height:100%;transform:rotate(135deg)}.skin-ho.jv .gz .g circle{fill:none;stroke-width:5;stroke-linecap:round}
+.skin-ho.jv .gz .g .bg{stroke:rgba(95,227,255,.16)}.skin-ho.jv .gz .g .fg{stroke:#5fe3ff;filter:drop-shadow(0 0 5px #5fe3ff);transition:stroke-dashoffset .5s}
+.skin-ho.jv .gz .g.am .fg{stroke:#ffb347;filter:drop-shadow(0 0 5px #ffb347)}
+.skin-ho.jv .gz .g .tk{stroke:rgba(95,227,255,.45);stroke-width:4;stroke-linecap:butt}
+.skin-ho.jv .gz .g .rot{position:absolute;inset:-5px;border-radius:50%;border:1px dashed rgba(95,227,255,.3);animation:jv-sp 14s linear infinite}
+.skin-ho.jv .gz .g.lg .rot{inset:-7px;border-style:dotted;animation-duration:22s;animation-direction:reverse}@keyframes jv-sp{to{transform:rotate(360deg)}}
+.skin-ho.jv .gz .g .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.skin-ho.jv .gz .g .v small{font-size:8.5px;letter-spacing:.18em;color:#6fa3bd}
+.skin-ho.jv .gz .g .v b{font:700 21px/1.1 var(--mono);color:#fff;text-shadow:0 0 10px rgba(95,227,255,.8)}.skin-ho.jv .gz .g.lg .v b{font-size:44px}
+.skin-ho.jv .gz .g .v b em{display:block;font-style:normal;font-size:9px;font-weight:400;color:#6fa3bd;text-shadow:none;text-align:center}
+.skin-ho.jv .gz .g .v u{text-decoration:none;font-size:8.5px;letter-spacing:.08em;color:#6fa3bd}
+.skin-ho.jv .jvv{margin-top:4px}
+.skin-ho.jv .jvv canvas{aspect-ratio:400/270}
+.skin-ho.jv .jvd{gap:6px;padding:0 12px 8px}
+.skin-ho.jv .jvd span{position:relative;padding:5px 6px 8px;border:1px solid rgba(95,227,255,.22);background:rgba(95,227,255,.04);clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%);font-size:8px}
+.skin-ho.jv .jvd s{position:absolute;left:6px;right:6px;bottom:3px;height:2px;background:rgba(95,227,255,.15)}
+.skin-ho.jv .jvd s i{display:block;height:100%;width:0;background:#5fe3ff;box-shadow:0 0 6px #5fe3ff;transition:width .5s}
+.skin-ho.jv .tpn .bts{gap:7px}.skin-ho.jv .tpn .bts button{height:52px}
+.skin-ho.jv .tpn .sy{display:flex;gap:12px;align-items:center;margin-top:10px;padding-top:8px}
+.skin-ho.jv .tpn .sy canvas{width:84px;height:84px;flex:0 0 84px}
+.skin-ho.jv .tpn .sy p{font-size:15px}
+.skin-ho.jv .jvboot{position:absolute;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#07202e,#02060a 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .7s;font-family:var(--mono)}
+.skin-ho.jv .jvboot.off{opacity:0;pointer-events:none}
+.skin-ho.jv .jvboot canvas{width:340px;height:340px}
+.skin-ho.jv .jvboot h1{margin:6px -.6em 0 0;font-size:30px;font-weight:300;letter-spacing:.6em;color:#eafaff;text-shadow:0 0 22px #5fe3ff}
+.skin-ho.jv .jvboot .ln{margin-top:16px;width:420px;font-size:12px;letter-spacing:.14em;color:#6fa3bd;line-height:1.9;min-height:120px}
+.skin-ho.jv .jvboot .ln div{display:flex;justify-content:space-between;opacity:0;transform:translateX(-8px);transition:.25s}.skin-ho.jv .jvboot .ln div.s{opacity:1;transform:none}
+.skin-ho.jv .jvboot .ln b{color:#8cffbe;font-weight:500}
+.skin-ho.jv .jvboot .bar{width:420px;height:3px;background:rgba(95,227,255,.15);margin-top:6px}
+.skin-ho.jv .jvboot .bar i{display:block;height:100%;width:0;background:#ffb347;box-shadow:0 0 10px #ffb347;transition:width .3s}
+.skin-ho.jv.lite .gz .g .rot{animation:none}.skin-ho.jv.lite .gz .g .fg{filter:none}

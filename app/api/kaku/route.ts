@@ -90,9 +90,16 @@ async function ext(k: string, q: URLSearchParams): Promise<any> {
   if (k === "route") {
     const a = [num(q.get("alat"), 20, 50), num(q.get("alng"), 120, 155)], b = [num(q.get("blat"), 20, 50), num(q.get("blng"), 120, 155)];
     if ([...a, ...b].some((v) => v == null)) return null;
-    const d = await get(`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`, 3600);
-    const r = d.routes?.[0]; if (!r) return null;
-    return { pts: r.geometry.coordinates.map(([x, y]: number[]) => [y, x]), dur: r.duration };
+    // 道順サービスは 2 か所を順に試す (1 か所が混んでいる・止まっていると、目的地まで直線になってしまうため)。それぞれ 6 秒で打ち切る
+    for (const h of ["https://router.project-osrm.org/route/v1/driving/", "https://routing.openstreetmap.de/routed-car/route/v1/driving/"]) {
+      try {
+        const res = await fetch(`${h}${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`, { headers: UA, cache: "no-store", signal: AbortSignal.timeout(6000) });
+        if (!res.ok) continue;
+        const r = (await res.json())?.routes?.[0];
+        if (r?.geometry?.coordinates?.length > 1) return { pts: r.geometry.coordinates.map(([x, y]: number[]) => [y, x]), dur: r.duration };
+      } catch { /* 次のサービスへ */ }
+    }
+    throw new Error("ROUTE");
   }
   if (k === "conv") {
     const lat = num(q.get("lat"), 20, 50), lng = num(q.get("lng"), 120, 155); if (lat == null || lng == null) return null;
