@@ -14,8 +14,8 @@
 export interface RemoteVoice { stop(): void; busy(): boolean; /** iPad の声を受け取れている (最近の問い合わせが成功) */ ok(): boolean }
 /** 効果音の印 (声の順番待ちに入れず、すぐ重ねて鳴らす・音楽も下げない) */
 export const SFX_MARK = "#sfx";
-/** これより古い声は鳴らさない (iPad は返事を最大 3.5 秒待ってから自分で鳴らす) */
-const STALE_MS = 6000;
+/** これより古い声は鳴らさない。iPad は返事を最大 5 秒待ってから自分で鳴らすので、それより手前で打ち切る (両方から鳴らないように) */
+const STALE_MS = 4300;
 let AC: AudioContext | null = null;
 const cache = new Map<string, Promise<AudioBuffer | null>>();
 export function unlockRemoteVoice() {
@@ -58,6 +58,8 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
         const buf = await load(it.u);
         if (buf && live && fresh(it.n)) {
           ack = Math.max(ack, it.n); // 鳴らし始めた (iPad はこれを見て自分の声を消す)
+          // 返事は次の 1 秒ごとの問い合わせを待たずに、すぐ送る (遅れると iPad が自分で鳴らしてしまう)。after を大きくして声は受け取らない
+          { const a0 = ack; void fetch(`/api/cabin/voice?t=${tripId}&after=9999999999999999&ready=1&ack=${a0}`, { cache: "no-store" }).then((x) => x.json()).then((r) => { if (r?.ok) ackSent = Math.max(ackSent, a0); }).catch(() => {}); }
           playing++; try { h.onPlay?.(it.u); } catch { /* */ } h.onStart?.();
           await new Promise<void>((ok) => { const s = AC!.createBufferSource(), g = AC!.createGain(); g.gain.value = 1; s.buffer = buf; s.connect(g); g.connect(AC!.destination); s.onended = () => ok(); s.start(); setTimeout(ok, buf.duration * 1000 + 500); });
           playing--; if (!playing) h.onEnd?.();

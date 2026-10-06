@@ -86,14 +86,14 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         const routes = await (await fetch("/cabin/routes.json")).json();
         if (!live || !root.current || !host.current) return;
         if (!host.current.firstChild) host.current.innerHTML = TRIP_HTML;
-        /* 声をスマホへ送り、スマホが「鳴らし始めた」と返事をするまで最大 3.5 秒待つ。
-           返事が無ければ false (iPad が自分で鳴らす)。そのあと 20 秒はスマホに任せない (毎回待たないように) */
+        /* 声をスマホへ送り、スマホが「鳴らし始めた」と返事をするまで最大 5 秒待つ (初めての声はスマホが読み込むのに時間がかかる)。
+           返事が無ければ false (iPad が自分で鳴らす)。そのあと 8 秒はスマホに任せない (毎回待たないように) */
         const sendVoice = async (id: string, u: string, s: string): Promise<boolean> => {
           const r = await fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "say", trip: id, u, s }) }).then((x) => x.json()).catch(() => null);
           if (s === SFX_MARK) return true; // 効果音は返事を待たない
           const n = Number(r?.n || 0);
-          if (!r?.ok || !n) { phoneMissUntil.current = Date.now() + 20000; return false; }
-          const until = Date.now() + 3500;
+          if (!r?.ok || !n) { phoneMissUntil.current = Date.now() + 8000; return false; }
+          const until = Date.now() + 5000;
           while (Date.now() < until) {
             await new Promise((ok) => setTimeout(ok, 400));
             const a = await fetch(`/api/cabin/voice?t=${id}&peek=1`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
@@ -101,7 +101,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
             // 返事の列がまだ無い (migration_cabin_voice_ack.sql 未実行) → 今までどおりスマホに任せる
             if (a && !a.ok && a.error === "SETUP_ACK") { await new Promise((ok) => setTimeout(ok, 700)); return true; }
           }
-          phoneMissUntil.current = Date.now() + 20000;
+          phoneMissUntil.current = Date.now() + 8000;
           return false;
         };
         const phoneOk = () => Date.now() > phoneMissUntil.current;
