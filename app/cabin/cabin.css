@@ -1147,3 +1147,32 @@
 /* ---- 到着画面: コンシェルジュの QR (金色。鍵・お部屋・地図の入口) ---- */
 .cab .aq button.con{background:linear-gradient(135deg,#caa04a,#8f6a1f);border-color:#ffe6a8;box-shadow:0 0 26px rgba(230,198,117,.55),inset 0 1px 0 rgba(255,255,255,.2)}
 .cab .aq button.con small{color:#fff3d2}
+
+/* ===== 回送: JARVIS ボタンと車両スキャン (ON のとき右の枠を入れ替える。OFF は今までどおり) ===== */
+.cab .dhjvb{position:absolute;right:14px;top:148px;z-index:1000;display:flex;align-items:center;gap:8px;height:46px;padding:0 14px 0 10px;border-radius:99px;border:1px solid rgba(95,176,255,.45);background:rgba(4,10,22,.85);color:#cfe0f5;font-size:13px;font-weight:700;letter-spacing:.18em}
+.cab .dhjvb i{width:22px;height:22px;border-radius:50%;border:2px solid #5b7aa3;box-shadow:inset 0 0 0 4px rgba(4,10,22,.9),inset 0 0 0 9px #5b7aa3}
+.cab .dhjvb em{font-style:normal;font-size:11px;color:#8fb2d9;letter-spacing:.1em}
+.cab .dh.jv .dhjvb{border-color:#ffb347;color:#ffe0b0;box-shadow:0 0 18px rgba(255,179,71,.45)}
+.cab .dh.jv .dhjvb i{border-color:#5fe3ff;box-shadow:inset 0 0 0 4px rgba(4,10,22,.9),inset 0 0 0 9px #5fe3ff,0 0 12px #5fe3ff;animation:dh-jvp 1.6s ease-in-out infinite}
+.cab .dh.jv .dhjvb em{color:#ffb347}
+@keyframes dh-jvp{50%{box-shadow:inset 0 0 0 4px rgba(4,10,22,.9),inset 0 0 0 7px #5fe3ff,0 0 22px #5fe3ff}}
+.cab .dhveh{display:none;padding-bottom:10px}
+.cab .dhveh h3{display:flex;align-items:center}
+.cab .vtab{margin-left:auto;display:flex;gap:4px}
+.cab .vtab b{white-space:nowrap;padding:6px 12px;border-radius:99px;border:1px solid rgba(95,227,255,.3);font-size:11px;letter-spacing:.08em;color:#8fb2d9;font-weight:500}
+.cab .vtab b.on{background:rgba(95,227,255,.16);color:#eafaff;border-color:#5fe3ff}
+.cab .dhveh .dg{position:relative;margin:0 -8px;aspect-ratio:440/340;border-radius:12px;background:radial-gradient(ellipse at 50% 60%,rgba(95,227,255,.10),transparent 70%)}
+.cab .dhveh canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.cab .vdat{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.cab .vdat div{padding:5px 8px;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(95,227,255,.14)}
+.cab .vdat small{display:block;font-size:9px;letter-spacing:.16em;color:#7fa6c9}
+.cab .vdat b{font-family:Rajdhani,ui-monospace,monospace;font-size:19px;color:#eafaff}.cab .vdat em{font-style:normal;font-size:10px;margin-left:2px;color:#9fb6d6}
+.cab .dh.jv .dhveh{display:block}
+.cab .dh.jv .dhrad,.cab .dh.jv .dhchk{display:none}
+.cab .dh.jv.vrad .dhrad,.cab .dh.jv.vchk .dhchk{display:block}
+.cab .dh.jv.vrad .dhveh .dg,.cab .dh.jv.vrad .vdat,.cab .dh.jv.vchk .dhveh .dg,.cab .dh.jv.vchk .vdat{display:none}
+.cab .dh.jv{background:radial-gradient(ellipse at 20% 0%,#062a3a,#02080f 62%)}
+.cab .dh.jv .box{border-color:rgba(95,227,255,.38);background:linear-gradient(180deg,rgba(6,30,44,.9),rgba(4,14,24,.92));box-shadow:inset 0 0 24px rgba(95,227,255,.06)}
+.cab .dh.jv .box h3{color:#5fe3ff}
+.cab .dh.jv .dhsub{border-color:rgba(255,179,71,.55)}
+.cab .dh.jv .eta{border-color:rgba(95,227,255,.6)}

@@ -1281,3 +1281,25 @@
 /* 通信バー: 話し終わったあと (少し残す間) は波を止めて、暗めに */
 .kops .agc.end .agc-w i{animation:none;transform:scaleY(.12);opacity:.45}.kops .agc.end{opacity:.82}.kops .agcx.end{opacity:.82}
 .kops .agcx.end .agcf b{animation:none;color:#9aa7ad}.kops .agc.end .agc-k b{color:#9aa7ad}
+
+/* ===== JARVIS (TACTICAL と同じ配置。色を水色とオレンジに、右に車両スキャン) ===== */
+.skin-ho.jv{--h:#bfefff;--h2:#5fe3ff;--hl:rgba(95,227,255,.5);--hd:rgba(95,227,255,.16);--y:#ffb347;--tile:grayscale(1) brightness(.5) contrast(1.5) sepia(.6) hue-rotate(155deg) saturate(2.4);background:#04090f}
+.skin-ho.jv .tpn{background:linear-gradient(180deg,#06141d,#040a10);color:#bfefff;padding-top:22px}
+.skin-ho.jv .tpn .prg{margin:22px 0 18px}
+.skin-ho.jv .tpn .prg i{background:#5fe3ff;box-shadow:0 0 8px #5fe3ff}.skin-ho.jv .tpn .prg u.ok{border-color:#5fe3ff;background:#5fe3ff}.skin-ho.jv .tpn .prg u.t{border-color:#ffb347}
+.skin-ho.jv .tpn .big{display:inline-block;vertical-align:top;width:33.3%;margin-bottom:10px;padding-left:8px;border-left-color:rgba(95,227,255,.55)}
+.skin-ho.jv .tpn .big small{font-size:10px;color:#6fa3bd}
+.skin-ho.jv .tpn .big b{font-size:30px;text-shadow:0 0 12px rgba(95,227,255,.7)}
+.skin-ho.jv .tpn .big b em{font-size:10px;margin-left:2px;color:#6fa3bd}
+.skin-ho.jv .jvv{position:relative;margin:0 -12px 8px;padding:6px 0 0;border-top:1px solid rgba(95,227,255,.22);border-bottom:1px solid rgba(95,227,255,.22);background:radial-gradient(ellipse at 50% 55%,rgba(95,227,255,.10),transparent 70%)}
+.skin-ho.jv .jvv>small{position:absolute;left:12px;top:6px;font-size:10px;letter-spacing:.18em;color:#5fe3ff}
+.skin-ho.jv .jvv canvas{display:block;width:100%;aspect-ratio:400/286;touch-action:none;cursor:grab}
+.skin-ho.jv .jvd{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:0 8px 6px}
+.skin-ho.jv .jvd span{font-size:8.5px;letter-spacing:.1em;color:#6fa3bd;white-space:nowrap}
+.skin-ho.jv .jvd b{display:block;font:700 15px var(--mono);color:#eafaff;letter-spacing:.02em}
+.skin-ho.jv .tpn .bts{gap:8px;margin-top:0}.skin-ho.jv .tpn .bts button{height:60px;border-color:rgba(95,227,255,.4);background:linear-gradient(180deg,#0b1d29,#071018);color:#bfefff}
+.skin-ho.jv .tpn .bts button.on{border-color:#ffb347;box-shadow:inset 0 0 0 1px #ffb347,inset 0 0 20px rgba(255,179,71,.2)}
+.skin-ho.jv .tpn .bts button.on i,.skin-ho.jv .tpn .bts button.on b{color:#ffb347}.skin-ho.jv .tpn .bts button.on::after{background:#ffb347;box-shadow:0 0 8px #ffb347}
+.skin-ho.jv .tpn .sy{margin-top:12px;padding-top:8px;border-top-color:rgba(255,179,71,.4)}
+.skin-ho.jv .tpn .sy small{color:#ffb347}.skin-ho.jv .tpn .sy p{font-size:16px;line-height:1.45}
+.skin-ho.jv.lite .jvv{background:none}

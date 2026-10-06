@@ -41,10 +41,13 @@ const HTML = `<div class="dhs">
   <canvas id="dhStars"></canvas>
   <div class="dhboost"><small>SKY GATE BRIDGE</small><b id="dhBT">BOOST</b><div class="dhbar"><i id="dhBP"></i></div></div>
   <div class="dhsub" id="dhSub"><i class="o"></i><div><div class="n">ASTRAEA · CAPTAIN CHANNEL</div><div class="j" id="dhJ">コパイロット待機中</div><div class="e" id="dhE"></div></div></div>
+  <button class="dhjvb" id="dhJvB"><i></i><span>JARVIS</span><em id="dhJvS">OFF</em></button>
   <button class="dhwbtn" id="dhWb">🪧 お出迎えボード</button>
  </div>
  <div class="side">
   <div class="box dhmis" id="dhMis"></div>
+  <div class="box dhveh"><h3>VEHICLE SCAN<span class="vtab"><b data-v="car" class="on">車両</b><b data-v="rad">レーダー</b><b data-v="chk">チェック</b></span></h3><div class="dg"><canvas id="dhCar"></canvas></div>
+   <div class="vdat"><div><small>SPEED</small><b id="dhVS">0<em>km/h</em></b></div><div><small>LIMIT KEPT</small><b id="dhVK">--<em>%</em></b></div><div><small>DRIVE</small><b id="dhVD">00:00</b></div><div><small>HDG</small><b id="dhVH">---<em>°</em></b></div></div></div>
   <div class="box dhchk"><h3 id="dhChkH">到着前チェック · PRE-ARRIVAL</h3><div class="dhck" id="dhCk"></div></div>
   <div class="box dhrad"><h3>上空レーダー · SKY RADAR</h3><canvas id="dhRc" width="170" height="150"></canvas><div class="dhfl" id="dhFl"></div></div>
  </div></div>
@@ -211,6 +214,25 @@ export function createDeadhead(c: DhCtx): Deadhead {
     for (const s of SS) { const pz = s.z; s.z -= v; if (s.z <= 0.02) { s.x = (Math.random() - 0.5) * 2; s.y = (Math.random() - 0.5) * 2; s.z = 1; continue; } const x = W / 2 + s.x / s.z * W * 0.43, y = H / 2 + s.y / s.z * H * 0.43, x2 = W / 2 + s.x / (pz + 0.06) * W * 0.43, y2 = H / 2 + s.y / (pz + 0.06) * H * 0.43; cx.strokeStyle = `rgba(${col},${1 - s.z})`; cx.lineWidth = (1 - s.z) * 3; cx.beginPath(); cx.moveTo(x2, y2); cx.lineTo(x, y); cx.stroke(); }
   }
 
+  /* ---------- JARVIS (画面だけ。声は ASTRAEA のまま): 右の枠を車両スキャンに。点データは最初の 1 回だけ読む ---------- */
+  let jv = false, jcar: any = null, keptN = 0, keptT = 0;
+  try { jv = localStorage.getItem("cabin.dhjv") === "1"; } catch { /* 保存できない端末 */ }
+  function jvCar() {
+    const W = window as any;
+    if (!jv || !onNow) { jcar?.stop(); jcar = null; return; }
+    if (jcar) return;
+    const go = () => { if (jv && onNow && !jcar && W.JVCAR) jcar = W.JVCAR.mount($("dhCar"), { w: 440, h: 340, sc: 88, speed: () => kmh }); };
+    if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(jvCar, 600);
+  }
+  function setJv(on: boolean, save = true) {
+    jv = on; host.classList.toggle("jv", on); $("dhJvS").textContent = on ? "ON" : "OFF";
+    if (save) { try { localStorage.setItem("cabin.dhjv", on ? "1" : "0"); } catch { /* 保存できない端末 */ } }
+    jvCar();
+  }
+  $("dhJvB").onclick = (e: Event) => { e.stopPropagation(); tone(on2(), 0, 0.08, 0.05); tone(on2() * 1.5, 0.08, 0.22, 0.05); setJv(!jv); };
+  function on2() { return jv ? 660 : 880; }
+  host.querySelectorAll(".vtab b").forEach((b) => { (b as HTMLElement).onclick = (e) => { e.stopPropagation(); const v = (b as HTMLElement).dataset.v; host.querySelectorAll(".vtab b").forEach((x) => x.classList.toggle("on", x === b)); host.classList.toggle("vrad", v === "rad"); host.classList.toggle("vchk", v === "chk"); }; });
+
   /* ---------- 位置 (スマホ or iPad の GPS) ---------- */
   let lastPan = 0, welcomeShown = false;
   function feed(ll: LL, v: number | null) {
@@ -226,6 +248,8 @@ export function createDeadhead(c: DhCtx): Deadhead {
     const br = onBridge(ll); if (br.on && !boosting) boostIn(); if (!br.on && boosting) boostOut();
     if (boosting) { $("dhBP").style.width = `${Math.round(Math.max(0, Math.min(1, br.t)) * 100)}%`; if (br.t > 0.45 && br.t < 0.55 && !said.bm) { said.bm = 1; void say("boostMid"); } }
     host.classList.toggle("over", kmh > LIMIT + 1);
+    if (kmh > 3) { keptT++; if (kmh <= LIMIT + 1) keptN++; }
+    if (jv) { const sec = Math.round((Date.now() - t0) / 1000); $("dhVS").innerHTML = `${Math.round(kmh)}<em>km/h</em>`; $("dhVK").innerHTML = `${keptT ? Math.round(keptN / keptT * 100) : "--"}<em>%</em>`; $("dhVD").textContent = `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`; $("dhVH").innerHTML = `${String(Math.round((p.hd + 360) % 360)).padStart(3, "0")}<em>°</em>`; }
     // 速度のひと言 (80 / 100 / 120 km/h を超えて 2 回続いたら。70 未満に落ちて 3 分たてば、また言う)
     const lv = kmh >= 140 ? 140 : kmh >= 120 ? 120 : kmh >= 100 ? 100 : kmh >= 80 ? 80 : 0;
     if (lv > spdLv && Date.now() - t0 > 20000) { if (++spdN >= 2) { spdLv = lv; spdAt = Date.now(); spdN = 0; const ks = dhSpdFor(lv, back); void say(ks[Math.floor(Math.random() * ks.length)]); } } else spdN = 0;
@@ -261,7 +285,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
       const first = !trip || trip.id !== t.id || !onNow;
       trip = t; room = r; info = inf; back = t.dir === "out";
       if (first) {
-        onNow = true; host.classList.add("on"); c.stage.classList.add("dh-on"); ensureMap(); said = {}; spdLv = 0; spdN = 0; quietAt = idleAt = Date.now(); prog = 0; boosting = false; welcomeShown = false; checkShown = false; t0 = Date.now(); host.classList.remove("boost", "over");
+        onNow = true; host.classList.add("on"); c.stage.classList.add("dh-on"); ensureMap(); said = {}; spdLv = 0; spdN = 0; quietAt = idleAt = Date.now(); prog = 0; boosting = false; welcomeShown = false; checkShown = false; t0 = Date.now(); keptN = keptT = 0; host.classList.remove("boost", "over"); setJv(jv, false);
         $("dhWbP").classList.remove("on"); $("dhBoard").textContent = "🧳 ゲスト乗車"; $("dhWb").style.display = back ? "none" : "";
         const P = PLACES[t.placeKey as keyof typeof PLACES], pll: LL = (P?.ll as LL) ?? t.placeLL ?? CRANE_NEST;
         const rk = back ? `${t.placeKey}_in` : `${t.placeKey}_out`, raw = c.routes[rk];
@@ -284,7 +308,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
       }
     },
     feed,
-    hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); },
+    hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); jvCar(); },
     on: () => onNow,
     tripId: () => trip?.id ?? null,
     unlock: () => unlockAudio(el, dhAudio("boot")),
