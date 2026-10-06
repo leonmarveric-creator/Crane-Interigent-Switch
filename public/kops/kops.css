@@ -1278,3 +1278,6 @@
 /* 走行中: 地図を上に大きく、ボタンは親指の届く下に */
 .kpad.pt-ta:not(.land) #mQ,.kpad.pt-ho:not(.land) #mQ{order:0;flex:1 1 200px!important;min-height:190px!important}
 .kpad.pt-ta:not(.land) #bCr,.kpad.pt-ho:not(.land) #bCr{min-height:78px}.kpad.pt-ta:not(.land) #vR .sq,.kpad.pt-ho:not(.land) #vR .sq{min-height:78px}
+/* 通信バー: 話し終わったあと (少し残す間) は波を止めて、暗めに */
+.kops .agc.end .agc-w i{animation:none;transform:scaleY(.12);opacity:.45}.kops .agc.end{opacity:.82}.kops .agcx.end{opacity:.82}
+.kops .agcx.end .agcf b{animation:none;color:#9aa7ad}.kops .agc.end .agc-k b{color:#9aa7ad}
