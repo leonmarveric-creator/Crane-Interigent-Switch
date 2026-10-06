@@ -18,7 +18,7 @@ export interface KOpsGuest {
 }
 export interface KOpsData { guests: KOpsGuest[]; devices: { id: string; name: string }[]; rooms: { id: string; name: string; kanji: string }[]; cabinMissing: boolean }
 
-const V = "43";
+const V = "46";
 function load(src: string): Promise<void> {
   return new Promise((ok, ng) => {
     if (/\.css(\?|$)/.test(src)) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = src; l.onload = () => ok(); l.onerror = () => ng(new Error(src)); document.head.appendChild(l); return; }
@@ -48,7 +48,7 @@ export default function KOpsApp({ data }: { data: KOpsData }) {
       try {
         await Promise.all([load("/cabin/leaflet/leaflet.css"), load(`/kops/kops.css?v=${V}`)]);
         if (!w.L) await load("/cabin/leaflet/leaflet.js");
-        if (!w.CNRT) await load("/rt.js").catch(() => {});
+        if (!w.CNRT) await load("/rt.js?v=2").catch(() => {});
         if (!w.KOPS) await load(`/kops/kops.js?v=${V}`);
         if (dead || !root.current) return;
         w.KOPS.mount(root.current);

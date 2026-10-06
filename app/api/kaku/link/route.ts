@@ -58,8 +58,9 @@ export async function POST(req: NextRequest) {
   }
   if (b.op === "cmd") {
     const cmd = String(b.cmd || "").slice(0, 40); if (!/^[a-z0-9_]+$/i.test(cmd)) return J({ ok: false, error: "BAD" });
-    const { error } = await supabaseAdmin.from("kaku_link_cmd").insert({ code: b.code, cmd, args: b.args ?? null });
-    return J(error ? { ok: false, error: setup(error.message) ? "SETUP" : error.message } : { ok: true });
+    // 番号 (id) を返す: スマホはこの番号つきで iPad へ直接知らせる (iPad は同じ命令を二度実行しない)
+    const { data, error } = await supabaseAdmin.from("kaku_link_cmd").insert({ code: b.code, cmd, args: b.args ?? null }).select("id").maybeSingle();
+    return J(error ? { ok: false, error: setup(error.message) ? "SETUP" : error.message } : { ok: true, id: (data as any)?.id ?? null });
   }
   return J({ ok: false, error: "BAD" });
 }

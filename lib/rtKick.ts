@@ -8,7 +8,7 @@ function rt(): Promise<RT | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
   const w = window as any;
   if (w.CNRT) return Promise.resolve(w.CNRT as RT);
-  if (!loading) loading = new Promise((ok) => { const s = document.createElement("script"); s.src = "/rt.js"; s.onload = () => ok((w.CNRT as RT) ?? null); s.onerror = () => { loading = null; ok(null); }; document.head.appendChild(s); });
+  if (!loading) loading = new Promise((ok) => { const s = document.createElement("script"); s.src = "/rt.js?v=2"; s.onload = () => ok((w.CNRT as RT) ?? null); s.onerror = () => { loading = null; ok(null); }; document.head.appendChild(s); });
   return loading;
 }
 /** 車内 iPad とお父さんのスマホの合図 */
