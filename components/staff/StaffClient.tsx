@@ -146,7 +146,7 @@ const STATUS_STYLE: Record<RoomStatus, { dot: string; chip: string; border: stri
 const card = "rounded-3xl bg-white shadow-[0_10px_30px_-20px_rgba(59,50,40,0.45)]";
 
 export default function StaffClient({
-  rooms, reservations, baseUrl, entranceUrlByBuilding, setupMissing, history = [], geo = null, passkeys = null, entranceCodes = [], roomCodes = null,
+  rooms, reservations, baseUrl, entranceUrlByBuilding, setupMissing, history = [], geo = null, passkeys = null, entranceCodes = [], roomCodes = null, cheers = null,
 }: {
   rooms: StaffRoom[]; reservations: StaffRes[]; baseUrl: string;
   entranceUrlByBuilding: Record<string, string>; setupMissing: boolean;
@@ -157,6 +157,8 @@ export default function StaffClient({
   entranceCodes?: EntranceCode[];
   /** お部屋の暗証番号 (room.id → 番号)。null = migration_room_codes.sql 未実行 */
   roomCodes?: Record<string, string | null> | null;
+  /** みんなの声 (来自世界的声音) の数。null = migration_guest_cheers.sql 未実行 */
+  cheers?: { total: number; unseen: number } | null;
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("zh");
@@ -192,13 +194,13 @@ export default function StaffClient({
         </p>
       )}
       <div className="px-4" style={big ? { zoom: 1.15 } : undefined}>
-        {tab === "today" && <TodayTab t={t} lang={lang} rooms={rooms} states={states} reservations={reservations} roomById={roomById} now={now} ach={ach} geo={geo} pkReady={passkeys !== null} />}
+        {tab === "today" && <TodayTab t={t} lang={lang} rooms={rooms} states={states} reservations={reservations} roomById={roomById} now={now} ach={ach} geo={geo} pkReady={passkeys !== null} cheers={cheers} />}
         {tab === "res" && (
           <ResTab t={t} reservations={reservations} roomById={roomById} states={states} now={now}
             baseUrl={baseUrl} entranceUrlByBuilding={entranceUrlByBuilding} />
         )}
         {tab === "cal" && <CalTab t={t} rooms={rooms} reservations={reservations} now={now} />}
-        {tab === "rec" && <RecTab t={t} lang={lang} ach={ach} now={now} passkeys={passkeys} />}
+        {tab === "rec" && <RecTab t={t} lang={lang} ach={ach} now={now} passkeys={passkeys} cheers={cheers} />}
         {tab === "memo" && <MemoTab t={t} lang={lang} rooms={rooms} entranceCodes={entranceCodes} roomCodes={roomCodes} />}
       </div>
       <BadgeCelebration t={t} lang={lang} count={ach.yearCleans} />
@@ -261,9 +263,10 @@ function Header({ t, lang, now, onLang, onLogout, big, onBig }: {
 }
 
 /* ---------------- 今天 ---------------- */
-function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, geo, pkReady }: {
+function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, geo, pkReady, cheers }: {
   t: ST; lang: Lang; rooms: StaffRoom[]; states: { room: StaffRoom; st: ReturnType<typeof roomState> }[]; reservations: StaffRes[];
   roomById: Map<string, StaffRoom>; now: number; ach: Achievements; geo: { lat: number; lng: number } | null; pkReady: boolean;
+  cheers: { total: number; unseen: number } | null;
 }) {
   const count = (s: RoomStatus) => states.filter((x) => x.st.status === s).length;
   const order: Record<RoomStatus, number> = { dirty: 0, staying: 1, vacant: 2 };
@@ -283,11 +286,13 @@ function TodayTab({ t, lang, rooms, states, reservations, roomById, now, ach, ge
   return (
     <div className="space-y-5 pt-5">
       <SpecialBanner lang={lang} now={now} />
+      {cheers && cheers.unseen > 0 && <VoicesLink lang={lang} cheers={cheers} kind="new" />}
       <CheerCard t={t} lang={lang} now={now} />
       {pkReady && <PasskeyPrompt t={t} />}
       {geo && <WeatherCard t={t} geo={geo} />}
       <EveningCard t={t} now={now} prog={prog} guests={events.filter((e) => e.kind === "in" && new Date(e.at).getTime() <= now).length} />
       <ProgressCard t={t} lang={lang} prog={prog} now={now} monthCleans={ach.monthCleans} />
+      {cheers && cheers.total > 0 && prog.total > 0 && prog.done >= prog.total && <VoicesLink lang={lang} cheers={cheers} kind="done" />}
       <div className="grid grid-cols-3 gap-2">
         {(["dirty", "staying", "vacant"] as RoomStatus[]).map((s) => (
           <div key={s} className={`${card} flex flex-col items-center py-3`}>
@@ -352,6 +357,27 @@ function CheerCard({ t, lang, now }: { t: ST; lang: Lang; now: number }) {
       </div>
       <p className="mt-2 text-[19px] font-bold leading-relaxed text-[#4a3b2c]">{dailyCheer(jstDay(now), lang, offset)}</p>
     </section>
+  );
+}
+
+/* 来自世界的声音 (みんなの声) への入口: 新しい声 / 清掃が全部終わったとき / 记录タブ */
+const VOICE_T = {
+  zh: { newT: (n: number) => `收到 ${n} 条 来自世界的新讯息`, newS: "客人退房时留下的话 · 点这里看", doneT: "🌍 来自世界的讯息", doneS: "今天辛苦了。听听大家的声音吧", recT: "🌍 来自世界的声音", recS: (n: number) => `已收到 ${n} 条讯息` },
+  ja: { newT: (n: number) => `世界から新しいメッセージが ${n} 件`, newS: "ゲストがチェックアウトで残した言葉 · タップで見る", doneT: "🌍 世界からのメッセージ", doneS: "今日もおつかれさま。みんなの声を見てみよう", recT: "🌍 世界からの声", recS: (n: number) => `${n} 件のメッセージ` },
+};
+function VoicesLink({ lang, cheers, kind }: { lang: Lang; cheers: { total: number; unseen: number }; kind: "new" | "done" | "rec" }) {
+  const v = VOICE_T[lang === "ja" ? "ja" : "zh"];
+  const title = kind === "new" ? `✉ ${v.newT(cheers.unseen)}` : kind === "done" ? v.doneT : v.recT;
+  const sub = kind === "new" ? v.newS : kind === "done" ? v.doneS : v.recS(cheers.total);
+  return (
+    <a href="/staff/voices" className="flex items-center gap-3 rounded-3xl bg-[#2f2c26] px-4 py-3.5 text-[#e6e0cc] no-underline shadow-[0_10px_30px_-18px_rgba(30,25,20,0.8)] active:scale-[0.99]">
+      <span className="min-w-0 flex-1">
+        <b className="block text-[16px] tracking-wide">{title}</b>
+        <small className="mt-0.5 block text-[12.5px] text-[#b2ab95]">{sub}</small>
+      </span>
+      {kind !== "rec" && cheers.unseen > 0 && <span className="rounded-full bg-[#e6e0cc] px-2 py-0.5 text-xs font-bold text-[#2f2c26]">{cheers.unseen}</span>}
+      <span className="text-xl text-[#e6e0cc]">›</span>
+    </a>
   );
 }
 
@@ -838,7 +864,7 @@ function WeatherCard({ t, geo }: { t: ST; geo: { lat: number; lng: number } }) {
 }
 
 /* ---------------- 记录 (がんばり記録) ---------------- */
-function RecTab({ t, lang, ach, now, passkeys }: { t: ST; lang: Lang; ach: Achievements; now: number; passkeys: StaffPasskey[] | null }) {
+function RecTab({ t, lang, ach, now, passkeys, cheers }: { t: ST; lang: Lang; ach: Achievements; now: number; passkeys: StaffPasskey[] | null; cheers: { total: number; unseen: number } | null }) {
   const month = Number(jstDay(now).slice(5, 7));
   const today = Number(jstDay(now).slice(8, 10));
   const stamps = new Set(ach.stampDays);
@@ -855,6 +881,7 @@ function RecTab({ t, lang, ach, now, passkeys }: { t: ST; lang: Lang; ach: Achie
   return (
     <div className="space-y-4 pt-5">
       <h2 className="flex items-center gap-2 px-1 text-xl font-bold"><Award className="h-6 w-6 text-[#e0a526]" /> {t.recTitle}</h2>
+      {cheers && <VoicesLink lang={lang} cheers={cheers} kind="rec" />}
       <div className="grid grid-cols-2 gap-3">
         <Stat label={t.recMonth} cleans={ach.monthCleans} guests={ach.monthGuests} />
         <Stat label={t.recYear} cleans={ach.yearCleans} guests={ach.yearGuests} />

@@ -6,6 +6,7 @@ import { findCheckoutStay } from "@/lib/guestCheckout";
 import { CO_T, checkoutWindow, coLang } from "@/lib/checkoutText";
 import { CHECKOUT_HTML } from "@/lib/checkoutPage";
 import { LANG_COOKIE } from "@/lib/langCookie";
+import { CHEER_A, CHEER_B, CHEER_C, CHEER_COUNTRIES, CHEER_POPULAR, CHEER_UI } from "@/lib/cheerText";
 
 /**
  * ゲストのチェックアウト画面 (お部屋の操作画面・コンシェルジュの「チェックアウトする」から開く)。
@@ -46,6 +47,8 @@ export async function GET(req: NextRequest, { params }: { params: { room: string
       wafu: !!room.switchbot_wafu_device_id, galaxy: !!room.switchbot_galaxy_device_id,
     },
     T: CO_T,
+    // 最後にひとこと (みんなの声)
+    cheer: { P: { A: CHEER_A, B: CHEER_B, C: CHEER_C }, CT: CHEER_COUNTRIES, POP: CHEER_POPULAR, UI: CHEER_UI },
   };
   const html = CHECKOUT_HTML.replace("__DATA__", JSON.stringify(data).replace(/</g, "\\u003c"));
   return new NextResponse(html, { headers: H });

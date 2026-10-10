@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { loadCheckoutRecords } from "@/lib/guestCheckout";
+import { pendingFreeCheers } from "@/lib/guestCheers";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
@@ -179,7 +180,7 @@ export default async function AdminPage() {
   }));
 
   return (
-    <AdminClient rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} bootVoice={await getBootVoice()} driverDesign={(await getDriverSettings()).design}
+    <AdminClient pendingCheers={await pendingFreeCheers()} rooms={rooms} reservations={enriched} switchbot={switchbot} logs={logs} bootVoice={await getBootVoice()} driverDesign={(await getDriverSettings()).design}
       smartkey={{ entrances, settings: smartkeySettings, logs: entranceLogs, setupMissing: !!entranceErr, locks, locksMissing: !!lockErr }} />
   );
 }

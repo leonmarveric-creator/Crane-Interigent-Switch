@@ -1,7 +1,7 @@
 /**
  * ゲストのチェックアウト (サーバー側)。
  *   お部屋の操作画面 (/room) とコンシェルジュ (/g) のどちらから押しても、ここで 1 つの記録にする。
- *   1) 同意の記録 (guest_checkouts) → 2) 予約に guest_checkout_at → 3) 起床アラームを止める → 4) 電源 OFF (外出と同じ)
+ *   1) 同意の記録 (guest_checkouts) → 2) 予約に guest_checkout_at → 3) 起床アラームを止める → 4) 電源 OFF (外出と同じ) → 5) みんなの声
  */
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { authorizeRoomRequest } from "@/lib/auth";
@@ -9,6 +9,7 @@ import { resolveGuestKey } from "@/lib/smartkey";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { CO_T, CHECKOUT_POLICY_VERSION, checkoutWindow, coLang, plainText } from "@/lib/checkoutText";
 import { isMissingColumn } from "@/lib/stayTimes";
+import { saveCheer, type CheerInput } from "@/lib/guestCheers";
 
 export interface CoReservation { id: string; check_out: string; guest_checkout_at?: string | null; guest_lang?: string | null }
 export interface CoStay { room: any; reservation: CoReservation; via: "room" | "concierge" }
@@ -40,7 +41,7 @@ export type CheckoutResult =
 
 export async function performCheckout(
   s: CoStay,
-  input: { lang?: unknown; items?: unknown; via?: unknown; ua?: string | null; ip?: string | null },
+  input: { lang?: unknown; items?: unknown; via?: unknown; cheer?: CheerInput | null; ua?: string | null; ip?: string | null },
   nowMs = Date.now(),
 ): Promise<CheckoutResult> {
   const r = s.reservation;
@@ -87,6 +88,9 @@ export async function performCheckout(
   } catch (e) { powerOk = false; powerErr = String((e as Error)?.message ?? e).slice(0, 200); }
   await logDevice({ room_id: s.room.id, reservation_id: r.id, action: "checkout", source: "guest", success: powerOk === true });
   try { await supabaseAdmin.from("guest_checkouts").update({ power_ok: powerOk, power_error: powerErr }).eq("reservation_id", r.id); } catch { /* ignore */ }
+
+  // 5) みんなの声 (お母さんの画面へ。選ばなかったゲストも「平安 踏上 旅途」として 1 件)
+  await saveCheer(r.id, s.room.id ?? null, L, input.cheer ?? null);
 
   return { ok: true, at, powerOk };
 }

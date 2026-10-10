@@ -6,6 +6,7 @@ import { isMissingColumn } from "@/lib/stayTimes";
 import { airbnbCode } from "@/lib/staffLogic";
 import type { StaffRoom, StaffRes, HistoryItem } from "@/lib/staffLogic";
 import StaffClient from "@/components/staff/StaffClient";
+import { cheerCounts } from "@/lib/guestCheers";
 
 export const dynamic = "force-dynamic";
 
@@ -104,8 +105,11 @@ export default async function StaffPage() {
   const pk = await supabaseAdmin.from("staff_passkeys").select("id, device_name, created_at, last_used_at").order("created_at");
   const passkeys = pk.error ? null : (pk.data ?? []);
 
+  // みんなの声 (来自世界的声音) の数 (migration_guest_cheers.sql 未実行なら null)
+  const cheers = await cheerCounts();
+
   return (
-    <StaffClient history={history} geo={geo} passkeys={passkeys} entranceCodes={entranceCodes} roomCodes={roomCodes} rooms={rooms} reservations={reservations} baseUrl={baseUrl}
+    <StaffClient cheers={cheers} history={history} geo={geo} passkeys={passkeys} entranceCodes={entranceCodes} roomCodes={roomCodes} rooms={rooms} reservations={reservations} baseUrl={baseUrl}
       entranceUrlByBuilding={entranceUrlByBuilding} setupMissing={setupMissing || resMissing} />
   );
 }

@@ -19,6 +19,7 @@ import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
 import BootVoiceCard from "./BootVoiceCard";
 import DriverDesignCard from "./DriverDesignCard";
+import PendingCheers, { type PendingCheer } from "./PendingCheers";
 import { RoomLockForm, type AdminSesameLock } from "./SesameLocks";
 
 export interface Room {
@@ -136,8 +137,8 @@ function SubmitButton({
 }
 
 export default function AdminClient({
-  rooms, reservations, switchbot, logs, smartkey, bootVoice = "astralis", driverDesign = "hybrid",
-}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[]; smartkey: SmartKeyProps; bootVoice?: "astralis" | "jarvis"; driverDesign?: "hybrid" | "bike" }) {
+  rooms, reservations, switchbot, logs, smartkey, bootVoice = "astralis", driverDesign = "hybrid", pendingCheers = [],
+}: { rooms: Room[]; reservations: Reservation[]; switchbot: SwitchBotInfo; logs: LogEntry[]; smartkey: SmartKeyProps; bootVoice?: "astralis" | "jarvis"; driverDesign?: "hybrid" | "bike"; pendingCheers?: PendingCheer[] }) {
   const [lang, setLang] = useState<AdminLang>("ja");
   const [tab, setTab] = useState<Tab>("today");
   const [toolsView, setToolsView] = useState<ToolsView>("test");
@@ -191,7 +192,7 @@ export default function AdminClient({
           </div>
         </header>
 
-        {tab === "today" && <TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
+        {tab === "today" && <><PendingCheers items={pendingCheers} /><TodayTab rooms={rooms} reservations={reservations} t={t} lang={lang} /></>}
         {tab === "reservations" && <ReservationsTab rooms={rooms} reservations={reservations} t={t} lang={lang} />}
         {tab === "rooms" && <RoomsTab rooms={rooms} info={switchbot} t={t} locks={smartkey.locks} locksMissing={smartkey.locksMissing} lang={lang} />}
         {tab === "smartkey" && (
