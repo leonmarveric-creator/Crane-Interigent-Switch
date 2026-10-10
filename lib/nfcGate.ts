@@ -6,14 +6,19 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isStaff } from "@/lib/staffAuth";
 import { authorizeRoomRequest } from "@/lib/auth";
-import { resolveGuestKey, getSmartKeySettings } from "@/lib/smartkey";
+import { resolveGuestKey, getSmartKeySettings, ENTRANCE_SCOPE, entranceCookieName } from "@/lib/smartkey";
+import { signScopedSession, verifyScopedSession, signSession, roomCookieName } from "@/lib/roomSession";
+import { keyStateFor, SESSION_GRACE_MS } from "@/lib/smartkeyLogic";
+import { withEffectiveTimes, isMissingColumn } from "@/lib/stayTimes";
 import { toCabinRoom } from "@/lib/cabinData";
 
 export interface GuideCodes { ent: string | null; room: string | null }
 /** チェックアウトのボタン用 (このゲストの予約の、実際のチェックアウト時刻と、済んでいればその時刻) */
 export interface GuideCheckout { checkOut: string; done: string | null }
+/** 確認済みのゲスト (専用 URL の発行用) */
+export interface GuideGuest { rid: string; roomSlug: string; checkOut: string }
 export type GuideAccess =
-  | { ok: true; codes: GuideCodes | null; co?: GuideCheckout | null }
+  | { ok: true; codes: GuideCodes | null; co?: GuideCheckout | null; guest?: GuideGuest | null }
   | { ok: false; redirect: string }
   | { ok: false; redirect?: undefined; entranceSlug: string | null; roomSlug: string | null; roomKanji: string | null };
 
@@ -44,9 +49,12 @@ export async function guideAccess(key: string): Promise<GuideAccess> {
       // 別のお部屋のページを開いた → 自分のお部屋のコンシェルジュへ
       if (hit && ctx.room.id !== hit.raw.id) return { ok: false, redirect: `/g/${encodeURIComponent(ctx.room.slug)}` };
       const co: GuideCheckout | null = hit && rv ? { checkOut: rv.check_out, done: rv.guest_checkout_at ?? null } : null;
-      if (left) return { ok: true, codes: null, co };
+      const guest: GuideGuest | null = rv ? { rid: String(rv.id), roomSlug: String(ctx.room.slug), checkOut: String(rv.check_out) } : null;
+      // 共用のページ (ロビーなど) を開いた → 自分のお部屋のコンシェルジュへ
+      if (!hit && guest) return { ok: false, redirect: `/g/${encodeURIComponent(guest.roomSlug)}` };
+      if (left) return { ok: true, codes: null, co, guest };
       // お部屋の番号は、滞在が始まってから (前のゲストがまだいる時間には出さない)
-      return { ok: true, codes: { ent: clean(ctx.data.keypadCode), room: hit && ctx.state === "active" ? clean(ctx.room.keypad_code) : null }, co: ctx.state === "active" ? co : null };
+      return { ok: true, codes: { ent: clean(ctx.data.keypadCode), room: hit && ctx.state === "active" ? clean(ctx.room.keypad_code) : null }, co: ctx.state === "active" ? co : null, guest };
     }
   }
   // (2) お部屋のページで確認済み
@@ -54,12 +62,70 @@ export async function guideAccess(key: string): Promise<GuideAccess> {
     const stay = await authorizeRoomRequest(String(hit.raw.slug)).catch(() => null);
     if (stay) {
       const co: GuideCheckout = { checkOut: stay.reservation.check_out, done: stay.reservation.guest_checkout_at ?? null };
-      if (co.done) return { ok: true, codes: null, co };
+      const guest: GuideGuest = { rid: stay.reservation.id, roomSlug: String(stay.room.slug), checkOut: stay.reservation.check_out };
+      if (co.done) return { ok: true, codes: null, co, guest };
       const st = await getSmartKeySettings().catch(() => null);
-      return { ok: true, codes: { ent: st && st.show_keypad_code === false ? null : clean(ent?.keypad_code), room: clean(stay.room.keypad_code) }, co };
+      return { ok: true, codes: { ent: st && st.show_keypad_code === false ? null : clean(ent?.keypad_code), room: clean(stay.room.keypad_code) }, co, guest };
     }
   }
   return { ok: false, entranceSlug: ent?.slug ?? null, roomSlug: hit ? String(hit.raw.slug) : null, roomKanji: hit?.c.kanji ?? null };
+}
+
+/* ================= ホーム画面用の URL (?k=…) =================
+ * 4 桁で確認できたら、/g/[自分の部屋]?k=<署名> に移す。ホーム画面に追加すると、この URL がアイコンになるので
+ * 次からは 4 桁なしで開ける (iPhone のホーム画面は Safari と Cookie が別なので、URL に持たせる)。
+ * 中身は予約 ID と期限の署名だけ。毎回いまの予約を確かめ、チェックアウト (退室ボタンなら 3 時間後) で使えなくなる。
+ */
+const GUIDE_SCOPE = "guide";
+const LEFT_GRACE_MS = 3 * 3600e3;
+export const guideKeyFor = (g: GuideGuest) =>
+  signScopedSession(GUIDE_SCOPE, g.rid, Date.parse(g.checkOut) + 2 * 86400e3);
+
+export interface GuideCookie { name: string; value: string; expires: Date }
+export type GuideKeyAccess =
+  | { ok: true; codes: GuideCodes | null; co: GuideCheckout | null; roomSlug: string; cookies: GuideCookie[] }
+  | { ok: false; redirect: string }
+  | null;
+
+/** ?k= の確認。使えなければ null (いつもの Cookie / 4 桁の確認へ) */
+export async function guideAccessByKey(key: string, k: string): Promise<GuideKeyAccess> {
+  const v = verifyScopedSession(GUIDE_SCOPE, k);
+  if (!v) return null;
+  const cols = "id, room_id, assigned_room_id, status, check_in, check_out, guest_lang";
+  const q = (c: string) => supabaseAdmin.from("reservations").select(c).eq("id", v.reservationId).maybeSingle();
+  let rr: any = await q(`${cols}, early_checkin_at, late_checkout_at, guest_checkout_at`);
+  if (isMissingColumn(rr.error)) rr = await q(`${cols}, early_checkin_at, late_checkout_at`);
+  if (isMissingColumn(rr.error)) rr = await q(cols);
+  if (!rr.data) return null;
+  const r: any = withEffectiveTimes(rr.data);
+  const now = Date.now();
+  const state = keyStateFor(r, now);
+  const left = state === "expired" && !!r.guest_checkout_at && now < Date.parse(r.check_out) + LEFT_GRACE_MS;
+  if (!(state === "active" || state === "before" || left)) return null;
+
+  const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("id", r.assigned_room_id || r.room_id).maybeSingle();
+  if (!room) return null;
+  const k0 = decodeURIComponent(key || "").trim().toLowerCase();
+  if (k0 !== String(room.slug).toLowerCase()) return { ok: false, redirect: `/g/${encodeURIComponent(room.slug)}` };
+
+  const co: GuideCheckout = { checkOut: r.check_out, done: r.guest_checkout_at ?? null };
+  if (left || co.done) return { ok: true, codes: null, co, roomSlug: room.slug, cookies: [] };
+
+  const { data: ents } = await supabaseAdmin.from("entrances").select("slug, building, keypad_code").eq("is_active", true).order("slug")
+    .then((x) => x, () => ({ data: null } as any));
+  const list = (ents ?? []) as any[];
+  const ent = list.find((e) => (e.building || "Crane Nest") === (room.building || "Crane Nest")) ?? list[0] ?? null;
+  const st = await getSmartKeySettings().catch(() => null);
+  const codes: GuideCodes = {
+    ent: st && st.show_keypad_code === false ? null : clean(ent?.keypad_code),
+    room: state === "active" ? clean(room.keypad_code) : null,
+  };
+  // ホーム画面から開いたときも、鍵・お部屋の画面がそのまま使えるように Cookie も入れ直す
+  const out = Date.parse(r.check_out);
+  const cookies: GuideCookie[] = [];
+  if (ent) cookies.push({ name: entranceCookieName(ent.slug), value: signScopedSession(ENTRANCE_SCOPE, r.id, out + SESSION_GRACE_MS), expires: new Date(out + SESSION_GRACE_MS) });
+  if (state === "active") cookies.push({ name: roomCookieName(room.slug), value: signSession(r.id, out), expires: new Date(out) });
+  return { ok: true, codes, co: state === "active" ? co : null, roomSlug: room.slug, cookies };
 }
 
 /** 4 桁を入れる画面 (言語はスマホの設定 / ?lang= に合わせる) */
