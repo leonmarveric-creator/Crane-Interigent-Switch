@@ -11,6 +11,8 @@ export interface StayReservation {
   check_out: string;
   unlock_pin: string | null;
   welcomed_at: string | null;
+  /** ゲストがチェックアウトボタンで退室した時刻 (migration_guest_checkout.sql) */
+  guest_checkout_at?: string | null;
 }
 
 export interface ActiveStay {
@@ -50,7 +52,8 @@ export async function getActiveStays(roomSlug: string): Promise<ActiveStays | nu
     //   2) 未割り当て(assigned_room_id is null)で、元の部屋がこの部屋
     //   ※割り当てが一切無ければ 2) だけになり、従来と同じ挙動。
     .or(`assigned_room_id.eq.${room.id},and(assigned_room_id.is.null,room_id.eq.${room.id})`);
-  let res: any = await query(`${base}, early_checkin_at, late_checkout_at`);
+  let res: any = await query(`${base}, early_checkin_at, late_checkout_at, guest_checkout_at`);
+  if (isMissingColumn(res.error)) res = await query(`${base}, early_checkin_at, late_checkout_at`); // migration_guest_checkout.sql 未実行
   if (isMissingColumn(res.error)) res = await query(base); // migration_staff.sql 未実行でも動く
   const reservations: StayReservation[] = ((res.data ?? []) as any[])
     .filter((r) => isStayingAt(r, now))

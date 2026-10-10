@@ -18,6 +18,7 @@ import {
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import EntranceKeyButton from "@/components/EntranceKeyButton";
+import CheckoutBanner from "@/components/CheckoutBanner";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
@@ -370,6 +371,7 @@ export default function LiteControlPanel({
 
       {/* 操作エリア */}
       <div className="mx-auto max-w-md px-5 pb-16 pt-2">
+        <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="wafu" className="mb-3" />
         {entranceHref && (
           <div className="mb-3">
             <EntranceKeyButton href={entranceHref} lang={lang} variant="wafu" />

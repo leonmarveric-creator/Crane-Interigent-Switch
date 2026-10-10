@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { loadCheckoutRecords } from "@/lib/guestCheckout";
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
@@ -73,6 +74,10 @@ export default async function AdminPage() {
       airbnb_reservation_url: r.airbnb_reservation_url ?? null,
     };
   });
+
+  // ゲストのチェックアウト (ボタン) の記録
+  const coRecs = await loadCheckoutRecords(enriched.map((r) => r.id));
+  for (const r of enriched) r.co = coRecs[r.id] ?? null;
 
   // SwitchBotデバイス一覧 (ID確認用)。env未設定なら error メッセージ。
   let switchbot: SwitchBotInfo;

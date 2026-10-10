@@ -10,8 +10,10 @@ import { resolveGuestKey, getSmartKeySettings } from "@/lib/smartkey";
 import { toCabinRoom } from "@/lib/cabinData";
 
 export interface GuideCodes { ent: string | null; room: string | null }
+/** チェックアウトのボタン用 (このゲストの予約の、実際のチェックアウト時刻と、済んでいればその時刻) */
+export interface GuideCheckout { checkOut: string; done: string | null }
 export type GuideAccess =
-  | { ok: true; codes: GuideCodes | null }
+  | { ok: true; codes: GuideCodes | null; co?: GuideCheckout | null }
   | { ok: false; redirect: string }
   | { ok: false; redirect?: undefined; entranceSlug: string | null; roomSlug: string | null; roomKanji: string | null };
 
@@ -35,19 +37,26 @@ export async function guideAccess(key: string): Promise<GuideAccess> {
   // (1) エントランスで確認済み (チェックアウトまで有効)
   if (ent) {
     const ctx = await resolveGuestKey(ent.slug).catch(() => null);
-    if (ctx && ctx.room && (ctx.state === "active" || ctx.state === "before")) {
+    const rv: any = ctx?.reservation ?? null;
+    // チェックアウトボタンで退室したゲストも、チェックアウト時刻の 3 時間後までは地図・送迎の案内を見られる (暗証番号は出さない)
+    const left = !!(ctx && ctx.room && ctx.state === "expired" && rv?.guest_checkout_at && Date.now() < Date.parse(rv.check_out) + 3 * 3600e3);
+    if (ctx && ctx.room && (ctx.state === "active" || ctx.state === "before" || left)) {
       // 別のお部屋のページを開いた → 自分のお部屋のコンシェルジュへ
       if (hit && ctx.room.id !== hit.raw.id) return { ok: false, redirect: `/g/${encodeURIComponent(ctx.room.slug)}` };
+      const co: GuideCheckout | null = hit && rv ? { checkOut: rv.check_out, done: rv.guest_checkout_at ?? null } : null;
+      if (left) return { ok: true, codes: null, co };
       // お部屋の番号は、滞在が始まってから (前のゲストがまだいる時間には出さない)
-      return { ok: true, codes: { ent: clean(ctx.data.keypadCode), room: hit && ctx.state === "active" ? clean(ctx.room.keypad_code) : null } };
+      return { ok: true, codes: { ent: clean(ctx.data.keypadCode), room: hit && ctx.state === "active" ? clean(ctx.room.keypad_code) : null }, co: ctx.state === "active" ? co : null };
     }
   }
   // (2) お部屋のページで確認済み
   if (hit) {
     const stay = await authorizeRoomRequest(String(hit.raw.slug)).catch(() => null);
     if (stay) {
+      const co: GuideCheckout = { checkOut: stay.reservation.check_out, done: stay.reservation.guest_checkout_at ?? null };
+      if (co.done) return { ok: true, codes: null, co };
       const st = await getSmartKeySettings().catch(() => null);
-      return { ok: true, codes: { ent: st && st.show_keypad_code === false ? null : clean(ent?.keypad_code), room: clean(stay.room.keypad_code) } };
+      return { ok: true, codes: { ent: st && st.show_keypad_code === false ? null : clean(ent?.keypad_code), room: clean(stay.room.keypad_code) }, co };
     }
   }
   return { ok: false, entranceSlug: ent?.slug ?? null, roomSlug: hit ? String(hit.raw.slug) : null, roomKanji: hit?.c.kanji ?? null };

@@ -21,6 +21,10 @@ export async function POST(
   if (!stay) {
     return NextResponse.json({ ok: false, error: "ACCESS_DENIED" }, { status: 403 });
   }
+  // チェックアウト済み (ゲストがボタンで退室) → 操作はもうできない
+  if (stay.reservation.guest_checkout_at) {
+    return NextResponse.json({ ok: false, error: "CHECKED_OUT" }, { status: 403 });
+  }
 
   // スマートキーの緊急停止中は、部屋パネルからの解錠も止める (施錠・家電操作は可)
   if (action === "unlock" && (await isAppUnlockStopped())) {

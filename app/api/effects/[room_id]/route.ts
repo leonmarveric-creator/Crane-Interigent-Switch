@@ -24,6 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { room_id: st
   let room: any = null;
   let reservationId: string | null = null;
   const stay = await authorizeRoomRequest(params.room_id);
+  if (stay?.reservation.guest_checkout_at) return NextResponse.json({ ok: false, error: "CHECKED_OUT" }, { status: 403 });
   if (stay) { room = stay.room; reservationId = stay.reservation.id; }
   else {
     const token = cookies().get(ADMIN_COOKIE)?.value;

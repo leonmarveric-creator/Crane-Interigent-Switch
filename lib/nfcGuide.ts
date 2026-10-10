@@ -13,16 +13,20 @@ import { CHECKIN_DEFAULT_URL, roomGuideOf } from "@/lib/cabinAiTalk";
 import { jstDay } from "@/lib/driverLogic";
 import { NFC_HTML } from "@/lib/nfcPage";
 import { roomIcon } from "@/lib/roomIcon";
+import { CO_T, checkoutWindow, coTime } from "@/lib/checkoutText";
+import type { GuideCheckout } from "@/lib/nfcGate";
 
 export interface NfcData {
   room: { kanji: string; en: string } | null; /** 部屋のイラスト (無ければ漢字を出す) */ icon: string | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
   /** 手動で開けるための暗証番号 (本人確認が済んだゲストにだけ入れる) */
   codes: { ent: string | null; room: string | null } | null;
+  /** チェックアウトのボタン (チェックアウト日の朝 6 時から・本人確認済みのゲストだけ) */
+  co: { open: boolean; done: string | null; time: string; href: string; T: typeof CO_T } | null;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
 }
 
-export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null): Promise<NfcData> {
-  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, G: { LOCK_T, TOILET_T } };
+export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null, co: GuideCheckout | null = null): Promise<NfcData> {
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, G: { LOCK_T, TOILET_T } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([
@@ -36,8 +40,14 @@ export async function nfcData(key: string, codes: { ent: string | null; room: st
     const rooms = ((data ?? []) as any[]).map((r) => ({ raw: r, c: toCabinRoom(r) }));
     const hit = rooms.find((r) => String(r.raw.slug || "").toLowerCase() === k || r.c.kanji === k || r.c.slug === k);
     if (!hit) return out;
+    if (co) {
+      const w = checkoutWindow(co.checkOut, Date.now());
+      if (co.done || w.open) out.co = { open: w.open, done: co.done, time: coTime(co.checkOut), href: `/checkout/${encodeURIComponent(hit.raw.slug)}?via=concierge`, T: CO_T };
+    }
     out.room = { kanji: hit.c.kanji, en: hit.c.en || "" }; out.icon = (await roomIcon(String(hit.raw.id), hit.c.kanji)).url; out.slug = String(hit.raw.slug); out.roomKey = `/room/${encodeURIComponent(hit.raw.slug)}`;
     { const e = entOf(hit.c.building || hit.raw.building || "Crane Nest"); out.entKey = e ? `/key/${encodeURIComponent(e.slug)}` : out.entKey; } out.knob = hasRoomLock(hit.raw.slug); out.natsu = roomGuideOf(hit.raw.slug) === "natsu";
+    // チェックアウト済みなら、お部屋・エントランスの鍵の入口は出さない
+    if (co?.done) { out.roomKey = null; out.entKey = null; }
     const now = Date.now(), today = jstDay(now), tomorrow = jstDay(now + 86400e3);
     const { res, tokens } = await loadReservations(now - 2 * 86400e3, now + 2 * 86400e3);
     const mine = res.filter((r) => r.roomId === hit.raw.id);

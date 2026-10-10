@@ -32,6 +32,7 @@ import EntranceKeyButton from "@/components/EntranceKeyButton";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { magicIncantationEcho, primeMagicAudio, setMuted as sfxSetMuted, spellCast } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
+import CheckoutBanner from "@/components/CheckoutBanner";
 import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
 import type { VoiceAction } from "@/lib/voiceCommand";
 
@@ -1166,6 +1167,7 @@ export default function MagicalControlPanel({
               {t.checkout}: <span className="text-[#f8ecd1]">{new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
             </p>
           )}
+          <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="magic" className="mx-auto mt-3 max-w-md" />
           <div className="magic-hero-art">
             <div className="hero-casting-stage">
               <MagicCircle key={`circle-${castPulse}`} activeKey={castPulse} tone={castTone} />

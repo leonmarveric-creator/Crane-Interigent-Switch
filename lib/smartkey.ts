@@ -93,7 +93,8 @@ export async function resolveGuestKey(slug: string): Promise<GuestKeyContext | n
   if (!v) return { entrance, settings, state: "verify", reservation: null, room: null, data: base };
 
   const cols = "id, room_id, assigned_room_id, status, check_in, check_out, guest_name, entrance_name, welcomed_at, guest_lang, guest_token";
-  let rr: any = await supabaseAdmin.from("reservations").select(`${cols}, early_checkin_at, late_checkout_at`).eq("id", v.reservationId).maybeSingle();
+  let rr: any = await supabaseAdmin.from("reservations").select(`${cols}, early_checkin_at, late_checkout_at, guest_checkout_at`).eq("id", v.reservationId).maybeSingle();
+  if (isMissingColumn(rr.error)) rr = await supabaseAdmin.from("reservations").select(`${cols}, early_checkin_at, late_checkout_at`).eq("id", v.reservationId).maybeSingle();
   if (isMissingColumn(rr.error)) rr = await supabaseAdmin.from("reservations").select(cols).eq("id", v.reservationId).maybeSingle();
   // 早期チェックイン / レイトチェックアウトを反映 (以降の check_in / check_out は実際に使える時間)
   const reservation: any = rr.data ? withEffectiveTimes(rr.data) : null;

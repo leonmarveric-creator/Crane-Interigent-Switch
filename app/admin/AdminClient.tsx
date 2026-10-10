@@ -43,6 +43,8 @@ export interface Reservation {
   check_in: string; check_out: string;
   unlock_pin: string | null;
   airbnb_reservation_url: string | null;
+  /** ゲストがチェックアウトボタンで退室した記録 (同意あり) */
+  co?: { at: string; via: string; lang: string; checked: number; total: number; powerOk: boolean | null; policy: string } | null;
 }
 export interface SwitchBotInfo {
   error: string | null;
@@ -292,13 +294,39 @@ function BottomNav({ tab, setTab, t }: { tab: Tab; setTab: (t: Tab) => void; t: 
 const jstDay = (iso: number | string) =>
   new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }); // YYYY-MM-DD
 
+/* ゲストのチェックアウト (ボタン・同意あり) */
+const CO_L: Record<AdminLang, { done: string; notYet: string; items: string; power: string; powerNg: string; via: Record<string, string>; policy: string }> = {
+  ja: { done: "チェックアウト済み・同意あり", notYet: "未チェックアウト（時刻を過ぎています）", items: "項目確認", power: "電源 OFF OK", powerNg: "電源 OFF 失敗", via: { room: "お部屋の画面", concierge: "コンシェルジュ" }, policy: "同意した文面" },
+  en: { done: "Checked out · consent", notYet: "Not checked out (past time)", items: "items checked", power: "Power off OK", powerNg: "Power off failed", via: { room: "Room screen", concierge: "Concierge" }, policy: "Agreed text" },
+  zh: { done: "已退房・已同意", notYet: "未退房（已过时间）", items: "项已确认", power: "已断电", powerNg: "断电失败", via: { room: "房间页面", concierge: "礼宾服务" }, policy: "同意的文字" },
+};
+function CheckoutBadge({ co, lang }: { co: NonNullable<Reservation["co"]>; lang: AdminLang }) {
+  const k = CO_L[lang];
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setOpen((v) => !v)} className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+        ✓ {k.done}
+      </button>
+      <p className="mt-1 text-[10.5px] text-white/45">
+        {fmt(co.at, lang)} · {co.lang} · {co.checked}/{co.total} {k.items} · {co.powerOk === false ? k.powerNg : k.power}
+      </p>
+      {open && (
+        <p className="mt-1 max-w-xs text-[10.5px] leading-relaxed text-white/55">
+          {k.via[co.via] ?? co.via} · {k.policy}: 「{co.policy}」
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservations: Reservation[]; t: T; lang: AdminLang }) {
   const now = Date.now();
   const today = jstDay(now);
 
   // 各部屋: 今滞在中 > 今日これから到着 の順で「今日のゲスト」を選ぶ
   const todayByRoom = useMemo(() => {
-    const m = new Map<string, { r: Reservation; state: "staying" | "arriving" }>();
+    const m = new Map<string, { r: Reservation; state: "staying" | "arriving" | "left" }>();
     for (const room of rooms) {
       const active = reservations.find((r) =>
         r.room_slug === room.slug && r.status === "active" &&
@@ -309,7 +337,13 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
         .filter((r) => r.room_slug === room.slug && r.status === "active"
           && new Date(r.check_in).getTime() > now && jstDay(r.check_in) === today)
         .sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime())[0];
-      if (arriving) m.set(room.slug, { r: arriving, state: "arriving" });
+      if (arriving) { m.set(room.slug, { r: arriving, state: "arriving" }); continue; }
+      // 今日チェックアウトの時刻を過ぎた予約 (ボタンで済んだか / 未か を出す)
+      const left = reservations
+        .filter((r) => r.room_slug === room.slug && r.status === "active"
+          && new Date(r.check_out).getTime() <= now && jstDay(r.check_out) === today)
+        .sort((a, b) => new Date(b.check_out).getTime() - new Date(a.check_out).getTime())[0];
+      if (left) m.set(room.slug, { r: left, state: "left" });
     }
     return m;
   }, [reservations, rooms, now, today]);
@@ -359,9 +393,13 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
                   <td className="px-2 py-3">
                     {!hit
                       ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/40">{t.empty}</span>
-                      : hit.state === "staying"
-                        ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{t.staying}</span>
-                        : <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">{t.arriving}</span>}
+                      : r?.co
+                        ? <CheckoutBadge co={r.co} lang={lang} />
+                        : hit.state === "left"
+                          ? <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[11px] font-semibold text-orange-300">{CO_L[lang].notYet}</span>
+                          : hit.state === "staying"
+                            ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{t.staying}</span>
+                            : <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">{t.arriving}</span>}
                   </td>
                   <td className="px-2 py-3 text-[11px] text-white/60">
                     {r ? `${fmt(r.check_in, lang)} → ${fmt(r.check_out, lang)}` : "—"}
@@ -1056,6 +1094,9 @@ function ReservationCard({ r, rooms, assignMode, t, lang }: { r: Reservation; ro
               {r.status}
             </span>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">{r.source === "ical" ? "Airbnb" : t.manual}</span>
+            {r.co && (
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✓ {CO_L[lang].done} {fmt(r.co.at, lang)}</span>
+            )}
           </div>
           <p className="mt-1.5 text-xs text-white/50">{fmt(r.check_in, lang)} → {fmt(r.check_out, lang)}</p>
           {r.guest_name && <p className="text-xs text-white/40">{r.guest_name}・{r.guest_lang}</p>}

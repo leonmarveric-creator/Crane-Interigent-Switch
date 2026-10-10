@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import EntranceKeyButton from "@/components/EntranceKeyButton";
+import CheckoutBanner from "@/components/CheckoutBanner";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
@@ -384,6 +385,9 @@ export default function ControlPanel({
             <LangSwitch lang={lang} setLang={setLang} />
           </div>
         </motion.header>
+
+        {/* チェックアウト (チェックアウト日の朝 6 時から) */}
+        <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="tech" className="mb-3" />
 
         {/* 外出 (全部OFF): 出かける時にすぐ押せるよう鍵の上に置く */}
         <motion.div className="mb-3" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>

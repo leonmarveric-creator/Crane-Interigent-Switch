@@ -12,6 +12,6 @@ export async function GET(req: NextRequest, { params }: { params: { room: string
     if (!("entranceSlug" in acc)) return NextResponse.redirect(new URL(acc.redirect + (req.nextUrl.search || ""), req.url), { status: 302, headers: { "cache-control": "no-store" } });
     return new NextResponse(gateHtml({ entranceSlug: acc.entranceSlug, roomSlug: acc.roomSlug, roomKanji: acc.roomKanji }), { headers: H });
   }
-  const html = nfcHtml(await nfcData(params.room, acc.codes));
+  const html = nfcHtml(await nfcData(params.room, acc.codes, acc.co ?? null));
   return new NextResponse(html, { headers: H });
 }

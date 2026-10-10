@@ -81,8 +81,10 @@ export function pickReservation(
 }
 
 /** 画面の状態 (予約の期間と現在時刻から)。 */
-export function keyStateFor(r: { check_in: string; check_out: string; status: string } | null, nowMs: number): KeyState {
+export function keyStateFor(r: { check_in: string; check_out: string; status: string; guest_checkout_at?: string | null } | null, nowMs: number): KeyState {
   if (!r || r.status !== "active") return "verify";
+  // チェックアウトボタンで退室済み → 鍵は終了
+  if (r.guest_checkout_at) return "expired";
   if (nowMs >= new Date(r.check_out).getTime()) return "expired";
   if (nowMs < new Date(r.check_in).getTime()) return "before";
   return "active";

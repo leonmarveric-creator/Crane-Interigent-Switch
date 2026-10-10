@@ -8,6 +8,7 @@ import { LANG_COOKIE } from "@/lib/langCookie";
 import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
+import CheckedOutScreen from "@/components/CheckedOutScreen";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
 import { passportNameFor } from "@/lib/passportName";
@@ -68,6 +69,11 @@ export default async function RoomPage({
         initialLang={lang}
       />
     );
+  }
+
+  // チェックアウトボタンで退室済み → 操作はもうできない (コンシェルジュの案内だけ)
+  if (matched.guest_checkout_at) {
+    return <CheckedOutScreen roomSlug={params.room_id} roomName={stays.room.display_name} lang={lang} at={matched.guest_checkout_at} />;
   }
 
   // 「ようこそ、◯◯様」用の名前と、同じ棟のエントランス鍵画面へのリンク

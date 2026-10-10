@@ -23,6 +23,7 @@ export async function POST(
 
   const stay = await authorizeRoomRequest(params.room_id);
   if (!stay) return NextResponse.json({ ok: false, error: "ACCESS_DENIED" }, { status: 403 });
+  if (stay.reservation.guest_checkout_at) return NextResponse.json({ ok: false, error: "CHECKED_OUT" }, { status: 403 });
 
   const { reservation, room } = stay;
 
