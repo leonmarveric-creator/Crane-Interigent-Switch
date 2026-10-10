@@ -8,7 +8,7 @@ import { DREAM_FADE_START } from "./dreamFade";
 
 /** 和風ライトのデフォルト暖色: 電球色 2700K・明るさ100%。 */
 export const WAFU_DEFAULT_WARM = { kelvin: 2700, brightness: 100 } as const;
-export const GALAXY_AUTO_OFF_MS = 60 * 60 * 1000; // ギャラクシーモードは ON から 60 分で自動 OFF
+export const GALAXY_AUTO_OFF_MS = 30 * 60 * 1000; // ギャラクシーモードは ON から 30 分で自動 OFF
 
 async function setGalaxyAutoOffAt(
   room: any,

@@ -48,9 +48,9 @@ test("good_night turns off every light-capable device without touching air condi
   assert.doesNotMatch(block, /switchbot_ac_device_id|acTurnOn|acTurnOff|acSetAll/);
 });
 
-test("galaxy_on stores a ninety-minute auto-off deadline and galaxy_off clears it", () => {
+test("galaxy_on stores a thirty-minute auto-off deadline and galaxy_off clears it", () => {
   const source = read(deviceControlPath);
-  assert.match(source, /GALAXY_AUTO_OFF_MS\s*=\s*60\s*\*\s*60\s*\*\s*1000/);
+  assert.match(source, /GALAXY_AUTO_OFF_MS\s*=\s*30\s*\*\s*60\s*\*\s*1000/);
   assert.match(source, /galaxy_auto_off_at/);
   assert.match(extractCase(source, "galaxy_on"), /setGalaxyAutoOffAt\(room,\s*autoOffAt\)/);
   assert.match(extractCase(source, "galaxy_off"), /setGalaxyAutoOffAt\(room,\s*null/);
