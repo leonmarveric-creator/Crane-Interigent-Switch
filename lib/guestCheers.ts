@@ -5,6 +5,28 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CHEER_A, CHEER_B, CHEER_C, cheerIdx, cheerLangFor, cheerText, isCheerCountry, type CheerLang } from "@/lib/cheerText";
 import { toCabinRoom } from "@/lib/cabinData";
+import { loadCraneNestDrops } from "@/lib/craneNest";
+import { toCountryCode } from "@/lib/countryCode";
+import { cheerKey } from "@/lib/cheerText";
+
+/** パスポート登録 (Crane Nest) の国籍 → 国コード。わからなければ null */
+export async function passportCountry(reservationId: string, room: any): Promise<string | null> {
+  const { data: r } = await supabaseAdmin.from("reservations").select("id, check_out, guest_token").eq("id", reservationId).maybeSingle();
+  if (!r) return null;
+  const drops = await loadCraneNestDrops([{ id: r.id, roomKanji: room ? toCabinRoom(room).kanji : null, checkOut: (r as any).check_out, token: (r as any).guest_token ?? null }]);
+  const code = toCountryCode(drops[r.id]?.nationality ?? null);
+  return code && isCheerCountry(code) ? code : null;
+}
+
+/** 最近 30 人の組み合わせと、言葉ごとの使われた回数 (候補が重ならないように) */
+export async function cheerHints(): Promise<{ recent: string[]; used: Record<"A" | "B" | "C", Record<number, number>> }> {
+  const used: Record<"A" | "B" | "C", Record<number, number>> = { A: {}, B: {}, C: {} };
+  const { data, error } = await supabaseAdmin.from("guest_cheers").select("a, b, c").eq("kind", "words").order("created_at", { ascending: false }).limit(30);
+  if (error) return { recent: [], used };
+  const rows = (data ?? []) as any[];
+  for (const x of rows) for (const [K, v] of [["A", x.a], ["B", x.b], ["C", x.c]] as const) if (v != null) used[K][v] = (used[K][v] ?? 0) + 1;
+  return { recent: rows.map((x) => cheerKey({ a: x.a, b: x.b, c: x.c })), used };
+}
 
 export interface CheerInput { country?: unknown; a?: unknown; b?: unknown; c?: unknown; free?: unknown }
 
@@ -27,7 +49,7 @@ export async function saveCheer(reservationId: string, roomId: string | null, ui
 }
 
 /** お母さんの画面に流す 1 件 */
-export interface CheerVoice { id: string; name: string; country: string | null; at: string; room: string | null; kind: "words" | "none"; text: string; zh: string; dir: "ltr" | "rtl"; isNew: boolean }
+export interface CheerVoice { id: string; name: string; country: string | null; at: string; room: string | null; nights: number | null; kind: "words" | "none"; text: string; zh: string; dir: "ltr" | "rtl"; isNew: boolean }
 
 /** 名前の表示 (大文字だけのパスポート表記は読みやすく) */
 const niceName = (s: string | null) => {
@@ -38,11 +60,22 @@ const niceName = (s: string | null) => {
 
 export async function loadCheers(limit = 300): Promise<{ voices: CheerVoice[]; setup: boolean }> {
   const { data, error } = await supabaseAdmin.from("guest_cheers")
-    .select("id, room_id, created_at, guest_name, country, lang, kind, a, b, c, free_text, free_zh, free_status, seen_at")
+    .select("id, reservation_id, room_id, created_at, guest_name, country, lang, kind, a, b, c, free_text, free_zh, free_status, seen_at")
     .order("created_at", { ascending: false }).limit(limit);
   if (error) return { voices: [], setup: false };
   const { data: rooms } = await supabaseAdmin.from("rooms").select("*");
   const kanji = new Map(((rooms ?? []) as any[]).map((r) => [r.id, toCabinRoom(r).kanji]));
+  // 泊数 (何も選ばなかったゲストの一行で使う)
+  const resIds = [...new Set(((data ?? []) as any[]).map((x) => x.reservation_id).filter(Boolean))];
+  const nightsOf = new Map<string, number>();
+  for (let i = 0; i < resIds.length; i += 100) {
+    const { data: rs } = await supabaseAdmin.from("reservations").select("id, check_in, check_out").in("id", resIds.slice(i, i + 100));
+    for (const r of (rs ?? []) as any[]) {
+      const d = (iso: string) => Date.parse(new Date(Date.parse(iso) + 9 * 3600e3).toISOString().slice(0, 10));
+      const n = Math.round((d(r.check_out) - d(r.check_in)) / 86400e3);
+      if (n > 0 && n < 60) nightsOf.set(r.id, n);
+    }
+  }
   const voices: CheerVoice[] = [];
   for (const x of (data ?? []) as any[]) {
     const lang = (x.lang || "en") as CheerLang;
@@ -55,7 +88,7 @@ export async function loadCheers(limit = 300): Promise<{ voices: CheerVoice[]; s
     }
     const kind = text ? "words" : "none";
     voices.push({
-      id: x.id, name: niceName(x.guest_name), country: x.country ?? null, at: x.created_at, room: kanji.get(x.room_id) ?? null,
+      id: x.id, name: niceName(x.guest_name), country: x.country ?? null, at: x.created_at, room: kanji.get(x.room_id) ?? null, nights: nightsOf.get(x.reservation_id) ?? null,
       kind, text, zh, dir: lang === "ar" ? "rtl" : "ltr", isNew: !x.seen_at,
     });
   }

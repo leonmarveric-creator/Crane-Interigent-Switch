@@ -9,6 +9,7 @@ import AccessDenied from "@/components/AccessDenied";
 import PinGate from "@/components/PinGate";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
 import CheckedOutScreen from "@/components/CheckedOutScreen";
+import { getWakeState } from "@/lib/wakeAuto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
 import { passportNameFor } from "@/lib/passportName";
@@ -88,9 +89,13 @@ export default async function RoomPage({
   const guestName = (nameRow as any)?.guest_name || (nameRow as any)?.entrance_name || null;
   const entranceHref = ent?.slug ? `/key/${ent.slug}` : null;
 
+  // 早朝便の自動光目覚まし (チェックアウトが近い予約だけ送迎予約を見る)
+  const wake = await getWakeState(matched.id, stays.room).catch(() => null);
+
   return (
     <>
     <RoomModeSwitch
+      wake={wake}
       guestName={guestName}
       entranceHref={entranceHref}
       roomSlug={params.room_id}

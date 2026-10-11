@@ -6,7 +6,8 @@ import { findCheckoutStay } from "@/lib/guestCheckout";
 import { CO_T, checkoutWindow, coLang } from "@/lib/checkoutText";
 import { CHECKOUT_HTML } from "@/lib/checkoutPage";
 import { LANG_COOKIE } from "@/lib/langCookie";
-import { CHEER_A, CHEER_B, CHEER_C, CHEER_COUNTRIES, CHEER_POPULAR, CHEER_UI } from "@/lib/cheerText";
+import { CHEER_A, CHEER_B, CHEER_C, CHEER_COUNTRIES, CHEER_POPULAR, CHEER_STAMPS, CHEER_UI } from "@/lib/cheerText";
+import { cheerHints, passportCountry } from "@/lib/guestCheers";
 
 /**
  * ゲストのチェックアウト画面 (お部屋の操作画面・コンシェルジュの「チェックアウトする」から開く)。
@@ -25,14 +26,20 @@ export async function GET(req: NextRequest, { params }: { params: { room: string
   const { data: room } = await supabaseAdmin.from("rooms").select("*").eq("slug", slug).maybeSingle();
   if (!room) return NextResponse.redirect(new URL("/g/lounge", req.url), { status: 302, headers: { "cache-control": "no-store" } });
 
-  let open = true, done: string | null = null, guestLang: string | null = null;
+  let open = true, done: string | null = null, guestLang: string | null = null, resId: string | null = null;
   if (!demo) {
     const stay = await findCheckoutStay(slug);
     if (!stay) return NextResponse.redirect(new URL(`/g/${encodeURIComponent(slug)}${req.nextUrl.search || ""}`, req.url), { status: 302, headers: { "cache-control": "no-store" } });
     done = stay.reservation.guest_checkout_at ?? null;
     open = checkoutWindow(stay.reservation.check_out, Date.now()).open;
     guestLang = stay.reservation.guest_lang ?? null;
+    resId = stay.reservation.id;
   }
+  // みんなの声: パスポートの国籍 (国を選ばなくていいように) と、最近使われた言葉 (重ならないように)
+  const [passport, hints] = await Promise.all([
+    resId && !done && open ? passportCountry(resId, room).catch(() => null) : Promise.resolve(null),
+    !done && open ? cheerHints().catch(() => ({ recent: [], used: {} })) : Promise.resolve({ recent: [], used: {} }),
+  ]);
   const saved = cookies().get(LANG_COOKIE)?.value;
   const q = encodeURIComponent(slug);
   const data = {
@@ -48,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: { room: string
     },
     T: CO_T,
     // 最後にひとこと (みんなの声)
-    cheer: { P: { A: CHEER_A, B: CHEER_B, C: CHEER_C }, CT: CHEER_COUNTRIES, POP: CHEER_POPULAR, UI: CHEER_UI },
+    cheer: { P: { A: CHEER_A, B: CHEER_B, C: CHEER_C }, ST: CHEER_STAMPS, CT: CHEER_COUNTRIES, POP: CHEER_POPULAR, UI: CHEER_UI, passport, recent: hints.recent, used: hints.used },
   };
   const html = CHECKOUT_HTML.replace("__DATA__", JSON.stringify(data).replace(/</g, "\\u003c"));
   return new NextResponse(html, { headers: H });

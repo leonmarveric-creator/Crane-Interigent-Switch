@@ -14,6 +14,7 @@ import ControlPanel from "@/components/ControlPanel";
 import LiteControlPanel from "@/components/LiteControlPanel";
 import MagicalControlPanel from "@/components/MagicalControlPanel";
 import { type Lang } from "@/lib/i18n";
+import type { WakeState } from "@/lib/wakeAutoLogic";
 
 type Mode = "select" | "normal" | "lite" | "magic";
 const STORE_KEY = "craneUiMode";
@@ -38,6 +39,8 @@ export interface RoomModeSwitchProps {
   entranceHref?: string | null;
   /** ハイテクUI の起動の声 (管理画面で切り替え) */
   bootVoice?: "astralis" | "jarvis";
+  /** 早朝便の自動光目覚まし (前の晩 20:00 〜 点灯まで。対象外なら null) */
+  wake?: WakeState | null;
 }
 
 const SEL: Record<Lang, {
@@ -187,6 +190,7 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
   if (mode === "lite") {
     return (
       <LiteControlPanel
+        wake={props.wake}
         roomSlug={props.roomSlug}
         roomName={props.roomName}
         checkOut={props.checkOut}
@@ -207,6 +211,7 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
   if (mode === "magic") {
     return (
       <MagicalControlPanel
+        wake={props.wake}
         roomSlug={props.roomSlug}
         roomName={props.roomName}
         checkOut={props.checkOut}
@@ -245,6 +250,7 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         guestName={props.guestName}
         entranceHref={props.entranceHref}
         bootVoice={props.bootVoice}
+        wake={props.wake}
       />
       <div className="fixed left-3 top-3 z-[60] flex items-center gap-1.5">
         <button

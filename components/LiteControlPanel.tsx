@@ -19,6 +19,8 @@ import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import EntranceKeyButton from "@/components/EntranceKeyButton";
 import CheckoutBanner from "@/components/CheckoutBanner";
+import WakeAutoBanner from "@/components/WakeAutoBanner";
+import type { WakeState } from "@/lib/wakeAutoLogic";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
@@ -37,6 +39,7 @@ export interface LiteProps {
   onSwitchMode?: () => void; // ハイテクUIへ
   guestName?: string | null;
   entranceHref?: string | null;
+  wake?: WakeState | null;
 }
 
 const EXTRA: Record<Lang, { lite: string; full: string; scenes: string; devices: string }> = {
@@ -277,7 +280,7 @@ function WakeLite({ roomSlug, admin, t, hasWafu }: { roomSlug: string; admin?: b
 }
 
 export default function LiteControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin,
+  roomSlug, roomName, checkOut, initialLang, admin, wake = null,
   posterUrl, hasGalaxy, hasNest, hasWafu, onSwitchMode, guestName, entranceHref,
 }: LiteProps) {
   const [lang, setLang] = useState<Lang>(initialLang);
@@ -371,6 +374,7 @@ export default function LiteControlPanel({
 
       {/* 操作エリア */}
       <div className="mx-auto max-w-md px-5 pb-16 pt-2">
+        <WakeAutoBanner roomSlug={roomSlug} initial={wake} lang={lang} variant="wafu" demo={admin} className="mb-3" />
         <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="wafu" className="mb-3" />
         {entranceHref && (
           <div className="mb-3">

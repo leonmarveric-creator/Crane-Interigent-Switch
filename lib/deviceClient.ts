@@ -15,6 +15,10 @@ export type DeviceAction =
   | "normal"
   | "dream_fade";
 
+/** 「おやすみ」の前に一度だけ挟む確認 (早朝便の自動光目覚まし)。WakeAutoBanner が登録する */
+let goodNightGate: null | (() => Promise<void>) = null;
+export function setGoodNightGate(fn: null | (() => Promise<void>)) { goodNightGate = fn; }
+
 /**
  * デバイス操作を送信。
  * guest: PIN認証セッションCookie経由 / admin: 管理者Cookieでテスト操作。
@@ -26,6 +30,7 @@ export async function callDevice(
   admin?: boolean,
   value?: string
 ): Promise<boolean> {
+  if (action === "good_night" && goodNightGate) { const g = goodNightGate; goodNightGate = null; await g().catch(() => {}); }
   // 回線が悪いときにボタンが回り続けないよう、20 秒で打ち切る
   const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), 20000) : null;

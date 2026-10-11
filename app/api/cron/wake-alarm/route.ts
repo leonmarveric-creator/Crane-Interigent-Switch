@@ -12,6 +12,7 @@ import { logDevice } from "@/lib/deviceControl";
 import { getWafuPrewakeStep, PREWAKE_WINDOW_MS } from "@/lib/wakePrewake";
 import { runDreamFade } from "@/lib/dreamFadeRunner";
 import { runDriverAuto } from "@/lib/driverRunner";
+import { syncAutoWakes } from "@/lib/wakeAuto";
 
 export const runtime = "nodejs";
 
@@ -210,5 +211,7 @@ export async function GET(req: NextRequest) {
 
   // お父さんの送迎画面: 自動準備・飛行機の自動確認・鍵の電池
   const driver = await runDriverAuto(nowMs).catch((e) => { console.error("driver auto failed", e); return null; });
-  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, driver, ranAt: nowIso });
+  // 早朝便の自動光目覚まし: 夜 20:00〜朝 7:00 だけ、10 分に 1 回 (昼間は何もしない)。いつもの Cron の中で動くので、呼び出しは増えない
+  const autoWake = now.getUTCMinutes() % 10 < 2 ? await syncAutoWakes(nowMs).catch(() => 0) : null;
+  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, driver, autoWake, ranAt: nowIso });
 }

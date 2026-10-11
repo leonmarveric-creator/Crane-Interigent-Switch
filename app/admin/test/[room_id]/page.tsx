@@ -9,13 +9,14 @@ export const dynamic = "force-dynamic";
  * 管理画面からのテスト用: ゲスト操作画面を PIN不要 で表示 (admin認証済み前提)。
  * /admin/test/[room_id]?lang=ja   (middlewareで /admin 配下は保護済み)
  * デバイス操作は admin専用エンドポイント経由 (ControlPanel admin モード)。
+ * ?wake=1 で「早朝便の自動光目覚まし」の見本を出す (明朝 4:50 出発・保存はしない)。
  */
 export default async function AdminTestRoomPage({
   params,
   searchParams,
 }: {
   params: { room_id: string };
-  searchParams: { lang?: string };
+  searchParams: { lang?: string; wake?: string };
 }) {
   const { data: room } = await supabaseAdmin
     .from("rooms")
@@ -27,6 +28,15 @@ export default async function AdminTestRoomPage({
 
   if (!room) return <AccessDenied lang={lang} />;
 
+  // 早朝便の自動光目覚ましの見本 (明朝 4:50 出発 · 便 7:30)
+  const tmr = new Date(Date.now() + 9 * 3600e3 + 86400e3).toISOString().slice(0, 10);
+  const dep = Date.parse(`${tmr}T04:50:00+09:00`);
+  const wake = searchParams.wake === "1" ? {
+    on: true, edited: false, wakeAt: new Date(dep - 45 * 60e3).toISOString(), departAt: new Date(dep).toISOString(),
+    flightAt: new Date(dep + 160 * 60e3).toISOString(), dest: "関西国際空港", terminal: "1",
+    minAt: new Date(dep - 120 * 60e3).toISOString(), maxAt: new Date(dep - 10 * 60e3).toISOString(),
+  } : null;
+
   return (
     <RoomModeSwitch
       roomSlug={room.slug}
@@ -34,6 +44,7 @@ export default async function AdminTestRoomPage({
       checkOut={new Date().toISOString()}
       initialLang={lang}
       admin
+      wake={wake}
       imageUrl={room.image_url}
       posterUrl={`/rooms/poster-${room.slug}.jpg`}
       hasGalaxy={!!room.switchbot_galaxy_device_id}

@@ -83,7 +83,7 @@ export const guideKeyFor = (g: GuideGuest) =>
 
 export interface GuideCookie { name: string; value: string; expires: Date }
 export type GuideKeyAccess =
-  | { ok: true; codes: GuideCodes | null; co: GuideCheckout | null; roomSlug: string; cookies: GuideCookie[] }
+  | { ok: true; codes: GuideCodes | null; co: GuideCheckout | null; roomSlug: string; rid: string; cookies: GuideCookie[] }
   | { ok: false; redirect: string }
   | null;
 
@@ -109,7 +109,7 @@ export async function guideAccessByKey(key: string, k: string): Promise<GuideKey
   if (k0 !== String(room.slug).toLowerCase()) return { ok: false, redirect: `/g/${encodeURIComponent(room.slug)}` };
 
   const co: GuideCheckout = { checkOut: r.check_out, done: r.guest_checkout_at ?? null };
-  if (left || co.done) return { ok: true, codes: null, co, roomSlug: room.slug, cookies: [] };
+  if (left || co.done) return { ok: true, codes: null, co, roomSlug: room.slug, rid: String(r.id), cookies: [] };
 
   const { data: ents } = await supabaseAdmin.from("entrances").select("slug, building, keypad_code").eq("is_active", true).order("slug")
     .then((x) => x, () => ({ data: null } as any));
@@ -125,7 +125,7 @@ export async function guideAccessByKey(key: string, k: string): Promise<GuideKey
   const cookies: GuideCookie[] = [];
   if (ent) cookies.push({ name: entranceCookieName(ent.slug), value: signScopedSession(ENTRANCE_SCOPE, r.id, out + SESSION_GRACE_MS), expires: new Date(out + SESSION_GRACE_MS) });
   if (state === "active") cookies.push({ name: roomCookieName(room.slug), value: signSession(r.id, out), expires: new Date(out) });
-  return { ok: true, codes, co: state === "active" ? co : null, roomSlug: room.slug, cookies };
+  return { ok: true, codes, co: state === "active" ? co : null, roomSlug: room.slug, rid: String(r.id), cookies };
 }
 
 /** 4 桁を入れる画面 (言語はスマホの設定 / ?lang= に合わせる) */

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { room: string
     const a = await guideAccessByKey(params.room, k);
     if (a && !a.ok) return NextResponse.redirect(withParams(req, a.redirect, k), { status: 302, headers: noStore });
     if (a && a.ok) {
-      const res = new NextResponse(nfcHtml(await nfcData(a.roomSlug, a.codes, a.co)), { headers: H });
+      const res = new NextResponse(nfcHtml(await nfcData(a.roomSlug, a.codes, a.co, a.co?.done ? null : a.rid)), { headers: H });
       for (const c of a.cookies) res.cookies.set(c.name, c.value, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires: c.expires });
       return res;
     }

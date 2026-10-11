@@ -42,7 +42,22 @@ export interface CnDrop {
   departAt: string | null;           // 出発したい時刻 ("HH:MM")
   pax: number; large: number; small: number; special: number;
   names: string[];                   // パスポートの名前 (代表者が先)
+  nationality: string | null;        // 代表者の国籍 (パスポート登録で入力したまま。lib/countryCode.ts で国コードにする)
   linked: "token" | "room";          // どう紐づいたか
+}
+
+/** guests の行から国の手がかりを探す (列名がわからないので順に): 国籍 → 国 → 住所 (住所は lib/countryCode.ts で最後の部分から国を読む) */
+const NAT_COLS = ["nationality", "nationality_code", "citizenship", "passport_country", "issuing_country", "country", "country_code", "nation"];
+function nationalityOf(g: any): string | null {
+  for (const k of NAT_COLS) { const v = g?.[k]; if (typeof v === "string" && v.trim()) return v.trim().slice(0, 120); }
+  // 住所の欄 (address / home_address など) を丸ごと渡す
+  for (const k of Object.keys(g ?? {})) {
+    if (!/address|residence|addr/i.test(k)) continue;
+    const v = g[k];
+    if (typeof v === "string" && v.trim()) return `address:${v.trim().slice(0, 300)}`;
+    if (v && typeof v === "object") { const c = v.country ?? v.country_code ?? v.nation; if (typeof c === "string" && c.trim()) return c.trim(); return `address:${Object.values(v).filter((x) => typeof x === "string").join(", ").slice(0, 300)}`; }
+  }
+  return null;
 }
 
 const jstDate = (iso: string) => new Date(Date.parse(iso) + 9 * 3600e3).toISOString().slice(0, 10);
@@ -66,8 +81,11 @@ async function fetchDrops(c: SupabaseClient, from: string, to: string, tokens: s
   const destName = new Map<string, string>(((dq as any).data ?? []).map((d: any) => [d.id, d.name]));
   const links = ((lq as any).error ? [] : (lq as any).data ?? []) as any[];
   const guestIds = [...new Set([...list.map((r) => r.guest_id), ...links.map((l) => l.guest_id)].filter(Boolean))];
-  const gq = guestIds.length ? await c.from("guests").select("id, full_name").in("id", guestIds) : { data: [] as any[] };
-  const gName = new Map<string, string>(((gq as any).data ?? []).map((g: any) => [g.id, g.full_name]));
+  // 国籍の列名は Crane Nest のシステム次第なので、全部の列を読んで、それらしい列を使う
+  const gq = guestIds.length ? await c.from("guests").select("*").in("id", guestIds) : { data: [] as any[] };
+  const gRows = ((gq as any).data ?? []) as any[];
+  const gName = new Map<string, string>(gRows.map((g: any) => [g.id, g.full_name]));
+  const gNat = new Map<string, string | null>(gRows.map((g: any) => [g.id, nationalityOf(g)]));
   return list.map((r) => {
     const ls = links.filter((l) => l.transfer_request_id === r.id).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
     const names = [...new Set([r.guest_id, ...ls.map((l) => l.guest_id)].map((g) => gName.get(g)).filter(Boolean) as string[])];
@@ -76,7 +94,7 @@ async function fetchDrops(c: SupabaseClient, from: string, to: string, tokens: s
       terminal: r.terminal ?? null, intent: r.rinku_route_intent === "nankai" || r.rinku_route_intent === "airport" ? r.rinku_route_intent : null,
       flightAt: r.flight_time ?? null, departAt: r.preferred_departure_time ?? null,
       pax: Number(r.passenger_count) || 1, large: Number(r.luggage_large) || 0, small: Number(r.luggage_small) || 0, special: Number(r.luggage_special) || 0,
-      names, linked: "room" as const,
+      names, nationality: [r.guest_id, ...ls.map((l) => l.guest_id)].map((g) => gNat.get(g)).find(Boolean) ?? null, linked: "room" as const,
     } };
   });
 }

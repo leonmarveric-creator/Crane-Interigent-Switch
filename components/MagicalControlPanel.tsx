@@ -33,6 +33,8 @@ import type { WakeLightMode } from "@/lib/wakePrewake";
 import { magicIncantationEcho, primeMagicAudio, setMuted as sfxSetMuted, spellCast } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
 import CheckoutBanner from "@/components/CheckoutBanner";
+import WakeAutoBanner from "@/components/WakeAutoBanner";
+import type { WakeState } from "@/lib/wakeAutoLogic";
 import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
 import type { VoiceAction } from "@/lib/voiceCommand";
 
@@ -52,6 +54,7 @@ export interface MagicalProps {
   entranceHref?: string | null;
   lat?: number | null;
   lng?: number | null;
+  wake?: WakeState | null;
 }
 
 const MAGIC_COPY: Record<Lang, {
@@ -912,6 +915,7 @@ function WakeMagic({
 }
 
 export default function MagicalControlPanel({
+  wake = null,
   roomSlug,
   roomName,
   checkOut,
@@ -1167,6 +1171,7 @@ export default function MagicalControlPanel({
               {t.checkout}: <span className="text-[#f8ecd1]">{new Date(checkOut).toLocaleString(lang, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
             </p>
           )}
+          <WakeAutoBanner roomSlug={roomSlug} initial={wake} lang={lang} variant="magic" demo={admin} className="mx-auto mt-3 max-w-md text-left" />
           <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="magic" className="mx-auto mt-3 max-w-md" />
           <div className="magic-hero-art">
             <div className="hero-casting-stage">

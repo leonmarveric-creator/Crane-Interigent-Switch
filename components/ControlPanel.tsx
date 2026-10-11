@@ -11,6 +11,8 @@ import {
 import { GX, T, LANGS, LANG_LABEL, type Lang } from "@/lib/i18n";
 import EntranceKeyButton from "@/components/EntranceKeyButton";
 import CheckoutBanner from "@/components/CheckoutBanner";
+import WakeAutoBanner from "@/components/WakeAutoBanner";
+import type { WakeState } from "@/lib/wakeAutoLogic";
 import { callDevice, type DeviceAction } from "@/lib/deviceClient";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { blip, powerUp, powerDown, error as sfxError, speak, speakOneOf, primeVoice, charge, sweep, setMuted as sfxSetMuted, navTick, keyTick, confirm as sfxConfirm, galaxyOn, galaxyOff, hoverTick, startAmbient, stopAmbient, toggleServo, systemChord, dataBurst, reticleLock, bootStage } from "@/lib/sfx";
@@ -38,6 +40,7 @@ interface Props {
   hasWafu?: boolean; // 和風ライト(行灯) 対応の部屋
   /** 起動の声: astralis = 「ASTRALIS system online」 / jarvis = 従来の J.A.R.V.I.S 系 */
   bootVoice?: "astralis" | "jarvis";
+  wake?: WakeState | null;
 }
 
 // メディアURLが動画か判定 (拡張子ベース)
@@ -133,7 +136,7 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref, bootVoice = "astralis",
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref, bootVoice = "astralis", wake = null,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -387,6 +390,7 @@ export default function ControlPanel({
         </motion.header>
 
         {/* チェックアウト (チェックアウト日の朝 6 時から) */}
+        <WakeAutoBanner roomSlug={roomSlug} initial={wake ?? null} lang={lang} variant="tech" demo={admin} className="mb-3" />
         <CheckoutBanner roomSlug={roomSlug} checkOut={checkOut} lang={lang} admin={admin} variant="tech" className="mb-3" />
 
         {/* 外出 (全部OFF): 出かける時にすぐ押せるよう鍵の上に置く */}

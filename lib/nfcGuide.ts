@@ -14,6 +14,8 @@ import { jstDay } from "@/lib/driverLogic";
 import { NFC_HTML } from "@/lib/nfcPage";
 import { roomIcon } from "@/lib/roomIcon";
 import { CO_T, checkoutWindow, coTime } from "@/lib/checkoutText";
+import { getWakeState } from "@/lib/wakeAuto";
+import { WAKE_T, type WakeState } from "@/lib/wakeAutoLogic";
 import type { GuideCheckout } from "@/lib/nfcGate";
 
 export interface NfcData {
@@ -22,6 +24,8 @@ export interface NfcData {
   codes: { ent: string | null; room: string | null } | null;
   /** チェックアウトのボタン (チェックアウト日の朝 6 時から・本人確認済みのゲストだけ) */
   co: { open: boolean; done: string | null; time: string; href: string; T: typeof CO_T } | null;
+  /** 早朝便の自動光目覚まし (前の晩 20:00 〜 点灯まで) */
+  wake: { st: WakeState; api: string; T: typeof WAKE_T } | null;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
   /** ホーム画面のアイコン (春・夏・秋・冬の部屋はその季節、ほかは今の季節) と名前 */
   home: { icon: string; title: string };
@@ -37,8 +41,8 @@ export function seasonNow(ms = Date.now()): Season {
 export const homeIconFor = (kanji: string | null | undefined, ms = Date.now()) =>
   `/nfc/home/${(kanji && ROOM_SEASON[kanji]) || seasonNow(ms)}`;
 
-export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null, co: GuideCheckout | null = null): Promise<NfcData> {
-  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
+export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null, co: GuideCheckout | null = null, rid: string | null = null): Promise<NfcData> {
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, wake: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([
@@ -59,6 +63,10 @@ export async function nfcData(key: string, codes: { ent: string | null; room: st
     out.home = { icon: homeIconFor(hit.c.kanji), title: `Crane Nest ${hit.c.kanji}` };
     out.room = { kanji: hit.c.kanji, en: hit.c.en || "" }; out.icon = (await roomIcon(String(hit.raw.id), hit.c.kanji)).url; out.slug = String(hit.raw.slug); out.roomKey = `/room/${encodeURIComponent(hit.raw.slug)}`;
     { const e = entOf(hit.c.building || hit.raw.building || "Crane Nest"); out.entKey = e ? `/key/${encodeURIComponent(e.slug)}` : out.entKey; } out.knob = hasRoomLock(hit.raw.slug); out.natsu = roomGuideOf(hit.raw.slug) === "natsu";
+    if (rid) {
+      const st = await getWakeState(rid, hit.raw).catch(() => null);
+      if (st) out.wake = { st, api: `/api/wake/${encodeURIComponent(hit.raw.slug)}`, T: WAKE_T };
+    }
     // チェックアウト済みなら、お部屋・エントランスの鍵の入口は出さない
     if (co?.done) { out.roomKey = null; out.entKey = null; }
     const now = Date.now(), today = jstDay(now), tomorrow = jstDay(now + 86400e3);
