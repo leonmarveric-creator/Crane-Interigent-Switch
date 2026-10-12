@@ -1,9 +1,9 @@
 /** 旅の記念: ゲストのページ (/k/<token>) に渡すデータと HTML の外枠 (サーバ専用) */
 import QRCode from "qrcode";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { ksExamples, ksLinks, ksSettings, toOrder, type KsInvite } from "@/lib/keepsake";
+import { ksExamples, ksLinks, ksSettings, soundsFor, toOrder, type KsInvite } from "@/lib/keepsake";
 
-export const KS_ASSET_V = "1";
+export const KS_ASSET_V = "3";
 
 /** ゲストに見せる申し込みの状態 (完成品はお渡し済みのときだけ、期限つきのリンクで) */
 export async function guestOrders(inviteId: string) {
@@ -18,6 +18,12 @@ export async function guestOrders(inviteId: string) {
   }));
 }
 
+/** ゲストに渡す音の設定 (リンクだけ。Storage の場所は渡さない) */
+async function guestSounds(s: Parameters<typeof soundsFor>[0]) {
+  const all = await soundsFor(s);
+  return Object.fromEntries(Object.entries(all).map(([k, x]) => [k, { mode: x.mode, vol: x.vol, url: x.url }]));
+}
+
 const json = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c").replace(/[\u2028\u2029]/g, "");
 
 export async function guestHtml(o: { inv: KsInvite | null; expired: boolean; cabin: boolean; origin: string; token: string; lang: string | null }): Promise<string> {
@@ -29,7 +35,7 @@ export async function guestHtml(o: { inv: KsInvite | null; expired: boolean; cab
       guestOrders(inv.id), inv.gifts.includes("art") ? ksExamples() : [], ksSettings(),
       o.cabin ? QRCode.toDataURL(`${o.origin}/k/${inv.token}`, { margin: 2, width: 460, errorCorrectionLevel: "M" }).catch(() => null) : null,
     ]);
-    ks = { token: inv.token, cabin: o.cabin, name: inv.name, lang: inv.lang || o.lang, gifts: inv.gifts, status: inv.status, cardGiven: !!inv.cardGivenAt, orders, examples, settings, expires: inv.expiresAt, qr };
+    ks = { token: inv.token, cabin: o.cabin, name: inv.name, lang: inv.lang || o.lang, gifts: inv.gifts, status: inv.status, cardGiven: !!inv.cardGivenAt, orders, examples, settings: { cheersOn: settings.cheersOn, cheersPrice: settings.cheersPrice, cheersNote: settings.cheersNote }, sounds: await guestSounds(settings.sounds), expires: inv.expiresAt, qr };
   }
-  return `<!doctype html><html lang="${/^(ja|zh|ko)$/.test(String(ks.lang)) ? ks.lang : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#070d18"><title>Crane Nest · Keepsake</title><link rel="stylesheet" href="/keepsake/guest.css?v=${KS_ASSET_V}"></head><body><div id="app"></div><script>window.KS=${json(ks)}</script><script src="/keepsake/guest.js?v=${KS_ASSET_V}"></script></body></html>`;
+  return `<!doctype html><html lang="${/^(ja|zh|ko)$/.test(String(ks.lang)) ? ks.lang : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#070d18"><title>Crane Nest · Keepsake</title><link rel="stylesheet" href="/keepsake/guest.css?v=${KS_ASSET_V}"></head><body><div id="app"></div><script>window.KS=${json(ks)}</script><script src="/keepsake/sfx.js?v=${KS_ASSET_V}"></script><script src="/keepsake/guest.js?v=${KS_ASSET_V}"></script></body></html>`;
 }

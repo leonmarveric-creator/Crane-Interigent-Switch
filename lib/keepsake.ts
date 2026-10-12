@@ -22,7 +22,34 @@ export interface KsOrder {
   id: string; inviteId: string; kind: KsKind; payload: Record<string, any>; photoPath: string | null;
   status: "new" | "done"; results: KsFile[]; link: string | null; createdAt: string; deliveredAt: string | null;
 }
-export interface KsSettings { cheersOn: boolean; cheersPrice: string; cheersNote: string }
+export interface KsSettings { cheersOn: boolean; cheersPrice: string; cheersNote: string; sounds: KsSounds }
+
+/** 招待くじの音 (GUEST BOARD でアップ・音量・切)。file は Storage の sounds/ に置く */
+export const KS_SOUND_SLOTS = ["bgm", "env", "drum", "open", "win", "card", "next"] as const;
+export type KsSoundSlot = (typeof KS_SOUND_SLOTS)[number];
+export interface KsSound { mode: "synth" | "file" | "off"; vol: number; path: string | null; name: string | null }
+export type KsSounds = Partial<Record<KsSoundSlot, KsSound>>;
+export const KS_SOUND_TYPES: Record<string, string> = { "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav" };
+export const KS_SOUND_MAX = 15 * 1024 * 1024;
+export function cleanSounds(v: unknown): KsSounds {
+  const out: KsSounds = {};
+  if (!v || typeof v !== "object") return out;
+  for (const k of KS_SOUND_SLOTS) {
+    const x = (v as any)[k]; if (!x || typeof x !== "object") continue;
+    const path = typeof x.path === "string" && /^sounds\/[A-Za-z0-9._-]+$/.test(x.path) ? x.path : null;
+    const mode = x.mode === "off" ? "off" : x.mode === "file" && path ? "file" : "synth";
+    const vol = Math.round(Math.max(0, Math.min(150, Number(x.vol ?? 100) || 0)));
+    out[k] = { mode, vol, path, name: path ? String(x.name || "").slice(0, 80) || null : null };
+  }
+  return out;
+}
+/** ページに渡す形 (アップした音は期限つきのリンク) */
+export async function soundsFor(s: KsSounds, sec = 12 * 3600): Promise<Record<string, { mode: string; vol: number; url: string | null; name: string | null; path: string | null }>> {
+  const links = await ksLinks(Object.values(s).map((x) => x?.path || "").filter(Boolean), sec);
+  const out: Record<string, any> = {};
+  for (const [k, x] of Object.entries(s)) if (x) out[k] = { mode: x.mode, vol: x.vol, url: x.path ? links[x.path] ?? null : null, name: x.name, path: x.path };
+  return out;
+}
 
 export const ksMissing = (e: any) => !!e && /keepsake_|schema cache|does not exist|PGRST205|42P01/i.test(String(e.message || e.code || ""));
 export const isUuid = (s: unknown): s is string => typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(s);
@@ -62,8 +89,8 @@ export async function ksLinks(paths: string[], sec = LINK_SEC): Promise<Record<s
 export async function ksSettings(): Promise<KsSettings> {
   try {
     const { data } = await supabaseAdmin.from("keepsake_settings").select("*").eq("id", 1).maybeSingle();
-    return { cheersOn: data?.cheers_on === true, cheersPrice: String(data?.cheers_price || ""), cheersNote: String(data?.cheers_note || "") };
-  } catch { return { cheersOn: false, cheersPrice: "", cheersNote: "" }; }
+    return { cheersOn: data?.cheers_on === true, cheersPrice: String(data?.cheers_price || ""), cheersNote: String(data?.cheers_note || ""), sounds: cleanSounds(data?.sounds) };
+  } catch { return { cheersOn: false, cheersPrice: "", cheersNote: "", sounds: {} }; }
 }
 
 export async function ksExamples(): Promise<{ id: string; before: string; after: string; caption: string }[]> {

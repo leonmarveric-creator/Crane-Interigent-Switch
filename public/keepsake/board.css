@@ -39,3 +39,11 @@ button,input,textarea{font:inherit}button{-webkit-tap-highlight-color:transparen
 .lbl{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px}.lbl input{width:20px;height:20px}
 .empty{color:var(--h2);font-size:13px;padding:18px 4px}
 .qrb{background:#fff;padding:10px;display:inline-block}.qrb img{display:block;width:260px;height:260px;border:0}
+
+/* くじの音 */
+.snd .sr{display:grid;grid-template-columns:minmax(200px,1.2fr) auto;gap:8px 14px;border:1px solid var(--hd);padding:10px;margin-bottom:8px;align-items:center}
+.snd .sn{display:flex;gap:10px;align-items:center}.snd .sn i{font-style:normal;font-size:22px;width:28px;text-align:center}.snd .sn b{display:block;font-size:14px;color:#fff}.snd .sn small{font-size:11.5px;color:var(--h2)}
+.snd .sm{display:flex;justify-self:end}.snd .sm button{font-size:12px;color:var(--h2);background:none;border:1px solid var(--hd);padding:7px 10px;margin-left:-1px}.snd .sm button.on{background:var(--y);border-color:var(--y);color:#1a1408;font-weight:700}.snd .sm button:disabled{opacity:.3}
+.snd .sf,.snd .sv{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.snd .sv{justify-self:end}.snd .fn{font-size:12.5px;color:var(--g);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.snd .fn.no{color:var(--h2);opacity:.7}
+.snd .sv input[type=range]{width:150px;accent-color:var(--y)}.snd .sv span{font-size:12px;width:42px;text-align:right}.snd .btn.dim{border-color:var(--hd);color:var(--h2)}.snd .sp{flex:1}
+@media (max-width:720px){.snd .sr{grid-template-columns:1fr}.snd .sm,.snd .sv{justify-self:start}.snd .sv input[type=range]{width:120px}}

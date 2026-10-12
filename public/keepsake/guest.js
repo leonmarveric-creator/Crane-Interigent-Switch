@@ -127,26 +127,22 @@
   var api = "/api/keepsake/" + encodeURIComponent(KS.token);
 
   /* ================= くじ ================= */
-  var AC = null, timers = [], va = null, sbT = 0, busy = false, idx = 0;
+  var timers = [], va = null, sbT = 0, busy = false, idx = 0;
   var later = function (f, ms) { timers.push(setTimeout(f, ms)); };
   var vib = function (p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* ignore */ } };
-  function ac() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); AC.resume(); } catch (e) { /* ignore */ } return AC; }
-  function tone(f, t, d, v, type, to) {
-    var c = ac(); if (!c) return; v = v == null ? .12 : v;
-    var o = c.createOscillator(), g = c.createGain(), T0 = c.currentTime + t; o.type = type || "triangle"; o.frequency.setValueAtTime(f, T0); if (to) o.frequency.exponentialRampToValueAtTime(to, T0 + d);
-    g.gain.setValueAtTime(0, T0); g.gain.linearRampToValueAtTime(v, T0 + .02); g.gain.exponentialRampToValueAtTime(.0001, T0 + d); o.connect(g).connect(c.destination); o.start(T0); o.stop(T0 + d + .05);
+  /* 音は /keepsake/sfx.js (GUEST BOARD で BGM・効果音をアップ・音量・切 を設定できる) */
+  var F = window.KSFX || { set: function () { }, ac: function () { }, play: function () { }, bgm: function () { }, level: function () { }, playing: function () { return false; }, mute: function () { }, muted: function () { return false; } };
+  F.set(KS.sounds || {});
+  var ac = function () { F.ac(); }, sfx = function (k) { F.play(k); };
+  function muteBtn() {
+    var b = document.createElement("button"); b.id = "mu"; b.type = "button";
+    b.style.cssText = "position:fixed;top:max(10px,env(safe-area-inset-top));right:12px;z-index:9999;border:1px solid rgba(255,255,255,.25);background:rgba(7,13,24,.6);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)";
+    var paint = function () { b.textContent = F.muted() ? "🔇" : "🔊"; }; paint();
+    b.onclick = function (e) { e.stopPropagation(); F.ac(); F.mute(!F.muted()); if (va) va.muted = F.muted(); paint(); };
+    document.body.appendChild(b);
   }
-  function noise(t, d, v, hp) {
-    var c = ac(); if (!c) return; var n = Math.floor(c.sampleRate * d), b = c.createBuffer(1, n, c.sampleRate), x = b.getChannelData(0);
-    for (var i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * (1 - i / n);
-    var s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); f.type = "highpass"; f.frequency.value = hp; g.gain.value = v; s.buffer = b; s.connect(f).connect(g).connect(c.destination); s.start(c.currentTime + t);
-  }
-  var drum = function () { for (var i = 0; i < 22; i++) tone(120 + i * 9, i * .055, .06, .07, "square"); };
-  var boom = function () { tone(90, 0, .9, .3, "sine", 38); noise(0, .5, .25, 1500); };
-  var fanfare = function () { [[523, 0], [659, .14], [784, .28], [1047, .44], [784, .62], [1047, .76]].forEach(function (a) { tone(a[0], a[1], .5, .11); tone(a[0] * 2, a[1], .4, .04, "sine"); }); [1319, 1568, 2093].forEach(function (f, i) { tone(f, .95 + i * .07, 1.4, .06, "sine"); }); };
-  var chime = function () { [1568, 2093, 2637].forEach(function (f, i) { tone(f, i * .09, .9, .07, "sine"); }); };
   function say(k) {
-    try { if (va) va.pause(); va = new Audio("/keepsake/voice/gv_" + k + ".mp3"); va.play().catch(function () { }); } catch (e) { /* ignore */ }
+    try { if (va) va.pause(); va = new Audio("/keepsake/voice/gv_" + k + ".mp3"); va.muted = F.muted(); if (F.playing()) { F.level(.35, .3); va.onended = va.onerror = function () { F.level(1, 1); }; } va.play().catch(function () { }); } catch (e) { /* ignore */ }
     var s = $("#sub"); s.innerHTML = "<small>ASTRAEA</small>" + T["v_" + k]; s.classList.add("on"); clearTimeout(sbT); sbT = setTimeout(function () { s.classList.remove("on"); }, 4600);
   }
   var cv, g2, P = [], raf = 0;
@@ -171,19 +167,19 @@
       '<div class="glow" id="glow"></div><canvas id="cf"></canvas>' +
       '<div class="win" id="win"><small>CONGRATULATIONS</small><b>' + T.won + "</b></div>" +
       '<div class="pers" id="pers"></div><div class="cnt" id="cnt"></div><button class="nx" id="nx"></button>';
-    document.body.appendChild(st);
+    document.body.appendChild(st); muteBtn();
     cv = $("#cf"); g2 = cv.getContext("2d"); size(); addEventListener("resize", size);
     $("#ev").onclick = function () {
-      if ($("#ev").classList.contains("op")) return; ac(); $("#ev").classList.add("op"); tone(660, 0, .5, .08, "sine"); tone(990, .12, .7, .06, "sine"); vib(60);
+      if ($("#ev").classList.contains("op")) return; ac(); F.bgm(true); $("#ev").classList.add("op"); sfx("env"); vib(60);
       later(function () { $("#env").classList.add("off"); $("#let").classList.add("on"); say("inv"); }, 800);
     };
-    $("#ltB").onclick = function () { $("#let").className = "let off"; tone(784, 0, .4, .07, "sine"); later(function () { say("draw"); }, 500); };
+    $("#ltB").onclick = function () { $("#let").className = "let off"; sfx("next"); later(function () { say("draw"); }, 500); };
     if (KS.cabin) $("#ltr").onclick = function () { $("#env").classList.add("off"); fin(true); };
     $("#cap").onclick = start; $("#tap").onclick = start;
     $("#nx").onclick = function () {
       $("#nx").classList.remove("on"); $("#cnt").classList.remove("on");
-      if (idx < gifts.length - 1) { var c = $("#pers").firstChild; c.className = "card out"; tone(500, 0, .2, .06, "sine", 900); later(function () { show(idx + 1); }, 450); }
-      else { say("end"); tone(1047, 0, .6, .08, "sine"); if (KS.cabin) fin(false); else later(function () { st.classList.remove("show"); hub(); }, 600); }
+      if (idx < gifts.length - 1) { var c = $("#pers").firstChild; c.className = "card out"; sfx("next"); later(function () { show(idx + 1); }, 450); }
+      else { say("end"); sfx("next"); if (KS.cabin) fin(false); else later(function () { st.classList.remove("show"); hub(); }, 600); }
     };
   }
   function start() {
@@ -192,17 +188,17 @@
     fetch(api, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "draw" }) }).catch(function () { });
     KS.status = "drawn";
     $("#tap").style.display = "none"; $("#ttl").style.opacity = 0; $("#st").classList.add("dim");
-    $("#cap").className = "cap shk"; drum(); vib([40, 40, 40, 40, 40, 40, 60, 40, 80, 40, 120]);
-    later(function () { $("#cap").className = "cap opn"; $("#glow").classList.add("on"); boom(); vib(350); }, 1300);
-    later(function () { $("#st").className = "st show gold"; $("#rays").classList.add("on"); burst(150); fanfare(); $("#cap").style.display = "none"; }, 1750);
+    $("#cap").className = "cap shk"; F.level(0, .3); sfx("drum"); vib([40, 40, 40, 40, 40, 40, 60, 40, 80, 40, 120]);
+    later(function () { $("#cap").className = "cap opn"; $("#glow").classList.add("on"); sfx("open"); vib(350); }, 1300);
+    later(function () { $("#st").className = "st show gold"; $("#rays").classList.add("on"); burst(150); sfx("win"); $("#cap").style.display = "none"; }, 1750);
     later(function () { $("#win").classList.add("on"); vib([60, 50, 60, 50, 200]); }, 2100); later(function () { say("win"); }, 3400);
-    later(function () { show(0); }, 2500); later(function () { rain(70); }, 3200);
+    later(function () { show(0); }, 2500); later(function () { F.bgm(true); }, 4200); later(function () { rain(70); }, 3200);
   }
   function show(k) {
     idx = k; var s = sv(gifts[k]), pe = $("#pers"); pe.classList.add("on");
     pe.innerHTML = '<div class="card in"><div class="fc"><small>YOU WON</small><i>' + s.i + "</i><b>" + s.n + "</b><span>" + s.d + '</span><em>CRANE NEST · IZUMISANO</em></div><div class="bk">鶴</div></div>';
-    var c = pe.firstChild; for (var i = 0; i < 7; i++) (function (i) { later(function () { tone(700 + i * 90, 0, .09, .05, "sine"); }, i * 330); })(i);
-    later(function () { chime(); vib([30, 40, 90]); burst(40); }, 3000);
+    var c = pe.firstChild; sfx("card");
+    later(function () { vib([30, 40, 90]); burst(40); }, 3000);
     later(function () { c.classList.remove("in"); c.classList.add("sw"); $("#cnt").textContent = gifts.length > 1 ? (k + 1) + " / " + gifts.length : ""; $("#cnt").classList.add("on"); $("#nx").textContent = k < gifts.length - 1 ? T.next : T.receive; $("#nx").classList.add("on"); }, 3250);
   }
   /* 車内 iPad の最後の画面: カードの手渡し + スマホで読む QR */
@@ -213,7 +209,7 @@
       (!skip && hand ? '<div class="b1"><i>🃏</i><b>' + T.cardName + "</b>" + T.cardHand + "</div>" : "") +
       (skip || dig.length ? '<div class="b1">' + qr + "<b>" + (skip ? T.drawHere : dig.map(SVN).join(" ・ ")) + "</b>" + (skip ? T.qrLater : T.qrApply) + "<br><small>" + T.valid + "</small></div>" : "") +
       "</div><small>" + T.thanks + "</small>";
-    $("#fin").classList.add("on");
+    $("#fin").classList.add("on"); later(function () { F.bgm(false); }, 6000);
   }
 
   /* ================= 記念のページ (申し込み・完成品) ================= */

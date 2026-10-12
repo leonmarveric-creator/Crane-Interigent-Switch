@@ -4,7 +4,7 @@ import { isStaff } from "@/lib/staffAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { loadDriverData } from "@/lib/driverData";
 import { jstDay, jstTime } from "@/lib/driverLogic";
-import { KS_BUCKET, KS_VALID_DAYS, cleanGifts, isKsToken, isUuid, ksExt, ksLinks, ksMissing, ksSettings, ksTypeOk, ksUpload, newKsToken, toInvite, toOrder } from "@/lib/keepsake";
+import { KS_BUCKET, KS_SOUND_MAX, KS_SOUND_SLOTS, KS_SOUND_TYPES, KS_VALID_DAYS, cleanGifts, cleanSounds, soundsFor, isKsToken, isUuid, ksExt, ksLinks, ksMissing, ksSettings, ksTypeOk, ksUpload, newKsToken, toInvite, toOrder } from "@/lib/keepsake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
     ok: true, setup, now, guests,
     orders: orders.map((o) => { const i = invById.get(o.inviteId); return { id: o.id, kind: o.kind, payload: o.payload, status: o.status, createdAt: o.createdAt, deliveredAt: o.deliveredAt, link: o.link, name: i?.name ?? "", room: i?.room ?? "", token: i?.token ?? "", photo: o.photoPath ? links[o.photoPath] ?? null : null, results: o.results.map((f) => ({ ...f, url: links[f.path] ?? null })) }; }),
     examples: exRows.map((e) => ({ id: e.id, caption: e.caption || "", before: links[e.before_path] ?? null, after: links[e.after_path] ?? null })),
-    settings: await ksSettings(),
+    settings: await ksSettings().then(async (st) => ({ ...st, sounds: await soundsFor(st.sounds, 3600) })),
   });
 }
 
@@ -141,6 +141,25 @@ export async function POST(req: NextRequest) {
   if (b.op === "settings") {
     const { error } = await supabaseAdmin.from("keepsake_settings").upsert({ id: 1, cheers_on: b.cheersOn === true, cheers_price: String(b.cheersPrice || "").slice(0, 60), cheers_note: String(b.cheersNote || "").slice(0, 400) });
     return error ? fail(error) : J({ ok: true });
+  }
+  /* ---- 招待くじの音 (BGM・効果音) ---- */
+  if (b.op === "soundSign" && (KS_SOUND_SLOTS as readonly string[]).includes(b.slot)) {
+    const ext = KS_SOUND_TYPES[String(b.type || "")];
+    if (!ext) return J({ ok: false, error: "SOUND_TYPE" });
+    if (Number(b.size) > KS_SOUND_MAX) return J({ ok: false, error: "SOUND_SIZE" });
+    const path = `sounds/${b.slot}-${Date.now()}.${ext}`;
+    const { data, error } = await supabaseAdmin.storage.from(KS_BUCKET).createSignedUploadUrl(path);
+    return error || !data ? J({ ok: false, error: /bucket/i.test(String(error?.message)) ? "SETUP" : error?.message || "SIGN" }) : J({ ok: true, path, url: data.signedUrl });
+  }
+  if (b.op === "sounds") {
+    const next = cleanSounds(b.sounds), prev = (await ksSettings()).sounds;
+    const { error } = await supabaseAdmin.from("keepsake_settings").update({ sounds: next }).eq("id", 1);
+    if (error) return J({ ok: false, error: /sounds/.test(error.message) ? "SETUP_SOUND" : error.message });
+    // もう使わないファイルは消す
+    const keep = new Set(Object.values(next).map((x) => x?.path).filter(Boolean));
+    const gone = Object.values(prev).map((x) => x?.path).filter((x): x is string => !!x && !keep.has(x));
+    if (gone.length) await supabaseAdmin.storage.from(KS_BUCKET).remove(gone).catch(() => {});
+    return J({ ok: true });
   }
   /* ---- 見本 ---- */
   if (b.op === "exCaption" && isUuid(b.id)) {
