@@ -229,7 +229,7 @@ test("room lock guide (spring / autumn / winter): button on the arrival screen, 
   assert.match(app, /map\(lockAudio\), \.\.\.Object\.values\(LOCK_IMG\)/, "lock guide is saved with 📥");
   assert.match(app, /map\(toiletAudio\), \.\.\.Object\.values\(TOILET_IMG\)/, "restroom guide is saved with 📥");
   assert.match(app, /Object\.keys\(DH_LINES\)\.map\(dhAudio\)/, "deadhead voices are saved with 📥");
-  assert.match(read("public", "cabin-sw.js"), /cabin-static-v4/, "cache version bumped so replaced voices are fetched again");
+  assert.match(read("public", "cabin-sw.js"), /cabin-static-v5/, "cache version bumped so replaced voices are fetched again");
   assert.match(read("lib", "cabinAiTalk.ts"), /Socks are perfectly fine/, "no need to be barefoot");
   assert.match(L.LOCK_VOICE.k0.en, /enter your room code.*unlock key at the bottom right.*does not lock by itself/i, "outside: code → bottom-right key; no auto-lock");
   assert.match(read("components", "cabin", "cabinLock.ts"), /room: \(\) => \{ code: string \| null; name: string \}/);
@@ -348,4 +348,22 @@ test("BOOST start sound is chosen in the settings (all candidates exist, 8.8 s),
   assert.match(c, /\(boost-sfx\|\\\/boost\\\/\[A-Za-z\]\+\)\\\.mp3\$/, "phone starts the BOOST song for any chosen sound");
   assert.match(d, /c\.boostUrl\?\.\(\)/);
   assert.match(read("supabase", "migration_boost_sfx.sql"), /add column if not exists boost_sfx text/);
+});
+
+test("ASTRAEA voices: original files by default, made clearer on the phone only around BOOST (switchable), and saved on the phone beforehand", () => {
+  const v = read("lib", "cabinVoice.ts"), rv = read("lib", "remoteVoice.ts"), c = read("components", "driver", "DriverCabin.tsx"), sw = read("public", "driver-sw.js");
+  assert.match(v, /VOICE_MODE_DEFAULT: VoiceMode = "boost"/);
+  const BOOST_VOICE = new RegExp(v.match(/BOOST_VOICE = \/(.+)\/;/)[1]);
+  for (const u of ["/cabin/audio/en-boost-on.mp3", "/cabin/audio/ai/bridge-0.mp3", "/cabin/audio/dh/boostIn.mp3", "/cabin/audio/ai/topspeed-1.mp3"]) assert.ok(BOOST_VOICE.test(u), u);
+  for (const u of ["/cabin/audio/en-arrive.mp3", "/cabin/audio/ai/bye-0.mp3", "/cabin/audio/dh/home.mp3"]) assert.ok(!BOOST_VOICE.test(u), u);
+  assert.match(rv, /s\.connect\(h\.clear\?\.\(it\.u\) \? clearChain\(AC!\) : AC!\.destination\)/, "clearer only when chosen");
+  assert.match(c, /clear: \(u\) => voiceClear\(u, voiceModeNow\)/);
+  assert.match(sw, /\\\/cabin\\\/audio\\\/\.\+\\\.mp3\$/, "phone keeps the voices");
+  assert.match(sw, /type !== "precache"/);
+  // 一覧が今のファイルと合っている (声を足したら node scripts/cabin-audio-list.mjs)
+  const list = JSON.parse(read("public", "cabin", "audio", "list.json"));
+  for (const f of list.files) assert.ok(fs.existsSync(path.join(root, "public", f)), f);
+  const n = fs.readdirSync(path.join(root, "public", "cabin", "audio", "ai")).length + fs.readdirSync(path.join(root, "public", "cabin", "audio", "dh")).length;
+  assert.ok(list.files.length >= n);
+  assert.match(read("supabase", "migration_voice_clear.sql"), /add column if not exists voice_clear text/);
 });

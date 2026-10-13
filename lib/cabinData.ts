@@ -2,6 +2,7 @@
  * 車内 iPad (/cabin) のデータ (サーバ専用)。
  *   migration_cabin.sql 未実行でも落ちないように、テーブルが無ければ「未設定」で返す。
  */
+import { VOICE_MODE_DEFAULT, isVoiceMode, type VoiceMode } from "@/lib/cabinVoice";
 import { BOOST_SFX_DEFAULT, isBoostSfx, type BoostSfxId } from "@/lib/boostSfx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roomColor } from "@/lib/driverLogic";
@@ -133,6 +134,12 @@ export async function boostSfxId(): Promise<BoostSfxId> {
   const { data, error } = await supabaseAdmin.from("app_settings").select("boost_sfx").eq("id", 1).maybeSingle();
   const v = (data as any)?.boost_sfx;
   return !error && isBoostSfx(v) ? v : BOOST_SFX_DEFAULT;
+}
+/** アストレアの声を聞き取りやすくするか (app_settings.voice_clear, migration_voice_clear.sql)。無ければ BOOST のときだけ */
+export async function voiceModeSetting(): Promise<VoiceMode> {
+  const { data, error } = await supabaseAdmin.from("app_settings").select("voice_clear").eq("id", 1).maybeSingle();
+  const v = (data as any)?.voice_clear;
+  return !error && isVoiceMode(v) ? v : VOICE_MODE_DEFAULT;
 }
 /** ASTRAEA のユーモアモード (映画・アニメ・ゲームのオマージュも話す)。全部の送迎で共通: app_settings.ai_humor (migration_ai_humor.sql) */
 export async function aiHumorOn(): Promise<boolean> {

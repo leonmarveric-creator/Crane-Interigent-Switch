@@ -28,6 +28,18 @@ export function unlockRemoteVoice() {
 /** 今このスマホで音を鳴らせるか (iPhone は電話・Siri などで音を止める)。
  *  画面が消えていても音が動いていれば鳴らせる (画面オフのときは大きめの声で鳴らす今の決まりのまま) */
 export const voiceReady = () => !!AC && AC.state === "running";
+/** 声を聞き取りやすく (その場で): 低いこもりを減らす → 言葉の帯域 (2.5〜4 kHz) を強める → やさしく圧縮 → 約 +7 dB → 割れないように抑える。
+ *  ファイルを作り直さないので、ノイズは足されない */
+function clearChain(ac: AudioContext): AudioNode {
+  const hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 130;
+  const mud = ac.createBiquadFilter(); mud.type = "peaking"; mud.frequency.value = 300; mud.Q.value = 1; mud.gain.value = -3;
+  const pres = ac.createBiquadFilter(); pres.type = "peaking"; pres.frequency.value = 3200; pres.Q.value = .9; pres.gain.value = 4;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -26; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = .006; comp.release.value = .18;
+  const g = ac.createGain(); g.gain.value = 1.8;
+  const lim = ac.createDynamicsCompressor(); lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .08;
+  hp.connect(mud); mud.connect(pres); pres.connect(comp); comp.connect(g); g.connect(lim); lim.connect(ac.destination);
+  return hp;
+}
 function load(u: string): Promise<AudioBuffer | null> {
   if (!cache.has(u)) {
     const p = fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
@@ -39,7 +51,7 @@ function load(u: string): Promise<AudioBuffer | null> {
   }
   return cache.get(u)!;
 }
-export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEnd?: () => void; onSetup?: () => void; /** 声を鳴らす直前 (どの声か) */ onPlay?: (u: string) => void; /** iPhone が音を止めていて鳴らせなかった (指で画面に触れると戻る) */ onBlocked?: () => void } = {}): RemoteVoice {
+export function startRemoteVoice(tripId: string, h: { /** この声を聞き取りやすくするか (lib/cabinVoice) */ clear?: (u: string) => boolean; onStart?: () => void; onEnd?: () => void; onSetup?: () => void; /** 声を鳴らす直前 (どの声か) */ onPlay?: (u: string) => void; /** iPhone が音を止めていて鳴らせなかった (指で画面に触れると戻る) */ onBlocked?: () => void } = {}): RemoteVoice {
   let okAt = 0, heardAt = 0, pollAt = 0;
   /* iPad と直接 (Supabase Realtime): 声・返事・「鳴らせます」の印を回線でやり取りし、サーバーへは 5 秒に 1 回の確認だけにする。
      iPad の印が 10 秒届かなければ、今までどおり 1 秒ごとにサーバーへ聞く */
@@ -66,7 +78,7 @@ export function startRemoteVoice(tripId: string, h: { onStart?: () => void; onEn
           rtSend(CABIN_CH, "a", { t: tripId, n: ack });
           { const a0 = ack; void fetch(`/api/cabin/voice?t=${tripId}&after=9999999999999999&ready=1&ack=${a0}`, { cache: "no-store" }).then((x) => x.json()).then((r) => { if (r?.ok) ackSent = Math.max(ackSent, a0); }).catch(() => {}); }
           playing++; try { h.onPlay?.(it.u); } catch { /* */ } h.onStart?.();
-          await new Promise<void>((ok) => { const s = AC!.createBufferSource(), g = AC!.createGain(); g.gain.value = 1; s.buffer = buf; s.connect(g); g.connect(AC!.destination); s.onended = () => ok(); s.start(); setTimeout(ok, buf.duration * 1000 + 500); });
+          await new Promise<void>((ok) => { const s = AC!.createBufferSource(); s.buffer = buf; s.connect(h.clear?.(it.u) ? clearChain(AC!) : AC!.destination); s.onended = () => ok(); s.start(); setTimeout(ok, buf.duration * 1000 + 500); });
           playing--; if (!playing) h.onEnd?.();
         }
       }

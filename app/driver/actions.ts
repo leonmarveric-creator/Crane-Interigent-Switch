@@ -1,6 +1,7 @@
 "use server";
 
 import { isBoostSfx } from "@/lib/boostSfx";
+import { isVoiceMode } from "@/lib/cabinVoice";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/staffAuth";
 import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
@@ -305,6 +306,14 @@ export async function cabinSetHumor(on: boolean): Promise<R> {
   const g = guard(); if (g) return g;
   const { error } = await supabaseAdmin.from("app_settings").update({ ai_humor: !!on }).eq("id", 1);
   if (error) return fail(/ai_humor/.test(error.message) ? "SETUP_HUMOR" : error.message);
+  return { ok: true };
+}
+/** アストレアの声を聞き取りやすくするか (全部の送迎で共通) */
+export async function cabinSetVoiceMode(m: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isVoiceMode(m)) return fail("MODE");
+  const { error } = await supabaseAdmin.from("app_settings").update({ voice_clear: m }).eq("id", 1);
+  if (error) return fail(/voice_clear/.test(error.message) ? "SETUP_VOICE" : error.message);
   return { ok: true };
 }
 /** BOOST の起動音を選ぶ (全部の送迎で共通) */

@@ -13,10 +13,12 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
+import { VOICE_MODES, isVoiceMode, voiceClear, type VoiceMode } from "@/lib/cabinVoice";
+import { onVoiceCache, syncVoiceCache, voiceCacheState, type VoiceCacheState } from "@/lib/driverVoiceCache";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
 import { rtJoin, rtJoinMsg, rtKick, rtSend, CABIN_CH } from "@/lib/rtKick";
 import type { Music } from "@/components/driver/DriverMusic";
@@ -26,7 +28,8 @@ type T = (s: string, v?: Record<string, string | number>) => string;
 const LANGS: [string, string][] = [["zh", "中文"], ["en", "EN"], ["ja", "日本語"], ["ko", "한국어"]];
 
 /* ================= 送迎中 (GPS を送る・BOOST の音楽) ================= */
-export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: string) => void, t: T) {
+export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: string) => void, t: T, voiceMode?: string) {
+  useEffect(() => { if (isVoiceMode(voiceMode)) voiceModeNow = voiceMode; }, [voiceMode]);
   const [trip, setTrip] = useState<CabinTrip | null>(initial);
   const [sending, setSending] = useState<"" | "ok" | "ng">("");
   const mRef = useRef(music); mRef.current = music;
@@ -57,6 +60,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     // 車内 iPad の声 (ASTRAEA・道案内) をこのスマホで鳴らす (Bluetooth で車のスピーカーへ)。話している間は音楽を小さく
     const rv = startRemoteVoice(trip.id, {
+      // 聞き取りやすくする声 (設定: BOOST のときだけ / いつも / 使わない)
+      clear: (u) => voiceClear(u, voiceModeNow),
       // ブースト開始のセリフと一緒に BOOST の曲を始め、完了のセリフと一緒にフェードアウト (元の曲へ)
       onPlay: (u) => {
         // 準備の合図 → 曲をゆっくり止める。効果音 (起動) → 5.2 秒後の点火の瞬間に、BOOST の曲を普通の音量で始める (回送の BOOST は準備が無いので今までどおり)
@@ -164,6 +169,45 @@ export function HumorPick({ initial, t }: { initial: boolean; t: T }) {
   );
 }
 
+/** アストレアの声を聞き取りやすく (このスマホで鳴らすときに、その場で整える) */
+let voiceModeNow: VoiceMode = "boost";
+export function VoicePick({ initial, t }: { initial: string; t: T }) {
+  const zh = t("変える") !== "変える";
+  const [cur, setCur] = useState<VoiceMode>(isVoiceMode(initial) ? initial : "boost");
+  const [msg, setMsg] = useState("");
+  useEffect(() => { voiceModeNow = cur; }, [cur]);
+  const pick = async (m: VoiceMode) => {
+    if (m === cur) return; sfx.tick(); const old = cur; setCur(m); setMsg("");
+    const r = await cabinSetVoiceMode(m);
+    if (!r.ok) { setCur(old); setMsg(r.error === "SETUP_VOICE" ? t("声の設定には Supabase の SQL（migration_voice_clear.sql）が必要です") : t("切り替えられませんでした")); }
+  };
+  return (
+    <>
+      <div className="csec">{t("アストレアの声を聞き取りやすく")}</div>
+      <div className="cchips">
+        {VOICE_MODES.map((v) => <button key={v.id} className={cur === v.id ? "on" : ""} onClick={() => void pick(v.id)}><b>{zh ? v.zh : v.ja}</b><small>{zh ? v.subZh : v.sub}</small></button>)}
+      </div>
+      {msg ? <p className="note warn">{msg}</p> : null}
+      <VoiceCacheLine t={t} />
+    </>
+  );
+}
+/** 声をこのスマホに保存した状態 (保存しておくと、車の中でも声がすぐ鳴る → iPad が代わりに話す回数が減る) */
+function VoiceCacheLine({ t }: { t: T }) {
+  const [v, setV] = useState<VoiceCacheState>(voiceCacheState());
+  useEffect(() => onVoiceCache(setV), []);
+  const txt = v.state === "done" ? "✓ " + t("声をこのスマホに保存済み（{n}）", { n: v.total })
+    : v.state === "saving" ? "📥 " + t("声をこのスマホに保存中… {d} / {n}", { d: v.done, n: v.total })
+    : v.state === "fail" ? "⚠ " + t("保存できなかった声があります（電波のよい所でもう一度）")
+    : v.state === "unsupported" ? t("このブラウザは保存に対応していません") : "📥 " + t("声をこのスマホに保存（約 14 MB・1 回だけ）");
+  return (
+    <div className="vcache">
+      <span>{txt}</span>
+      {v.state !== "saving" && v.state !== "unsupported" && <button onClick={() => { sfx.tick(); void syncVoiceCache(boostNow ? [`/cabin/audio/${boostSfxFile(boostNow)}.mp3`] : [], true); }}>{v.state === "done" ? t("確認") : t("保存")}</button>}
+    </div>
+  );
+}
+
 /** BOOST の起動音を選ぶ (▶ で試聴。全部の送迎で共通) */
 let boostNow: string | null = null;
 export function BoostPick({ initial, t }: { initial: string; t: T }) {
@@ -184,7 +228,7 @@ export function BoostPick({ initial, t }: { initial: string; t: T }) {
   const pick = async (id: string) => {
     if (id === cur) return; sfx.tick(); const old = cur; setCur(id); setMsg("");
     const r = await cabinSetBoostSfx(id); rtKick(CABIN_CH);
-    if (r.ok) boostNow = id;
+    if (r.ok) { boostNow = id; void syncVoiceCache([`/cabin/audio/${boostSfxFile(id)}.mp3`]); }
     else { setCur(old); setMsg(r.error === "SETUP_BOOST_SFX" ? t("BOOST の音を選ぶには Supabase の SQL（migration_boost_sfx.sql）が必要です") : t("切り替えられませんでした")); }
   };
   return (
@@ -393,6 +437,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       <div className="ctitle">🚗 {t("車内 iPad")}</div>
       <HumorPick initial={data.cabin.humor} t={t} />
       <BoostPick initial={data.cabin.boostSfx} t={t} />
+      <VoicePick initial={data.cabin.voiceMode} t={t} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
       {data.cabin.devices.map((d) => (

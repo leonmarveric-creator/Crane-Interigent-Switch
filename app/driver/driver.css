@@ -656,3 +656,8 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .bsfx-r .pl { flex:none; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:#101a2b; color:var(--sun2); font-size:14px; }
 .drv .bsfx-r .nm { flex:1; text-align:left; min-height:40px; border:0; background:none; color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .drv .bsfx-r .nm em { font-style:normal; color:var(--sun2); font-size:12px; white-space:nowrap; }
+
+/* 声をスマホに保存 */
+.drv .vcache { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12.5px; color:var(--muted); }
+.drv .vcache span { flex:1; }
+.drv .vcache button { border:1px solid var(--line); background:#101a2b; color:var(--text); border-radius:10px; padding:6px 12px; font-size:12.5px; }

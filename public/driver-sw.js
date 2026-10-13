@@ -1,7 +1,7 @@
 /* HIROSHI DRIVE: 画面の画像・アンドロイドの声をスマホに保存して、2 回目からはギガを使わずに表示・再生する。
- * 対象は /driver/*.(jpg|png|webmanifest) と /audio/driver/*.mp3 だけ。ページ本体や API は保存しない (いつも最新)。
+ * 対象は /driver/*.(jpg|png|webmanifest) と /audio/driver/*.mp3、車内のアストレアの声・効果音 (/cabin/audio/**.mp3)。ページ本体や API は保存しない (いつも最新)。
  * 画像や声を差し替えたら VERSION を上げる。 */
-const VERSION = "drv-static-v1";
+const VERSION = "drv-static-v2"; // v2: アストレアの声もスマホに保存 (iPad が話す回数を減らす)
 
 self.addEventListener("install", (e) => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
@@ -13,7 +13,24 @@ self.addEventListener("activate", (e) => {
 
 const isStatic = (u) =>
   u.origin === self.location.origin &&
-  (/^\/driver\/[^/]+\.(jpg|png|webmanifest)$/.test(u.pathname) || /^\/audio\/driver\/[^/]+\.mp3$/.test(u.pathname));
+  (/^\/driver\/[^/]+\.(jpg|png|webmanifest)$/.test(u.pathname) || /^\/audio\/driver\/[^/]+\.mp3$/.test(u.pathname) || /^\/cabin\/audio\/.+\.mp3$/.test(u.pathname));
+
+/* 声をまとめて保存 (アプリから: { type: "precache", urls, reset })。reset のときは差し替わった声を消してから取り直す */
+self.addEventListener("message", (e) => {
+  if (!e.data || e.data.type !== "precache") return;
+  const port = e.ports[0];
+  e.waitUntil((async () => {
+    const cache = await caches.open(VERSION); let done = 0, fail = 0;
+    for (const url of e.data.urls) {
+      try {
+        const key = new URL(url, self.location.origin).href;
+        if (e.data.reset) await cache.delete(key);
+        if (!(await cache.match(key))) { const r = await fetch(key, { cache: "no-store" }); if (r.ok && r.status === 200) await cache.put(key, r); else fail++; }
+      } catch (err) { fail++; }
+      done++; if (port && (done % 10 === 0 || done === e.data.urls.length)) port.postMessage({ done, total: e.data.urls.length, fail });
+    }
+  })());
+});
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;

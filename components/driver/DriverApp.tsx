@@ -6,6 +6,8 @@
  *   表示言語: 简体中文 (既定) / 日本語。
  *   ページ: ホーム / 送迎 (お迎え・お見送り) / 案内 (部屋を選んで QR と説明) / 設定。中央の START でお出迎え準備。
  */
+import { syncVoiceCache } from "@/lib/driverVoiceCache";
+import { boostSfxFile } from "@/lib/boostSfx";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import type { DriverData, DriverPlace } from "@/lib/driverData";
@@ -65,7 +67,9 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
     const id = setInterval(() => setNowMs(Date.now()), 30000); setNowMs(Date.now());
     // 画面の画像・声をこの端末に保存 (2 回目からギガを使わない)
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/driver-sw.js", { scope: "/driver" }).catch(() => {});
-    return () => clearInterval(id);
+    // アストレアの声をこのスマホに先に保存 (車の中で読み込みが間に合わず iPad が話すのを防ぐ)。保存済みなら何もしない
+    const vt = setTimeout(() => { void syncVoiceCache([`/cabin/audio/${boostSfxFile(data.cabin.boostSfx)}.mp3`]); }, 4000);
+    return () => { clearInterval(id); clearTimeout(vt); };
   }, []);
   useEffect(() => { setDriverMute(!sfxOn, !voiceOn); }, [sfxOn, voiceOn]);
   useEffect(() => { document.documentElement.lang = lang === "zh" ? "zh-CN" : "ja"; }, [lang]);
@@ -105,7 +109,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const autoWho = { in: next ? `${gName(next)}（${rName(next)}）` : "", out: nextOut ? `${gName(nextOut)}（${rName(nextOut)}）` : "" };
   const music = useDriverMusic(data.tracks, t, toast, autoLang);
   // 車内 iPad (お客さん用の画面) と、送迎中のスマホの位置・BOOST の音楽
-  const cab = useCabin(data.cabin.trip, music, toast, t);
+  const cab = useCabin(data.cabin.trip, music, toast, t, data.cabin.voiceMode);
   const cabS = useCabinSheet();
   const [musicOpen, setMusicOpen] = useState(false);
   const full = useMusicFull(music);
