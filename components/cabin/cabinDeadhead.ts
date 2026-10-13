@@ -19,6 +19,7 @@ export interface DhCtx {
   routes: Record<string, [number, number][]>;
   ac: () => AudioContext | null;
   remote: () => boolean;                          // 声はスマホから
+  boostUrl?: () => string;                        // BOOST の起動音 (設定で選んだもの)
   say: (url: string, text: string) => Promise<boolean>; // スマホへ声を送る (スマホが鳴らし始めたら true)
   board: (tripId: string) => void;                // ゲスト乗車
   end: (tripId: string) => void;                  // 帰着 (送迎を終わりに)
@@ -206,7 +207,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
     return { on: t > 0 && t < 1 && Math.abs(q[0] * b[1] - q[1] * b[0]) / Math.sqrt(L2) < 300, t };
   };
   function scr(e: HTMLElement, txt: string, ms: number) { const C = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789#$%&"; const tb = performance.now(); (function f(n: number) { const u = Math.min(1, (n - tb) / ms); e.textContent = [...txt].map((ch, i) => (ch === " " || i / txt.length < u ? ch : C[Math.random() * C.length | 0])).join(""); if (u < 1) requestAnimationFrame(f); })(tb); }
-  function boostIn() { boosting = true; host.classList.add("boost"); $("dhTag").textContent = "SKY GATE BOOST"; sfx("/cabin/audio/boost-sfx.mp3"); scr($("dhBT"), "BOOST", 800); void say("boostIn"); said.bm = 0; }
+  function boostIn() { boosting = true; host.classList.add("boost"); $("dhTag").textContent = "SKY GATE BOOST"; sfx(c.boostUrl?.() ?? "/cabin/audio/boost-sfx.mp3"); scr($("dhBT"), "BOOST", 800); void say("boostIn"); said.bm = 0; }
   function boostOut() { boosting = false; host.classList.remove("boost"); $("dhTag").textContent = back ? "帰り道 · RETURN" : "回送中 · DEADHEAD"; tone(880, 0, 0.1, 0.05); tone(1320, 0.1, 0.3, 0.05); void say("boostOut"); }
   const cv = $("dhStars") as HTMLCanvasElement, cx = cv.getContext("2d")!, SS = Array.from({ length: 200 }, () => ({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: Math.random() }));
   function stars() {

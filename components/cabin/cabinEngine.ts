@@ -4,6 +4,7 @@
  *   Leaflet は /cabin/leaflet/leaflet.js を先に読み込んでおくこと (window.L)。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { boostSfxFile } from "@/lib/boostSfx";
 import {
   BASE_MIN, BRIDGE, BOOST_INIT, CRANE_NEST, PLACES, POIS, boostPrepDue, boostStep, bridgePos, bufferMin, decodePolyline, dist, etaMin,
   makeRoute, pointAt, poisFor, project, type BoostState, type GLang, type LL, type PoiKey, type Route,
@@ -64,6 +65,10 @@ export interface Engine {
   setQuiet(q: boolean): void;
   /** ユーモアモード (映画・アニメ・ゲームのオマージュも話す) */
   setHumor(on: boolean): void;
+  /** BOOST の起動音 (lib/boostSfx の id) */
+  setBoostSfx(id: string | null): void;
+  /** 今選ばれている BOOST の起動音の URL */
+  boostSfxUrl(): string;
   setVoiceSeen(ageMs: number | null): void;
   /** 声をスマホから流すか (スマホが取りに来ているか) */
   remoteVoice(): boolean;
@@ -128,7 +133,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const linkS = () => { const t = now(); [1200, 1600, 2400].forEach((f, i) => tone(f, f, t + i * 0.09, 0.08, 0.05)); tone(300, 1400, t + 0.3, 0.5, 0.04); };
   const scanS = () => { const t = now(); tone(1800, 1800, t, 0.06, 0.03); tone(2400, 2400, t + 0.08, 0.06, 0.03); [0.9, 1.25, 1.6].forEach((d) => tone(2600, 3400, t + d, 0.09, 0.025)); };
   const blobs: Record<string, string> = {};
-  const src = (k: string) => blobs[k] || AUDIO + k + ".mp3";
+  /** BOOST の起動音は設定で選んだもの (lib/boostSfx)。ほかの声・効果音はそのまま */
+  let boostFile = "boost-sfx";
+  const file = (k: string) => (k === "boost-sfx" ? boostFile : k);
+  const src = (k: string) => blobs[file(k)] || AUDIO + file(k) + ".mp3";
   const voice = new Audio(); let Q: Promise<void> = Promise.resolve();
   let voiceN = 0; // 道案内などの声が出ている (待っている) 数。AI はこの間は話さない
   /* 声はスマホ (Bluetooth で車のスピーカー) から流す。スマホが来ていないときだけ iPad から。
@@ -153,7 +161,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     return Q;
   };
   // ブーストの効果音もスマホから (Bluetooth で車のスピーカー)。スマホが来ていなければ iPad から。音そのものは同じ
-  const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + k + ".mp3", SFX_MARK); return; } const a = new Audio(src(k)); a.play().catch(() => {}); };
+  const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + file(k) + ".mp3", SFX_MARK); return; } const a = new Audio(src(k)); a.play().catch(() => {}); };
   const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end", "boost-prep",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
 
@@ -739,8 +747,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     ac(); voice.muted = true; voice.src = AUDIO + "en-arrive.mp3"; voice.play().then(() => { voice.pause(); voice.muted = false; }).catch(() => { voice.muted = false; });
     // 声・効果音を先に読み込んでおく (保存済みなら iPad の中から。再生のときに待たない)
     void (async () => {
-      for (const k of AUDIO_KEYS) {
-        if (blobs[k]) continue;
+      for (const k0 of AUDIO_KEYS) {
+        const k = file(k0); if (blobs[k]) continue;
         try { const r = await fetch(AUDIO + k + ".mp3"); if (r.ok) blobs[k] = URL.createObjectURL(await r.blob()); } catch { /* 次へ */ }
       }
     })();
@@ -789,6 +797,12 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     },
     setQuiet: (q) => { aiQuiet = q; stage.classList.toggle("ai-quiet", q); },
     setHumor: (on) => { aiHumor = on; },
+    boostSfxUrl: () => AUDIO + boostFile + ".mp3",
+    setBoostSfx: (id) => {
+      const f = boostSfxFile(id); if (f === boostFile) return; boostFile = f;
+      // 新しい音を先に読み込んでおく
+      if (!blobs[f]) void fetch(AUDIO + f + ".mp3").then((r) => (r.ok ? r.blob() : null)).then((b) => { if (b) blobs[f] = URL.createObjectURL(b); }).catch(() => {});
+    },
     /** スマホが声を取りに来ている (ageMs = 最後に来てからの時間) */
     remoteVoice: () => Date.now() - phoneSeen < 12000,
     setVoiceSeen: (ageMs: number | null) => { phoneSeen = ageMs == null ? 0 : Date.now() - ageMs; },

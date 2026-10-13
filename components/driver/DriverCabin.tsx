@@ -13,9 +13,10 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
+import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
 import { rtJoin, rtJoinMsg, rtKick, rtSend, CABIN_CH } from "@/lib/rtKick";
 import type { Music } from "@/components/driver/DriverMusic";
@@ -60,7 +61,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       onPlay: (u) => {
         // 準備の合図 → 曲をゆっくり止める。効果音 (起動) → 5.2 秒後の点火の瞬間に、BOOST の曲を普通の音量で始める (回送の BOOST は準備が無いので今までどおり)
         if (/boost-prep\.mp3$/.test(u)) { mRef.current.boostPrep(); return; }
-        if (/boost-sfx\.mp3$/.test(u)) { if (mRef.current.prepped() && !mRef.current.inBoost()) { clearTimeout(gT); boosting = mRef.current.boostIn(5200, true); } return; }
+        if (/(boost-sfx|\/boost\/[A-Za-z]+)\.mp3$/.test(u)) { if (mRef.current.prepped() && !mRef.current.inBoost()) { clearTimeout(gT); boosting = mRef.current.boostIn(5200, true); } return; }
         if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
         else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
       },
@@ -158,6 +159,49 @@ export function HumorPick({ initial, t }: { initial: boolean; t: T }) {
         <button className={!on ? "on" : ""} onClick={() => void pick(false)}><b>🙂 {t("ふつう")}</b><small>{t("案内とふつうのひと言")}</small></button>
         <button className={on ? "on" : ""} onClick={() => void pick(true)}><b>😂 {t("ユーモアモード")}</b><small>{t("映画・アニメ・ゲームのネタも話す")}</small></button>
       </div>
+      {msg ? <p className="note warn">{msg}</p> : null}
+    </>
+  );
+}
+
+/** BOOST の起動音を選ぶ (▶ で試聴。全部の送迎で共通) */
+let boostNow: string | null = null;
+export function BoostPick({ initial, t }: { initial: string; t: T }) {
+  const ui: "zh" | "ja" = t("変える") !== "変える" ? "zh" : "ja";
+  const [cur, setCur] = useState(boostNow ?? initial);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState("");
+  const au = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => { au.current?.pause(); }, []);
+  const name = (id: string) => { const x = BOOST_SFX.find((b) => b.id === id); return x ? (ui === "zh" ? x.zh : x.name) : id; };
+  const play = (id: string) => {
+    if (au.current) au.current.pause();
+    if (playing === id) { setPlaying(null); return; }
+    const a = new Audio(`/cabin/audio/${boostSfxFile(id)}.mp3`); au.current = a; setPlaying(id);
+    a.onended = () => setPlaying((p) => (p === id ? null : p)); a.play().catch(() => setPlaying(null));
+  };
+  const pick = async (id: string) => {
+    if (id === cur) return; sfx.tick(); const old = cur; setCur(id); setMsg("");
+    const r = await cabinSetBoostSfx(id); rtKick(CABIN_CH);
+    if (r.ok) boostNow = id;
+    else { setCur(old); setMsg(r.error === "SETUP_BOOST_SFX" ? t("BOOST の音を選ぶには Supabase の SQL（migration_boost_sfx.sql）が必要です") : t("切り替えられませんでした")); }
+  };
+  return (
+    <>
+      <div className="csec">{t("BOOST の起動音")}</div>
+      <button className="bsfx-cur" onClick={() => setOpen((v) => !v)}><b>⚡ {name(cur)}</b><span>{open ? "▲" : t("変える") + " ▾"}</span></button>
+      {open && (
+        <div className="bsfx">
+          {BOOST_SFX.map((b) => (
+            <div key={b.id} className={`bsfx-r ${cur === b.id ? "on" : ""}`}>
+              <button className="pl" onClick={() => play(b.id)}>{playing === b.id ? "■" : "▶"}</button>
+              <button className="nm" onClick={() => void pick(b.id)}>{ui === "zh" ? b.zh : b.name}{cur === b.id ? <em>✓ {t("使用中")}</em> : null}</button>
+            </div>
+          ))}
+          <p className="note">{t("▶ で試聴、名前をタップで決定。次の BOOST から変わります（全部の送迎で共通）。")}</p>
+        </div>
+      )}
       {msg ? <p className="note warn">{msg}</p> : null}
     </>
   );
@@ -348,6 +392,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
     <div className="card" id="cabinSet">
       <div className="ctitle">🚗 {t("車内 iPad")}</div>
       <HumorPick initial={data.cabin.humor} t={t} />
+      <BoostPick initial={data.cabin.boostSfx} t={t} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
       {data.cabin.devices.map((d) => (

@@ -2,6 +2,7 @@
  * 車内 iPad (/cabin) のデータ (サーバ専用)。
  *   migration_cabin.sql 未実行でも落ちないように、テーブルが無ければ「未設定」で返す。
  */
+import { BOOST_SFX_DEFAULT, isBoostSfx, type BoostSfxId } from "@/lib/boostSfx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roomColor } from "@/lib/driverLogic";
 import { CRANE_NEST, type GLang, type LL } from "@/lib/cabinGeo";
@@ -127,6 +128,12 @@ export async function cabinRoomById(id: string | null): Promise<CabinRoom | null
   return room;
 }
 
+/** BOOST の起動音 (app_settings.boost_sfx, migration_boost_sfx.sql)。無ければ今までの音を大きくしたもの */
+export async function boostSfxId(): Promise<BoostSfxId> {
+  const { data, error } = await supabaseAdmin.from("app_settings").select("boost_sfx").eq("id", 1).maybeSingle();
+  const v = (data as any)?.boost_sfx;
+  return !error && isBoostSfx(v) ? v : BOOST_SFX_DEFAULT;
+}
 /** ASTRAEA のユーモアモード (映画・アニメ・ゲームのオマージュも話す)。全部の送迎で共通: app_settings.ai_humor (migration_ai_humor.sql) */
 export async function aiHumorOn(): Promise<boolean> {
   const { data, error } = await supabaseAdmin.from("app_settings").select("ai_humor").eq("id", 1).maybeSingle();

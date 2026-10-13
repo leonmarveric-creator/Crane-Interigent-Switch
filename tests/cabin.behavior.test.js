@@ -136,7 +136,7 @@ test("cabin: BOOST prep (music fades → prep line → charge sfx → ignition) 
   assert.match(ai, /done\.add\("bridge"\);[\s\S]{0,400}return say\("bridge", \{ force: true, duck: false \}\)/);
   const cab = read("components", "driver", "DriverCabin.tsx"), mus = read("components", "driver", "DriverMusic.tsx");
   assert.match(cab, /boost-prep\\\.mp3\$\/\.test\(u\)\) \{ mRef\.current\.boostPrep\(\); return; \}/);
-  assert.match(cab, /boost-sfx\\\.mp3\$\/\.test\(u\)\) \{ if \(mRef\.current\.prepped\(\) && !mRef\.current\.inBoost\(\)\) \{ clearTimeout\(gT\); boosting = mRef\.current\.boostIn\(5200, true\); \}/);
+  assert.match(cab, /\(boost-sfx\|\\\/boost\\\/\[A-Za-z\]\+\)\\\.mp3\$\/\.test\(u\)\) \{ if \(mRef\.current\.prepped\(\) && !mRef\.current\.inBoost\(\)\) \{ clearTimeout\(gT\); boosting = mRef\.current\.boostIn\(5200, true\); \}/);
   assert.match(mus, /fadeTo\(0, 2500\)/, "slow fade-out"); assert.match(mus, /apiRef\.current\?\.boostPrepCancel\(\); \}, 40000\)/, "music comes back if the boost never starts");
   assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) try \{ h\.onPlay\?\.\(String\(it\.u\)\); \}/, "the phone hears which sfx / cue played");
   assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "boost-prep.mp3")));

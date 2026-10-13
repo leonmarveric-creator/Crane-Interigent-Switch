@@ -1,7 +1,8 @@
 /* 車内 iPad (/cabin): 声・効果音・部屋の写真・地図の部品を iPad に保存して、2 回目からは通信なし・待ち時間なしで出す。
  * 対象: /cabin/** の静的ファイル と Supabase に上げた部屋の写真 (driver-music/rooms/)。ページ本体や API は保存しない (いつも最新)。
  * 中身を差し替えたら VERSION を上げる。 */
-const VERSION = "cabin-static-v3"; // v3: 入り方ガイドの声 (外から・スマホの電池切れのとき)
+const VERSION = "cabin-static-v4"; // v4: 声を大きく・聞き取りやすく (全部)、BOOST の起動音を選べるように
+// v3: 入り方ガイドの声 (外から・スマホの電池切れのとき)
 
 self.addEventListener("install", () => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => {

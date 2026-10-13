@@ -129,6 +129,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         dhRef.current = createDeadhead({
           stage: root.current.querySelector(".stage") as HTMLElement, routes, ac: () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); void w.__dhAc.resume(); return w.__dhAc; } catch { return null; } },
           remote: () => !!eng.current?.remoteVoice() && phoneOk(),
+          boostUrl: () => eng.current?.boostSfxUrl() ?? "/cabin/audio/boost-sfx.mp3",
           say: (u, s) => { const id = tripRef.current?.id; return id ? sendVoice(id, u, s) : Promise.resolve(false); },
           board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else { rtKick(CABIN_CH); void poll(); } },
           end: (id) => void endTrip(id, true),
@@ -223,6 +224,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           phoneAt.current = t.phone.at; e.feed(t.phone.ll, t.phone.kmh, "phone");
         }
         e.setQuiet(!!t.aiQuiet); // AI の静かモード (お父さんのスマホで切り替え)
+        e.setBoostSfx(typeof j.boostSfx === "string" ? j.boostSfx : null);
         e.setHumor(j.humor === true); // ユーモアモード (お父さんのスマホ / AGENT KAKU で切り替え。全部の送迎で共通)
         // チェックイン QR: 予約つき (合言葉入り・その予約に自動で紐づく) があればそれ、無ければ全員共通の画像
         if (typeof j.checkinLink === "string") {
@@ -306,7 +308,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       // 到着画面のガイド (トイレ・お部屋の鍵) と回送モードの声・写真も
       ...(Object.keys(TOILET_VOICE) as ToiletKey[]).map(toiletAudio), ...Object.values(TOILET_IMG),
       ...(Object.keys(LOCK_VOICE) as LockKey[]).map(lockAudio), ...Object.values(LOCK_IMG),
-      ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3",
+      ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3", e.boostSfxUrl(),
       "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });

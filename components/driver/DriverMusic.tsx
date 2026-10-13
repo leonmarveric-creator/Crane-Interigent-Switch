@@ -49,6 +49,8 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const prep = useRef<{ url: string | null; pos: number; wasPlaying: boolean; at: number } | null>(null); // BOOST の準備中 (曲を止めて、準備のセリフと効果音を待っている)
   const prepSafety = useRef<ReturnType<typeof setTimeout> | null>(null);
   const duckWanted = useRef(false); // 声が流れている (音楽を小さくしたい)
+  /** 「次に流す」の予約 (曲の id。今のプレイリストの中だけ) */
+  const [queue, setQueue] = useState<string[]>([]);
   /** 曲の入れ替えが終わったら、今の声の状態に合わせた音量へ */
   const settle = () => { switching.current = false; if (!el().paused) fadeTo(duckWanted.current ? vol.current * 0.2 : vol.current, 900); };
   /** 手で曲を選んだときなど: 高速モードをやめる (次の橋でまた BOOST の曲が流れるように) */
@@ -108,6 +110,20 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       x.play().then(() => { x.pause(); x.muted = false; }).catch(() => { x.muted = false; });
     }
   };
+  /** 普通の再生 (画面が消えていた間) から、音量を下げられる再生 (Web Audio) へ戻す。曲の変わり目か、声が入る瞬間にだけ行う */
+  const backToMain = (lv: number) => {
+    const m = main(), p = plainEl(), g = graph.current;
+    if (!g || !onPlain.current) return;
+    const at = p.currentTime, wasPlaying = !p.paused;
+    const go = () => {
+      try { m.currentTime = at + 0.03; } catch { /* ignore */ }
+      g.gain.gain.value = lv; level.current = lv;
+      if (!wasPlaying) { onPlain.current = false; p.pause(); return; }
+      if (g.ctx.state !== "running") void g.ctx.resume();
+      m.play().then(() => { onPlain.current = false; p.pause(); }).catch(() => { /* そのまま普通の再生で */ });
+    };
+    if (m.src !== p.src) { m.src = p.src; m.addEventListener("loadedmetadata", go, { once: true }); } else go();
+  };
   /** 再生の前: Web Audio が止まっていたら動かす */
   const route = () => { if (graph.current && graph.current.ctx.state !== "running") void graph.current.ctx.resume(); };
   // 画面が消えたら普通の再生へ、ついたら Web Audio の再生へ (続きの位置から)
@@ -121,17 +137,12 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
         p.volume = level.current;
         const go = () => { try { p.currentTime = at; } catch { /* ignore */ } p.play().then(() => { onPlain.current = true; m.pause(); }).catch(() => { /* そのまま */ }); };
         if (p.readyState >= 1) go(); else p.addEventListener("loadedmetadata", go, { once: true });
-      } else if (document.visibilityState === "visible" && onPlain.current) {
-        const at = p.currentTime, wasPlaying = !p.paused;
-        const back = () => {
-          try { m.currentTime = at; } catch { /* ignore */ }
-          onPlain.current = false; graph.current!.gain.gain.value = level.current;
-          if (!wasPlaying) { p.pause(); setPlaying(false); return; }
-          void graph.current!.ctx.resume();
-          m.play().then(() => { p.pause(); setPlaying(true); }).catch(() => { onPlain.current = true; });
-        };
-        if (m.src !== p.src) { m.src = p.src; m.addEventListener("loadedmetadata", back, { once: true }); } else back();
+      } else if (document.visibilityState === "visible" && onPlain.current && p.paused) {
+        // 普通の再生が止まっている (止めてから戻った) ときだけ、すぐ戻す。流れている間は切り替えない
+        try { m.currentTime = p.currentTime; } catch { /* ignore */ }
+        onPlain.current = false; graph.current!.gain.gain.value = level.current;
       }
+      // 流れているまま画面に戻ったとき: 切り替えない (次の曲か、声が入る瞬間に backToMain で戻す)
     };
     document.addEventListener("visibilitychange", swap);
     return () => document.removeEventListener("visibilitychange", swap);
@@ -143,18 +154,26 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     requestAnimationFrame(f);
   };
   const load = useCallback(async (tr: DriverTrack | null, play: boolean) => {
+    if (graph.current && onPlain.current && document.visibilityState === "visible") { plainEl().pause(); onPlain.current = false; graph.current.gain.gain.value = level.current; }
     const a = el();
     if (!tr) { a.pause(); return; }
     if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; }
     const src = await cachedUrl(tr.url);
     if (src.startsWith("blob:")) blobUrl.current = src;
     a.src = src; setPos(0);
+    // もう一方 (画面が消えたとき用) にも同じ曲を読み込んでおく → 切り替えが一瞬で済む
+    if (graph.current) { const o = onPlain.current ? main() : plainEl(); if (o !== a) { o.src = src; o.preload = "auto"; try { o.load(); } catch { /* ignore */ } } }
     if (play) { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 2000)).catch(() => {}); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 曲が終わったら次へ
-  listeners.current.ended = () => setCur((c) => ({ ...c, i: list.length ? (c.i + 1) % list.length : 0 }));
+  const nextIndex = (): { i: number; q: string[] } => {
+    const q = queue.filter((id) => list.some((x) => x.id === id));
+    if (q.length) { const i = list.findIndex((x) => x.id === q[0]); return { i, q: q.slice(1) }; }
+    return { i: list.length ? (cur.i + 1) % list.length : 0, q };
+  };
+  listeners.current.ended = () => { const n = nextIndex(); setQueue(n.q); setCur((c) => ({ ...c, i: n.i })); };
   const lastId = useRef<string | null>(null);
   useEffect(() => {
     if (track?.id === lastId.current) return;
@@ -198,19 +217,30 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     play() { sfx.prime(); prime(); const a = el(); if (!track) { toast(t("この言語の曲はまだありません。設定から追加できます。")); return; } if (!a.src) void load(track, true); else { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 1500)).catch(() => {}); } },
     pause() { el().pause(); },
     toggle() { playing ? api.pause() : api.play(); },
-    next() { const i = list.length ? (cur.i + 1) % list.length : 0; if (boost.current) return api.pick(i); setCur((c) => ({ ...c, i: list.length ? (c.i + 1) % list.length : 0 })); },
+    next() { const n = nextIndex(); setQueue(n.q); if (boost.current) return api.pick(n.i); setCur((c) => ({ ...c, i: n.i })); },
     prev() { if (boost.current) return api.pick(cur.i); const a = el(); if (a.currentTime > 3) a.currentTime = 0; else setCur((c) => ({ ...c, i: list.length ? (c.i - 1 + list.length) % list.length : 0 })); },
     pick(i: number) {
       prime();
+      const pid = list[i]?.id; if (pid) setQueue((q) => q.filter((x) => x !== pid));
       // BOOST の曲の最中に手で選んだ → 高速モードをやめて、選んだ曲をすぐ流す (同じ曲でも読み込み直す)
       if (boost.current) { dropBoost(); const tr = list[i] ?? null; lastId.current = tr?.id ?? null; setCur((c) => ({ ...c, i })); void load(tr, true); return; }
       setCur((c) => ({ ...c, i })); if (!playing) setTimeout(() => api.play(), 50); },
-    setPlaylist(p: "in" | "out", l: MLang, play = false) { if (play) prime(); dropBoost(); lastId.current = null; setCur({ p, l, i: 0 }); if (play) setTimeout(() => { route(); el().play().catch(() => {}); }, 120); },
-    startWith(p: "in" | "out", l: MLang) { dropBoost(); lastId.current = null; const L = tracks.filter((x) => x.purpose === p && x.lang === l); setCur({ p, l, i: 0 }); if (L.length) { const tr = L.sort((a, b) => a.sort - b.sort)[0]; lastId.current = tr.id; void load(tr, true); } },
+    setPlaylist(p: "in" | "out", l: MLang, play = false) { if (play) prime(); dropBoost(); setQueue([]); lastId.current = null; setCur({ p, l, i: 0 }); if (play) setTimeout(() => { route(); el().play().catch(() => {}); }, 120); },
+    startWith(p: "in" | "out", l: MLang) { dropBoost(); setQueue([]); lastId.current = null; const L = tracks.filter((x) => x.purpose === p && x.lang === l); setCur({ p, l, i: 0 }); if (L.length) { const tr = L.sort((a, b) => a.sort - b.sort)[0]; lastId.current = tr.id; void load(tr, true); } },
     /** アンドロイドの声の間は音楽を 20% に (声が終わったらゆっくり戻す) */
     /** タップの中で呼ぶ (あとで自動で流すときのため) */
     prime,
-    duck(on: boolean) { duckWanted.current = on; if (!playing || switching.current) return; fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900); },
+    duck(on: boolean) {
+      duckWanted.current = on; if (!playing || switching.current) return;
+      if (on && onPlain.current && graph.current && document.visibilityState === "visible") { backToMain(vol.current * 0.2); return; }
+      fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900);
+    },
+    /** 次に流す: 予約 (今の曲の終わりに流れる。何曲でも順番に) */
+    queue, queued: (id: string) => queue.indexOf(id),
+    enqueue(i: number) { const id = list[i]?.id; if (!id || i === cur.i) return; setQueue((q) => (q.includes(id) ? q.filter((x) => x !== id) : [...q, id])); },
+    dequeue(id: string) { setQueue((q) => q.filter((x) => x !== id)); },
+    queueUp(id: string) { setQueue((q) => { const k = q.indexOf(id); if (k <= 0) return q; const n = q.slice(); [n[k - 1], n[k]] = [n[k], n[k - 1]]; return n; }); },
+    nextTrack(): DriverTrack | null { const n = nextIndex(); return list[n.i] ?? null; },
     /** 高速モード (スカイゲートブリッジ): 今の曲を止めて「⚡ BOOST 用」の曲を開始位置から。iPad の点火に合わせて少し待つ */
     /** BOOST の準備: 今の曲をゆっくり (2.5 秒) 小さくして止める。準備のセリフと効果音は無音の中で鳴る。
         40 秒たっても BOOST が始まらなければ (遅くなって起動しなかった)、元の曲に戻す */
@@ -396,7 +426,7 @@ export function MusicFull({ m, t, full }: { m: Music; t: T; full: ReturnType<typ
         ) : <div className="none">{m.track ? t("歌詞なし") : t("曲がありません")}</div>}
       </div>
       <div className="mf-bot">
-        <div className="tt"><b>{m.track?.title ?? "—"}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : ""}</small></div>
+        <div className="tt"><b>{m.track?.title ?? "—"}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : ""}</small>{m.queue.length > 0 && m.nextTrack() ? <small className="mnext">⏭ {t("次")}: {m.nextTrack()!.title}</small> : null}</div>
         <div className="pw"><SeekBar m={m} /><div className="mtime"><span>{fmt(m.pos)}</span><span>{fmt(m.dur)}</span></div></div>
         <div className="ctl">
           <button onClick={() => { sfx.blip(); m.prev(); }}>⏮</button>
@@ -422,7 +452,7 @@ export function MusicPlayer({ m, t, onOpen, onArrive, onFull }: { m: Music; t: T
       </div>
       <div className="mpl-row">
         <CoverArt track={m.track} p={m.cur.p} className="mart" />
-        <div className="nm"><b>{m.track?.title ?? t("曲がありません")}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : t("設定から曲を追加してください")}</small></div>
+        <div className="nm"><b>{m.track?.title ?? t("曲がありません")}</b><small>{m.track ? `${m.track.artist || "Crane Nest"}・${m.cur.i + 1} / ${m.list.length}` : t("設定から曲を追加してください")}</small>{m.queue.length > 0 && m.nextTrack() ? <small className="mnext">⏭ {t("次")}: {m.nextTrack()!.title}</small> : null}</div>
         <div className="eq"><i /><i /><i /></div>
       </div>
       <div className={`mlyr ${L.length ? "has" : ""}`}>
@@ -443,6 +473,24 @@ export function MusicPlayer({ m, t, onOpen, onArrive, onFull }: { m: Music; t: T
   );
 }
 
+/** 「次に流す」で予約した曲 (順番・取り消し) */
+function QueueBox({ m, t }: { m: Music; t: T }) {
+  const q = m.queue.map((id) => m.list.find((x) => x.id === id)).filter(Boolean) as DriverTrack[];
+  if (!q.length) return null;
+  return (
+    <div className="mqbox">
+      <h5>⏭ {t("次に流れる曲")}</h5>
+      {q.map((tr, k) => (
+        <div key={tr.id} className="mqr">
+          <em>{k + 1}</em><span>{tr.title}</span>
+          {k > 0 && <button onClick={() => { sfx.tick(); m.queueUp(tr.id); }}>↑</button>}
+          <button onClick={() => { sfx.tick(); m.dequeue(tr.id); }}>✕</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** プレイリストを選ぶシート */
 export function MusicSheet({ m, t, open, onClose, autoLang, autoWho, onAdmin }: { m: Music; t: T; open: boolean; onClose: () => void; autoLang: { in: MLang; out: MLang }; autoWho: { in: string; out: string }; onAdmin: () => void }) {
   const count = (p: string, l: string) => m.tracks.filter((x) => x.purpose === p && x.lang === l).length;
@@ -459,14 +507,25 @@ export function MusicSheet({ m, t, open, onClose, autoLang, autoWho, onAdmin }: 
         </div>
         <p className="mauto">{t("次のゲスト")}: {autoWho[m.cur.p] || "—"} → {MLANGS[autoLang[m.cur.p]]}</p>
         <div className="auto"><button className={`sw ${m.lyrOnCar ? "on" : ""}`} onClick={() => { sfx.blip(); m.setLyrOnCar(!m.lyrOnCar); }} />{t("車の「再生中」画面に歌詞を出す")}</div>
+        <QueueBox m={m} t={t} />
         <div className="mlist">
-          {m.list.length ? m.list.map((tr, i) => (
-            <button key={tr.id} className={`mrow ${i === m.cur.i ? "on" : ""}`} onClick={() => m.pick(i)}>
-              <span className="n">{i === m.cur.i && m.playing ? "▶" : i + 1}</span>
-              <span className="t"><b>{tr.title}</b><small>{tr.artist || "Crane Nest"}{m.saved.has(tr.url) ? " ・ " + t("保存済み") : ""}</small></span>
-              {tr.lrc ? <span className="ltag">{t("歌詞")}</span> : null}
-            </button>
-          )) : <p className="note">{t("この言語の曲はまだありません。設定から追加できます。")}</p>}
+          {m.list.length ? m.list.map((tr, i) => {
+            const qk = m.queued(tr.id);
+            return (
+              <div key={tr.id} className={`mrow ${i === m.cur.i ? "on" : ""}`}>
+                <button className="mpick" onClick={() => m.pick(i)}>
+                  <span className="n">{i === m.cur.i && m.playing ? "▶" : i + 1}</span>
+                  <span className="t"><b>{tr.title}</b><small>{tr.artist || "Crane Nest"}{m.saved.has(tr.url) ? " ・ " + t("保存済み") : ""}</small></span>
+                  {tr.lrc ? <span className="ltag">{t("歌詞")}</span> : null}
+                </button>
+                {i !== m.cur.i && (
+                  <button className={`mq ${qk >= 0 ? "in" : ""}`} onClick={() => { sfx.tick(); m.enqueue(i); }}>
+                    {qk >= 0 ? `✓ ${t("次に流す")} ${qk + 1}` : `⏭ ${t("次に流す")}`}
+                  </button>
+                )}
+              </div>
+            );
+          }) : <p className="note">{t("この言語の曲はまだありません。設定から追加できます。")}</p>}
         </div>
         <button className="linkbtn" onClick={onAdmin}>{t("曲の追加・削除（設定）")} ›</button>
       </div>

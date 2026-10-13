@@ -1,5 +1,6 @@
 "use server";
 
+import { isBoostSfx } from "@/lib/boostSfx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/staffAuth";
 import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
@@ -304,6 +305,14 @@ export async function cabinSetHumor(on: boolean): Promise<R> {
   const g = guard(); if (g) return g;
   const { error } = await supabaseAdmin.from("app_settings").update({ ai_humor: !!on }).eq("id", 1);
   if (error) return fail(/ai_humor/.test(error.message) ? "SETUP_HUMOR" : error.message);
+  return { ok: true };
+}
+/** BOOST の起動音を選ぶ (全部の送迎で共通) */
+export async function cabinSetBoostSfx(id: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isBoostSfx(id)) return fail("SFX");
+  const { error } = await supabaseAdmin.from("app_settings").update({ boost_sfx: id }).eq("id", 1);
+  if (error) return fail(/boost_sfx/.test(error.message) ? "SETUP_BOOST_SFX" : error.message);
   return { ok: true };
 }
 export async function cabinGetHumor(): Promise<boolean> {

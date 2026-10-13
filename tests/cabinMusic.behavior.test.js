@@ -229,19 +229,19 @@ test("room lock guide (spring / autumn / winter): button on the arrival screen, 
   assert.match(app, /map\(lockAudio\), \.\.\.Object\.values\(LOCK_IMG\)/, "lock guide is saved with 📥");
   assert.match(app, /map\(toiletAudio\), \.\.\.Object\.values\(TOILET_IMG\)/, "restroom guide is saved with 📥");
   assert.match(app, /Object\.keys\(DH_LINES\)\.map\(dhAudio\)/, "deadhead voices are saved with 📥");
-  assert.match(read("public", "cabin-sw.js"), /cabin-static-v3/, "cache version bumped so replaced voices are fetched again");
+  assert.match(read("public", "cabin-sw.js"), /cabin-static-v4/, "cache version bumped so replaced voices are fetched again");
   assert.match(read("lib", "cabinAiTalk.ts"), /Socks are perfectly fine/, "no need to be barefoot");
   assert.match(L.LOCK_VOICE.k0.en, /enter your room code.*unlock key at the bottom right.*does not lock by itself/i, "outside: code → bottom-right key; no auto-lock");
   assert.match(read("components", "cabin", "cabinLock.ts"), /room: \(\) => \{ code: string \| null; name: string \}/);
   // ブーストの効果音もスマホから (音はそのまま)
-  assert.match(e, /const sfx = \(k: string\) => \{ if \(remote\(\)\) \{ hooks\.onSay\?\.\(trip!\.id, AUDIO \+ k \+ "\.mp3", SFX_MARK\)/);
+  assert.match(e, /const sfx = \(k: string\) => \{ if \(remote\(\)\) \{ hooks\.onSay\?\.\(trip!\.id, AUDIO \+ file\(k\) \+ "\.mp3", SFX_MARK\)/);
   assert.match(read("components", "cabin", "cabinDeadhead.ts"), /if \(c\.remote\(\)\) \{ void c\.say\(u, SFX_MARK\)/);
   assert.match(read("lib", "remoteVoice.ts"), /if \(it\.s === SFX_MARK\) \{ void playFx/, "effects play at once on the phone, without ducking");
 });
 
 test("Sky Gate boost music always returns to the normal song (voice ducking can't freeze the fade), manual pick ends boost, next bridge boosts again", () => {
   const m = read("components", "driver", "DriverMusic.tsx"), c = read("components", "driver", "DriverCabin.tsx");
-  assert.match(m, /duck\(on: boolean\) \{ duckWanted\.current = on; if \(!playing \|\| switching\.current\) return;/, "no ducking while switching songs");
+  assert.match(m, /duck\(on: boolean\) \{\s+duckWanted\.current = on; if \(!playing \|\| switching\.current\) return;/, "no ducking while switching songs");
   assert.match(m, /setTimeout\(\(\) => fadeTo\(0, 1800\), 200\);\s*setTimeout\(async \(\) => \{\s*if \(boost\.current !== b\) return;/, "boost-out switches back on a timer, not on the fade callback");
   assert.match(m, /if \(boost\.current\) \{ dropBoost\(\); const tr = list\[i\] \?\? null;/, "picking a song during boost ends boost and plays it");
   assert.match(m, /if \(boost\.current && Date\.now\(\) - boost\.current\.at > 600000\) dropBoost\(\);/, "a stuck boost never blocks the next bridge");
@@ -252,7 +252,7 @@ test("Sky Gate boost music always returns to the normal song (voice ducking can'
   assert.match(c, /else if \(\/\(en-boost-off\|dh\\\/boostOut\)\\\.mp3\$\/\.test\(u\)\) \{ clearTimeout\(gT\); if \(mRef\.current\.inBoost\(\)\) \{ boosting = false; mRef\.current\.boostOut\(\); \} \}/, "fades out with the boost-complete line");
   assert.match(c, /rv\.ok\(\) \? 12000 : 5000/, "phone GPS only as a fallback when no voice comes from the iPad");
   assert.match(read("lib", "remoteVoice.ts"), /try \{ h\.onPlay\?\.\(it\.u\); \} catch/);
-  assert.match(m, /duck\(on: boolean\) \{ duckWanted\.current = on;/, "music level follows the voice after the switch");
+  assert.match(m, /duck\(on: boolean\) \{\s+duckWanted\.current = on;/, "music level follows the voice after the switch");
 });
 
 test("Crane Nest link: reservation QR with the booking's token, drop-off + passport shown to dad, prefill API for the form", async () => {
@@ -328,4 +328,24 @@ test("humor mode: film / anime / game homages only when it's on (set from dad's 
   assert.match(read("components", "kaku", "kakuMarkup.ts"), /id="hTg"/);
   assert.match(read("components", "kaku", "kakuEngine.ts"), /ASTRAEA の話し方 \(車内 iPad\)/, "AGENT KAKU: the switch is also on the guest-pickup screen, right before starting");
   assert.ok(read("supabase", "migration_ai_humor.sql").includes("ai_humor"));
+});
+
+test("music: 次に流す (queue) plays after the current song; voice ducking still works after coming back from another app", () => {
+  const m = read("components", "driver", "DriverMusic.tsx");
+  assert.match(m, /listeners\.current\.ended = \(\) => \{ const n = nextIndex\(\); setQueue\(n\.q\);/, "queued song first when the song ends");
+  assert.match(m, /next\(\) \{ const n = nextIndex\(\);/, "⏭ also plays the queued song first");
+  assert.match(m, /enqueue\(i: number\)/); assert.match(m, /queueUp\(id: string\)/); assert.match(m, /dequeue\(id: string\)/);
+  assert.match(m, /backToMain\(vol\.current \* 0\.2\)/, "a voice brings the music back to the duckable player");
+  assert.match(m, /流れているまま画面に戻ったとき: 切り替えない/, "no switch (no gap) when returning to the screen");
+  assert.match(m, /もう一方 \(画面が消えたとき用\) にも同じ曲を読み込んでおく/, "the background player is pre-loaded");
+});
+test("BOOST start sound is chosen in the settings (all candidates exist, 8.8 s), deadhead and phone follow it", () => {
+  const b = read("lib", "boostSfx.ts"), e = read("components", "cabin", "cabinEngine.ts"), c = read("components", "driver", "DriverCabin.tsx"), d = read("components", "cabin", "cabinDeadhead.ts");
+  const ids = [...b.matchAll(/\{ id: "([A-Za-z]+)"/g)].map((x) => x[1]);
+  assert.ok(ids.length >= 20);
+  for (const id of ids) if (id !== "orig") assert.ok(fs.existsSync(path.join(root, "public", "cabin", "audio", "boost", id + ".mp3")), id);
+  assert.match(e, /const file = \(k: string\) => \(k === "boost-sfx" \? boostFile : k\)/);
+  assert.match(c, /\(boost-sfx\|\\\/boost\\\/\[A-Za-z\]\+\)\\\.mp3\$/, "phone starts the BOOST song for any chosen sound");
+  assert.match(d, /c\.boostUrl\?\.\(\)/);
+  assert.match(read("supabase", "migration_boost_sfx.sql"), /add column if not exists boost_sfx text/);
 });
