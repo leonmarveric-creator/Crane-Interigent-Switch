@@ -665,7 +665,7 @@ body:has(.drv) { margin:0; background:#04070d; }
 /* 🏮 乗車時のお部屋の自動準備の通知 */
 .drv .cabbar .prepnote { position:absolute; left:8px; right:8px; bottom:calc(100% + 8px); display:flex; align-items:center; gap:10px; padding:10px 10px 10px 12px; border-radius:16px; background:linear-gradient(135deg,#3a2410,#1c140c); border:1px solid rgba(255,190,110,.55); box-shadow:0 0 24px rgba(255,160,70,.35),0 8px 24px rgba(0,0,0,.5); color:#ffe9cc; z-index:30; animation:drv-prepin .45s cubic-bezier(.2,1.4,.4,1); }
 .drv .cabbar .prepnote.ng { background:#2a1214; border-color:rgba(255,110,110,.6); box-shadow:0 8px 24px rgba(0,0,0,.5); }
-.drv .cabbar .prepnote .pi { font-size:30px; filter:drop-shadow(0 0 10px rgba(255,170,80,.9)); }
+.drv .cabbar .prepnote .pi { font-size:30px; filter:drop-shadow(0 0 10px rgba(120,210,255,.9)); }
 .drv .cabbar .prepnote .pt { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .drv .cabbar .prepnote .pt b { font-size:14px; font-weight:900; }
 .drv .cabbar .prepnote .pt small { font-size:11px; opacity:.8; line-height:1.35; }

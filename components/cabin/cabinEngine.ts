@@ -11,7 +11,7 @@ import {
 } from "@/lib/cabinGeo";
 import { CABIN_T, type CabinText } from "@/lib/cabinI18n";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
-import { CON_T, MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
+import { CON_T, CQ_T, MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
 import { createGuide } from "@/components/cabin/cabinGuide";
@@ -188,7 +188,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip) return;
     const O = trip.dir === "out";
     setText("etaL", O ? T.etaTo.replace("{p}", trip.placeKey === "other" ? T.dest : placeName()) : T.etaIn); setText("etaU", T.u);
-    setText("h-wx", T.wx); setText("h-rec", T.rec);
+    setText("h-wx", T.wx); setText("h-rec", T.rec); if (cqOn || cqMiniOn) void cqRender();
     $("rec").innerHTML = T.recs.map(([e, b, s]) => `<div><span class="e">${e}</span><span><b>${b}</b><small>${s}</small></span></div>`).join("");
     setText("rtChip", O ? `CRANE NEST → ${placeName()}` : `${placeName()} → CRANE NEST`);
     roomTexts();
@@ -338,7 +338,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- 到着 ---------- */
   function arrive() {
-    if (!trip) return; arrived = true; const id = trip.id;
+    if (!trip) return; arrived = true; const id = trip.id; cqOff(); // 着いたら QR は到着画面のボタンへ
     ($("etaM").firstChild as Text).textContent = "0"; setText("km", T.arrived);
     if (trip.dir === "in") { $("ltI").className = ""; setText("ltE", T.ltOn); $("room").classList.add("lit"); roomTexts(); arriveS(); void say("en-arrive"); }
     else { byeS(); void say(byeKey); }
@@ -598,6 +598,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
     roomLights: () => { if (trip && !trip.id.startsWith("demo")) hooks.onLights?.(trip.id); setTimeout(roomLit, 2500); },
     roomLit: () => roomLit(),
+    conQr: () => cqShow(),
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
@@ -607,6 +608,38 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     }),
   });
   setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on()) ai.tick(); }, 1000);
+  /* ---------- 🛎 コンシェルジュの QR (送迎中・右下の枠。地図はふさがない) ----------
+     お迎えの送迎が始まって 20 秒後 (乗車のあいさつのあと) に自動で出す。10 分か ✕ で閉じ、小さい「🛎 QR」ボタンが残る。着いたら消す */
+  let cqOn = false, cqMiniOn = false, cqT: ReturnType<typeof setTimeout> | null = null, cqImg = "", cqUrl = "";
+  const cqBox = () => $("recBox");
+  function cqEls() {
+    const box = cqBox(); let el = box.querySelector<HTMLElement>("#cq"), mini = box.querySelector<HTMLElement>("#cqMini");
+    if (!el) {
+      el = document.createElement("div"); el.id = "cq"; box.appendChild(el);
+      el.onclick = (e) => { if ((e.target as HTMLElement).closest(".cqx")) { e.stopPropagation(); cqHide(); } };
+    }
+    if (!mini) { mini = document.createElement("button"); mini.id = "cqMini"; box.appendChild(mini); mini.onclick = (e) => { e.stopPropagation(); cqShow(); }; }
+    return { el, mini };
+  }
+  async function cqImage() {
+    const u = qrLinks().con; if (u === cqUrl && cqImg) return cqImg;
+    try { cqImg = await QRCode.toDataURL(u, { margin: 1, width: 440, errorCorrectionLevel: "M", color: { dark: "#0a1426", light: "#ffffff" } }); cqUrl = u; } catch { /* ignore */ }
+    return cqImg;
+  }
+  async function cqRender() {
+    if (!trip) return; const { el, mini } = cqEls(); const k = CQ_T[lang] ?? CQ_T.en, img = await cqImage(), e2 = (x: string) => x.replace(/[<&>]/g, "");
+    el.innerHTML = `<button class="cqx" aria-label="close">✕</button><div class="cqw"><div class="cqk"><i>🛎</i>${e2(k.k)}</div><div class="cqt">${e2(k.t)}</div><div class="cqm"><div class="cqq">${img ? `<img src="${img}" alt="QR">` : ""}</div><ol class="cqs">${k.s.map((x) => `<li>${e2(x)}</li>`).join("")}</ol></div><div class="cqa">${e2(k.a)}</div><div class="cqc">${e2(k.c)}</div></div>`;
+    mini.innerHTML = `${img ? `<img src="${img}" alt="">` : ""}🛎 ${e2(k.mini)}`;
+    el.classList.toggle("on", cqOn); mini.classList.toggle("on", !cqOn && cqMiniOn); cqBox().classList.toggle("cqon", cqOn);
+  }
+  function cqShow() {
+    if (!trip || trip.dir !== "in" || arrived) return;
+    cqOn = true; cqMiniOn = true; void cqRender();
+    if (cqT) clearTimeout(cqT); cqT = setTimeout(cqHide, 600000);
+  }
+  function cqHide() { cqOn = false; if (cqT) { clearTimeout(cqT); cqT = null; } void cqRender(); }
+  function cqOff() { cqOn = false; cqMiniOn = false; if (cqT) { clearTimeout(cqT); cqT = null; } const b = cqBox(); b.classList.remove("cqon"); b.querySelector("#cq")?.classList.remove("on"); b.querySelector("#cqMini")?.classList.remove("on"); }
+
   function roomLit() { if (!trip || trip.dir !== "in") return; $("room").classList.add("lit"); $("ltI").className = ""; setText("ltE", T.ltOn); roomTexts(); }
 
   /* ---------- 入り方ガイド (押したときだけ) ---------- */
@@ -706,12 +739,13 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     setTimeout(() => MAP.invalidateSize(), 50);
     // 出発の演出
     linkS(); void say(goKey); $("sweep").classList.add("on");
+    cqOff(); if (t.dir === "in") T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと)
     if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("rscanning", "tagged"); void rm.offsetWidth; rm.classList.add("rscanning"); scanS(); setTimeout(() => { rm.classList.remove("rscanning"); rm.classList.add("tagged"); }, 4200); });
     else T_(2000, () => { $("room").classList.remove("lit"); });
   }
   function stop() {
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
-    trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
+    cqOff(); trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
     qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide(); stopVoice(voice);
   }
 

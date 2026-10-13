@@ -92,6 +92,7 @@ export type DeviceAction =
   | "wafu_on" | "wafu_off" // 和風ライト(行灯): スマート電球 ON/OFF
   | "wafu_on_warm" // ON + 既定の暖色 (管理者ON用)
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
+  | "ac_comfort" // エアコンだけ適温でつける (送迎のゲスト乗車時。明かりは到着してから)
   | "wafu_mode" // 和の灯り: 和風ライトを暖色で点灯 + ほかの明かりを消す (エアコンはそのまま。お部屋画面の切り替え)
   | "wafu_brightness" | "wafu_temp" | "wafu_color" // 詳細: 明るさ / 色温度 / フルカラー (value必須)
   | "welcome" | "welcome_cozy" | "good_night" | "away"
@@ -214,6 +215,10 @@ export async function executeDeviceAction(
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
       const ok = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id);
       return { ok };
+    }
+    case "ac_comfort": {
+      if (!room.switchbot_ac_device_id) return { ok: false, error: "NO_AC" };
+      return { ok: await safe(() => sceneAcComfort(sbCreds, room)) };
     }
     case "wafu_mode": {
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };

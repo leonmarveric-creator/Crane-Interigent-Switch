@@ -11,8 +11,8 @@ export interface CaptainCmd { id: CaptainId; icon: string; zh: string; ja: strin
 export type CaptainId = "intro" | "status" | "joke" | "room" | "bridge" | "thanks" | "checkin";
 export const CAPTAIN_IDS: CaptainId[] = ["intro", "status", "joke", "room", "bridge", "thanks", "checkin"];
 /** お父さんの指示 (ASTRAEA が答えるもの + 入り方ガイド + 聞き取れなかった) */
-export type CaptainCmdId = CaptainId | "guide" | "unknown";
-export const CMD_IDS: CaptainCmdId[] = [...CAPTAIN_IDS, "guide", "unknown"];
+export type CaptainCmdId = CaptainId | "guide" | "unknown" | "qr";
+export const CMD_IDS: CaptainCmdId[] = [...CAPTAIN_IDS, "guide", "unknown", "qr"];
 
 export const GUEST_Q: GuestQ[] = [
   { id: "who", icon: "🙋", q: {"ja": "あなたは誰？", "zh": "你是谁？", "en": "Who are you?", "ko": "당신은 누구예요?"}, v: [
@@ -109,8 +109,10 @@ const WORDS: [CaptainId | "guide", RegExp][] = [
   ["thanks", /お礼|ありがとう|さようなら|バイバイ|感谢|感謝|谢谢|謝謝|再见|再見|goodbye|thank/i],
   ["room", /部屋|へや|準備|房间|房間|准备|準備|room|prepare/i],
 ];
-export function matchCaptain(text: string): CaptainId | "guide" | null {
+export function matchCaptain(text: string): CaptainId | "guide" | "qr" | null {
   const s = String(text || "");
+  // 「QR を出して」→ iPad の右下にコンシェルジュの QR
+  if (/QR|キューアール|二维码|二維碼|コンシェルジュ|礼宾|禮賓/i.test(s)) return "qr";
   for (const [id, re] of WORDS) if (re.test(s)) return id;
   return null;
 }

@@ -17,6 +17,7 @@ import { CO_T, checkoutWindow, coTime } from "@/lib/checkoutText";
 import { getWakeState } from "@/lib/wakeAuto";
 import { WAKE_T, type WakeState } from "@/lib/wakeAutoLogic";
 import type { GuideCheckout } from "@/lib/nfcGate";
+import { lightState, type LightPref } from "@/lib/arrivalLight";
 
 export interface NfcData {
   room: { kanji: string; en: string } | null; /** 部屋のイラスト (無ければ漢字を出す) */ icon: string | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
@@ -27,7 +28,9 @@ export interface NfcData {
   /** 早朝便の自動光目覚まし (前の晩 20:00 〜 点灯まで) */
   wake: { st: WakeState; api: string; T: typeof WAKE_T } | null;
   /** お部屋の明かり (和の灯り ⇄ ふつう)。宿泊中で和風ライトがある部屋だけ */
-  light: { api: string } | null;
+  light: { api: string; pref: LightPref | null; arrived: boolean } | null;
+  /** 宿泊中・到着前のゲスト: 「到着までに」カード (明かり → チェックイン手続き) を出す */
+  arrive: { arrived: boolean } | null;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
   /** ホーム画面のアイコン (春・夏・秋・冬の部屋はその季節、ほかは今の季節) と名前 */
   home: { icon: string; title: string };
@@ -44,7 +47,7 @@ export const homeIconFor = (kanji: string | null | undefined, ms = Date.now()) =
   `/nfc/home/${(kanji && ROOM_SEASON[kanji]) || seasonNow(ms)}`;
 
 export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null, co: GuideCheckout | null = null, rid: string | null = null): Promise<NfcData> {
-  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, wake: null, light: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, wake: null, light: null, arrive: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([
@@ -69,7 +72,12 @@ export async function nfcData(key: string, codes: { ent: string | null; room: st
       const st = await getWakeState(rid, hit.raw).catch(() => null);
       if (st) out.wake = { st, api: `/api/wake/${encodeURIComponent(hit.raw.slug)}`, T: WAKE_T };
       // 宿泊中 (お部屋の操作ができる) で和風ライトがある部屋 → 明かりの切り替えを出す
-      if (hit.raw.switchbot_wafu_device_id && !co?.done) out.light = { api: `/api/devices/${encodeURIComponent(hit.raw.slug)}` };
+      // 部屋に入る前 (送迎中) に選ぶ → 着いて鍵を開けたときにその明かりがつく / 入ったあと → その場で切り替え
+      if (!co?.done) {
+        const ls = await lightState(rid).catch(() => ({ pref: null, arrived: true }));
+        out.arrive = { arrived: ls.arrived };
+        if (hit.raw.switchbot_wafu_device_id) out.light = { api: `/api/guide-light/${encodeURIComponent(hit.raw.slug)}`, ...ls };
+      }
     }
     // チェックアウト済みなら、お部屋・エントランスの鍵の入口は出さない
     if (co?.done) { out.roomKey = null; out.entKey = null; }

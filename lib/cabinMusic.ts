@@ -107,10 +107,18 @@ export const MUSIC_T: Record<GLang, MusicText> = {
   },
 };
 
+/** 送迎中に右下の枠に出す「コンシェルジュの QR」(乗車のあとに自動で。スマートホーム・チェックイン・着いたときの明かり) */
+export const CQ_T: Record<GLang, { k: string; t: string; s: string[]; a: string; c: string; mini: string }> = {
+  ja: { k: "CONCIERGE · スマホで読む", t: "スマートホームへのアクセスとチェックイン手続き", s: ["スマホのカメラで QR を読む", "電話番号の下 4 桁を入れる", "チェックイン手続きと、着いたときのお部屋の明かりを選ぶ"], a: "🔑 スマートキー　🛂 チェックイン　🏮 お部屋の明かり", c: "地図・送迎の案内もここから", mini: "QR" },
+  zh: { k: "CONCIERGE · 用手机扫码", t: "智能家居访问与入住手续", s: ["用手机相机或微信扫描二维码", "输入手机号码的后 4 位", "办理入住手续，并选择到达时的房间灯光"], a: "🔑 智能钥匙　🛂 入住手续　🏮 房间灯光", c: "地图、接送信息也在这里", mini: "二维码" },
+  en: { k: "CONCIERGE · SCAN WITH YOUR PHONE", t: "Smart home access & check-in", s: ["Scan the QR with your phone", "Enter the last 4 digits of your phone number", "Complete check-in and pick your room lights for arrival"], a: "🔑 Smart key　🛂 Check-in　🏮 Room lights", c: "Maps and transfer info are here too", mini: "QR" },
+  ko: { k: "CONCIERGE · 휴대폰으로 스캔", t: "스마트홈 접속과 체크인 절차", s: ["휴대폰 카메라로 QR 스캔", "전화번호 뒤 4자리 입력", "체크인 절차와 도착했을 때의 객실 조명 고르기"], a: "🔑 스마트키　🛂 체크인　🏮 객실 조명", c: "지도·픽업 안내도 여기서", mini: "QR" },
+};
+
 /** 車内 iPad の「コンシェルジュの QR」(1 回読んで保存すれば、鍵もお部屋もそこから) */
 export const CON_T: Record<GLang, { btn: string; title: string; steps: string[]; tip: string }> = {
-  ja: { btn: "コンシェルジュ", title: "スマホで読む · コンシェルジュ", steps: ["スマホのカメラ（または WeChat）で QR を読む", "案内にそって、このページを保存する", "エントランスの鍵・お部屋・地図は、ここから開けます"], tip: "まず 🛎 コンシェルジュを読むと、鍵もお部屋もそこから開けます" },
-  zh: { btn: "礼宾服务", title: "用手机扫码 · 礼宾服务", steps: ["用手机相机或微信扫描二维码", "按页面提示保存此页面", "大门钥匙、房间、地图都从这里打开"], tip: "先扫 🛎 礼宾服务，钥匙和房间都能从那里打开" },
-  en: { btn: "Concierge", title: "Scan with your phone · Concierge", steps: ["Scan with your phone camera (or WeChat)", "Follow the prompt to save the page", "Entrance key, room and map all open from there"], tip: "Scan 🛎 Concierge first — your keys and room open from there" },
-  ko: { btn: "컨시어지", title: "휴대폰으로 스캔 · 컨시어지", steps: ["휴대폰 카메라(또는 WeChat)로 QR 스캔", "안내에 따라 이 페이지를 저장", "현관 열쇠·객실·지도를 모두 여기서 열 수 있어요"], tip: "먼저 🛎 컨시어지를 스캔하면 열쇠와 객실을 거기서 열 수 있어요" },
+  ja: { btn: "コンシェルジュ", title: "スマホで読む · コンシェルジュ", steps: ["スマホのカメラ（または WeChat）で QR を読む", "案内にそって、このページを保存する", "エントランスの鍵・お部屋・地図は、ここから開けます", "お部屋に着いたときの明かり（🏮 和 / 💡 ふつう）もここで選べます"], tip: "まず 🛎 コンシェルジュを読むと、鍵もお部屋もそこから開けます" },
+  zh: { btn: "礼宾服务", title: "用手机扫码 · 礼宾服务", steps: ["用手机相机或微信扫描二维码", "按页面提示保存此页面", "大门钥匙、房间、地图都从这里打开", "到达时的房间灯光（🏮 和风 / 💡 普通）也在这里选择"], tip: "先扫 🛎 礼宾服务，钥匙和房间都能从那里打开" },
+  en: { btn: "Concierge", title: "Scan with your phone · Concierge", steps: ["Scan with your phone camera (or WeChat)", "Follow the prompt to save the page", "Entrance key, room and map all open from there", "Choose your room lights for arrival (🏮 lantern / 💡 regular) there too"], tip: "Scan 🛎 Concierge first — your keys and room open from there" },
+  ko: { btn: "컨시어지", title: "휴대폰으로 스캔 · 컨시어지", steps: ["휴대폰 카메라(또는 WeChat)로 QR 스캔", "안내에 따라 이 페이지를 저장", "현관 열쇠·객실·지도를 모두 여기서 열 수 있어요", "도착했을 때의 객실 조명(🏮 일본풍 / 💡 일반)도 여기서 고를 수 있어요"], tip: "먼저 🛎 컨시어지를 스캔하면 열쇠와 객실을 거기서 열 수 있어요" },
 };

@@ -3,6 +3,7 @@ import { authorizeRoomRequest } from "@/lib/auth";
 import { executeDeviceAction, logDevice, type DeviceAction } from "@/lib/deviceControl";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isAppUnlockStopped } from "@/lib/smartkey";
+import { readLightPref, welcomeActionFor } from "@/lib/arrivalLight";
 
 export const runtime = "nodejs"; // crypto / aes-cmac のため Edge不可
 
@@ -45,13 +46,15 @@ export async function POST(
 
     // 初回解錠で自動ウェルカム (1滞在1回・ホストが先に実行済みならスキップ)
     if (action === "unlock" && r.ok && !stay.reservation.welcomed_at) {
-      const w = await executeDeviceAction(stay.room, "welcome", "Auto Welcome");
+      // 和風ライトがある部屋は、ゲストがコンシェルジュで選んだ明かり (未選択は和の灯り) でお出迎え
+      const wa = welcomeActionFor(stay.room, await readLightPref(stay.reservation.id).catch(() => null));
+      const w = await executeDeviceAction(stay.room, wa, "Auto Welcome");
       await supabaseAdmin.from("reservations")
         .update({ welcomed_at: new Date().toISOString() })
         .eq("id", stay.reservation.id);
       await logDevice({
         room_id: stay.room.id, reservation_id: stay.reservation.id,
-        action: "welcome", source: "guest", success: w.ok,
+        action: wa, source: "guest", success: w.ok,
       });
     }
 

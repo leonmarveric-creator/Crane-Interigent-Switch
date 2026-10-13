@@ -135,7 +135,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const stopPrep = useCallback(async () => {
     const tr = tripRef2.current; if (!tr) return; sfx.down();
     const r = await cabinRoomPrepStop(tr.id); setPrep(null);
-    toast(r.ok ? t("お部屋のエアコンと明かりを消しました") : t("消せませんでした。お部屋の操作画面から消してください"));
+    toast(r.ok ? t("お部屋のエアコンを消しました") : t("消せませんでした。お部屋の操作画面から消してください"));
   }, [toast, t]);
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
@@ -400,12 +400,11 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
 /* ================= 🏮 乗車時のお部屋の自動準備 (お父さんへの通知) ================= */
 function PrepNote({ p, cab, t }: { p: RoomPrep; cab: Cabin; t: T }) {
   useEffect(() => { const id = setTimeout(() => cab.closePrep(), 90000); return () => clearTimeout(id); }, [p.n]); // eslint-disable-line react-hooks/exhaustive-deps
-  const what = p.act === "welcome_cozy" ? t("和風ライトとエアコンをつけました") : t("照明とエアコンをつけました");
   return (
     <div className={`prepnote ${p.ok ? "" : "ng"}`}>
-      <span className="pi">{p.act === "welcome_cozy" ? "🏮" : "💡"}</span>
-      <span className="pt"><b>{p.room ? `${p.room} · ` : ""}{p.ok ? what : t("お部屋の準備がうまくいきませんでした")}</b><small>{p.ok ? t("ゲストが乗ったので自動でつけました。着くころには和の灯りでお出迎えです") : t("お部屋の操作画面から確かめてください")}</small></span>
-      {p.ok && <button className="ps" onClick={() => { if (confirm(t("お部屋のエアコンと明かりを消しますか？"))) void cab.stopPrep(); }}>{t("止める")}</button>}
+      <span className="pi">❄️</span>
+      <span className="pt"><b>{p.room ? `${p.room} · ` : ""}{p.ok ? t("お部屋のエアコンをつけました") : t("お部屋の準備がうまくいきませんでした")}</b><small>{p.ok ? t("明かりは着いて鍵を開けたとき、ゲストがコンシェルジュで選んだ明かりでつきます") : t("お部屋の操作画面から確かめてください")}</small></span>
+      {p.ok && <button className="ps" onClick={() => { if (confirm(t("お部屋のエアコンを消しますか？"))) void cab.stopPrep(); }}>{t("止める")}</button>}
       <button className="px" onClick={() => cab.closePrep()}>✕</button>
     </div>
   );
@@ -413,6 +412,8 @@ function PrepNote({ p, cab, t }: { p: RoomPrep; cab: Cabin; t: T }) {
 
 /* ================= ASTRAEA に話しかける (マイク) / 指示ボタン ================= */
 const GUIDE_BTN = { id: "guide" as const, icon: "🔑", zh: "进门方法", ja: "入り方ガイド" };
+/** iPad の右下にコンシェルジュの QR をもう一度出す (お迎えのとき) */
+const QR_BTN = { id: "qr" as const, icon: "🛎", zh: "显示礼宾二维码", ja: "QR を出す" };
 function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: Cabin; t: T; ui: "zh" | "ja"; onClose: () => void; toast: (s: string) => void }) {
   const [listen, setListen] = useState(false), [heard, setHeard] = useState(""), [sent, setSent] = useState(""), [btns, setBtns] = useState(false);
   const rec = useRef<any>(null);
@@ -436,7 +437,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
       rec.current = null; setListen(false); cab.duck(false);
       const s = (fin || "").trim() || heardRef.current.trim(); if (!s) return;
       const id = matchCaptain(s);
-      if (id) { const b = id === "guide" ? GUIDE_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
+      if (id) { const b = id === "guide" ? GUIDE_BTN : id === "qr" ? QR_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
       else void send("unknown", "？");
     };
     setHeard(""); setListen(true); cab.duck(true); sfx.tick();
@@ -444,7 +445,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
   };
   const heardRef = useRef(""); heardRef.current = heard;
   useEffect(() => () => { try { rec.current?.abort?.(); } catch { /* ignore */ } cab.duck(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const all = [...CAPTAIN.map((c) => ({ id: c.id as CaptainCmdId, icon: c.icon, zh: c.zh, ja: c.ja })), GUIDE_BTN];
+  const all = [...CAPTAIN.map((c) => ({ id: c.id as CaptainCmdId, icon: c.icon, zh: c.zh, ja: c.ja })), GUIDE_BTN, ...(tr.dir === "in" ? [QR_BTN] : [])];
   return (
     <>
       <div className="sheet-bg show" onClick={onClose} />

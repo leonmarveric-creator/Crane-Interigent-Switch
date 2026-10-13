@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     return J(error ? { ok: false, error: /music_cmd/.test(error.message) ? "SETUP" : error.message } : { ok: true });
   }
   // 回送の切り替え: board = ゲスト乗車 (iPad のボタン) / deadhead = お見送りの到着のあと、帰り道へ
-  // 乗車: お迎えならお部屋の和風ライト + エアコンも自動でつける (cabinRoomPrep)
+  // 乗車: お迎えならお部屋のエアコンも自動でつける (cabinRoomPrep。明かりは着いてから)
   if (b.op === "board" && isId(b.trip)) {
     const r = await boardTrip(b.trip);
     return J(r.ok ? { ok: true } : { ok: false, error: r.error });

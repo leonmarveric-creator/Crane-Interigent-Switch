@@ -46,7 +46,7 @@ test("cabin: arrival screen QR → the usual entrance key / room pages in the gu
   assert.deepEqual(M.qrUrls("https://x.app/", { roomSlug: "room-autumn", entrance: "crane-nest" }, "zh"), { key: "https://x.app/key/crane-nest?lang=zh", room: "https://x.app/room/room-autumn?lang=zh", con: "https://x.app/g/room-autumn?lang=zh" });
   assert.deepEqual(M.qrUrls("https://x.app", { roomSlug: "r", entrance: null }, "en"), { key: null, room: "https://x.app/room/r?lang=en", con: "https://x.app/g/r?lang=en" });
   assert.deepEqual(M.qrUrls("https://x.app", null, "en"), { key: null, room: null, con: "https://x.app/g/lounge?lang=en" });
-  for (const l of ["ja", "zh", "en", "ko"]) assert.equal(M.CON_T[l].steps.length, 3);
+  for (const l of ["ja", "zh", "en", "ko"]) assert.equal(M.CON_T[l].steps.length, 4);
   for (const l of ["ja", "zh", "en", "ko"]) { const T = M.MUSIC_T[l]; assert.equal(T.qSteps.key.length, 3); assert.ok(T.qKey && T.qRoom && T.toastCmd); }
   const eng = read("components", "cabin", "cabinEngine.ts");
   assert.match(eng, /trip\?\.dir === "out"[^;]*"none"/, "not shown when seeing guests off");
@@ -332,7 +332,7 @@ test("humor mode: film / anime / game homages only when it's on (set from dad's 
 
 test("music: 次に流す (queue) plays after the current song; voice ducking still works after coming back from another app", () => {
   const m = read("components", "driver", "DriverMusic.tsx");
-  assert.match(m, /listeners\.current\.ended = \(\) => \{ const n = nextIndex\(\); setQueue\(n\.q\);/, "queued song first when the song ends");
+  assert.match(m, /listeners\.current\.ended = \(\) => \{\s+const n = nextIndex\(\); setQueue\(n\.q\);/, "queued song first when the song ends");
   assert.match(m, /next\(\) \{ const n = nextIndex\(\);/, "⏭ also plays the queued song first");
   assert.match(m, /enqueue\(i: number\)/); assert.match(m, /queueUp\(id: string\)/); assert.match(m, /dequeue\(id: string\)/);
   assert.match(m, /backToMain\(vol\.current \* 0\.2\)/, "a voice brings the music back to the duckable player");
@@ -366,4 +366,11 @@ test("ASTRAEA voices: original files by default, made clearer on the phone only 
   const n = fs.readdirSync(path.join(root, "public", "cabin", "audio", "ai")).length + fs.readdirSync(path.join(root, "public", "cabin", "audio", "dh")).length;
   assert.ok(list.files.length >= n);
   assert.match(read("supabase", "migration_voice_clear.sql"), /add column if not exists voice_clear text/);
+});
+
+test("music: when a song ends the next one plays (the browser's pause before 'ended' must not stop it); a single song repeats", () => {
+  const m = read("components", "driver", "DriverMusic.tsx");
+  assert.match(m, /autoNext\.current = true; setCur/);
+  assert.match(m, /const go = playing \|\| autoNext\.current; autoNext\.current = false;\s+void load\(track, go\);/);
+  assert.match(m, /1 曲だけ: もう一度/);
 });

@@ -4,6 +4,7 @@ import { sendSesameCommand, SESAME_CMD } from "@/lib/sesame";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { resolveGuestKey, entranceCreds, logEntrance, recentCommandCount } from "@/lib/smartkey";
 import { CMD_LIMIT_PER_MIN, checkGeofence } from "@/lib/smartkeyLogic";
+import { readLightPref, welcomeActionFor } from "@/lib/arrivalLight";
 
 export const runtime = "nodejs"; // aes-cmac のため Edge 不可
 
@@ -75,9 +76,11 @@ export async function POST(req: NextRequest, { params }: { params: { entrance: s
 
     // 部屋の初回解錠で自動ウェルカム (既存 /api/devices と同じ挙動: 1滞在1回)
     if (action === "unlock" && r.ok && !ctx.reservation.welcomed_at) {
-      const w = await executeDeviceAction(ctx.room, "welcome", "Auto Welcome");
+      // 和風ライトがある部屋は、ゲストがコンシェルジュで選んだ明かり (未選択は和の灯り) でお出迎え
+      const wa = welcomeActionFor(ctx.room, await readLightPref(ctx.reservation.id).catch(() => null));
+      const w = await executeDeviceAction(ctx.room, wa, "Auto Welcome");
       await supabaseAdmin.from("reservations").update({ welcomed_at: new Date().toISOString() }).eq("id", ctx.reservation.id);
-      await logDevice({ room_id: ctx.room.id, reservation_id: ctx.reservation.id, action: "welcome", source: "guest", success: w.ok });
+      await logDevice({ room_id: ctx.room.id, reservation_id: ctx.reservation.id, action: wa, source: "guest", success: w.ok });
     }
     return NextResponse.json({ ok: r.ok, error: r.ok ? undefined : (r.error ?? "DEVICE_ERROR") }, { status: r.ok ? 200 : 502 });
   } catch (e) {

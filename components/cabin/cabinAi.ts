@@ -42,6 +42,7 @@ export interface AiCtx {
   guide: () => void;               // 入り方ガイドを流す
   roomLights: () => void;          // お部屋の照明をつける (ゲストの質問から)
   roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
+  conQr: () => void;               // 右下の枠にコンシェルジュの QR を出す (お父さんのスマホのボタン)
 }
 export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出す (話し終わったら戻る) */ prep(): Promise<boolean>; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
 
@@ -279,13 +280,15 @@ export function createAi(c: AiCtx): Ai {
     else if (cmd.n <= lastCmd) return;
     lastCmd = cmd.n;
     if (cmd.c === "guide") { c.guide(); return; }
+    if (cmd.c === "qr") { c.conQr(); return; }
     if (cmd.c === "unknown") { const i = (lastC.unknown = ((lastC.unknown ?? -1) + 1) % UNKNOWN.length); void speak(captainAudio("unknown", i), UNKNOWN[i], { st: "TO: CAPTAIN", duck: false }); return; }
     const k = CAPTAIN.find((x) => x.id === cmd.c); if (!k) return;
     let i = Math.floor(Math.random() * k.v.length); if (k.v.length > 1 && i === lastC[k.id]) i = (i + 1) % k.v.length; lastC[k.id] = i;
     if (k.id === "checkin") setTimeout(() => c.checkin(), 700);
     // 乗車時の自動準備 (auto) は、乗車のあいさつが終わるころ (約 20 秒後) に話す
     const wait = cmd.auto ? 20000 : 0;
-    if (k.id === "room") setTimeout(() => c.roomLit(), wait + 4000);
+    // 乗車時の自動準備はエアコンだけ (明かりは着いてから) なので、iPad のお部屋の明かりは点けない
+    if (k.id === "room" && !cmd.auto) setTimeout(() => c.roomLit(), 4000);
     // 話している途中なら、終わってから
     const go = () => { if (speaking) { setTimeout(go, 500); return; } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
     if (wait) setTimeout(go, wait); else go();

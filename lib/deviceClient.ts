@@ -11,7 +11,7 @@ export type DeviceAction =
   | "wafu_on" | "wafu_off"
   | "wafu_on_warm" | "wafu_warm"
   | "wafu_brightness" | "wafu_temp" | "wafu_color"
-  | "wafu_mode"
+  | "wafu_mode" | "ac_comfort"
   | "welcome" | "welcome_cozy" | "good_night" | "away"
   | "normal"
   | "dream_fade";

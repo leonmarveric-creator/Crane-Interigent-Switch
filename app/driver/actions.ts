@@ -243,11 +243,11 @@ export async function cabinStart(v: {
 export async function cabinBoard(tripId: string): Promise<R<{ prep: RoomPrep | null }>> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
-  // お迎えなら、乗った時点でお部屋の和風ライト + エアコンを自動でつける (1 回だけ)
+  // お迎えなら、乗った時点でお部屋のエアコンを自動でつける (1 回だけ。明かりは着いてから)
   const r = await boardTrip(tripId);
   return r.ok ? { ok: true, prep: r.prep } : fail(r.error === "SETUP" ? "SETUP_VOICE" : r.error);
 }
-/** 乗車時に自動でつけたお部屋の明かり・エアコンを止める */
+/** 乗車時に自動でつけたお部屋のエアコンを止める */
 export async function cabinRoomPrepStop(tripId: string): Promise<R> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");

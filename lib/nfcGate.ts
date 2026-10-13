@@ -81,6 +81,9 @@ const LEFT_GRACE_MS = 3 * 3600e3;
 export const guideKeyFor = (g: GuideGuest) =>
   signScopedSession(GUIDE_SCOPE, g.rid, Date.parse(g.checkOut) + 2 * 86400e3);
 
+/** ?k= の署名から予約 ID だけ取り出す (コンシェルジュの明かりの選択など。期限・予約の確認は呼ぶ側で) */
+export const guideRidFromKey = (k: string | null | undefined): string | null => (k ? verifyScopedSession(GUIDE_SCOPE, k)?.reservationId ?? null : null);
+
 export interface GuideCookie { name: string; value: string; expires: Date }
 export type GuideKeyAccess =
   | { ok: true; codes: GuideCodes | null; co: GuideCheckout | null; roomSlug: string; rid: string; cookies: GuideCookie[] }
