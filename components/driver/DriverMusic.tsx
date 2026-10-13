@@ -173,12 +173,20 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     if (q.length) { const i = list.findIndex((x) => x.id === q[0]); return { i, q: q.slice(1) }; }
     return { i: list.length ? (cur.i + 1) % list.length : 0, q };
   };
-  listeners.current.ended = () => { const n = nextIndex(); setQueue(n.q); setCur((c) => ({ ...c, i: n.i })); };
+  /* 曲が終わったら次の曲を流す。終わるときブラウザは「一時停止」も知らせる (playing が false になる) ので、
+     「止めた」と区別するために autoNext で覚えておく (以前はここで止まってしまっていた) */
+  const autoNext = useRef(false);
+  listeners.current.ended = () => {
+    const n = nextIndex(); setQueue(n.q);
+    if (n.i === cur.i || list[n.i]?.id === track?.id) { const a = el(); try { a.currentTime = 0; } catch { /* */ } route(); void a.play().catch(() => {}); return; } // 1 曲だけ: もう一度
+    autoNext.current = true; setCur((c) => ({ ...c, i: n.i }));
+  };
   const lastId = useRef<string | null>(null);
   useEffect(() => {
     if (track?.id === lastId.current) return;
     lastId.current = track?.id ?? null;
-    void load(track, playing);
+    const go = playing || autoNext.current; autoNext.current = false;
+    void load(track, go);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id]);
 
