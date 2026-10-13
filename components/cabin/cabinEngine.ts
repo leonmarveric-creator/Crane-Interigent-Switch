@@ -73,7 +73,7 @@ export interface Engine {
   /** 声をスマホから流すか (スマホが取りに来ているか) */
   remoteVoice(): boolean;
   /** お父さんから ASTRAEA への指示 */
-  aiCommand(cmd: { c: string; n: number } | null): void;
+  aiCommand(cmd: { c: string; n: number; auto?: boolean } | null): void;
   /** 待機中に ⚙ から手動でガイドを流す (トイレの前・ドアの前で)。送迎中は false */
   manual(k: "ent" | "room" | "toilet" | "ck" | "wifi" | "keyqr" | "conqr" | "stop", room: CabinRoom | null, lang: GLang): boolean;
   /** このお部屋で「お部屋の開け方」が使えるか */

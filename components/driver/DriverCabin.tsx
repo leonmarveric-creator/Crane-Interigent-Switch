@@ -13,7 +13,8 @@ import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
-import { cabinStart, cabinBoard, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
+import type { RoomPrep } from "@/lib/cabinRoomPrep";
+import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
@@ -78,6 +79,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     const reUnlock = () => unlockRemoteVoice();
     document.addEventListener("pointerdown", reUnlock, true);
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
+    let firstPoll = true;
     let warned = false;
     /* サーバーへ位置と曲を送る: 今までは 3 秒ごと。iPad と直接つながっている間は 9 秒ごと (位置は上で直接送っている)。
        曲が変わったとき・iPad から合図が来たとき (乗車・終わり・再生ボタン) は、すぐ送る */
@@ -103,6 +105,9 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
         if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
         // 回送 ⇄ ゲスト乗車 (iPad のボタンで切り替わることもある)
         if (r.phase && r.phase !== trip.phase) setTrip((p) => (p && p.id === trip.id ? { ...p, phase: r.phase! } : p));
+        // 乗車でお部屋を自動準備した (iPad の乗車ボタンのときもここで知る) → 通知
+        if (r.prep && (!firstPoll || Date.now() - r.prep.n < 120000)) showPrep(r.prep);
+        firstPoll = false;
         // iPad の再生ボタン (ゲストが押した) → このスマホの音楽を操作
         if (lastCmd == null) lastCmd = r.cmd?.n ?? 0;
         else if (r.cmd && r.cmd.n > lastCmd) { lastCmd = r.cmd.n; mRef.current.remote(r.cmd.c, r.cmd.v); }
@@ -120,6 +125,18 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     };
   }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const tripRef2 = useRef(trip); tripRef2.current = trip;
+  /** 🏮 乗車時のお部屋の自動準備 (和風ライト + エアコン) の通知 */
+  const [prep, setPrep] = useState<RoomPrep | null>(null);
+  const seenPrep = useRef(0);
+  const showPrep = useCallback((p: RoomPrep) => {
+    if (p.n <= seenPrep.current) return; seenPrep.current = p.n;
+    setPrep(p); sfx.chord(); vib([40, 60, 40]);
+  }, []);
+  const stopPrep = useCallback(async () => {
+    const tr = tripRef2.current; if (!tr) return; sfx.down();
+    const r = await cabinRoomPrepStop(tr.id); setPrep(null);
+    toast(r.ok ? t("お部屋のエアコンと明かりを消しました") : t("消せませんでした。お部屋の操作画面から消してください"));
+  }, [toast, t]);
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
     unlockRemoteVoice(); // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
@@ -136,11 +153,12 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     const tr = tripRef2.current; if (!tr) return; sfx.chord(); vib(30);
     const r = await cabinBoard(tr.id); rtKick(CABIN_CH);
     if (!r.ok) { toast(r.error === "SETUP_VOICE" ? t("回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です") : t("切り替えられませんでした")); return; }
-    setTrip({ ...tr, phase: "guest" }); toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
-  }, [toast, t]);
+    setTrip({ ...tr, phase: "guest" });
+    if (r.prep) showPrep(r.prep); else toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
+  }, [toast, t, showPrep]);
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck, board };
+  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null) };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -372,8 +390,23 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button className={`qbtn ${humor ? "on" : ""}`} title={t("ユーモアモード")} onClick={() => void toggleHumor()}>{humor ? "😂" : "🙂"}<small>{humor ? t("ユーモア") : t("ふつう")}</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
+      {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
       {talk && <AstraeaSheet tr={tr} cab={cab} t={t} ui={ui} onClose={() => setTalk(false)} toast={toastQ} />}
+    </div>
+  );
+}
+
+/* ================= 🏮 乗車時のお部屋の自動準備 (お父さんへの通知) ================= */
+function PrepNote({ p, cab, t }: { p: RoomPrep; cab: Cabin; t: T }) {
+  useEffect(() => { const id = setTimeout(() => cab.closePrep(), 90000); return () => clearTimeout(id); }, [p.n]); // eslint-disable-line react-hooks/exhaustive-deps
+  const what = p.act === "welcome_cozy" ? t("和風ライトとエアコンをつけました") : t("照明とエアコンをつけました");
+  return (
+    <div className={`prepnote ${p.ok ? "" : "ng"}`}>
+      <span className="pi">{p.act === "welcome_cozy" ? "🏮" : "💡"}</span>
+      <span className="pt"><b>{p.room ? `${p.room} · ` : ""}{p.ok ? what : t("お部屋の準備がうまくいきませんでした")}</b><small>{p.ok ? t("ゲストが乗ったので自動でつけました。着くころには和の灯りでお出迎えです") : t("お部屋の操作画面から確かめてください")}</small></span>
+      {p.ok && <button className="ps" onClick={() => { if (confirm(t("お部屋のエアコンと明かりを消しますか？"))) void cab.stopPrep(); }}>{t("止める")}</button>}
+      <button className="px" onClick={() => cab.closePrep()}>✕</button>
     </div>
   );
 }

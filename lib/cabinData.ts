@@ -32,7 +32,7 @@ export interface CabinTrip {
   /** お父さんのスマホで流れている曲 */
   np: NowPlaying | null;
   /** お父さんから ASTRAEA への指示 (最後の 1 つ) */
-  aiCmd: { c: string; n: number } | null;
+  aiCmd: { c: string; n: number; auto?: boolean } | null;
   /** iPad から スマホへの再生の操作 (最後の 1 つ) */
   cmd: MusicCmdRow | null;
   /** migration_cabin_music.sql を実行済みか (now_playing の列があるか) */
@@ -87,7 +87,7 @@ export function toCabinTrip(t: any): CabinTrip {
     roomId: t.room_id ?? null, lang: (["ja", "en", "zh", "ko"].includes(t.guest_lang) ? t.guest_lang : "en") as GLang,
     ac: t.ac_mode === "heat" ? "heat" : t.ac_mode === "none" ? "none" : "cool", startedAt: t.started_at,
     phone: typeof t.phone_lat === "number" && typeof t.phone_lng === "number" && t.phone_at ? { ll: [t.phone_lat, t.phone_lng], kmh: t.phone_speed ?? null, at: t.phone_at } : null,
-    aiCmd: t.ai_cmd && typeof t.ai_cmd === "object" && typeof t.ai_cmd.n === "number" ? { c: String(t.ai_cmd.c), n: t.ai_cmd.n } : null,
+    aiCmd: t.ai_cmd && typeof t.ai_cmd === "object" && typeof t.ai_cmd.n === "number" ? { c: String(t.ai_cmd.c), n: t.ai_cmd.n, ...(t.ai_cmd.auto ? { auto: true } : {}) } : null,
     np: toNowPlaying(t.now_playing), npReady: "now_playing" in t, aiQuiet: t.ai_quiet === true, voiceSeen: t.voice_seen ?? null, phase: t.phase === "dead" ? "dead" : "guest",
     cmd: t.music_cmd && typeof t.music_cmd === "object" && typeof t.music_cmd.n === "number" ? t.music_cmd : null,
   };

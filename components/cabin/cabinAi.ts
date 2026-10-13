@@ -273,7 +273,7 @@ export function createAi(c: AiCtx): Ai {
 
   /* ---------- お父さんの指示 (スマホのボタン・声) ---------- */
   let lastCmd: number | null = null; const lastC: Record<string, number> = {};
-  function command(cmd: { c: string; n: number } | null) {
+  function command(cmd: { c: string; n: number; auto?: boolean } | null) {
     if (!cmd || typeof cmd.n !== "number") return;
     if (lastCmd == null) { lastCmd = cmd.n; if (Date.now() - cmd.n > 20000) return; } // 前の送迎の指示は実行しない
     else if (cmd.n <= lastCmd) return;
@@ -283,10 +283,12 @@ export function createAi(c: AiCtx): Ai {
     const k = CAPTAIN.find((x) => x.id === cmd.c); if (!k) return;
     let i = Math.floor(Math.random() * k.v.length); if (k.v.length > 1 && i === lastC[k.id]) i = (i + 1) % k.v.length; lastC[k.id] = i;
     if (k.id === "checkin") setTimeout(() => c.checkin(), 700);
-    if (k.id === "room") setTimeout(() => c.roomLit(), 4000);
+    // 乗車時の自動準備 (auto) は、乗車のあいさつが終わるころ (約 20 秒後) に話す
+    const wait = cmd.auto ? 20000 : 0;
+    if (k.id === "room") setTimeout(() => c.roomLit(), wait + 4000);
     // 話している途中なら、終わってから
     const go = () => { if (speaking) { setTimeout(go, 500); return; } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
-    go();
+    if (wait) setTimeout(go, wait); else go();
   }
 
   /* ---------- 光の玉 (声に合わせて揺れる) ---------- */

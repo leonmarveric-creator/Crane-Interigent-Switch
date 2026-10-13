@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/cabinData";
 import { cleanCmd } from "@/lib/cabinMusic";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
+import { boardTrip } from "@/lib/cabinRoomPrep";
 import { aiHumorOn, boostSfxId, checkinQrUrl } from "@/lib/cabinData";
 import { checkinLinkFor } from "@/lib/craneNest";
 import { pendingInviteFor } from "@/lib/keepsake";
@@ -97,8 +98,13 @@ export async function POST(req: NextRequest) {
     return J(error ? { ok: false, error: /music_cmd/.test(error.message) ? "SETUP" : error.message } : { ok: true });
   }
   // 回送の切り替え: board = ゲスト乗車 (iPad のボタン) / deadhead = お見送りの到着のあと、帰り道へ
-  if ((b.op === "board" || b.op === "deadhead") && isId(b.trip)) {
-    const up = b.op === "board" ? { phase: "guest", started_at: new Date().toISOString() } : { phase: "dead" };
+  // 乗車: お迎えならお部屋の和風ライト + エアコンも自動でつける (cabinRoomPrep)
+  if (b.op === "board" && isId(b.trip)) {
+    const r = await boardTrip(b.trip);
+    return J(r.ok ? { ok: true } : { ok: false, error: r.error });
+  }
+  if (b.op === "deadhead" && isId(b.trip)) {
+    const up = { phase: "dead" };
     const { error } = await supabaseAdmin.from("cabin_trips").update(up).eq("id", b.trip).eq("status", "active");
     return J(error ? { ok: false, error: /phase/.test(error.message) ? "SETUP" : error.message } : { ok: true });
   }

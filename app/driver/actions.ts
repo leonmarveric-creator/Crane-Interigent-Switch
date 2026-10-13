@@ -12,6 +12,7 @@ import { langOf } from "@/lib/driverLogic";
 import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
+import { boardTrip, prepFromCmd, stopRoomPrep, type RoomPrep } from "@/lib/cabinRoomPrep";
 import { iconPrefix, isIconPath, roomIcon, uploadedIcons } from "@/lib/roomIcon";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
@@ -239,14 +240,21 @@ export async function cabinStart(v: {
   return { ok: true, trip: toCabinTrip(data) };
 }
 /** ゲスト乗車: 回送 → ゲストが乗っている (iPad がゲスト用の画面に切り替わる) */
-export async function cabinBoard(tripId: string): Promise<R> {
+export async function cabinBoard(tripId: string): Promise<R<{ prep: RoomPrep | null }>> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
-  const { error } = await supabaseAdmin.from("cabin_trips").update({ phase: "guest", started_at: new Date().toISOString() }).eq("id", tripId).eq("status", "active");
-  return error ? fail(/phase/.test(error.message) ? "SETUP_VOICE" : error.message) : { ok: true };
+  // お迎えなら、乗った時点でお部屋の和風ライト + エアコンを自動でつける (1 回だけ)
+  const r = await boardTrip(tripId);
+  return r.ok ? { ok: true, prep: r.prep } : fail(r.error === "SETUP" ? "SETUP_VOICE" : r.error);
+}
+/** 乗車時に自動でつけたお部屋の明かり・エアコンを止める */
+export async function cabinRoomPrepStop(tripId: string): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(tripId)) return fail("BAD");
+  return (await stopRoomPrep(tripId).catch(() => false)) ? { ok: true } : fail("DEVICE");
 }
 /** スマホの位置を送る (3 秒ごと)。送迎が終わっていたら active = false */
-export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup"; phase?: "dead" | "guest" }>> {
+export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup"; phase?: "dead" | "guest"; prep?: RoomPrep | null }>> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
   const up: Record<string, unknown> = {};
@@ -264,7 +272,7 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   }
   if (r.error) return fail(r.error.message);
   const row: any = r.data?.[0];
-  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok", phase: row?.phase === "dead" ? "dead" : "guest" };
+  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok", phase: row?.phase === "dead" ? "dead" : "guest", prep: prepFromCmd(row?.ai_cmd) };
 }
 /** お父さんから車内 iPad の ASTRAEA へ指示 (ボタン・声)。「お部屋の準備」は本当にエアコン + 照明もつける */
 export async function cabinAiCmd(tripId: string, c: CaptainCmdId): Promise<R> {

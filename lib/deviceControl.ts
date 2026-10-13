@@ -48,7 +48,7 @@ async function setDreamFade(room: any, startedAt: string | null): Promise<boolea
 /** 灯りを操作したら Dream Fade を止める (実行中の部屋だけ。失敗しても本処理は止めない) */
 const DREAM_FADE_CANCEL: ReadonlySet<string> = new Set([
   "light_on", "light_off", "galaxy_on", "galaxy_off", "nest_on", "nest_off",
-  "wafu_on", "wafu_off", "wafu_on_warm", "wafu_warm", "wafu_brightness", "wafu_temp", "wafu_color",
+  "wafu_on", "wafu_off", "wafu_on_warm", "wafu_warm", "wafu_mode", "wafu_brightness", "wafu_temp", "wafu_color",
   "welcome", "welcome_cozy", "good_night", "away", "normal",
 ]);
 async function cancelDreamFade(room: any) {
@@ -92,6 +92,7 @@ export type DeviceAction =
   | "wafu_on" | "wafu_off" // 和風ライト(行灯): スマート電球 ON/OFF
   | "wafu_on_warm" // ON + 既定の暖色 (管理者ON用)
   | "wafu_warm" // 既定の暖色に戻す (トグルなし)
+  | "wafu_mode" // 和の灯り: 和風ライトを暖色で点灯 + ほかの明かりを消す (エアコンはそのまま。お部屋画面の切り替え)
   | "wafu_brightness" | "wafu_temp" | "wafu_color" // 詳細: 明るさ / 色温度 / フルカラー (value必須)
   | "welcome" | "welcome_cozy" | "good_night" | "away"
   | "normal" // シーン: 快適 / 和み / おやすみ / 外出全OFF
@@ -213,6 +214,14 @@ export async function executeDeviceAction(
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
       const ok = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id);
       return { ok };
+    }
+    case "wafu_mode": {
+      if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
+      const [w] = await Promise.all([
+        safe(async () => { const on = await deviceTurnOn(sbCreds, room.switchbot_wafu_device_id); const warm = await applyWafuWarm(sbCreds, room.switchbot_wafu_device_id); return on.ok && warm; }),
+        offLight(), offGalaxy(), offNest(),
+      ]);
+      return { ok: w };
     }
     case "wafu_brightness": {
       if (!room.switchbot_wafu_device_id) return { ok: false, error: "NO_WAFU" };
