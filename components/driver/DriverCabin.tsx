@@ -414,6 +414,8 @@ function PrepNote({ p, cab, t }: { p: RoomPrep; cab: Cabin; t: T }) {
 const GUIDE_BTN = { id: "guide" as const, icon: "🔑", zh: "进门方法", ja: "入り方ガイド" };
 /** iPad の右下にコンシェルジュの QR をもう一度出す (お迎えのとき) */
 const QR_BTN = { id: "qr" as const, icon: "🛎", zh: "显示礼宾二维码", ja: "QR を出す" };
+/** iPad の地図の枠に建物のホログラム (お迎えのとき・約 46 秒。声は iPhone から) */
+const HOLO_BTN = { id: "holo" as const, icon: "🛰", zh: "显示全息投影", ja: "ホログラム" };
 function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: Cabin; t: T; ui: "zh" | "ja"; onClose: () => void; toast: (s: string) => void }) {
   const [listen, setListen] = useState(false), [heard, setHeard] = useState(""), [sent, setSent] = useState(""), [btns, setBtns] = useState(false);
   const rec = useRef<any>(null);
@@ -437,7 +439,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
       rec.current = null; setListen(false); cab.duck(false);
       const s = (fin || "").trim() || heardRef.current.trim(); if (!s) return;
       const id = matchCaptain(s);
-      if (id) { const b = id === "guide" ? GUIDE_BTN : id === "qr" ? QR_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
+      if (id) { const b = id === "guide" ? GUIDE_BTN : id === "qr" ? QR_BTN : id === "holo" ? HOLO_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
       else void send("unknown", "？");
     };
     setHeard(""); setListen(true); cab.duck(true); sfx.tick();
@@ -445,7 +447,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
   };
   const heardRef = useRef(""); heardRef.current = heard;
   useEffect(() => () => { try { rec.current?.abort?.(); } catch { /* ignore */ } cab.duck(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const all = [...CAPTAIN.map((c) => ({ id: c.id as CaptainCmdId, icon: c.icon, zh: c.zh, ja: c.ja })), GUIDE_BTN, ...(tr.dir === "in" ? [QR_BTN] : [])];
+  const all = [...CAPTAIN.map((c) => ({ id: c.id as CaptainCmdId, icon: c.icon, zh: c.zh, ja: c.ja })), GUIDE_BTN, ...(tr.dir === "in" ? [QR_BTN, HOLO_BTN] : [])];
   return (
     <>
       <div className="sheet-bg show" onClick={onClose} />

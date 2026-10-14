@@ -54,8 +54,8 @@ test("iPad: concierge QR in the bottom-right box 20 s after a pickup starts; ✕
   assert.match(e, /arrived = true; const id = trip\.id; cqOff\(\)/);
   assert.match(e, /const cqBox = \(\) => \$\("recBox"\)/);
   assert.match(R("components/cabin/cabinAi.ts"), /if \(cmd\.c === "qr"\) \{ c\.conQr\(\); return; \}/);
-  assert.match(R("lib/cabinAiTalk.ts"), /"unknown", "qr"\]/);
-  assert.match(R("components/driver/DriverCabin.tsx"), /tr\.dir === "in" \? \[QR_BTN\]/);
+  assert.match(R("lib/cabinAiTalk.ts"), /"unknown", "qr"[,\]]/);
+  assert.match(R("components/driver/DriverCabin.tsx"), /tr\.dir === "in" \? \[QR_BTN[,\]]/);
   const css = R("app/cabin/cabin.css");
   assert.match(css, /\.cab #cq\{position:absolute;inset:0/);
 });

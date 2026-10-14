@@ -21,6 +21,7 @@ import TechPercent from "@/components/tech/TechPercent";
 import TechButton from "@/components/tech/TechButton";
 import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
 import type { VoiceAction } from "@/lib/voiceCommand";
+import RoomHolo from "@/components/tech/RoomHolo";
 import { TouchReticle, GalaxyLaunch, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
 
 interface Props {
@@ -423,6 +424,11 @@ export default function ControlPanel({
             hasGalaxy={hasGalaxy} hasNest={hasNest} hasWafu={hasWafu} onGalaxyState={setGalaxyActive}
             onGalaxyLaunch={() => setGalaxyLaunch((n) => n + 1)}
             />
+        </motion.div>
+
+        {/* お部屋のホログラム (操作・モードに合わせて反応する。今の画面はそのまま、ここに 1 枠足すだけ) */}
+        <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <RoomHolo roomSlug={roomSlug} roomName={roomName} lang={lang} />
         </motion.div>
 
         {/* 位置制限の常設案内 (有効な部屋のみ) */}

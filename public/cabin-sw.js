@@ -13,7 +13,7 @@ self.addEventListener("activate", (e) => {
 });
 
 const isStatic = (u) =>
-  (u.origin === self.location.origin && /^\/cabin\/.+\.(mp3|webp|jpg|png|js|css|json)$/.test(u.pathname)) ||
+  (u.origin === self.location.origin && /^\/cabin\/.+\.(mp3|webp|jpg|png|js|css|json)$/.test(u.pathname)) || // ホログラムの JS (/cabin/holo/holo.js?v=…) もここ
   /\/storage\/v1\/object\/public\/driver-music\/rooms\//.test(u.pathname);
 
 /* 「この iPad に保存」ボタン: 渡された URL を全部保存 */

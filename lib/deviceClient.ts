@@ -42,6 +42,8 @@ export async function callDevice(
       body: JSON.stringify(admin ? { roomSlug, action, value } : { action, value }),
       signal: ctrl?.signal,
     });
+    // お部屋のホログラム (components/tech/RoomHolo.tsx) に「操作できた」と知らせる。成功したときだけ
+    if (res.ok && typeof window !== "undefined") { try { window.dispatchEvent(new CustomEvent("cn:device", { detail: { action, value } })); } catch { /* */ } }
     return res.ok;
   } catch {
     return false;

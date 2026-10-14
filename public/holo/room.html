@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- ゲストのお部屋画面 (ControlPanel) に埋め込むホログラム。お部屋の操作・モードを postMessage で受け取って反応する。音は鳴らさない (お部屋画面が鳴らす)。
+     元: 作業用の holoembed.js を esbuild でまとめたもの (public/holo/room.js)。room.js を作り直したら、この v と components/tech/RoomHolo.tsx の HOLO_V を合わせる -->
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Room hologram</title>
+<style>
+:root{--void:#02060c;--holo:#48c8ff;--holo2:#8fe6ff;--gold:#ffb347;--ink:#dff6ff;--mute:#6f97ad;--line:rgba(72,200,255,.35);--hud:ui-monospace,"SF Mono",Menlo,monospace;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:-apple-system,"Hiragino Sans",sans-serif;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+#app{position:fixed;inset:0}
+.fx{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(120,210,255,.03) 0 1px,transparent 1px 3px),radial-gradient(120% 100% at 50% 50%,transparent 55%,rgba(0,0,0,.7) 100%)}
+.hide{display:none}
+#hud{position:fixed;left:10px;top:8px;display:flex;flex-direction:column;gap:2px;pointer-events:none}
+#hud small{font:600 9px var(--hud);letter-spacing:.28em;color:var(--holo)}
+#mode{font:600 12px var(--hud);letter-spacing:.16em;color:var(--holo2);text-shadow:0 0 10px rgba(72,200,255,.5);transition:color .6s}
+#st{position:fixed;left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;pointer-events:none}
+#st div{border:1px solid var(--line);background:rgba(2,12,22,.6);padding:4px 7px;display:flex;flex-direction:column;transition:border-color .4s,box-shadow .4s}
+#st small{font:9px var(--hud);letter-spacing:.14em;color:var(--mute)}
+#st b{font:600 13px var(--hud);color:var(--mute)}
+#st .on{border-color:rgba(143,230,255,.7)}#st .on b{color:var(--ink)}
+#st .au{border-color:rgba(255,179,71,.7)}#st .au b{color:#ffd59a}
+#sub{position:fixed;left:50%;top:34px;transform:translate(-50%,-6px);display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--line);background:rgba(2,10,18,.7);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap}
+#sub.on{opacity:1;transform:translate(-50%,0)}#sub canvas{width:20px;height:20px}
+#subJa{font-size:12px}#subEn{display:none}
+#glitch{position:fixed;inset:0;pointer-events:none;opacity:0}
+#glitch.on{animation:gl .45s steps(2) both}
+@keyframes gl{0%{opacity:1;background:rgba(143,230,255,.12)}30%{opacity:.3;background:transparent}50%{opacity:.8;background:rgba(72,200,255,.06)}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#glitch.on{animation:none}}
+</style></head><body>
+<div id="app"></div><div class="fx"></div>
+<div id="hud"><small>ROOM HOLOGRAM · <span id="roomEn"></span></small><span id="mode">ROOM · LIVE</span></div>
+<div id="st"></div>
+<div id="sub"><canvas id="vring" width="40" height="40"></canvas><span id="subJa"></span><span id="subEn"></span></div>
+<div id="glitch"></div>
+<div class="hide"><svg id="leaders"></svg><div id="callouts"></div><div id="reticle"><span id="lockName"></span></div><div id="big"></div><div id="ticker"></div><svg id="roomPlan"></svg><b id="roomName"></b><span id="roomMeta"></span></div>
+<script src="/holo/room.js?v=67b35bafe7"></script>
+</body></html>
