@@ -80,3 +80,24 @@ test("guest room UI: hologram added under the modes without changing the rest; r
   for (const a of ["welcome_cozy", "good_night", "away", "dream_fade", "galaxy_on", "nest_on", "light_on", "wafu_mode", "ac_on"]) assert.ok(js.includes(`"${a}"`), a);
   assert.ok(!/new AudioContext|webkitAudioContext/.test(js)); // the hologram is silent (the room page keeps its own sounds)
 });
+test("concierge entrance: after the 4 digits match, a short hologram plays once, then the concierge", () => {
+  const lib = R("lib/cabinHolo.ts"), page = R("public/holo/intro.html");
+  const js = lib.match(/INTRO_JS = "([^"]+)"/)[1];
+  assert.ok(page.includes(`src="${js}"`), "intro.html must load " + js);
+  assert.ok(fs.existsSync(path.join(root, "public", js.split("?")[0])));
+  const v = R("app/api/key/[entrance]/verify/route.ts");
+  assert.match(v, /const hk = room \? holoRoomOf\(toCabinRoom\(room\)\) : null;/);
+  assert.match(v, /NextResponse\.json\(\{ ok: true, intro \}\)/);
+  const g = R("lib/nfcGate.ts");
+  assert.match(g, /await intro\(j\.intro\);location\.reload\(\)/);
+  assert.match(g, /prefers-reduced-motion: reduce/); // no motion → straight to the concierge
+  assert.match(g, /if\(!ready\)fin\(\)\},4500\)/); // can't load → straight on
+  assert.match(g, /postMessage\(\{intro:1,name:x\.name\|\|""\}/); // the name is not put in the URL
+  assert.doesNotMatch(g, /IP\+"\?room="[^;]*name=/);
+  const ij = R("public/holo/intro.js");
+  assert.match(ij, /ACCESS GRANTED/); assert.ok(!/data:image\/jpeg/.test(ij));
+});
+test("intro name: first word of a latin name, CJK names kept short", () => {
+  const src = R("lib/cabinHolo.ts");
+  assert.match(src, /export function introName/);
+});

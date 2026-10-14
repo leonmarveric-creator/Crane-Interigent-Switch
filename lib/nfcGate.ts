@@ -11,6 +11,7 @@ import { signScopedSession, verifyScopedSession, signSession, roomCookieName } f
 import { keyStateFor, SESSION_GRACE_MS } from "@/lib/smartkeyLogic";
 import { withEffectiveTimes, isMissingColumn } from "@/lib/stayTimes";
 import { toCabinRoom } from "@/lib/cabinData";
+import { INTRO_JS, INTRO_PAGE } from "@/lib/cabinHolo";
 
 export interface GuideCodes { ent: string | null; room: string | null }
 /** チェックアウトのボタン用 (このゲストの予約の、実際のチェックアウト時刻と、済んでいればその時刻) */
@@ -158,13 +159,23 @@ zh:{t:"请输入 4 位数字",s:"即预订电话号码的后 4 位，与大门�
 ko:{t:"4자리 번호를 입력하세요",s:"예약하신 전화번호의 마지막 4자리입니다. 현관 열쇠와 같은 번호이며, 체크아웃까지 이 페이지를 이용할 수 있습니다.",go:"들어가기",nm:"성함 (예약하신 이름)",need:"같은 번호의 예약이 있습니다. 성함도 입력해 주세요.",bad:"번호가 맞지 않습니다. 다시 확인해 주세요.",lock:"잠시 입력할 수 없습니다. {M}분 후에 다시 시도해 주세요.",no:"유효한 예약을 찾을 수 없습니다.",net:"연결에 실패했습니다. 다시 시도해 주세요.",n:"번호를 모르시면 직원에게 문의해 주세요."}};
 let L=(()=>{try{const q=new URLSearchParams(location.search).get("lang");if(q&&T[q])return q}catch(e){}const n=(navigator.language||"en").toLowerCase();return n.startsWith("ja")?"ja":n.startsWith("zh")?"zh":n.startsWith("ko")?"ko":"en"})();
 const $=id=>document.getElementById(id);let busy=false;
+/* 4 桁が合ったら、コンシェルジュの前に短いホログラム (約 11 秒・1 回だけ。public/holo/intro.html)。
+   入力している間に先に読み込み、指が触れたときに音の準備 (iPhone は指で触れないと音が出せない) */
+const IJ=${JSON.stringify(INTRO_JS)},IP=${JSON.stringify(INTRO_PAGE)};let pre=false;
+function warm(){if(!pre){pre=true;try{fetch(IJ).catch(()=>{});fetch(IP).catch(()=>{})}catch(e){}}try{if(!window.__cnAC){const C=window.AudioContext||window.webkitAudioContext;if(C)window.__cnAC=new C()}if(window.__cnAC&&window.__cnAC.state!=="running")window.__cnAC.resume()}catch(e){}}
+["touchend","click","keydown","focusin"].forEach(ev=>document.addEventListener(ev,warm,{passive:true}));
+function intro(x){return new Promise(ok=>{let rm=false;try{rm=matchMedia("(prefers-reduced-motion: reduce)").matches}catch(e){}if(!x||!x.room||rm)return ok();
+ const f=document.createElement("iframe");f.src=IP+"?room="+encodeURIComponent(x.room)+"&lang="+L;f.title="Crane Nest";f.setAttribute("allow","autoplay");f.style.cssText="position:fixed;inset:0;width:100%;height:100%;border:0;z-index:9;background:#02060c";
+ let done=false,ready=false;const fin=()=>{if(done)return;done=true;window.removeEventListener("message",on);ok()};
+ const on=e=>{if(e.origin!==location.origin||e.source!==f.contentWindow||!e.data||e.data.intro!==1)return;if(e.data.ready){ready=true;try{f.contentWindow.postMessage({intro:1,name:x.name||""},location.origin)}catch(_){}}if(e.data.end)fin()};
+ window.addEventListener("message",on);document.body.appendChild(f);setTimeout(()=>{if(!ready)fin()},4500);setTimeout(fin,17000)})}
 function draw(){const t=T[L];document.documentElement.lang=L==="zh"?"zh-CN":L;$("t").textContent=t.t;$("s").textContent=t.s;$("go").textContent=t.go;$("n").textContent=t.n;$("nm").placeholder=t.nm;$("rm").textContent=A.roomKanji||"";document.querySelectorAll("[data-l]").forEach(b=>b.classList.toggle("on",b.dataset.l===L))}
 document.querySelectorAll("[data-l]").forEach(b=>b.onclick=()=>{L=b.dataset.l;draw()});
 async function send(){const pin=$("pin").value.replace(/\\D/g,""),t=T[L];if(pin.length<4||busy)return;busy=true;$("go").disabled=true;$("er").textContent="";
  const name=$("nm").value.trim();let r=null,j=null;
  try{r=A.entranceSlug?await fetch("/api/key/"+encodeURIComponent(A.entranceSlug)+"/verify",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({digits:pin,name})})
   :await fetch("/api/room/"+encodeURIComponent(A.roomSlug||"")+"/auth",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pin,name})});j=await r.json().catch(()=>null)}catch(e){}
- if(r&&r.ok&&j&&j.ok){location.reload();return}
+ if(r&&r.ok&&j&&j.ok){try{$("pin").blur()}catch(e){}await intro(j.intro);location.reload();return}
  busy=false;$("go").disabled=false;
  if(!r){$("er").textContent=t.net;return}
  if(r.status===429){$("er").textContent=t.lock.replace("{M}",(j&&j.retryAfterMin)||10);return}

@@ -60,3 +60,15 @@ export function holoQuiet(s: HoloScene): boolean {
   if (s.nextPoiM != null && s.nextPoiM < HOLO_POI_GAP_M) return false;
   return true;
 }
+
+/* ---------- コンシェルジュの入口: 4 桁が合ったあとの短いホログラム (public/holo/intro.html・約 11 秒) ---------- */
+/** intro.js を作り直したら v を合わせる (public/holo/intro.html と同じ) */
+export const INTRO_JS = "/holo/intro.js?v=12cf7c14ae";
+export const INTRO_PAGE = "/holo/intro.html";
+/** 演出に出すお名前 (ご予約のお名前の最初の 1 語。漢字などはそのまま 12 文字まで)。無ければ null */
+export function introName(raw: string | null | undefined): string | null {
+  const s = String(raw ?? "").replace(/[<>&"]/g, "").trim();
+  if (!s) return null;
+  if (/^[\x20-\x7e\u00c0-\u024f]+$/.test(s)) { const w = s.split(/\s+/)[0]; return w.length >= 2 ? w.slice(0, 16) : null; }
+  return s.replace(/\s+/g, " ").slice(0, 12);
+}

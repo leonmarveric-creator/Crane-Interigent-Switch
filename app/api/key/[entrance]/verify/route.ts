@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { holoRoomOf, introName } from "@/lib/cabinHolo";
+import { toCabinRoom } from "@/lib/cabinData";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { signSession, roomCookieName, signScopedSession } from "@/lib/roomSession";
 import {
@@ -90,7 +92,10 @@ export async function POST(req: NextRequest, { params }: { params: { entrance: s
 
   const checkOut = new Date(r.check_out).getTime();
   const keyExp = checkOut + SESSION_GRACE_MS;
-  const res = NextResponse.json({ ok: true });
+  // コンシェルジュの入口で、4 桁が合ったあとに出す短いホログラム (Crane Nest の季節のお部屋だけ)。確認できた本人にだけ返す
+  const hk = room ? holoRoomOf(toCabinRoom(room)) : null;
+  const intro = hk ? { room: hk, name: introName(name || r.guest_name || r.entrance_name) } : null;
+  const res = NextResponse.json({ ok: true, intro });
   const cookieBase = { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" };
   res.cookies.set(entranceCookieName(entrance.slug), signScopedSession(ENTRANCE_SCOPE, r.id, keyExp), {
     ...cookieBase, expires: new Date(keyExp),

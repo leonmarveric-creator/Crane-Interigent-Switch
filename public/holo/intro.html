@@ -1,0 +1,136 @@
+<!doctype html>
+<!-- コンシェルジュの入口: 4 桁が合ったあとに 1 回だけ出す短いホログラム (約 11 秒)。4 桁の画面 (lib/nfcGate.ts) が全画面の iframe で出す。
+     音は 4 桁の画面で指が触れたときに作った AudioContext (parent.__cnAC) で鳴らす。お名前は URL に載せず postMessage で受け取る。
+     元: 作業用の intro.js を esbuild でまとめたもの (public/holo/intro.js)。作り直したら v と lib/cabinHolo.ts の INTRO_JS を合わせる --><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Crane Nest</title><meta name="robots" content="noindex">
+
+<style>
+/* layout: 全画面の投影。左上に投影の状態、右上に時計と到着、選んだ部屋の設備は吹き出しで。暗い単一ルック (車内 iPad 用) */
+:root{
+  --void:#02060c; --holo:#48c8ff; --holo2:#8fe6ff; --gold:#ffb347; --green:#7dffb2; --ink:#dff6ff; --mute:#6f97ad; --panel:rgba(4,16,28,.55); --line:rgba(72,200,255,.4);
+  --hud:"Chakra Petch",ui-monospace,monospace; --jp:"Zen Kaku Gothic New","Hiragino Sans",sans-serif; color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font-family:var(--jp)}
+#app{position:fixed;inset:0}
+.fx{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(120,210,255,.035) 0 1px,transparent 1px 3px),radial-gradient(120% 100% at 50% 50%,transparent 55%,rgba(0,0,0,.75) 100%);mix-blend-mode:screen}
+.fx::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 50%,transparent 60%,rgba(0,0,0,.7) 100%)}
+#hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .6s}
+.tl{position:absolute;top:calc(18px + env(safe-area-inset-top,0px));left:max(22px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px}
+.tl small{font-family:var(--hud);font-size:11px;letter-spacing:.32em;color:var(--holo)}
+.tl b{font-family:var(--hud);font-weight:600;font-size:clamp(22px,3.4vw,34px);letter-spacing:.14em;color:var(--ink);text-shadow:0 0 18px rgba(72,200,255,.55)}
+.st{display:flex;align-items:center;gap:10px;font-family:var(--hud);font-size:12px;letter-spacing:.2em;color:var(--holo2)}
+.st i{width:8px;height:8px;border-radius:50%;background:var(--holo2);box-shadow:0 0 10px var(--holo2);animation:bl 1s infinite}
+.st em{font-style:normal;font-size:22px;letter-spacing:.06em;color:var(--ink);font-variant-numeric:tabular-nums}
+@keyframes bl{50%{opacity:.25}}
+.tr{position:absolute;top:calc(18px + env(safe-area-inset-top,0px));right:max(22px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:14px;font-family:var(--hud)}
+.gauge{position:relative;width:92px;height:92px}
+.gauge svg{position:absolute;inset:0;animation:spin 14s linear infinite}.gauge svg.b{animation-duration:9s;animation-direction:reverse}
+.gauge div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge small{font-size:9px;letter-spacing:.2em;color:var(--mute)}.gauge b{font-size:22px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tr .txt{display:flex;flex-direction:column;align-items:flex-end;gap:2px}.tr .txt small{font-size:10px;letter-spacing:.24em;color:var(--mute)}.tr .txt b{font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+#ticker{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-family:var(--hud);font-size:11px;letter-spacing:.24em;color:var(--holo);white-space:nowrap;max-width:calc(100% - 40px);overflow:hidden;text-overflow:ellipsis}
+#leaders{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#leaders path{fill:none;stroke:var(--holo2);stroke-width:1.3;stroke-dasharray:1;filter:drop-shadow(0 0 4px var(--holo))}
+#leaders circle{fill:var(--holo2);filter:drop-shadow(0 0 6px var(--holo))}#leaders circle.ring{fill:none;stroke:var(--holo2);stroke-width:1;opacity:.7}
+#callouts{position:fixed;inset:0;pointer-events:none}
+.co{position:absolute;left:0;top:0;width:210px;padding:8px 12px 9px;border:1px solid var(--line);border-left:2px solid var(--holo2);background:var(--panel);backdrop-filter:blur(3px);display:flex;flex-direction:column;gap:1px;opacity:0;transition:opacity .5s calc(var(--i)*.18s)}
+#callouts.on .co{opacity:1}
+.co small{font-family:var(--hud);font-size:10px;letter-spacing:.24em;color:var(--mute)}.co b{font-family:var(--hud);font-size:20px;font-weight:600;letter-spacing:.04em}.co span{font-size:11.5px;color:var(--holo2)}
+.co.au{border-left-color:var(--gold)}.co.au b{color:#ffd59a}.co.gr{border-left-color:var(--green)}.co.gr b{color:var(--green)}
+#reticle{position:fixed;left:0;top:0;width:300px;height:300px;pointer-events:none;opacity:0}
+#reticle svg{width:100%;height:100%;animation:spin 18s linear infinite}
+#roomCard{position:fixed;left:max(22px,env(safe-area-inset-left,0px));bottom:calc(46px + env(safe-area-inset-bottom,0px));width:min(300px,40vw);border:1px solid var(--line);background:var(--panel);opacity:0;transform:translateX(-14px);transition:opacity .6s,transform .6s;pointer-events:none}
+#roomCard.on{opacity:1;transform:none}
+#roomCard svg{display:block;width:100%;height:auto;padding:10px 10px 0;box-sizing:border-box;font-family:var(--jp)}
+#roomCard .in{padding:9px 12px 11px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#roomCard small{width:100%;font-family:var(--hud);font-size:10px;letter-spacing:.26em;color:var(--gold)}
+#roomCard b{font-size:30px;font-weight:700;line-height:1}#roomCard em{font-style:normal;font-family:var(--hud);font-size:13px;letter-spacing:.22em;color:var(--holo2)}#roomCard span{width:100%;font-family:var(--hud);font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+#big{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;opacity:0;transition:opacity 1s}
+#big.on{opacity:1}#big small{font-family:var(--hud);font-size:13px;letter-spacing:.5em;color:var(--holo)}
+#big b{font-family:var(--hud);font-weight:600;font-size:clamp(30px,6vw,64px);letter-spacing:.2em;text-shadow:0 0 28px rgba(72,200,255,.8)}#big span{font-size:15px;color:var(--holo2);letter-spacing:.12em}
+.ctl{position:fixed;right:max(22px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;gap:4px;padding:4px;border:1px solid var(--line);background:var(--panel)}
+.ctl button{font-family:var(--jp);font-size:13px;color:var(--mute);background:none;border:1px solid transparent;padding:5px 9px;cursor:pointer}
+.ctl button[aria-pressed="true"]{color:var(--void);background:var(--holo2)}
+.ctl button:focus-visible{outline:2px solid var(--holo2)}
+@media (max-width:640px){.gauge{display:none}.co{width:170px}.co b{font-size:16px}#ticker{display:none}#roomCard{width:min(240px,60vw)}}
+@media (prefers-reduced-motion:reduce){.gauge svg,#reticle svg,.st i{animation:none}}
+
+/* 起動チェック */
+#sys{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;opacity:0;transition:opacity .6s;width:300px}
+#sys.on{opacity:1}
+#sys li{display:flex;align-items:center;gap:8px;font-family:var(--hud);font-size:11px;letter-spacing:.14em;color:var(--holo2);animation:typein .25s steps(6) both}
+#sys li i{flex:1;border-bottom:1px dotted rgba(143,230,255,.35);min-width:20px}
+#sys li b{font-family:var(--hud);font-size:11px;letter-spacing:.14em;font-weight:600;color:var(--mute);text-shadow:none}#sys li.ok b{color:var(--green);text-shadow:0 0 8px rgba(125,255,178,.6)}
+@keyframes typein{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+/* 字幕と声のリング */
+#sub{position:fixed;left:50%;bottom:calc(46px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);width:min(540px,calc(100vw - 44px));display:flex;align-items:center;gap:12px;padding:8px 14px 8px 8px;border:1px solid var(--line);background:rgba(2,10,18,.62);backdrop-filter:blur(4px);opacity:0;transition:opacity .35s,transform .35s;pointer-events:none}
+#sub.on{opacity:1;transform:translate(-50%,0)}
+#sub canvas{width:58px;height:58px;flex:none}
+#sub div{display:flex;flex-direction:column;gap:3px;min-width:0}
+#sub small{font-family:var(--hud);font-size:9.5px;letter-spacing:.3em;color:var(--holo)}
+#subJa{font-size:15px;line-height:1.45;color:var(--ink)}#subEn{font-family:var(--hud);font-size:11px;letter-spacing:.04em;color:var(--mute)}
+/* 画面のノイズ */
+#glitch{position:fixed;inset:0;pointer-events:none;opacity:0;mix-blend-mode:screen}
+#glitch.on{animation:gl .7s steps(2) both}
+#glitch::before,#glitch::after{content:"";position:absolute;left:0;right:0;height:9%;background:rgba(143,230,255,.22);box-shadow:0 0 30px rgba(72,200,255,.6)}
+#glitch.on::before{animation:gb .7s steps(5) both}#glitch.on::after{animation:gb2 .7s steps(4) both}
+@keyframes gl{0%{opacity:1;background:rgba(143,230,255,.28)}20%{opacity:.4;background:transparent}35%{opacity:1;background:rgba(72,200,255,.1)}100%{opacity:0}}
+@keyframes gb{0%{top:12%;transform:translateX(-4%)}25%{top:58%;transform:translateX(5%)}50%{top:31%}75%{top:77%;transform:translateX(-2%)}100%{top:44%}}
+@keyframes gb2{0%{top:70%;height:3%}33%{top:20%;height:6%}66%{top:88%;height:2%}100%{top:5%;height:4%}}
+/* 照準のロック */
+#reticle .lbl{position:absolute;left:50%;top:calc(100% - 22px);transform:translateX(-50%);white-space:nowrap;font-family:var(--hud);font-size:12px;letter-spacing:.3em;color:var(--gold);opacity:0;transition:opacity .3s}
+#reticle.lock .lbl{opacity:1}#reticle.lock svg{filter:drop-shadow(0 0 8px rgba(255,179,71,.9))}
+/* 四隅の枠 */
+.frame{position:fixed;inset:10px;pointer-events:none;background:
+ linear-gradient(var(--holo),var(--holo)) top left/34px 1.5px,linear-gradient(var(--holo),var(--holo)) top left/1.5px 34px,
+ linear-gradient(var(--holo),var(--holo)) top right/34px 1.5px,linear-gradient(var(--holo),var(--holo)) top right/1.5px 34px,
+ linear-gradient(var(--holo),var(--holo)) bottom left/34px 1.5px,linear-gradient(var(--holo),var(--holo)) bottom left/1.5px 34px,
+ linear-gradient(var(--holo),var(--holo)) bottom right/34px 1.5px,linear-gradient(var(--holo),var(--holo)) bottom right/1.5px 34px;background-repeat:no-repeat;opacity:.6}
+#fps{font-size:10px;letter-spacing:.2em;color:var(--mute)}
+/* タップで開始 */
+#tap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(60% 60% at 50% 50%,rgba(4,20,34,.55),rgba(2,6,12,.92));cursor:pointer;z-index:5;transition:opacity .6s,transform .6s;border:0;width:100%;color:var(--ink);font:inherit}
+#tap.go{opacity:0;transform:scale(1.06)}
+#tap .emb{position:relative;width:150px;height:150px}
+#tap .emb svg{position:absolute;inset:0;animation:spin 10s linear infinite}#tap .emb svg.b{animation-duration:6s;animation-direction:reverse}
+#tap .emb b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--hud);font-size:15px;letter-spacing:.3em;color:var(--holo2);text-shadow:0 0 14px var(--holo)}
+#tap strong{font-family:var(--hud);font-weight:500;font-size:20px;letter-spacing:.42em;color:var(--ink)}
+#tap span{font-size:13px;color:var(--mute)}
+#tap:focus-visible{outline:2px solid var(--holo2);outline-offset:-6px}
+@media (max-width:640px){#sys{display:none}#subJa{font-size:13.5px}}
+
+/* 4 桁のあとの短い演出 (スマホ縦) */
+#grant{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;pointer-events:none;opacity:0;transform:scale(1.08);transition:opacity .35s,transform .5s}
+#grant.on{opacity:1;transform:none}#grant svg{width:96px;height:96px;filter:drop-shadow(0 0 14px rgba(125,255,178,.7))}
+#grant b{font-family:var(--hud);font-size:22px;letter-spacing:.32em;color:#7dffb2;text-shadow:0 0 18px rgba(125,255,178,.6)}#grant small{font-family:var(--hud);font-size:11px;letter-spacing:.34em;color:var(--mute)}
+#skip{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;font:600 13px var(--jp);color:var(--holo2);background:rgba(2,10,18,.6);border:1px solid var(--line);padding:9px 14px;cursor:pointer}
+#sub,#ticker,#sys,.gauge,#pct{display:none!important}
+body{transition:opacity .45s}body.out{opacity:0}
+#big b{font-size:clamp(22px,7vw,52px);letter-spacing:.12em;text-align:center;padding:0 12px}#big span{font-size:14px}
+@media (max-width:640px){#big small{letter-spacing:.24em;font-size:11px}#roomPlan{max-height:84px}.tr{display:none}#roomCard{left:50%;transform:translate(-50%,10px);bottom:calc(64px + env(safe-area-inset-bottom,0px));width:min(300px,82vw)}#roomCard.on{transform:translate(-50%,0)}#reticle{width:220px;height:220px}}
+</style></head><body>
+<div id="app"></div>
+<div class="fx"></div>
+<svg id="leaders"></svg>
+<div id="reticle"><svg viewBox="-150 -150 300 300" fill="none" stroke="#ffb347" stroke-width="1.4">
+  <circle r="128" stroke-dasharray="40 14" opacity=".8"/><circle r="112" stroke="#8fe6ff" stroke-dasharray="2 6" opacity=".7"/>
+  <path d="M-140 0h22M118 0h22M0 -140v22M0 118v22" stroke-width="2"/><path d="M-96 -96l14 14M96 96l-14 -14M96 -96l-14 14M-96 96l14 -14" stroke="#8fe6ff"/></svg><div class="lbl">YOUR ROOM · <span id="lockName"></span></div></div>
+<div id="callouts"></div>
+<div id="hud">
+  <div class="tl"><small>ASTRAEA · ARCHITECTURAL PROJECTION</small><b>CRANE NEST</b><div class="st"><i></i><span id="stage">INITIALIZING</span><em id="pct">000</em></div><ul id="sys"></ul></div>
+  <div class="tr">
+    <div class="txt"><small>LOCAL TIME</small><b id="clock">--:--:--</b><small>IZUMISANO · OSAKA</small></div>
+    <div class="gauge"><svg viewBox="0 0 92 92" fill="none" stroke="#48c8ff"><circle cx="46" cy="46" r="43" stroke-dasharray="60 10 4 10" stroke-width="2"/></svg><svg class="b" viewBox="0 0 92 92" fill="none" stroke="#8fe6ff" opacity=".6"><circle cx="46" cy="46" r="36" stroke-dasharray="3 5"/></svg><div><small>ETA</small><b>11</b><small>MIN</small></div></div>
+  </div>
+  <div id="ticker"></div>
+</div>
+<div id="roomCard"><svg id="roomPlan" viewBox="0 0 9.6 5.05" aria-hidden="true"></svg><div class="in"><small>YOUR ROOM · FLOOR PLAN</small><b id="roomName">夏</b><em id="roomEn">NATSU</em><span id="roomMeta"></span></div></div>
+<div id="big"><small>IDENTITY VERIFIED</small><b id="bigT">WELCOME</b><span id="bigS"></span></div>
+<div class="frame"></div>
+<div id="grant"><svg viewBox="-60 -60 120 120" fill="none" stroke="#7dffb2" stroke-width="2"><circle r="50" stroke-dasharray="6 5" opacity=".7"/><circle r="40"/><path d="M-17 1l11 11 23-24" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><b>ACCESS GRANTED</b><small>IDENTITY VERIFIED</small></div>
+<button id="skip" type="button">Skip ›</button>
+<div id="glitch"></div>
+<div id="sub"><canvas id="vring" width="116" height="116"></canvas><div><small>ASTRAEA</small><span id="subJa"></span><span id="subEn"></span></div></div>
+
+<script src="/holo/intro.js?v=12cf7c14ae"></script>
+</body></html>
