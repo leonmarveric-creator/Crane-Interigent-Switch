@@ -20,6 +20,7 @@ import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab"
 import BootVoiceCard from "./BootVoiceCard";
 import DriverDesignCard from "./DriverDesignCard";
 import PendingCheers, { type PendingCheer } from "./PendingCheers";
+import LiveBuilding from "@/components/admin/LiveBuilding";
 import { RoomLockForm, type AdminSesameLock } from "./SesameLocks";
 
 export interface Room {
@@ -353,6 +354,8 @@ function TodayTab({ rooms, reservations, t, lang }: { rooms: Room[]; reservation
 
   return (
     <section>
+      {/* LIVE: 建物のホログラムで、どの部屋の明かり・エアコンがついているか (今の表はそのまま、上に 1 枠足すだけ) */}
+      <LiveBuilding lang={lang} />
       <div className="mb-3 flex items-center gap-2 text-sm text-cyan-200">
         <CalendarDays className="h-4 w-4" /> {t.todayTitle}
       </div>

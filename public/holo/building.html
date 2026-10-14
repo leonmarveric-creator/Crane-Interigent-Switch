@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- 管理画面 LIVE (components/admin/LiveBuilding.tsx) の建物のホログラム。部屋ごとの状態を postMessage で受け取って光らせる。音なし。
+     元: 作業用の bldg.js を esbuild でまとめたもの (public/holo/building.js)。作り直したら v と LiveBuilding.tsx の BUILDING_V を合わせる -->
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Building live</title><meta name="robots" content="noindex">
+<style>
+:root{--void:#02060c;--holo:#48c8ff;--holo2:#8fe6ff;--gold:#ffb347;--ink:#dff6ff;--mute:#6f97ad;--hud:ui-monospace,"SF Mono",Menlo,monospace;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:-apple-system,"Hiragino Sans",sans-serif;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+#app{position:fixed;inset:0}
+.fx{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(120,210,255,.03) 0 1px,transparent 1px 3px),radial-gradient(120% 100% at 50% 50%,transparent 55%,rgba(0,0,0,.7) 100%)}
+#hd{position:fixed;left:10px;top:8px;font:600 9px var(--hud);letter-spacing:.28em;color:var(--holo);pointer-events:none}
+#tags{position:fixed;inset:0;pointer-events:none}
+.tag{position:absolute;left:0;top:0;display:flex;align-items:center;gap:3px;flex-wrap:nowrap;white-space:nowrap;padding:2px 6px;border:1px solid rgba(72,200,255,.35);background:rgba(2,10,18,.72);font-size:11px}
+.tag b{font-size:13px}.tag .d{width:7px;height:7px;border-radius:50%;background:#56708a}.tag .d.stay{background:#7dffb2;box-shadow:0 0 6px #7dffb2}.tag .d.soon{background:var(--gold)}
+.tag i{font-style:normal;font:600 10px var(--hud);padding:1px 4px;border-radius:3px}
+.tag i.w{background:rgba(234,248,255,.18);color:#fff}.tag i.a{background:rgba(255,160,64,.22);color:#ffd09a}.tag i.c{background:rgba(72,200,255,.2);color:#bdf0ff}.tag i.v{background:rgba(176,125,255,.25);color:#e2d2ff}.tag i.o,.tag i.u{color:var(--mute)}
+.tag em{font-style:normal;font-size:10.5px;font-weight:700;color:#ff8a96}
+.tag.al{border-color:#ff3b4f;box-shadow:0 0 12px rgba(255,59,79,.45)}
+</style></head><body>
+<div id="app"></div><div class="fx"></div><div id="hd">CRANE NEST · LIVE</div><div id="tags"></div>
+<script src="/holo/building.js?v=02b5b74763"></script>
+</body></html>

@@ -67,7 +67,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       onPlay: (u) => {
         // 準備の合図 → 曲をゆっくり止める。効果音 (起動) → 5.2 秒後の点火の瞬間に、BOOST の曲を普通の音量で始める (回送の BOOST は準備が無いので今までどおり)
         if (/boost-prep\.mp3$/.test(u)) { mRef.current.boostPrep(); return; }
-        if (/(boost-sfx|\/boost\/[A-Za-z]+)\.mp3$/.test(u)) { if (mRef.current.prepped() && !mRef.current.inBoost()) { clearTimeout(gT); boosting = mRef.current.boostIn(5200, true); } return; }
+        if (/(boost-sfx|\/boost\/[A-Za-z]+)\.mp3$/.test(u)) { if (!mRef.current.inBoost()) { clearTimeout(gT); boosting = mRef.current.boostIn(5200, true); } return; } // 準備が無い回送の BOOST も: 今の曲をすぐ小さくして起動音を聞かせ、点火 (5.2 秒) で BOOST の曲
         if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
         else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
       },

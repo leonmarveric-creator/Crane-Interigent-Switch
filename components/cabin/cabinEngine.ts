@@ -23,7 +23,7 @@ import { stationsFor } from "@/lib/cabinTrains";
 import { hasRoomLock, LOCK_T } from "@/lib/cabinLock";
 import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText, CHECKIN_DEFAULT_URL } from "@/lib/cabinAiTalk";
 import QRCode from "qrcode";
-import { playSafe, stopVoice } from "@/lib/cabinAudio";
+import { playSafe, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 import { createHolo } from "@/components/cabin/cabinHolo";
 import { HOLO_AUDIO, HOLO_JS, HOLO_LEN_MS, holoQuiet, holoRoomOf } from "@/lib/cabinHolo";
 
@@ -163,7 +163,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     return Q;
   };
   // ブーストの効果音もスマホから (Bluetooth で車のスピーカー)。スマホが来ていなければ iPad から。音そのものは同じ
-  const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + file(k) + ".mp3", SFX_MARK); return; } const a = new Audio(src(k)); a.play().catch(() => {}); };
+  const sfx = (k: string) => { if (remote()) { hooks.onSay?.(trip!.id, AUDIO + file(k) + ".mp3", SFX_MARK); return; } playFxUrl(ac(), src(k)); };
   const AUDIO_KEYS = ["en-arrive", "en-bridge", "en-rinku", "en-izumi", "en-boost-on", "en-boost-off", "boost-sfx", "boost-end", "boost-prep",
     ...["kix", "kix2", "rinku", "r833", "hineno", "other"].flatMap((k) => [`en-${k}_in-go`, `en-${k}_out-go`, `en-${k}_out-arrive`])];
 

@@ -352,6 +352,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }
 
+  // 画面に触れるたびに、回送モードの効果音の AudioContext を動かしておく (iPad はスリープ明けなどで音を止めることがある)
+  useEffect(() => {
+    const wake = () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); if (w.__dhAc.state !== "running") void w.__dhAc.resume(); } catch { /* 鳴らせない端末 */ } };
+    document.addEventListener("pointerdown", wake, true); document.addEventListener("touchend", wake, true);
+    return () => { document.removeEventListener("pointerdown", wake, true); document.removeEventListener("touchend", wake, true); };
+  }, []);
   const tap = () => { if (tapped) return; setTapped(true); eng.current?.unlock(); dhRef.current?.unlock(); try { (document.documentElement as any).webkitRequestFullscreen?.(); } catch { /* ignore */ } };
 
   return (

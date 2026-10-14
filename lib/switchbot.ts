@@ -163,3 +163,26 @@ export function bulbSetColor(creds: SwitchBotCreds, deviceId: string, rgb: strin
 }
 
 export type { SwitchBotCreds };
+
+/* ---------- Webhook (SwitchBot から状態の変化を知らせてもらう) ----------
+ * 電球・プラグ・シーリングライト (実機) などは、状態が変わるとこちらの URL に知らせが来る (問い合わせの回数を使わない)。
+ * 赤外線リモコン (エアコン・IR の照明) は対象外。1 つのアカウントに登録できる URL は 1 つだけ。 */
+async function webhookCall(creds: SwitchBotCreds, path: string, body: object): Promise<{ ok: boolean; body: any }> {
+  try {
+    const res = await fetch(`${BASE}/webhook/${path}`, { method: "POST", headers: authHeaders(creds), body: JSON.stringify(body), cache: "no-store" });
+    const j = await res.json().catch(() => null);
+    return { ok: res.ok && j?.statusCode === 100, body: j };
+  } catch { return { ok: false, body: null }; }
+}
+/** 登録されている URL (無ければ []) */
+export async function webhookQuery(creds: SwitchBotCreds): Promise<{ ok: boolean; urls: string[] }> {
+  const r = await webhookCall(creds, "queryWebhook", { action: "queryUrl" });
+  const urls = r.body?.body?.urls;
+  return { ok: r.ok || r.body?.statusCode === 190, urls: Array.isArray(urls) ? urls.map(String) : [] };
+}
+export async function webhookSetup(creds: SwitchBotCreds, url: string): Promise<boolean> {
+  return (await webhookCall(creds, "setupWebhook", { action: "setupWebhook", url, deviceList: "ALL" })).ok;
+}
+export async function webhookDelete(creds: SwitchBotCreds, url: string): Promise<boolean> {
+  return (await webhookCall(creds, "deleteWebhook", { action: "deleteWebhook", url })).ok;
+}

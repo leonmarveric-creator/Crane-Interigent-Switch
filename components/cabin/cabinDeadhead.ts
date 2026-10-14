@@ -11,7 +11,7 @@ import { SFX_MARK } from "@/lib/remoteVoice";
 import { DH_LINES, DH_IDLE, dhSpdFor, dhAudio, callsignOf } from "@/lib/cabinDeadheadLines";
 import { BRIDGE, CRANE_NEST, PLACES, dist, type GLang, type LL } from "@/lib/cabinGeo";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
-import { playSafe, unlockAudio, stopVoice } from "@/lib/cabinAudio";
+import { playSafe, unlockAudio, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 
 export interface DhInfo { guest: string | null; flightNo: string | null; flight: any; prepared: string | null; pickupAt: string | null; battery: number | null }
 export interface DhCtx {
@@ -90,7 +90,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
     g.gain.setValueAtTime(v, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + t + d); o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d + 0.05);
   };
   // 効果音もスマホから (スマホが来ていなければ iPad から)
-  const sfx = (u: string) => { if (c.remote()) { void c.say(u, SFX_MARK); return; } const a = new Audio(u); a.play().catch(() => {}); };
+  const sfx = (u: string) => { if (c.remote()) { void c.say(u, SFX_MARK); return; } playFxUrl(c.ac(), u); };
 
   /* ---------- 地図 ---------- */
   function ensureMap() {
@@ -207,7 +207,9 @@ export function createDeadhead(c: DhCtx): Deadhead {
     return { on: t > 0 && t < 1 && Math.abs(q[0] * b[1] - q[1] * b[0]) / Math.sqrt(L2) < 300, t };
   };
   function scr(e: HTMLElement, txt: string, ms: number) { const C = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789#$%&"; const tb = performance.now(); (function f(n: number) { const u = Math.min(1, (n - tb) / ms); e.textContent = [...txt].map((ch, i) => (ch === " " || i / txt.length < u ? ch : C[Math.random() * C.length | 0])).join(""); if (u < 1) requestAnimationFrame(f); })(tb); }
-  function boostIn() { boosting = true; host.classList.add("boost"); $("dhTag").textContent = "SKY GATE BOOST"; sfx(c.boostUrl?.() ?? "/cabin/audio/boost-sfx.mp3"); scr($("dhBT"), "BOOST", 800); void say("boostIn"); said.bm = 0; }
+  function boostIn() { boosting = true; host.classList.add("boost"); $("dhTag").textContent = "SKY GATE BOOST"; sfx(c.boostUrl?.() ?? "/cabin/audio/boost-sfx.mp3"); scr($("dhBT"), "BOOST", 800); said.bm = 0;
+    // 起動音を先に (お客さま用と同じ): 点火 (約 5 秒) のあとで「ブースト開始」のひと言。声と重ねると効果音が聞こえなくなる
+    const id = trip?.id; setTimeout(() => { if (onNow && boosting && trip?.id === id) void say("boostIn"); }, 5600); }
   function boostOut() { boosting = false; host.classList.remove("boost"); $("dhTag").textContent = back ? "帰り道 · RETURN" : "回送中 · DEADHEAD"; tone(880, 0, 0.1, 0.05); tone(1320, 0.1, 0.3, 0.05); void say("boostOut"); }
   const cv = $("dhStars") as HTMLCanvasElement, cx = cv.getContext("2d")!, SS = Array.from({ length: 200 }, () => ({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: Math.random() }));
   function stars() {
@@ -312,6 +314,8 @@ export function createDeadhead(c: DhCtx): Deadhead {
     hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); jvCar(); },
     on: () => onNow,
     tripId: () => trip?.id ?? null,
-    unlock: () => unlockAudio(el, dhAudio("boot")),
+    // 声 (audio 要素) と一緒に、効果音・合図の音 (AudioContext) も指で触れたときに動かしておく。
+    // 以前は橋に来たときに初めて作っていたので、iPad が音を止めたままになり BOOST の起動音が鳴らなかった
+    unlock: () => { unlockAudio(el, dhAudio("boot")); const a = c.ac(); try { if (a) { void a.resume(); const b = a.createBuffer(1, 1, 22050), s = a.createBufferSource(); s.buffer = b; s.connect(a.destination); s.start(0); } } catch { /* 鳴らせない端末 */ } },
   };
 }

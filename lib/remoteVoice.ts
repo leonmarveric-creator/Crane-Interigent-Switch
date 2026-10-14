@@ -56,7 +56,7 @@ export function startRemoteVoice(tripId: string, h: { /** この声を聞き取�
   /* iPad と直接 (Supabase Realtime): 声・返事・「鳴らせます」の印を回線でやり取りし、サーバーへは 5 秒に 1 回の確認だけにする。
      iPad の印が 10 秒届かなければ、今までどおり 1 秒ごとにサーバーへ聞く */
   const direct = () => rtOn() && Date.now() - heardAt < 10000;
-  let live = true, last = 0, playing = 0, busy = false, setupSaid = false;
+  let live = true, last = 0, playing = 0, busy = false, setupSaid = false; const lastU = new Set<string>();
   let ack = 0, ackSent = 0, skew = 0; // ack: 鳴らし始めた声の番号 / skew: サーバーの時計 − このスマホの時計
   const q: { u: string; n: number }[] = [];
   const fresh = (n: number) => Date.now() + skew - n < STALE_MS;
@@ -96,8 +96,10 @@ export function startRemoteVoice(tripId: string, h: { /** この声を聞き取�
   const onVis = () => { if (document.visibilityState === "visible") void resume(); };
   document.addEventListener("visibilitychange", onVis);
   function take(items: any[]) {
-    for (const it of items.filter((x: any) => Number(x.n) > last)) {
-      last = Math.max(last, Number(it.n));
+    // 同じ番号 (同時に送った効果音と声) でも、中身が違えば両方鳴らす
+    for (const it of items.filter((x: any) => Number(x.n) > last || (Number(x.n) === last && !lastU.has(String(x.u))))) {
+      if (Number(it.n) > last) lastU.clear();
+      last = Math.max(last, Number(it.n)); lastU.add(String(it.u));
       if (it.s === SFX_MARK) try { h.onPlay?.(String(it.u)); } catch { /* */ } // 何が鳴るかを知らせる (BOOST の準備の合図・起動の効果音)
       if (it.s === SFX_MARK) { void playFx(String(it.u)); continue; } // 効果音はすぐ鳴らす
       q.push({ u: String(it.u), n: Number(it.n) }); void load(String(it.u));

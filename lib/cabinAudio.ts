@@ -28,3 +28,25 @@ export function playSafe(el: HTMLAudioElement, wake: () => void, onFail: () => v
 }
 /** 声を止める (止めたあと、遅れて鳴り直さないように) */
 export function stopVoice(el: HTMLAudioElement) { (el as any).__vstop = true; (el as any).__vg = ((el as any).__vg || 0) + 1; try { el.pause(); } catch { /* */ } }
+
+/**
+ * 効果音を iPad で鳴らす (スマホが来ていないとき)。new Audio() は指で触れた直後でないと iPad が鳴らさないことがあるので、
+ * 一度動き出した AudioContext (ac) で鳴らす。読み込んだ音は覚えておく (2 回目からすぐ鳴る)
+ */
+const fxCache = new Map<string, Promise<AudioBuffer | null>>();
+export function playFxUrl(ac: AudioContext | null, url: string): void {
+  if (!ac) { const a = new Audio(url); a.play().catch(() => {}); return; }
+  if (!fxCache.has(url)) {
+    const p = fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((b) => new Promise<AudioBuffer | null>((ok) => ac.decodeAudioData(b, ok, () => ok(null)))).catch(() => null);
+    fxCache.set(url, p); void p.then((b) => { if (!b) fxCache.delete(url); });
+  }
+  void fxCache.get(url)!.then((buf) => {
+    if (!buf) { const a = new Audio(url); a.play().catch(() => {}); return; }
+    const play = () => { try { const s = ac.createBufferSource(); s.buffer = buf; s.connect(ac.destination); s.start(); } catch { /* 鳴らせなくても続ける */ } };
+    if (ac.state === "running") return play();
+    // 音が止められている (指で触れていない) → 動かしてみて、だめなら audio 要素で鳴らす (無音で終わらせない)
+    void ac.resume().catch(() => {});
+    setTimeout(() => { if (ac.state === "running") play(); else { const a = new Audio(url); a.play().catch(() => {}); } }, 250);
+  });
+}
