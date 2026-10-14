@@ -11,20 +11,24 @@ import type { AdminLang } from "@/lib/adminI18n";
 import type { Part, RoomLive } from "@/lib/buildingState";
 
 /** public/holo/building.html の版 (building.js を作り直したら合わせる) */
-export const BUILDING_V = "02b5b74763";
+export const BUILDING_V = "418ef50b8e";
 const POLL_MS = 20000;
+/** 便槽 (地下) は 1 日ごとにしか変わらないので 5 分ごと */
+const TANK_MS = 300000;
+interface TankLive { pct: number; liters: number; cap: number; status: "safe" | "caution" | "alert"; caution: number; alert: number; smell: number; days: number | null }
 
 const TX: Record<AdminLang, Record<string, string>> = {
-  ja: { title: "LIVE · 建物の今の状態", hide: "閉じる", show: "ひらく", ceil: "天井", wa: "和の灯り", ac: "エアコン", galaxy: "ギャラクシー", nest: "NEST", stay: "宿泊中", soon: "到着予定", vacant: "空室", alert: "空室なのについています", off: "すべて OFF", none: "記録なし", hookOn: "SwitchBot の知らせ: 受信中", hookOff: "SwitchBot の知らせを登録", hookSql: "SQL（migration_device_state.sql）を実行してください", hookOther: "このアカウントには別の URL が登録済みです（上書きしません）", hookDone: "登録しました", hookFail: "登録できませんでした", note: "天井・エアコンは赤外線リモコンなので「最後に送った操作」です。和の灯りなどは SwitchBot の知らせで、壁スイッチやアプリでの変更も反映されます。", cool: "冷房", heat: "暖房", on: "ON", ago: "前" },
-  en: { title: "LIVE · Building now", hide: "Hide", show: "Show", ceil: "Ceiling", wa: "Wa light", ac: "AC", galaxy: "Galaxy", nest: "NEST", stay: "Staying", soon: "Arriving", vacant: "Vacant", alert: "On in a vacant room", off: "All off", none: "No record", hookOn: "SwitchBot updates: receiving", hookOff: "Register SwitchBot updates", hookSql: "Run the SQL (migration_device_state.sql)", hookOther: "Another URL is already registered for this account (not overwritten)", hookDone: "Registered", hookFail: "Could not register", note: "Ceiling and AC are IR remotes, so this is the last command sent. Wa light etc. come from SwitchBot updates, including wall-switch and app changes.", cool: "Cool", heat: "Heat", on: "ON", ago: "ago" },
-  zh: { title: "LIVE · 建筑当前状态", hide: "收起", show: "展开", ceil: "顶灯", wa: "和风灯", ac: "空调", galaxy: "星空灯", nest: "NEST", stay: "入住中", soon: "即将到达", vacant: "空房", alert: "空房但设备开着", off: "全部关闭", none: "无记录", hookOn: "SwitchBot 通知：接收中", hookOff: "登记 SwitchBot 通知", hookSql: "请执行 SQL（migration_device_state.sql）", hookOther: "该账号已登记其他 URL（不覆盖）", hookDone: "已登记", hookFail: "登记失败", note: "顶灯和空调是红外遥控，显示的是最后发送的操作。和风灯等来自 SwitchBot 通知，墙上开关或 App 的变更也会反映。", cool: "制冷", heat: "制热", on: "开", ago: "前" },
+  ja: { title: "LIVE · 建物の今の状態", hide: "閉じる", show: "ひらく", ceil: "天井", wa: "和の灯り", ac: "エアコン", galaxy: "ギャラクシー", nest: "NEST", stay: "宿泊中", soon: "到着予定", vacant: "空室", alert: "空室なのについています", off: "すべて OFF", none: "記録なし", hookOn: "SwitchBot の知らせ: 受信中", hookOff: "SwitchBot の知らせを登録", hookSql: "SQL（migration_device_state.sql）を実行してください", hookOther: "このアカウントには別の URL が登録済みです（上書きしません）", hookDone: "登録しました", hookFail: "登録できませんでした", tank: "便槽", tankDays: "警告まで約 {d} 日", note: "天井・エアコンは赤外線リモコンなので「最後に送った操作」です。和の灯りなどは SwitchBot の知らせで、壁スイッチやアプリでの変更も反映されます。", cool: "冷房", heat: "暖房", on: "ON", ago: "前" },
+  en: { title: "LIVE · Building now", hide: "Hide", show: "Show", ceil: "Ceiling", wa: "Wa light", ac: "AC", galaxy: "Galaxy", nest: "NEST", stay: "Staying", soon: "Arriving", vacant: "Vacant", alert: "On in a vacant room", off: "All off", none: "No record", hookOn: "SwitchBot updates: receiving", hookOff: "Register SwitchBot updates", hookSql: "Run the SQL (migration_device_state.sql)", hookOther: "Another URL is already registered for this account (not overwritten)", hookDone: "Registered", hookFail: "Could not register", tank: "Tank", tankDays: "~{d} days to alert", note: "Ceiling and AC are IR remotes, so this is the last command sent. Wa light etc. come from SwitchBot updates, including wall-switch and app changes.", cool: "Cool", heat: "Heat", on: "ON", ago: "ago" },
+  zh: { title: "LIVE · 建筑当前状态", hide: "收起", show: "展开", ceil: "顶灯", wa: "和风灯", ac: "空调", galaxy: "星空灯", nest: "NEST", stay: "入住中", soon: "即将到达", vacant: "空房", alert: "空房但设备开着", off: "全部关闭", none: "无记录", hookOn: "SwitchBot 通知：接收中", hookOff: "登记 SwitchBot 通知", hookSql: "请执行 SQL（migration_device_state.sql）", hookOther: "该账号已登记其他 URL（不覆盖）", hookDone: "已登记", hookFail: "登记失败", tank: "便槽", tankDays: "约 {d} 天到警戒", note: "顶灯和空调是红外遥控，显示的是最后发送的操作。和风灯等来自 SwitchBot 通知，墙上开关或 App 的变更也会反映。", cool: "制冷", heat: "制热", on: "开", ago: "前" },
 };
 const BY: Record<AdminLang, Record<string, string>> = { ja: { guest: "ゲスト", admin: "管理", cron: "自動" }, en: { guest: "guest", admin: "admin", cron: "auto" }, zh: { guest: "客人", admin: "管理", cron: "自动" } };
 const ago = (ms: number, x: Record<string, string>) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? `${m}m ${x.ago}` : m < 1440 ? `${Math.round(m / 60)}h ${x.ago}` : `${Math.round(m / 1440)}d ${x.ago}`; };
 
 export default function LiveBuilding({ lang }: { lang: AdminLang }) {
   const x = TX[lang] ?? TX.ja;
-  const [open, setOpen] = useState(true), [data, setData] = useState<{ rooms: RoomLive[]; hooks: { setup: boolean; n: number } } | null>(null), [msg, setMsg] = useState("");
+  const [open, setOpen] = useState(true), [data, setData] = useState<{ rooms: RoomLive[]; hooks: { setup: boolean; n: number } } | null>(null), [msg, setMsg] = useState(""), [tank, setTank] = useState<TankLive | null>(null);
+  const tankRef = useRef<TankLive | null>(null);
   const box = useRef<HTMLDivElement>(null), fr = useRef<HTMLIFrameElement>(null), ready = useRef(false), vis = useRef(true);
   useEffect(() => { try { if (localStorage.getItem("cnLiveOpen") === "0") setOpen(false); } catch { /* */ } }, []);
   const toggle = () => setOpen((o) => { try { localStorage.setItem("cnLiveOpen", o ? "0" : "1"); } catch { /* */ } return !o; });
@@ -38,13 +42,24 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
     const j = await fetch("/api/admin/live", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
     if (j?.ok) { setData({ rooms: j.rooms, hooks: j.hooks }); if (ready.current) post({ rooms: toHolo(j.rooms) }); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 地下の便槽 (便槽モニタリングと同じ計算: /api/admin/tank)
+  const loadTank = useCallback(async () => {
+    if (!vis.current || document.hidden) return;
+    const j = await fetch("/api/admin/tank", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const sm = j?.summary; if (!sm || typeof j.capacityLiters !== "number") return;
+    const cap = j.capacityLiters || 300;
+    const t: TankLive = { pct: Number(sm.pct) || 0, liters: Number(j.currentLiters) || 0, cap, status: sm.status === "alert" || sm.status === "caution" ? sm.status : "safe",
+      caution: (sm.cautionLine ?? cap * .7) / cap, alert: (sm.alertLine ?? cap * .8) / cap, smell: (sm.smellLine ?? cap * .9) / cap, days: typeof sm.forecastDays === "number" ? sm.forecastDays : null };
+    tankRef.current = t; setTank(t); if (ready.current) post({ tank: t });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void loadTank(); const t = setInterval(loadTank, TANK_MS); return () => clearInterval(t); }, [loadTank]);
   useEffect(() => {
     void load(); const t = setInterval(load, POLL_MS);
     const onVis = () => { post({ pause: document.hidden }); if (!document.hidden) void load(); };
     document.addEventListener("visibilitychange", onVis);
     const el = box.current; let io: IntersectionObserver | null = null;
     if (el && typeof IntersectionObserver !== "undefined") { io = new IntersectionObserver(([e]) => { vis.current = e.isIntersecting; post({ pause: !e.isIntersecting }); if (e.isIntersecting) void load(); }); io.observe(el); }
-    const onMsg = (e: MessageEvent) => { if (e.origin !== location.origin || e.source !== fr.current?.contentWindow || !e.data?.ready) return; ready.current = true; if (data) post({ rooms: toHolo(data.rooms) }); else void load(); };
+    const onMsg = (e: MessageEvent) => { if (e.origin !== location.origin || e.source !== fr.current?.contentWindow || !e.data?.ready) return; ready.current = true; void load(); if (tankRef.current) post({ tank: tankRef.current }); else void loadTank(); };
     window.addEventListener("message", onMsg);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); io?.disconnect(); window.removeEventListener("message", onMsg); };
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,6 +106,14 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
             {r.alert && <span className="text-[10.5px] font-semibold text-rose-300">⚠ {x.alert}</span>}
           </div>
         ))}
+        {tank && (
+          <a href="/admin/tank" className={`flex flex-wrap items-center gap-1.5 rounded px-1.5 py-1 ${tank.status === "alert" ? "bg-rose-500/10 ring-1 ring-rose-400/50" : ""}`}>
+            <b className="min-w-[2.2em] text-sm text-white">{x.tank}</b>
+            <span className={`rounded px-1.5 py-0.5 text-[10.5px] ${tank.status === "alert" ? "bg-rose-500/25 text-rose-100" : tank.status === "caution" ? "bg-amber-400/20 text-amber-100" : "bg-cyan-300/15 text-cyan-50"}`}>{tank.pct}%</span>
+            <span className="text-[10.5px] text-white/55">{Math.round(tank.liters)} / {tank.cap} L{tank.days != null ? ` · ${x.tankDays.replace("{d}", String(tank.days))}` : ""}</span>
+            <span className="text-[10.5px] text-cyan-300/70">›</span>
+          </a>
+        )}
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[10.5px] text-white/40">
           {data && (data.hooks.setup ? (data.hooks.n > 0 ? <span className="text-emerald-300/80">⚡ {x.hookOn}</span>
             : <button onClick={hook} className="rounded border border-cyan-300/30 px-2 py-0.5 text-cyan-200">⚡ {x.hookOff}</button>) : <span className="text-amber-300/80">{x.hookSql}</span>)}

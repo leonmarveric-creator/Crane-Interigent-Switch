@@ -40,3 +40,12 @@ test("deadhead BOOST: the iPad's effect-sound AudioContext is started on touch, 
   assert.match(R("components/cabin/CabinApp.tsx"), /document\.addEventListener\("pointerdown", wake, true\)/);
   assert.match(R("lib/cabinAudio.ts"), /if \(ac\.state === "running"\) play\(\); else \{ const a = new Audio\(url\); a\.play\(\)/);
 });
+test("admin LIVE: septic tank underground in the building hologram, same numbers as the tank monitor", () => {
+  const c = R("components/admin/LiveBuilding.tsx");
+  assert.match(c, /fetch\("\/api\/admin\/tank"/);
+  assert.match(c, /const TANK_MS = 300000;/); // changes daily → every 5 min, only while visible
+  assert.match(c, /post\(\{ tank: t \}\)/);
+  assert.match(c, /href="\/admin\/tank"/);
+  const js = R("public/holo/building.js");
+  assert.match(js, /便槽|\\u4FBF\\u69FD/);
+});
