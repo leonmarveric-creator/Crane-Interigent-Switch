@@ -30,7 +30,7 @@ export interface Room {
   nest_device_id: string | null;
   wafu_device_id: string | null;
   /** エアコンの暖房・冷房 (migration_ac_climate.sql。未実行なら null) */
-  ac_climate?: { policy: string; cool_cmd: string; heat_cmd: string; off_cmd: string; cool_temp: number; heat_temp: number } | null;
+  ac_climate?: { policy: string; cool_cmd: string; heat_cmd: string; off_cmd: string; cool_temp: number; heat_temp: number; cool_dev?: string; heat_dev?: string } | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
   has_lock?: boolean;
@@ -784,6 +784,17 @@ function RoomManageCard({
                   <option value="heat">いつも暖房</option>
                 </select>
               </label>
+              <label className="text-[11px] text-sky-300/80">冷房用のエアコン
+                <select name="cool_dev" defaultValue={room.ac_climate.cool_dev ?? ""} className={`${selCls} mt-1 py-2 text-xs`}>
+                  <option value="">（使わない）</option>{acs.map(opt)}
+                </select>
+              </label>
+              <label className="text-[11px] text-orange-300/80">暖房用のエアコン
+                <select name="heat_dev" defaultValue={room.ac_climate.heat_dev ?? ""} className={`${selCls} mt-1 py-2 text-xs`}>
+                  <option value="">（使わない）</option>{acs.map(opt)}
+                </select>
+              </label>
+              <p className="col-span-2 text-[10px] leading-relaxed text-white/40">SwitchBot で冷房と暖房を別の機器として登録している場合は、上の 2 つを選ぶだけで OK です（下のボタン名は空欄のまま）。消すときは「デバイス割り当て」のエアコンで消します。</p>
               <label className="text-[11px] text-sky-300/80">冷房のボタン名（DIY）
                 <input name="cool_cmd" defaultValue={room.ac_climate.cool_cmd} placeholder="例：冷房" className={`${selCls} mt-1 py-2 text-xs`} />
               </label>

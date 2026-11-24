@@ -68,10 +68,18 @@ async function applyWafuWarm(creds: SwitchBotCreds, deviceId: string): Promise<b
 }
 
 /** シーン共通: エアコンを適温でつける。冷房 / 暖房は lib/acClimate (部屋の設定 → 外の気温 + 季節) で決める。
- *  DIY 登録で「冷房」「暖房」のボタン名が入っていればそのボタンを押す。無ければ setAll (エアコンとして登録した場合)。デバイス未設定なら true。 */
+ *  ① 冷房用・暖房用のエアコンを別々に登録していれば (SwitchBot で「冷房」「暖房」を別の機器として登録)、その機器の電源 ON
+ *  ② DIY の「冷房」「暖房」ボタン名が入っていればそのボタン
+ *  ③ どちらも無ければ setAll (エアコンとして登録した場合)。デバイス未設定なら true。 */
 async function sceneAcComfort(creds: SwitchBotCreds, room: any): Promise<boolean> {
   if (!room.switchbot_ac_device_id) return true;
   const { mode } = await acModeFor(room);
+  const dev = String((mode === "cool" ? room.ac_cool_device_id : room.ac_heat_device_id) ?? "").trim();
+  if (dev) {
+    let r = await acTurnOn(creds, dev);
+    if (!r.ok) r = await deviceTurnOn(creds, dev);
+    return r.ok;
+  }
   const cmd = String((mode === "cool" ? room.ac_cool_cmd : room.ac_heat_cmd) ?? "").trim();
   let r;
   if (cmd) r = await irCustomButton(creds, room.switchbot_ac_device_id, cmd);
@@ -82,6 +90,9 @@ async function sceneAcComfort(creds: SwitchBotCreds, room: any): Promise<boolean
   }
   return r.ok;
 }
+
+/** 冷房・暖房を分けて登録しているか (ON をシーン扱いにする) */
+const acSplit = (room: any) => !!(room.ac_cool_device_id || room.ac_heat_device_id || room.ac_cool_cmd || room.ac_heat_cmd);
 
 /** エアコンを消す。DIY の「停止」ボタン名があればそれを押す (別のボタンなので 2 回押しても点かない → 取りこぼし対策で少し空けてもう 1 回) */
 async function acOff(creds: SwitchBotCreds, room: any): Promise<boolean> {
@@ -168,7 +179,7 @@ export async function executeDeviceAction(
       if (!room.switchbot_ac_device_id) return { ok: false, error: "NO_AC" };
       // ON: DIY の「冷房」「暖房」ボタンが登録されていれば、季節 + 気温で選んだ方を押す (無ければ今までどおり電源 ON)
       const r = action === "ac_on"
-        ? ((room.ac_cool_cmd || room.ac_heat_cmd) ? { ok: await sceneAcComfort(sbCreds, room) } : await acTurnOn(sbCreds, room.switchbot_ac_device_id))
+        ? (acSplit(room) ? { ok: await sceneAcComfort(sbCreds, room) } : await acTurnOn(sbCreds, room.switchbot_ac_device_id))
         : { ok: await acOff(sbCreds, room) };
       return { ok: r.ok };
     }

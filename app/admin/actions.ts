@@ -134,6 +134,12 @@ export async function saveAcClimate(formData: FormData) {
     ac_policy: policy, ac_cool_cmd: s("cool_cmd"), ac_heat_cmd: s("heat_cmd"), ac_off_cmd: s("off_cmd"),
     ac_cool_temp: n("cool_temp", 26), ac_heat_temp: n("heat_temp", 23),
   }).eq("id", room_id);
+  // 冷房用・暖房用のエアコン (別の機器として登録している場合)。migration_ac_devices.sql が必要
+  if (!error) {
+    const d = (k: string) => String(formData.get(k) || "").trim().slice(0, 80) || null;
+    const { error: e2 } = await supabaseAdmin.from("rooms").update({ ac_cool_device_id: d("cool_dev"), ac_heat_device_id: d("heat_dev") }).eq("id", room_id);
+    if (e2) throw new Error("migration_ac_devices.sql を実行してください: " + e2.message);
+  }
   if (error) throw new Error("migration_ac_climate.sql を実行してください: " + error.message);
   revalidatePath("/admin");
 }
