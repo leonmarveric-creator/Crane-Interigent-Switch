@@ -120,6 +120,11 @@ export function acSetAll(
   });
 }
 
+/** DIY (学習リモコン) のボタンを押す: SwitchBot アプリで付けたボタンの名前をそのまま送る (例: 「暖房」「冷房」「停止」) */
+export function irCustomButton(creds: SwitchBotCreds, deviceId: string, name: string) {
+  return sendCommand(creds, deviceId, { command: name, parameter: "default", commandType: "customize" });
+}
+
 /**
  * 汎用デバイス: ON / OFF。
  * SwitchBot Bot / Plug Mini などの物理デバイスも仮想IRも turnOn/turnOff で動く。

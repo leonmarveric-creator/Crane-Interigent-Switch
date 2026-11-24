@@ -1,8 +1,9 @@
 import { sendSesameCommand, SESAME_CMD } from "./sesame";
 import {
   acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, deviceTurnOn, deviceTurnOff,
-  bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, type SwitchBotCreds,
+  bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, irCustomButton, type SwitchBotCreds,
 } from "./switchbot";
+import { acModeFor } from "./acClimate";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { DREAM_FADE_START } from "./dreamFade";
 
@@ -66,15 +67,31 @@ async function applyWafuWarm(creds: SwitchBotCreds, deviceId: string): Promise<b
   return b.ok && t.ok;
 }
 
-/** シーン共通: エアコンを季節判定で適温ON (冷房/暖房)。デバイス未設定なら true。 */
+/** シーン共通: エアコンを適温でつける。冷房 / 暖房は lib/acClimate (部屋の設定 → 外の気温 + 季節) で決める。
+ *  DIY 登録で「冷房」「暖房」のボタン名が入っていればそのボタンを押す。無ければ setAll (エアコンとして登録した場合)。デバイス未設定なら true。 */
 async function sceneAcComfort(creds: SwitchBotCreds, room: any): Promise<boolean> {
   if (!room.switchbot_ac_device_id) return true;
-  const m = Number(new Date().toLocaleString("en-US", { month: "numeric", timeZone: "Asia/Tokyo" }));
-  const cool = m >= 5 && m <= 10; // 5〜10月は冷房
-  let r = await acSetAll(creds, room.switchbot_ac_device_id,
-    { temp: cool ? 26 : 24, mode: cool ? 2 : 5, fan: 1, power: "on" });
-  if (!r.ok) r = await acTurnOn(creds, room.switchbot_ac_device_id); // DIY等フォールバック
+  const { mode } = await acModeFor(room);
+  const cmd = String((mode === "cool" ? room.ac_cool_cmd : room.ac_heat_cmd) ?? "").trim();
+  let r;
+  if (cmd) r = await irCustomButton(creds, room.switchbot_ac_device_id, cmd);
+  else {
+    const temp = mode === "cool" ? Number(room.ac_cool_temp ?? 26) : Number(room.ac_heat_temp ?? 23);
+    r = await acSetAll(creds, room.switchbot_ac_device_id, { temp: Math.max(16, Math.min(30, temp || 25)), mode: mode === "cool" ? 2 : 5, fan: 1, power: "on" });
+    if (!r.ok) r = await acTurnOn(creds, room.switchbot_ac_device_id); // DIY等フォールバック
+  }
   return r.ok;
+}
+
+/** エアコンを消す。DIY の「停止」ボタン名があればそれを押す (別のボタンなので 2 回押しても点かない → 取りこぼし対策で少し空けてもう 1 回) */
+async function acOff(creds: SwitchBotCreds, room: any): Promise<boolean> {
+  if (!room.switchbot_ac_device_id) return true;
+  const off = String(room.ac_off_cmd ?? "").trim();
+  if (!off) return (await acTurnOff(creds, room.switchbot_ac_device_id)).ok;
+  const r = await irCustomButton(creds, room.switchbot_ac_device_id, off);
+  await new Promise((ok) => setTimeout(ok, 2500));
+  const r2 = await irCustomButton(creds, room.switchbot_ac_device_id, off);
+  return r.ok || r2.ok;
 }
 
 /** 操作ログを記録 (失敗しても本処理は止めない)。 */
@@ -149,9 +166,10 @@ export async function executeDeviceAction(
     case "ac_on":
     case "ac_off": {
       if (!room.switchbot_ac_device_id) return { ok: false, error: "NO_AC" };
+      // ON: DIY の「冷房」「暖房」ボタンが登録されていれば、季節 + 気温で選んだ方を押す (無ければ今までどおり電源 ON)
       const r = action === "ac_on"
-        ? await acTurnOn(sbCreds, room.switchbot_ac_device_id)
-        : await acTurnOff(sbCreds, room.switchbot_ac_device_id);
+        ? ((room.ac_cool_cmd || room.ac_heat_cmd) ? { ok: await sceneAcComfort(sbCreds, room) } : await acTurnOn(sbCreds, room.switchbot_ac_device_id))
+        : { ok: await acOff(sbCreds, room) };
       return { ok: r.ok };
     }
     case "light_on":
@@ -301,7 +319,7 @@ export async function executeDeviceAction(
     case "away": {
       // 外出: エアコン + 照明 + ギャラクシー + NEST OFF
       const all = await Promise.all([
-        safe(async () => !room.switchbot_ac_device_id || (await acTurnOff(sbCreds, room.switchbot_ac_device_id)).ok),
+        safe(() => acOff(sbCreds, room)),
         offLight(), offGalaxy(), offNest(), offWafu(),
       ]);
       return { ok: all.every(Boolean) };

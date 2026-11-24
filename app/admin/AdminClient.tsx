@@ -13,7 +13,7 @@ import {
   AT, ADMIN_LANGS, ADMIN_LANG_LABEL, isAdminLang, type AdminLang,
 } from "@/lib/adminI18n";
 import {
-  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom, assignReservation,
+  addReservation, cancelReservation, regeneratePin, setPin, assignDevices, saveAcClimate, updateRoomImage, uploadRoomImage, updateGeofence, syncNow, renameRoom, addRoom, assignReservation,
 } from "./actions";
 import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
@@ -29,6 +29,8 @@ export interface Room {
   galaxy_device_id: string | null;
   nest_device_id: string | null;
   wafu_device_id: string | null;
+  /** エアコンの暖房・冷房 (migration_ac_climate.sql。未実行なら null) */
+  ac_climate?: { policy: string; cool_cmd: string; heat_cmd: string; off_cmd: string; cool_temp: number; heat_temp: number } | null;
   image_url: string | null;
   lat: number | null; lng: number | null; radius: number;
   has_lock?: boolean;
@@ -765,6 +767,46 @@ function RoomManageCard({
           </form>
         )}
       </div>
+
+      {/* エアコンの暖房・冷房 (DIY 登録は SwitchBot アプリのボタン名をそのまま) */}
+      {room.ac_device_id && (
+        <div className="border-t border-white/10 p-4">
+          {!room.ac_climate ? (
+            <p className="text-[11px] text-amber-300/80">❄️🔥 暖房・冷房の登録には Supabase で supabase/migration_ac_climate.sql を実行してください</p>
+          ) : (
+            <form action={saveAcClimate} className="grid grid-cols-2 gap-2">
+              <input type="hidden" name="room_id" value={room.id} />
+              <p className="col-span-2 text-[11px] font-bold tracking-widest text-sky-200/80">❄️🔥 エアコン（暖房・冷房）</p>
+              <label className="col-span-2 text-[11px] text-white/50">つけ方
+                <select name="policy" defaultValue={room.ac_climate.policy} className={`${selCls} mt-1 py-2 text-xs`}>
+                  <option value="auto">自動（季節 + 外の気温：24℃以上→冷房／18℃以下→暖房）</option>
+                  <option value="cool">いつも冷房</option>
+                  <option value="heat">いつも暖房</option>
+                </select>
+              </label>
+              <label className="text-[11px] text-sky-300/80">冷房のボタン名（DIY）
+                <input name="cool_cmd" defaultValue={room.ac_climate.cool_cmd} placeholder="例：冷房" className={`${selCls} mt-1 py-2 text-xs`} />
+              </label>
+              <label className="text-[11px] text-orange-300/80">暖房のボタン名（DIY）
+                <input name="heat_cmd" defaultValue={room.ac_climate.heat_cmd} placeholder="例：暖房" className={`${selCls} mt-1 py-2 text-xs`} />
+              </label>
+              <label className="text-[11px] text-white/50">停止のボタン名（DIY・任意）
+                <input name="off_cmd" defaultValue={room.ac_climate.off_cmd} placeholder="例：停止" className={`${selCls} mt-1 py-2 text-xs`} />
+              </label>
+              <div className="flex gap-2">
+                <label className="flex-1 text-[11px] text-sky-300/80">冷房℃
+                  <input name="cool_temp" type="number" min={16} max={30} defaultValue={room.ac_climate.cool_temp} className={`${selCls} mt-1 py-2 text-xs`} />
+                </label>
+                <label className="flex-1 text-[11px] text-orange-300/80">暖房℃
+                  <input name="heat_temp" type="number" min={16} max={30} defaultValue={room.ac_climate.heat_temp} className={`${selCls} mt-1 py-2 text-xs`} />
+                </label>
+              </div>
+              <p className="col-span-2 text-[10px] leading-relaxed text-white/40">ボタン名は SwitchBot アプリでこのエアコンに学習させたボタンの名前と完全に同じにしてください（空欄なら「エアコン」登録として温度で指定）。℃は「エアコン」登録のときに使います。</p>
+              <div className="col-span-2"><SubmitButton savedText={t.saved} className="rounded-lg border border-emerald-400/50 bg-emerald-500/15 px-3 py-2 text-xs text-emerald-200">{t.save}</SubmitButton></div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* 画像: ファイルアップロード */}
       <form action={uploadRoomImage} className="flex items-end gap-2 border-t border-white/10 p-4">

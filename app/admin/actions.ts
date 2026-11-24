@@ -122,6 +122,22 @@ export async function assignDevices(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** エアコンの暖房・冷房の登録 (DIY のボタン名・温度・つけ方)。migration_ac_climate.sql が必要 */
+export async function saveAcClimate(formData: FormData) {
+  requireAdmin();
+  const room_id = String(formData.get("room_id") || "");
+  if (!room_id) return;
+  const s = (k: string) => String(formData.get(k) || "").trim().slice(0, 40) || null;
+  const n = (k: string, d: number) => { const v = Math.round(Number(formData.get(k))); return Number.isFinite(v) && v >= 16 && v <= 30 ? v : d; };
+  const policy = ["auto", "cool", "heat"].includes(String(formData.get("policy"))) ? String(formData.get("policy")) : "auto";
+  const { error } = await supabaseAdmin.from("rooms").update({
+    ac_policy: policy, ac_cool_cmd: s("cool_cmd"), ac_heat_cmd: s("heat_cmd"), ac_off_cmd: s("off_cmd"),
+    ac_cool_temp: n("cool_temp", 26), ac_heat_temp: n("heat_temp", 23),
+  }).eq("id", room_id);
+  if (error) throw new Error("migration_ac_climate.sql を実行してください: " + error.message);
+  revalidatePath("/admin");
+}
+
 /**
  * 予約を別の部屋へ「割り当て（寄せ）」。実際に泊まる物理部屋を上書きする。
  * 空文字なら解除（元の予約どおり）。看板の付け替え運用に対応。

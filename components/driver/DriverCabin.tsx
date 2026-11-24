@@ -61,6 +61,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     }, () => setSending("ng"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
     // 車内 iPad の声 (ASTRAEA・道案内) をこのスマホで鳴らす (Bluetooth で車のスピーカーへ)。話している間は音楽を小さく
     const rv = startRemoteVoice(trip.id, {
+      // ほかのアプリを使っている・画面が消えている間も、音楽と同じ audio 要素で ASTRAEA の声を鳴らす (iPhone は裏で Web Audio を止めるため)
+      bg: { ready: () => mRef.current.bgVoiceReady(), play: (u, started) => mRef.current.voiceOver(u, started) },
       // 聞き取りやすくする声 (設定: BOOST のときだけ / いつも / 使わない)
       clear: (u) => voiceClear(u, voiceModeNow),
       // ブースト開始のセリフと一緒に BOOST の曲を始め、完了のセリフと一緒にフェードアウト (元の曲へ)
@@ -76,7 +78,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       onBlocked: () => { if (Date.now() - blockedAt > 30000) { blockedAt = Date.now(); toast(t("🔇 スマホの音が止まっています。画面をタップすると ASTRAEA の声が戻ります（今は iPad が話します）")); } } });
     let blockedAt = 0;
     // 画面のどこかに触れたら音を戻す (iPhone は指で触れたときしか音を再開できない)
-    const reUnlock = () => unlockRemoteVoice();
+    const reUnlock = () => { unlockRemoteVoice(); try { mRef.current.prime(); } catch { /* */ } };
     document.addEventListener("pointerdown", reUnlock, true);
     let lastCmd: number | null = null; // 最初の返事にある操作は前のもの (実行しない)
     let firstPoll = true;
@@ -139,7 +141,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   }, [toast, t]);
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
-    unlockRemoteVoice(); // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
+    unlockRemoteVoice(); try { mRef.current.prime(); } catch { /* */ } // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
     const r = await cabinStart(v); rtKick(CABIN_CH);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));

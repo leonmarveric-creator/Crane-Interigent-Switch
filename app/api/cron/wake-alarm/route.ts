@@ -13,6 +13,7 @@ import { getWafuPrewakeStep, PREWAKE_WINDOW_MS } from "@/lib/wakePrewake";
 import { runDreamFade } from "@/lib/dreamFadeRunner";
 import { runDriverAuto } from "@/lib/driverRunner";
 import { syncAutoWakes } from "@/lib/wakeAuto";
+import { runCheckoutAutoOff } from "@/lib/checkoutAutoOff";
 
 export const runtime = "nodejs";
 
@@ -126,7 +127,11 @@ export async function GET(req: NextRequest) {
       .select("switchbot_light_device_id, switchbot_token, switchbot_secret")
       .eq("id", alarm.room_id)
       .maybeSingle();
-    if (!room?.switchbot_light_device_id) continue;
+    if (!room?.switchbot_light_device_id) {
+      // 照明が登録されていない部屋: 何も起きないので記録だけ残す (管理画面のログで分かるように)
+      await logDevice({ room_id: alarm.room_id, action: "wake_no_light", source: "cron", success: false });
+      continue;
+    }
 
     const creds: SwitchBotCreds = {
       token: room.switchbot_token ?? process.env.SWITCHBOT_TOKEN!,
@@ -212,6 +217,9 @@ export async function GET(req: NextRequest) {
   // お父さんの送迎画面: 自動準備・飛行機の自動確認・鍵の電池
   const driver = await runDriverAuto(nowMs).catch((e) => { console.error("driver auto failed", e); return null; });
   // 早朝便の自動光目覚まし: 夜 20:00〜朝 7:00 だけ、10 分に 1 回 (昼間は何もしない)。いつもの Cron の中で動くので、呼び出しは増えない
-  const autoWake = now.getUTCMinutes() % 10 < 2 ? await syncAutoWakes(nowMs).catch(() => 0) : null;
-  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, driver, autoWake, ranAt: nowIso });
+  // 早朝便の自動光目覚まし: 毎回確認する (以前は 10 分ごとの最初の 2 分だけ → Cron の間隔によっては一度も動かないことがあった。昼間は inWakeHours ですぐ終わる)
+  const autoWake = await syncAutoWakes(nowMs).catch(() => 0);
+  // チェックアウトボタンが押されなかった部屋: チェックアウト時刻に自動 OFF (lib/checkoutAutoOff)
+  const autoOff = await runCheckoutAutoOff(nowMs).catch((e) => { console.error("checkout auto off failed", e); return null; });
+  return NextResponse.json({ ok: true, fired, prewaked, wafuAutoOff, dreamFade, driver, autoWake, autoOff, ranAt: nowIso });
 }

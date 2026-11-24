@@ -30,6 +30,10 @@ export default async function AdminPage() {
     .order("check_in", { ascending: false })
     .limit(100);
 
+  // エアコンの暖房・冷房 (列が無ければ null → 画面に「SQL を実行してください」)
+  const { data: acRows, error: acErr } = await supabaseAdmin.from("rooms").select("id, ac_policy, ac_cool_cmd, ac_heat_cmd, ac_off_cmd, ac_cool_temp, ac_heat_temp");
+  const acMap = new Map<string, any>(acErr ? [] : ((acRows ?? []) as any[]).map((x) => [x.id, x]));
+
   // 部屋ごとの固定URL + 印刷用QR (これをドアに貼る)
   const rooms: Room[] = await Promise.all(
     (roomRows ?? []).map(async (r) => {
@@ -45,6 +49,7 @@ export default async function AdminPage() {
         galaxy_device_id: r.switchbot_galaxy_device_id ?? null,
         nest_device_id: r.switchbot_nest_device_id ?? null,
         wafu_device_id: r.switchbot_wafu_device_id ?? null,
+        ac_climate: acMap.has(r.id) ? (() => { const x = acMap.get(r.id); return { policy: x.ac_policy ?? "auto", cool_cmd: x.ac_cool_cmd ?? "", heat_cmd: x.ac_heat_cmd ?? "", off_cmd: x.ac_off_cmd ?? "", cool_temp: x.ac_cool_temp ?? 26, heat_temp: x.ac_heat_temp ?? 23 }; })() : null,
         image_url: r.image_url ?? null,
         lat: r.lat ?? null, lng: r.lng ?? null, radius: r.geofence_radius_m ?? 150,
         has_lock: !!(r.sesame_device_uuid && r.sesame_secret_key && r.sesame_api_key),

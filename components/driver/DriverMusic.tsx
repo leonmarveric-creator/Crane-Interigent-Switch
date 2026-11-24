@@ -38,6 +38,9 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const audio = useRef<HTMLAudioElement | null>(null);   // 画面がついているとき (Web Audio で音量を下げられる)
   const plain = useRef<HTMLAudioElement | null>(null);   // 画面が消えているとき (iPhone は Web Audio が止まるため)
   const onPlain = useRef(false);
+  const vEl = useRef<HTMLAudioElement | null>(null);    // ASTRAEA の声専用 (画面が消えている・ほかのアプリを使っている間)
+  const vFail = useRef(false);                          // 裏で声専用の要素が鳴らせなかった (画面に戻るまで iPad に任せる)
+  const vSwap = useRef(false);                          // 今、音楽の audio 要素で声を鳴らしている (この間の再生・終了の知らせは音楽として扱わない)
   const graph = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
   const blobUrl = useRef<string | null>(null);
   const fade = useRef<number>(0);
@@ -73,7 +76,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   const make = (routed: boolean) => {
     const a = new Audio(); a.preload = "auto";
     if (routed) a.crossOrigin = "anonymous"; // Web Audio に通すため (Supabase は CORS OK)
-    const mine = () => el() === a;
+    const mine = () => el() === a && !vSwap.current;
     a.addEventListener("timeupdate", () => { if (mine()) setPos(a.currentTime); });
     a.addEventListener("loadedmetadata", () => { if (mine()) setDur(a.duration || 0); });
     a.addEventListener("play", () => { if (mine()) setPlaying(true); });
@@ -104,7 +107,8 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       }
       if (graph.current && graph.current.ctx.state !== "running") void graph.current.ctx.resume();
     } catch { graph.current = null; }
-    for (const x of [main(), plainEl()]) {
+    const ve = (vEl.current ??= (() => { const v = new Audio(); v.preload = "auto"; return v; })());
+    for (const x of [main(), plainEl(), ve]) {
       if (x.dataset.primed || x.src) continue;
       x.dataset.primed = "1"; x.muted = true; x.src = "/audio/driver/prep.mp3";
       x.play().then(() => { x.pause(); x.muted = false; }).catch(() => { x.muted = false; });
@@ -129,6 +133,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   // 画面が消えたら普通の再生へ、ついたら Web Audio の再生へ (続きの位置から)
   useEffect(() => {
     const swap = () => {
+      if (document.visibilityState === "visible") vFail.current = false;
       const m = main(), p = plainEl();
       if (!graph.current) return;
       if (document.visibilityState === "hidden" && !onPlain.current && !m.paused) {
@@ -242,6 +247,44 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       duckWanted.current = on; if (!playing || switching.current) return;
       if (on && onPlain.current && graph.current && document.visibilityState === "visible") { backToMain(vol.current * 0.2); return; }
       fadeTo(on ? vol.current * 0.2 : vol.current, on ? 300 : 900);
+    },
+    /** 画面が消えている・ほかのアプリを使っている間でも、このスマホで声を鳴らせるか
+     *  (iPhone は裏に回ると Web Audio が止まる。普通の audio 要素なら鳴り続ける) */
+    bgVoiceReady(): boolean {
+      if (document.visibilityState !== "hidden") return false;
+      const p = plain.current;
+      return (onPlain.current && !!p && !p.paused) || (!!vEl.current?.dataset.primed && !vFail.current);
+    },
+    /** 裏に回っている間の声: 音楽が流れていれば、その audio 要素で声を鳴らし、終わったら同じ位置から曲に戻す
+     *  (iPhone は鳴っている要素なら裏でも中身を替えて鳴らせる)。音楽が止まっていれば声専用の要素で鳴らす。
+     *  started は声が鳴り始めた瞬間、戻り値は「最後まで鳴らせたか」(鳴らせなければ false → iPad が代わりに話す) */
+    voiceOver(url: string, started: () => void): Promise<boolean> {
+      return new Promise<boolean>((res) => {
+        const p = plain.current;
+        if (onPlain.current && p && !p.paused && !vSwap.current) {
+          const src = p.src, at = p.currentTime, loop = p.loop, v0 = p.volume;
+          let done = false;
+          const back = (ok: boolean) => {
+            if (done) return; done = true; p.onended = null;
+            if (p.src !== new URL(url, location.href).href) { vSwap.current = false; res(ok); return; } // 途中で曲が替わった (BOOST など): そのまま
+            p.loop = loop; p.src = src;
+            const go = () => { try { p.currentTime = at; } catch { /* ignore */ } p.volume = v0; p.play().catch(() => {}).finally(() => { vSwap.current = false; }); };
+            if (p.readyState >= 1) go(); else p.addEventListener("loadedmetadata", go, { once: true });
+            setTimeout(() => { vSwap.current = false; }, 5000);
+            res(ok);
+          };
+          vSwap.current = true; p.loop = false; p.volume = 1; p.src = url;
+          p.onended = () => back(true);
+          p.play().then(() => { started(); setTimeout(() => back(true), ((p.duration || 20) + 1.5) * 1000); }).catch(() => back(false));
+          return;
+        }
+        const v = vEl.current;
+        if (!v || !v.dataset.primed) { res(false); return; }
+        v.src = url; v.volume = 1;
+        let done = false; const fin = (ok: boolean) => { if (!done) { done = true; v.onended = null; res(ok); } };
+        v.onended = () => fin(true);
+        v.play().then(() => { started(); setTimeout(() => fin(true), ((v.duration || 20) + 1.5) * 1000); }).catch(() => { vFail.current = true; fin(false); });
+      });
     },
     /** 次に流す: 予約 (今の曲の終わりに流れる。何曲でも順番に) */
     queue, queued: (id: string) => queue.indexOf(id),

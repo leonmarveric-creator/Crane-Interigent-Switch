@@ -51,7 +51,10 @@ function load(u: string): Promise<AudioBuffer | null> {
   }
   return cache.get(u)!;
 }
-export function startRemoteVoice(tripId: string, h: { /** この声を聞き取りやすくするか (lib/cabinVoice) */ clear?: (u: string) => boolean; onStart?: () => void; onEnd?: () => void; onSetup?: () => void; /** 声を鳴らす直前 (どの声か) */ onPlay?: (u: string) => void; /** iPhone が音を止めていて鳴らせなかった (指で画面に触れると戻る) */ onBlocked?: () => void } = {}): RemoteVoice {
+export function startRemoteVoice(tripId: string, h: {
+  /** 画面が消えている・ほかのアプリを使っている間の鳴らし方 (Web Audio は iPhone が裏で止めるので、普通の audio 要素で鳴らす。DriverMusic の voiceOver) */
+  bg?: { ready(): boolean; play(u: string, started: () => void): Promise<boolean> };
+  /** この声を聞き取りやすくするか (lib/cabinVoice) */ clear?: (u: string) => boolean; onStart?: () => void; onEnd?: () => void; onSetup?: () => void; /** 声を鳴らす直前 (どの声か) */ onPlay?: (u: string) => void; /** iPhone が音を止めていて鳴らせなかった (指で画面に触れると戻る) */ onBlocked?: () => void } = {}): RemoteVoice {
   let okAt = 0, heardAt = 0, pollAt = 0;
   /* iPad と直接 (Supabase Realtime): 声・返事・「鳴らせます」の印を回線でやり取りし、サーバーへは 5 秒に 1 回の確認だけにする。
      iPad の印が 10 秒届かなければ、今までどおり 1 秒ごとにサーバーへ聞く */
@@ -60,6 +63,16 @@ export function startRemoteVoice(tripId: string, h: { /** この声を聞き取�
   let ack = 0, ackSent = 0, skew = 0; // ack: 鳴らし始めた声の番号 / skew: サーバーの時計 − このスマホの時計
   const q: { u: string; n: number }[] = [];
   const fresh = (n: number) => Date.now() + skew - n < STALE_MS;
+  const hidden = () => document.visibilityState === "hidden";
+  /** 今このスマホで声を鳴らせるか: 画面が出ていれば Web Audio、裏に回っていれば普通の audio 要素 */
+  const ready = () => (hidden() ? !!h.bg?.ready() || voiceReady() : voiceReady());
+  /** 鳴らし始めた: 番号をすぐ返す (遅れると iPad が自分で鳴らしてしまう)。after を大きくして声は受け取らない */
+  const started = (n: number, u: string) => {
+    ack = Math.max(ack, n);
+    rtSend(CABIN_CH, "a", { t: tripId, n: ack });
+    { const a0 = ack; void fetch(`/api/cabin/voice?t=${tripId}&after=9999999999999999&ready=1&ack=${a0}`, { cache: "no-store" }).then((x) => x.json()).then((r) => { if (r?.ok) ackSent = Math.max(ackSent, a0); }).catch(() => {}); }
+    try { h.onPlay?.(u); } catch { /* */ }
+  };
   async function resume(): Promise<boolean> {
     if (!AC) return false;
     if (AC.state !== "running") await AC.resume().catch(() => {});
@@ -69,15 +82,17 @@ export function startRemoteVoice(tripId: string, h: { /** この声を聞き取�
     if (busy || !q.length || !AC) return; busy = true; const it = q.shift()!;
     try {
       if (!fresh(it.n)) { /* 遅れて届いた声は iPad が鳴らしている */ }
+      else if (hidden() && h.bg?.ready()) {
+        // 裏に回っている (ほかのアプリ・画面オフ): 普通の audio 要素で鳴らす。鳴らせなければ iPad が代わりに話す
+        const ok = await h.bg.play(it.u, () => started(it.n, it.u));
+        if (!ok && ack < it.n) h.onBlocked?.();
+      }
       else if (!(await resume())) h.onBlocked?.(); // 鳴らしたことにしない → iPad が代わりに鳴らす
       else {
         const buf = await load(it.u);
         if (buf && live && fresh(it.n)) {
-          ack = Math.max(ack, it.n); // 鳴らし始めた (iPad はこれを見て自分の声を消す)
-          // 返事は次の 1 秒ごとの問い合わせを待たずに、すぐ送る (遅れると iPad が自分で鳴らしてしまう)。after を大きくして声は受け取らない
-          rtSend(CABIN_CH, "a", { t: tripId, n: ack });
-          { const a0 = ack; void fetch(`/api/cabin/voice?t=${tripId}&after=9999999999999999&ready=1&ack=${a0}`, { cache: "no-store" }).then((x) => x.json()).then((r) => { if (r?.ok) ackSent = Math.max(ackSent, a0); }).catch(() => {}); }
-          playing++; try { h.onPlay?.(it.u); } catch { /* */ } h.onStart?.();
+          started(it.n, it.u); // 鳴らし始めた (iPad はこれを見て自分の声を消す)
+          playing++; h.onStart?.();
           await new Promise<void>((ok) => { const s = AC!.createBufferSource(); s.buffer = buf; s.connect(h.clear?.(it.u) ? clearChain(AC!) : AC!.destination); s.onended = () => ok(); s.start(); setTimeout(ok, buf.duration * 1000 + 500); });
           playing--; if (!playing) h.onEnd?.();
         }
@@ -111,13 +126,13 @@ export function startRemoteVoice(tripId: string, h: { /** この声を聞き取�
     if (ev === "hb") { heardAt = Date.now(); return; }
     if (ev === "v" && p.u && Number(p.n) > 0) { heardAt = Date.now(); take([{ u: p.u, s: p.s, n: Number(p.n) }]); }
   });
-  const pr = setInterval(() => { if (live) rtSend(CABIN_CH, "pr", { t: tripId, ready: voiceReady() }); }, 2000);
+  const pr = setInterval(() => { if (live) rtSend(CABIN_CH, "pr", { t: tripId, ready: ready() }); }, 2000);
   const iv = setInterval(async () => {
     if (!live) return;
     const a = ack > ackSent ? `&ack=${ack}` : "";
     if (direct() && !a && Date.now() - pollAt < 4800) return; // 直接つながっている間は 5 秒に 1 回だけ
     pollAt = Date.now();
-    const r = await fetch(`/api/cabin/voice?t=${tripId}&after=${last}&ready=${voiceReady() ? 1 : 0}${a}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/cabin/voice?t=${tripId}&after=${last}&ready=${ready() ? 1 : 0}${a}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (r?.ok) { okAt = Date.now(); if (a) ackSent = Math.max(ackSent, ack); }
     if (!r?.ok) { if (r?.error === "SETUP" && !setupSaid) { setupSaid = true; h.onSetup?.(); } return; }
     if (typeof r.now === "number") skew = Number(r.now) - Date.now();

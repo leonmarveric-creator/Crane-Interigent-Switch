@@ -51,7 +51,8 @@ export async function POST(
   await supabaseAdmin.from("alarms").delete().eq("reservation_id", reservation.id);
   const { error } = await supabaseAdmin.from("alarms").insert({
     reservation_id: reservation.id,
-    room_id: reservation.room_id,
+    // 実際に泊まっている部屋 (割り当て・看板の付け替えがあればそちら)。予約の元の部屋 (reservation.room_id) だと、別の部屋の照明がついてしまう
+    room_id: room.id,
     fire_at: fireAt.toISOString(),
     is_enabled: true,
     wake_mode: wakeMode,
