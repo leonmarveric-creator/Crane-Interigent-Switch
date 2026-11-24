@@ -29,6 +29,8 @@ export async function POST(
 
   if (clear) {
     await supabaseAdmin.from("alarms").delete().eq("reservation_id", reservation.id);
+    // 解除したら早朝便の自動目覚ましも使わない (そうしないと Cron が 1 分後にまたセットしてしまう)
+    await supabaseAdmin.from("reservations").update({ wake_auto_off: true }).eq("id", reservation.id).then(() => {}, () => {});
     return NextResponse.json({ ok: true, cleared: true });
   }
 

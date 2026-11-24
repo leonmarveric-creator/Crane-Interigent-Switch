@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
   /* ---- 解除 ---- */
   if (b.clear) {
     await wipe();
+    // 解除したら早朝便の自動目覚ましも使わない (そうしないと Cron が 1 分後にまたセットしてしまう)
+    if (ids.length) await supabaseAdmin.from("reservations").update({ wake_auto_off: true }).in("id", ids).then(() => {}, () => {});
     const left = await currentAlarm(room, ids, now);
     const still = left && !left.triggered_at && Date.parse(left.fire_at) > now;
     return NextResponse.json({ ok: !still, cleared: !still, error: still ? "CLEAR_FAILED" : undefined });
