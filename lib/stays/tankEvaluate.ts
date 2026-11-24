@@ -12,11 +12,12 @@ import {
   alertLineLiters, cautionLineLiters, smellLineLiters, forecastDays, remainingLiters,
   statusFor, tankPct, isOdorSeason, guestNightsToLiters,
 } from "./tank";
-import { getTankState, setAlerted, upcomingDailyGuests } from "./tankStore";
+import { getTankState, setAlerted, upcomingDailyGuests, tankHistory } from "./tankStore";
 import { dispatchTankAlerts } from "./tankAlerts";
 import type { AlertResult } from "./tankAlerts";
 
 export type TankStateWithSummary = Awaited<ReturnType<typeof getTankState>> & {
+  history?: Awaited<ReturnType<typeof tankHistory>>;
   summary: {
     pct: number;
     status: ReturnType<typeof statusFor>;
@@ -76,6 +77,7 @@ export async function buildResponse(
       guestNightsToAlert: guestNightsToLiters(state.currentLiters, alertLine, state.litersPerGuestPerDay),
       guestNightsToSmell: guestNightsToLiters(state.currentLiters, smellLine, state.litersPerGuestPerDay),
     },
+    history: await tankHistory().catch(() => []),
   };
 }
 

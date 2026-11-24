@@ -193,3 +193,24 @@ export async function craneNestPassportPhotos(dropId: string): Promise<{ on: boo
   }
   return { on: true, photos };
 }
+
+
+/** 予約ごとのパスポート登録人数 (合言葉 = こちらの予約の guest_token)。便槽の計算に使う。
+ *  同じ予約で何回か登録していれば、いちばん多い人数を使う。読めなければ空 */
+export async function passportCountsByToken(tokens: string[]): Promise<Record<string, number>> {
+  const c = cn(); const out: Record<string, number> = {};
+  if (!c || !tokens.length) return out;
+  try {
+    const { data: reqs } = await c.from("transfer_requests").select("id, reservation_token").in("reservation_token", tokens).neq("status", "cancelled");
+    const list = (reqs ?? []) as { id: string; reservation_token: string }[];
+    if (!list.length) return out;
+    const { data: links } = await c.from("transfer_request_guests").select("transfer_request_id, guest_id").in("transfer_request_id", list.map((r) => r.id));
+    const per = new Map<string, Set<string>>();
+    for (const l of (links ?? []) as { transfer_request_id: string; guest_id: string }[]) {
+      if (!per.has(l.transfer_request_id)) per.set(l.transfer_request_id, new Set());
+      per.get(l.transfer_request_id)!.add(l.guest_id);
+    }
+    for (const r of list) { const n = per.get(r.id)?.size ?? 0; if (n > (out[r.reservation_token] ?? 0)) out[r.reservation_token] = n; }
+  } catch { /* 読めなければ仮の人数 */ }
+  return out;
+}

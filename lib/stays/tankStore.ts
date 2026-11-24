@@ -20,7 +20,9 @@
 //   ※ このファイルは API Route からのみ import すること（クライアントには載せない）。
 // =========================================================
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { passportCountsByToken } from "@/lib/craneNest";
 import {
+  eachNight,
   DailyLog,
   ReservationLite,
   TankState,
@@ -139,38 +141,45 @@ async function getReservations(sinceDate: string): Promise<ReservationLite[]> {
     return [...own, ...ext];
   }
 
+  // 実際の予約 (Airbnb の iCal + 手動) を数える。人数は
+  //   ① Crane Nest のパスポート登録人数 (いちばん正確) → ② Airbnb のメールの人数 (日付が一致するもの) → ③ 仮の人数 (2 人)
+  // Airbnb のメール取り込みは人数を知るためだけに使う (別に数えると二重になる)。
+  //   以前は iCal を数えず、メール取り込みだけを数えていたため、取り込みが止まると予約が丸ごと抜けていた。
   const out: ReservationLite[] = [];
   const sinceIso = new Date(sinceDate + "T00:00:00Z").toISOString();
+  let own: any[] = [];
   try {
-    // 自社/手動予約のみ（iCalはAirbnb取り込みと二重計上になるため除外）。
-    // check_in/out は timestamptz → JSTの日付へ変換して夜次展開に渡す。
-    const { data: own } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from("reservations")
-      .select("check_in, check_out, status, source")
-      .eq("source", "manual")
+      .select("check_in, check_out, status, source, guest_token")
+      .in("source", ["manual", "ical"])
+      .neq("status", "cancelled")
       .gt("check_out", sinceIso);
-    for (const r of (own as any[]) || []) {
-      out.push({
-        check_in: toJstDate(r.check_in),
-        check_out: toJstDate(r.check_out),
-        guests: defaultGuests(),
-        status: r.status,
-      });
-    }
+    own = (data as any[]) || [];
   } catch {
     /* noop */
   }
+  let ext: { check_in: string; check_out: string; guests: number | null; used?: boolean }[] = [];
   try {
-    const { data: ext } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from("stays_ext_reservations")
       .select("check_in, check_out, guests, status")
+      .eq("status", "confirmed")
       .gt("check_out", sinceDate);
-    for (const r of (ext as any[]) || []) {
-      const lite = extToLite(r);
-      if (lite) out.push(lite);
-    }
+    // 30 泊を超えるものはメールの読み取りミス (例: 1 年間の滞在) なので使わない
+    ext = ((data as any[]) || []).filter((r) => r.check_in && r.check_out && eachNight(r.check_in, r.check_out).length <= 30);
   } catch {
     /* noop */
+  }
+  const pass = await passportCountsByToken(own.map((r) => r.guest_token).filter(Boolean)).catch(() => ({} as Record<string, number>));
+  for (const r of own) {
+    const ci = toJstDate(r.check_in), co = toJstDate(r.check_out);
+    let guests = r.guest_token ? pass[r.guest_token] ?? 0 : 0;
+    if (!guests) {
+      const same = ext.filter((e) => !e.used && e.check_in === ci && e.check_out === co);
+      if (same.length) { same[0].used = true; guests = same[0].guests ?? 0; }
+    }
+    out.push({ check_in: ci, check_out: co, guests: guests > 0 ? guests : defaultGuests(), status: r.status });
   }
   return out;
 }
@@ -391,15 +400,36 @@ export async function resetTank(): Promise<TankState> {
     return getTankState();
   }
   try {
+    // 汲み取りの記録を残す (日付・そのときの量・泊数・人数)。手動の補正も消さない
+    const before = await getTankState().catch(() => null);
+    if (before) {
+      await supabaseAdmin.from("stays_tank_history").insert({
+        emptied_on: t,
+        prev_emptied_on: before.lastEmptiedDate,
+        liters: before.currentLiters,
+        nights: before.logs.filter((l) => l.guests > 0).length,
+        guest_nights: before.logs.reduce((a, l) => a + l.guests, 0),
+      }).then(() => null, () => null);
+    }
     await supabaseAdmin
       .from("stays_tank_state")
       .upsert(
         { id: TANK_ID, last_emptied_date: t, alerted: false, updated_at: new Date().toISOString() },
         { onConflict: "id" }
       );
-    await supabaseAdmin.from("stays_tank_logs").delete().lt("date", t);
   } catch {
     /* noop */
   }
   return getTankState();
+}
+
+/** 汲み取りの履歴 (新しい順)。migration_tank_history.sql が無ければ空 */
+export async function tankHistory(limit = 24): Promise<{ emptied_on: string; prev_emptied_on: string | null; liters: number; nights: number; guest_nights: number }[]> {
+  if (!supabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabaseAdmin.from("stays_tank_history").select("emptied_on, prev_emptied_on, liters, nights, guest_nights").order("emptied_on", { ascending: false }).limit(limit);
+    return error ? [] : ((data as any[]) || []);
+  } catch {
+    return [];
+  }
 }

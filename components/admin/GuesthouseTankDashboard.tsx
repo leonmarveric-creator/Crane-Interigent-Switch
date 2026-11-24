@@ -60,6 +60,7 @@ interface TankResponse {
   alerted: boolean;
   updatedAt: string;
   summary: TankSummary;
+  history?: { emptied_on: string; prev_emptied_on: string | null; liters: number; nights: number; guest_nights: number }[];
   alertDispatched?: {
     wxpusher: { ok: boolean; skipped?: boolean; error?: string };
   } | null;
@@ -908,6 +909,24 @@ export default function GuesthouseTankDashboard() {
               </button>
             </div>
           </div>
+
+          {/* 汲み取りの履歴 */}
+          {!!data.history?.length && (
+            <div className="tank-floatup overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
+              <div className="bg-white/5 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-slate-400">🚛 PUMP-OUT HISTORY · 汲み取り履歴</div>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-white/5">
+                  {data.history.map((h) => (
+                    <tr key={h.emptied_on + h.prev_emptied_on} className="transition hover:bg-white/5">
+                      <td className="px-4 py-2 font-mono text-slate-400">{h.emptied_on}</td>
+                      <td className="px-4 py-2 text-slate-300">{h.prev_emptied_on ? `${h.prev_emptied_on} 〜` : ""} {h.nights}夜 · 延べ{h.guest_nights}人</td>
+                      <td className="px-4 py-2 text-right font-mono font-semibold text-cyan-200">{Math.round(Number(h.liters))} L</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* 宿泊ログ */}
           {data.logs.length > 0 && (
