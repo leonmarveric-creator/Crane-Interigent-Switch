@@ -799,8 +799,7 @@ const RK2=(()=>{
    for(const x of[120,121.2,122.4])box(1.1,1.9,.75,x,F,79.3,0xff9a7a,.14,.8)}
   for(const [x,m] of[[142,100],[92,50]]){const sp=sign(t=>[[t.rk_m2.replace("{m}",m),56,"#e3f6ff"]],{c:"#5fd8ff",w:460,h:100,sx:2.6});sp.position.set(x,F+3.4,78.6);g.add(sp)}
   {const zr=z=>z>=64.5&&z<=95?88-z:z;g.children.forEach(o=>{if(o.isSprite||o.position.z!==0){o.position.z=zr(o.position.z)}else if(o.geometry&&o.geometry.attributes.position){const p=o.geometry.attributes.position;for(let k=0;k<p.count;k++)p.setZ(k,zr(p.getZ(k)));p.needsUpdate=true;o.geometry.computeBoundingSphere()}})}g.updateMatrixWorld(true);const W=(x,y,z)=>g.localToWorld(V(x,y,z));
-  const P0=STN.stop.clone(),P1=W(130,0,23),P2=W(165,0,24.5),P3=W(188,0,24.5);P0.y=0;
-  const ext=[];for(let k=0;k<=40;k++){const f=k/40,a=(1-f)**3,b=3*(1-f)**2*f,c=3*(1-f)*f*f,d=f**3;ext.push(P0.clone().multiplyScalar(a).addScaledVector(P1,b).addScaledVector(P2,c).addScaledVector(P3,d))}
+  const P0=STN.stop.clone();P0.y=0;const ext=new THREE.CatmullRomCurve3([P0,W(94,0,-6),W(86,0,20.6),W(62,0,21),W(48,0,21.2),W(43.4,0,22.4),W(42.2,0,24),W(43.4,0,25.6),W(48,0,26.2),W(70,0,26.2),W(130,0,25.8),W(170,0,25.2),W(188,0,24.8)],false,"centripetal").getPoints(90);
   let extL=0;for(let k=1;k<ext.length;k++)extL+=ext[k].distanceTo(ext[k-1]);
   const w2=[[188,0,27],[190,0,32.5],[193,0,36],[195,0,36],[195,F,36],[192,F,36],[192,F,32],[192,F,22],[192,F,17]].map(q=>W(...q));
   const w3=[[192,F,17],[44,F,17],[42.5,F,18]].map(q=>W(...q));

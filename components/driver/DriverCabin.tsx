@@ -14,7 +14,7 @@ import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
 import type { RoomPrep } from "@/lib/cabinRoomPrep";
-import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon, cabinArriveImages, cabinArriveUploadUrl, cabinSetArriveImages , driverAllOff, cabinAutoAlert } from "@/app/driver/actions";
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
@@ -26,6 +26,14 @@ import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
 type T = (s: string, v?: Record<string, string | number>) => string;
+/** ボタンひとつの送迎で自動にすること */
+export interface AutoPlan {
+  tripId: string; roomId: string | null; roomKey: string; roomName: string; lang: "zh" | "en" | "ja" | "ko";
+  /** お見送り (チェックアウトの日): 家から 200 m で部屋を全部オフ */
+  off: { roomId: string; resId: string; room: string; name: string } | null; offDone?: boolean;
+  /** お迎え: 迎え先 (関空は連絡橋に入ったら / ほかは 500 m 離れたら) で自動乗車 */
+  pick: { ll: LL; kix: boolean } | null; near?: boolean; boarded?: boolean;
+}
 const LANGS: [string, string][] = [["zh", "中文"], ["en", "EN"], ["ja", "日本語"], ["ko", "한국어"]];
 
 /* ================= 送迎中 (GPS を送る・BOOST の音楽) ================= */
@@ -34,6 +42,24 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const [trip, setTrip] = useState<CabinTrip | null>(initial);
   const [sending, setSending] = useState<"" | "ok" | "ng">("");
   const mRef = useRef(music); mRef.current = music;
+  /* ---------- ボタンひとつの送迎 (自動の部屋オフ・自動乗車・アストレアの確認) ---------- */
+  const auto = useRef<AutoPlan | null>(null);
+  const boardRef = useRef<(auto?: boolean) => Promise<void>>(async () => {});
+  /** アストレアの確認の声 (英語) + 画面の字幕 (お父さんの言語) */
+  const confirmSay = useCallback((key: string, room: string, msg: string) => {
+    toast(msg); try { void mRef.current.voiceOver(`/cabin/audio/room/${key}-${room}.mp3`, () => {}); } catch { /* 音が出せない */ }
+  }, [toast]);
+  const autoOff = useCallback(async (a: AutoPlan) => {
+    if (!a.off) return; const { roomId, resId, room, name } = a.off;
+    for (let i = 0; i < 3; i++) {
+      const r = await driverAllOff(roomId, resId).catch(() => ({ ok: false }));
+      if (r.ok) { sfx.chord(); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
+      if (i === 0) { sfx.error(); confirmSay("offFail", room, t("{r} が応答しません。もう一度送ります", { r: name })); }
+      await new Promise((ok) => setTimeout(ok, 6000));
+    }
+    sfx.error(); vib([80, 60, 80]); confirmSay("failFinal", room, t("⚠ {r} のオフを確認できませんでした（お知らせに残しました）", { r: name }));
+    void cabinAutoAlert(roomId, "auto_off");
+  }, [confirmSay, t]);
   useEffect(() => { setTrip(initial); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // 合図の回線を先につないでおく (出発を押した瞬間に iPad へ届くように)
   useEffect(() => { rtJoin(CABIN_CH, () => {}); }, []);
@@ -50,6 +76,15 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       // iPad へ直接 (1 秒に 1 回まで)。サーバーへは下の間隔で
       if (Date.now() - posRt > 900) { posRt = Date.now(); rtSend(CABIN_CH, "pos", { t: trip.id, ll: [+ll[0].toFixed(6), +ll[1].toFixed(6)], kmh: kmh == null ? null : Math.round(kmh * 10) / 10 }); }
       const r = boostStep(bs, ll, kmh); bs = r.s;
+      // ボタンひとつ: お見送りは家から 200 m 離れたら部屋を全部オフ (チェックアウトの日だけ)。お迎えは迎え先を離れたら自動で乗車
+      const a = auto.current, tr = tripRef2.current;
+      if (a && tr && a.tripId === tr.id) {
+        if (tr.dir === "out" && a.off && !a.offDone && dist(ll, CRANE_NEST) > 200) { a.offDone = true; void autoOff(a); }
+        if (tr.dir === "in" && tr.phase === "dead" && a.pick && !a.boarded) {
+          const d = dist(ll, a.pick.ll); if (d < (a.pick.kix ? 700 : 250)) a.near = true;
+          if (a.near && ((a.pick.kix && r.event === "start") || (!a.pick.kix && d > 500))) { a.boarded = true; void boardRef.current(true); }
+        }
+      }
       // BOOST の準備 (曲をゆっくり止める) は iPad の合図 (boost-prep) で。iPad の声がスマホに来ていないときだけ、このスマホの GPS で
       if (!r.event && !rv.ok() && boostPrepDue(bs, ll, kmh)) mRef.current.boostPrep();
       // BOOST の曲は iPad の「ブースト開始 / 完了」のセリフに合わせる (下の onPlay)。
@@ -140,24 +175,34 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     toast(r.ok ? t("お部屋のエアコンを消しました") : t("消せませんでした。お部屋の操作画面から消してください"));
   }, [toast, t]);
 
-  const start = useCallback(async (v: Parameters<typeof cabinStart>[0]) => {
+  const start = useCallback(async (v: Parameters<typeof cabinStart>[0], plan?: Omit<AutoPlan, "tripId">) => {
     unlockRemoteVoice(); try { mRef.current.prime(); } catch { /* */ } // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
     const r = await cabinStart(v); rtKick(CABIN_CH);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));
+    auto.current = plan ? { ...plan, tripId: r.trip.id } : null;
     return true;
   }, [toast, t]);
   const end = useCallback(async () => {
     if (!trip) return; const id = trip.id; setTrip(null); sfx.down(); await cabinEnd(id); rtKick(CABIN_CH); toast(t("送迎を終わりにしました"));
   }, [trip, toast, t]);
   /** ゲスト乗車: 回送 (父向けの画面) → ゲスト用の送迎画面 */
-  const board = useCallback(async () => {
-    const tr = tripRef2.current; if (!tr) return; sfx.chord(); vib(30);
+  const board = useCallback(async (isAuto?: boolean) => {
+    const tr = tripRef2.current; if (!tr || tr.phase !== "dead") return; sfx.chord(); vib(30);
+    const a = auto.current; if (a) a.boarded = true;
     const r = await cabinBoard(tr.id); rtKick(CABIN_CH);
     if (!r.ok) { toast(r.error === "SETUP_VOICE" ? t("回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です") : t("切り替えられませんでした")); return; }
     setTrip({ ...tr, phase: "guest" });
-    if (r.prep) showPrep(r.prep); else toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
-  }, [toast, t, showPrep]);
+    if (isAuto) toast(t("🚗 迎え先を離れたので、自動で乗車にしました"));
+    if (a?.lang) setTimeout(() => { try { mRef.current.startWith("in", a.lang); } catch { /* */ } }, 6000); // 乗ったらゲストの言語のお迎え用の音楽へ
+    if (r.prep) {
+      showPrep(r.prep);
+      const rk = a?.roomKey ?? "room", nm = a?.roomName ?? "";
+      if (r.prep.ok) setTimeout(() => confirmSay("onOk", rk, t("✓ {r} のエアコンをつけました", { r: nm })), 2500);
+      else { setTimeout(() => confirmSay("onFail", rk, t("⚠ {r} のエアコンが応答しません（お知らせに残しました）", { r: nm })), 2500); if (a?.roomId) void cabinAutoAlert(a.roomId, "auto_on"); }
+    } else if (!isAuto) toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
+  }, [toast, t, showPrep, confirmSay]);
+  boardRef.current = board;
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
   return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null) };
@@ -547,6 +592,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
         ))}
       </div>
       <RoomIcons rooms={data.cabin.rooms} t={t} toast={toast} />
+      <ArriveImages t={t} toast={toast} />
       {edit && <PhotoEditor room={edit} t={t} toast={toast} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void refresh(); }} />}
     </div>
   );
@@ -582,6 +628,49 @@ function CheckinQr({ url, t, toast, refresh }: { url: string | null; t: T; toast
         {url ? <img src={url} alt="" /> : <span className="ckempty">QR</span>}
         <label className="btn">{busy ? t("保存中…") : "🖼 " + (url ? t("変える") : t("QR 画像を選ぶ"))}<input type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void up(f); }} /></label>
         {url ? <button onClick={async () => { if (!confirm(t("チェックイン QR を外しますか？"))) return; const r = await cabinSetCheckinQr(null); if (r.ok) { toast(t("外しました")); await refresh(); } }}>{t("外す")}</button> : null}
+      </div>
+    </>
+  );
+}
+
+/* 到着演出の画像: お見送りで着いたとき、iPad のホログラムの額に順に出す絵 (並べ替え・外すもここで)。何もなければ最初から入っている絵 */
+function ArriveImages({ t, toast }: { t: T; toast: (s: string) => void }) {
+  const [items, setItems] = useState<{ path: string; url: string }[]>([]), [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { const r = await cabinArriveImages().catch(() => null); if (r?.ok) setItems(r.items); }, []);
+  useEffect(() => { void load(); }, [load]);
+  const save = async (next: { path: string; url: string }[]) => { setItems(next); const r = await cabinSetArriveImages(next.map((x) => x.path)); if (!r.ok) { toast(t("保存できませんでした")); await load(); } };
+  const shrink = async (f: File): Promise<{ blob: Blob; ext: "webp" | "jpg" } | null> => {
+    try { const bm = await createImageBitmap(f); const s = Math.min(1, 1400 / Math.max(bm.width, bm.height)); const c = document.createElement("canvas"); c.width = Math.round(bm.width * s); c.height = Math.round(bm.height * s); c.getContext("2d")!.drawImage(bm, 0, 0, c.width, c.height);
+      const w = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/webp", 0.86)); if (w && w.type === "image/webp") return { blob: w, ext: "webp" };
+      const j = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.86)); return j ? { blob: j, ext: "jpg" } : null; } catch { return null; }
+  };
+  const add = async (files: FileList) => {
+    setBusy(true); const added: { path: string; url: string }[] = [];
+    for (const f of Array.from(files).slice(0, 10)) {
+      const c = await shrink(f); if (!c) { toast(t("画像を読み込めませんでした")); continue; }
+      const u = await cabinArriveUploadUrl(c.ext); if (!u.ok) { toast(t("アップロードできませんでした")); continue; }
+      const put = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": c.blob.type, "x-upsert": "false" }, body: c.blob }).catch(() => null);
+      if (!put?.ok) { toast(t("アップロードできませんでした")); continue; }
+      added.push({ path: u.path, url: URL.createObjectURL(c.blob) });
+    }
+    if (added.length) { await save([...items, ...added]); sfx.chord(); toast(t("保存しました")); await load(); }
+    setBusy(false);
+  };
+  const move = (i: number, d: number) => { const j = i + d; if (j < 0 || j >= items.length) return; const n = items.slice(); [n[i], n[j]] = [n[j], n[i]]; sfx.tick(); void save(n); };
+  const del = (i: number) => { if (!confirm(t("この画像を外しますか？"))) return; void save(items.filter((_, k) => k !== i)); };
+  return (
+    <>
+      <div className="ctitle" style={{ marginTop: 14 }}>🖼 {t("到着演出の画像")}</div>
+      <div className="cnote">{t("お見送りで着いたとき、iPad のホログラムの額に順番に出る絵です。上から順に出ます。何も入れていないときは、最初から入っている絵が出ます。")}</div>
+      <div className="arrimgs">
+        {items.map((x, i) => (
+          <div className="arri" key={x.path}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={x.url} alt="" /><em>{i + 1}</em>
+            <div><button onClick={() => move(i, -1)} disabled={i === 0}>↑</button><button onClick={() => move(i, 1)} disabled={i === items.length - 1}>↓</button><button onClick={() => del(i)}>✕</button></div>
+          </div>
+        ))}
+        <label className="arri add">{busy ? t("保存中…") : "＋ " + t("画像を追加")}<input type="file" accept="image/*" multiple disabled={busy} onChange={(e) => { const f = e.target.files; if (f && f.length) void add(f); e.target.value = ""; }} hidden /></label>
       </div>
     </>
   );

@@ -409,3 +409,46 @@ export async function cabinSetRoomPhoto(roomId: string, photo: string | null, sp
   if (prev && prev.startsWith("rooms/") && prev !== photo) await supabaseAdmin.storage.from("driver-music").remove([prev]).catch(() => null);
   return { ok: true };
 }
+
+/* ===== 到着演出の画像 (iPad の到着ホログラムで額に入れて順に見せる絵)。Storage の cabin/arrive/ に置き、並び順は cabin/arrive/list.json ===== */
+const ARR_DIR = "cabin/arrive";
+async function arriveList(): Promise<string[]> {
+  const { data } = await supabaseAdmin.storage.from("driver-music").download(`${ARR_DIR}/list.json`).catch(() => ({ data: null } as any));
+  if (!data) return [];
+  try { const j = JSON.parse(await (data as Blob).text()); return Array.isArray(j) ? j.filter((x) => typeof x === "string" && x.startsWith(ARR_DIR + "/img-")) : []; } catch { return []; }
+}
+async function arriveSave(list: string[]): Promise<boolean> {
+  const { error } = await supabaseAdmin.storage.from("driver-music").upload(`${ARR_DIR}/list.json`, new Blob([JSON.stringify(list)], { type: "application/json" }), { upsert: true, contentType: "application/json", cacheControl: "0" });
+  return !error;
+}
+const arrUrl = (p: string) => supabaseAdmin.storage.from("driver-music").getPublicUrl(p).data.publicUrl;
+/** 到着演出の画像の一覧 (並び順) */
+export async function cabinArriveImages(): Promise<R<{ items: { path: string; url: string }[] }>> {
+  const g = guard(); if (g) return g;
+  return { ok: true, items: (await arriveList()).map((p) => ({ path: p, url: arrUrl(p) })) };
+}
+/** アップロード先 (ブラウザで 1400px の WebP / JPG に縮めてから直接送る) */
+export async function cabinArriveUploadUrl(ext: "webp" | "jpg"): Promise<R<{ path: string; signedUrl: string }>> {
+  const g = guard(); if (g) return g;
+  const path = `${ARR_DIR}/img-${Date.now().toString(36)}.${ext === "webp" ? "webp" : "jpg"}`;
+  const { data, error } = await supabaseAdmin.storage.from("driver-music").createSignedUploadUrl(path);
+  if (error || !data) return fail(error?.message || "UPLOAD_URL");
+  return { ok: true, path, signedUrl: data.signedUrl };
+}
+/** 追加 / 並べ替え / 外す: 新しい並び順をそのまま保存。外した画像は消す */
+export async function cabinSetArriveImages(paths: string[]): Promise<R> {
+  const g = guard(); if (g) return g;
+  const ok = paths.filter((p) => /^cabin\/arrive\/img-[\w-]+\.(webp|jpg)$/.test(p)).slice(0, 30);
+  const old = await arriveList();
+  if (!(await arriveSave(ok))) return fail("SAVE");
+  const gone = old.filter((p) => !ok.includes(p)); if (gone.length) await supabaseAdmin.storage.from("driver-music").remove(gone).catch(() => null);
+  return { ok: true };
+}
+
+/** ボタンひとつの送迎: 自動のオン・オフを確かめられなかった → 送迎画面のお知らせに残す (お父さん・カクが見る) */
+export async function cabinAutoAlert(roomId: string, kind: "auto_off" | "auto_on"): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!isId(roomId)) return fail("BAD");
+  const { error } = await supabaseAdmin.from("driver_alerts").insert({ room_id: roomId, kind: kind === "auto_on" ? "auto_on" : "auto_off" });
+  return error ? fail(error.message) : { ok: true };
+}

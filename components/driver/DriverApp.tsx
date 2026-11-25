@@ -21,6 +21,8 @@ import {
 } from "@/app/driver/actions";
 import { useDriverMusic, MusicPlayer, MusicSheet, MusicAdmin, MusicFull, useMusicFull, type MLang } from "@/components/driver/DriverMusic";
 import { useCabin, useCabinSheet, CabinSheet, CabinBar, CabinSettings } from "@/components/driver/DriverCabin";
+import { PLACES, acModeFor, placeFromText, type PlaceKey } from "@/lib/cabinGeo";
+import { toCountryCode } from "@/lib/countryCode";
 
 type Page = "home" | "pick" | "guide" | "set";
 const P = (x: number, y: number, w: number, h: number, W: number, H: number) =>
@@ -245,6 +247,60 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   };
   const arriveSoon = () => { sfx.notify(); say(["arrive"], 200); setTimeout(() => music.fadeOut(), 2400); };
 
+  /* ---------------- ボタンひとつの送迎 (お父さん用) ----------------
+     押すだけで: 行き先・お部屋・言語・冷暖房を予約から入れて iPad に出す → 音楽 → (お見送り) 家から 200 m で部屋を全部オフ
+     / (お迎え) 迎え先を離れたら自動で乗車 → お部屋のエアコン。りんくうはいつも 5 番出口 (ガラスのエレベーターは押したときだけ) */
+  const [glass, setGlass] = useState<Record<string, boolean>>({});
+  const natLang = (n?: string | null): MLang | null => { const c = toCountryCode(n ?? null); if (!c) return null; return ["CN", "TW", "HK", "MO"].includes(c) ? "zh" : c === "KR" ? "ko" : c === "JP" ? "ja" : "en"; };
+  const quickPlace = (r: DRes, dir: "in" | "out"): PlaceKey | null => {
+    const drop = dir === "out" ? r.drop ?? null : null;
+    let pk = drop?.dest ? placeFromText(drop.dest, drop.terminal) : placeFromText(r.pickupPlace ?? null, r.flightInfo?.terminal ?? null);
+    if (!pk && dir === "in" && r.flightNo) pk = "kix";
+    if (pk === "rinku" || pk === "r833") pk = glass[r.id] ? "rinku" : "r833";
+    return pk === "other" ? null : pk;
+  };
+  const roomKeyOf = (slug?: string | null) => { const s = String(slug || "").toLowerCase(); return /haru|spring/.test(s) ? "haru" : /natsu|natu|summer/.test(s) ? "natsu" : /aki|autumn/.test(s) ? "aki" : /fuyu|winter/.test(s) ? "fuyu" : "room"; };
+  const quick = async (r: DRes, dir: "in" | "out") => {
+    sfx.prime(); music.prime();
+    const pk = quickPlace(r, dir); if (!pk) { cabS.open(r, dir); return; } // 行き先がわからないときは、今までの画面で選ぶ
+    let dev: string | null = null; try { dev = localStorage.getItem("drvCabDev"); } catch { /* ignore */ }
+    if (!data.cabin.devices.some((d) => d.id === dev)) dev = data.cabin.devices[0]?.id ?? null;
+    const room = roomOf(r.roomId), rk = roomKeyOf(room?.slug);
+    const lang = (dir === "out" ? natLang(r.drop?.nationality) : null) ?? ((["zh", "en", "ja", "ko"].includes(r.lang) ? r.lang : "en") as MLang);
+    const checkoutToday = jstDay(r.checkOut) === jstDay(Date.now());
+    const ok = await cab.start(
+      { deviceId: dev, resId: r.id, dir, placeKey: pk, placeName: null, placeLL: null, roomId: r.roomId, lang, ac: acModeFor(Date.now()), phase: dir === "in" ? "dead" : "guest" },
+      { roomId: r.roomId, roomKey: rk, roomName: room?.name ?? "", lang,
+        off: dir === "out" && checkoutToday && room ? { roomId: room.id, resId: r.id, room: rk, name: room.name } : null,
+        pick: dir === "in" ? { ll: PLACES[pk as Exclude<PlaceKey, "other">].ll, kix: pk === "kix" || pk === "kix2" } : null },
+    );
+    if (ok && dir === "out") setTimeout(() => music.startWith("out", lang), 1500);
+  };
+  /** ヘッドライトのボタン (画像のデザイン) と、りんくうの 5 番出口 / ガラスのエレベーター */
+  const QuickGo = ({ r, dir }: { r: DRes; dir: "in" | "out" }) => {
+    const pk = quickPlace(r, dir), on = cab.trip?.resId === r.id, rin = pk === "r833" || pk === "rinku";
+    const room = roomOf(r.roomId), offToday = dir === "out" && jstDay(r.checkOut) === jstDay(nowMs);
+    return (
+      <div className="qgo">
+        {rin && (
+          <div className="qdst">
+            <button className={!glass[r.id] ? "on" : ""} onClick={() => { sfx.tick(); setGlass((g) => ({ ...g, [r.id]: false })); }}>{t("5番出口")}</button>
+            <button className={glass[r.id] ? "on" : ""} onClick={() => { sfx.tick(); setGlass((g) => ({ ...g, [r.id]: true })); }}>{t("ガラスのエレベーター")}</button>
+          </div>
+        )}
+        <button className={`hlb ${dir === "out" ? "o" : "c"}`} disabled={on} onClick={() => void quick(r, dir)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={dir === "out" ? "/driver/hd/btn-orange.webp" : "/driver/hd/btn-cyan.webp"} alt="" />
+          <span>{on ? t("送迎中") : dir === "out" ? "→ " + t("出発") : "→ " + t("迎えに行く")}</span>
+        </button>
+        <div className="qnote">
+          {pk ? <b>{PLACES[pk as Exclude<PlaceKey, "other">].name[lang]}</b> : <b>{t("行き先を選んでから出発")}</b>}
+          {dir === "out" ? (offToday && room ? <span>{t("家から 200 m で {r} を自動でオフ", { r: room.name })}</span> : null) : <span>{pk === "kix" || pk === "kix2" ? t("連絡橋に入ったら自動で乗車") : t("迎え先を 500 m 離れたら自動で乗車")}</span>}
+        </div>
+      </div>
+    );
+  };
+
   /* ---------------- 送迎: お迎え場所・便名・飛行機 ---------------- */
   const [pickTab, setPickTab] = useState<"in" | "out">("in");
   const [pickSheet, setPickSheet] = useState<DRes | null>(null);
@@ -351,6 +407,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
           <span className={`v ${r.pickupPlace || r.pickupNone ? "" : "unset"}`}>{r.pickupNone ? t("送迎なし") : r.pickupPlace ? r.pickupPlace : t("未設定（タップで設定）")}{r.pickupAt && !r.pickupNone ? <small>{jstTime(r.pickupAt)}</small> : null}</span>
           <span className="go">›</span>
         </button>
+        {!r.pickupNone && today && QuickGo({ r, dir: "in" })}
         {!r.pickupNone && (
           <button className="line cabl" onClick={() => cabS.open(r, "in")}>
             <span className="ic">🚗</span><span className="v">{cab.trip?.resId === r.id ? t("iPad に表示中") : t("車内 iPad に出して出発")}</span><span className="go">›</span>
@@ -537,6 +594,12 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
           <div className="wrap">
             {data.setupMissing && <div className="alert">⚠ {t("Supabase の SQL（migration_driver.sql）がまだ実行されていません")}</div>}
             {data.alerts.map((a) => (
+              a.kind === "auto_off" || a.kind === "auto_on" ? (
+                <div className="alert" key={a.id}>{a.kind === "auto_off" ? t("⚠ {r} の自動オフを確認できませんでした。エアコン・照明を確認してください", { r: roomOf(a.roomId || "")?.name ?? "" }) : t("⚠ {r} のエアコンを自動でつけられませんでした", { r: roomOf(a.roomId || "")?.name ?? "" })}
+                  <small> ・ {jstTime(a.createdAt)}</small>
+                  <button onClick={async () => { await driverResolveAlert(a.id); setData((d) => ({ ...d, alerts: d.alerts.filter((x) => x.id !== a.id) })); sfx.chord(); }}>{t("確認しました")}</button>
+                </div>
+              ) :
               <div className="alert" key={a.id}>🔋 {t("{r} の鍵の電池を交換してください（残り {b}%）", { r: roomOf(a.roomId || "")?.name ?? "", b: a.battery ?? "?" })}
                 {a.dueAt ? <small> ・ {t("チェックイン {d}", { d: jstDay(a.dueAt).slice(5).replace("-", "/") })}</small> : null}
                 <button onClick={async () => { await driverResolveAlert(a.id); setData((d) => ({ ...d, alerts: d.alerts.filter((x) => x.id !== a.id) })); sfx.chord(); }}>{t("交換しました")}</button>
@@ -636,6 +699,7 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
                     <div className="who">{gName(r)}<small>{r.lang.toUpperCase()}</small></div>
                     <div className="meta">{t("お部屋")} <b>{rName(r)}</b></div>
                     <DropInfo d={r.drop ?? null} t={t} />
+                    {QuickGo({ r, dir: "out" })}
                     <div className="btns">
                       <button className="btn" onClick={() => { music.setPlaylist("out", r.lang as MLang, false); setTimeout(() => music.play(), 150); toast(t("お見送りの音楽を流します")); }}>🎵 {t("お見送りの音楽")}</button>
                       <button className="btn" onClick={() => cabS.open(r, "out")}>🚗 {cab.trip?.resId === r.id ? t("iPad に表示中") : t("車内 iPad に出して出発")}</button>

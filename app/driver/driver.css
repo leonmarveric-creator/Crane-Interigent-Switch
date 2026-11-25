@@ -700,3 +700,28 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .cabbar .tx { min-width:64px; }
 .drv .cabbar .qbtn, .drv .cabbar .abtn, .drv .cabbar .airbtn { min-width:46px; padding:0 6px; }
 .drv .cabbar > button:last-of-type { white-space:nowrap; padding:0 10px; }
+
+/* 到着演出の画像 */
+.arrimgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:8px}
+.arri{position:relative;border:1px solid rgba(143,230,255,.25);border-radius:10px;overflow:hidden;background:#0b1424;display:flex;flex-direction:column}
+.arri img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.arri em{position:absolute;left:6px;top:6px;font-style:normal;font:700 11px ui-monospace,monospace;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:1px 6px}
+.arri div{display:flex}.arri div button{flex:1;min-height:34px;border:0;border-top:1px solid rgba(143,230,255,.15);background:transparent;color:#bfefff;font-size:14px}
+.arri div button+button{border-left:1px solid rgba(143,230,255,.15)}.arri div button:disabled{opacity:.3}
+.arri.add{align-items:center;justify-content:center;min-height:120px;color:#ffcf7a;font-weight:700;font-size:13px;cursor:pointer;border-style:dashed}
+
+/* ===== ボタンひとつの送迎 (ヘッドライトのボタン・画像のデザイン) ===== */
+.drv .qgo{margin:10px -4px 4px}
+.drv .qdst{display:flex;gap:6px;margin:0 4px 6px}
+.drv .qdst button{flex:1;min-height:36px;border-radius:10px;border:1px solid rgba(120,180,255,.35);background:rgba(6,16,34,.6);color:#9fc0e6;font-size:13px;font-weight:700}
+.drv .qdst button.on{color:#00121e;background:linear-gradient(180deg,#5ff0ff,#13b9ff);border-color:#5ff0ff}
+.drv .hlb{position:relative;display:block;width:100%;padding:0;border:0;background:none;cursor:pointer;transition:transform .12s,filter .12s}
+.drv .hlb img{display:block;width:100%;height:auto;animation:drv-hl 2.6s ease-in-out infinite}
+.drv .hlb:active{transform:scale(.97);filter:brightness(1.25)}
+.drv .hlb:disabled{filter:grayscale(.6) brightness(.7)}
+.drv .hlb span{position:absolute;left:34%;right:17%;top:50%;transform:translateY(-52%);text-align:center;font-size:clamp(18px,6vw,26px);font-weight:900;letter-spacing:.06em;white-space:nowrap}
+.drv .hlb.o span{color:#ffc21f;text-shadow:0 0 12px rgba(255,170,20,.85)}
+.drv .hlb.c span{color:#3ff0ff;text-shadow:0 0 10px rgba(40,220,255,.9)}
+.drv .qnote{display:flex;flex-wrap:wrap;gap:4px 10px;margin:2px 8px 0;font-size:12px;color:var(--muted)}
+.drv .qnote b{color:var(--text)}
+@keyframes drv-hl{50%{filter:brightness(1.12) drop-shadow(0 0 6px rgba(80,200,255,.35))}}

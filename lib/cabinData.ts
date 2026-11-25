@@ -161,3 +161,10 @@ export async function cabinTrackById(id: string): Promise<CabinTrack | null> {
   // select("*"): カバーの列 (cover_path) がまだ無い古いデータベースでも歌詞は出す
   return { id: data.id, title: data.title, artist: data.artist ?? null, cover: data.cover_path ? cabinPublicUrl(data.cover_path) : null, lrc: data.lrc ?? null };
 }
+
+/** 到着演出の画像 (お父さんのスマホで登録。Storage の cabin/arrive/list.json の順) */
+export async function arriveImageUrls(): Promise<string[]> {
+  const { data } = await supabaseAdmin.storage.from("driver-music").download("cabin/arrive/list.json").catch(() => ({ data: null } as any));
+  if (!data) return [];
+  try { const j = JSON.parse(await (data as Blob).text()); return Array.isArray(j) ? j.filter((x: unknown) => typeof x === "string" && /^cabin\/arrive\/img-/.test(x as string)).map((p: string) => cabinPublicUrl(p)) : []; } catch { return []; }
+}

@@ -41,6 +41,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null); // 送迎画面の中身 (React は触らない。engine が直接動かす)
   const eng = useRef<Engine | null>(null);
+  const [arrMode, setArrMode] = useState<"new" | "old">("new");
+  useEffect(() => { try { if (localStorage.getItem("cabArrive") === "old") setArrMode("old"); } catch { /* ignore */ } }, []);
+  const setArr = (m: "new" | "old") => { setArrMode(m); try { localStorage.setItem("cabArrive", m); } catch { /* ignore */ } };
   const dhRef = useRef<Deadhead | null>(null);
   const ckLink = useRef<{ link: string; img: string | null } | null>(null); // 予約つきチェックイン QR // 回送モード (ゲストなし: 迎えに行く途中・送ったあとの帰り道)
   const [dev, setDev] = useState<{ id: string; name: string } | null>(null);
@@ -133,6 +136,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           say: (u, s) => { const id = tripRef.current?.id; return id ? sendVoice(id, u, s) : Promise.resolve(false); },
           board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else { rtKick(CABIN_CH); void poll(); } },
           end: (id) => void endTrip(id, true),
+          near: (t2, info, r) => { eng.current?.pickArrive({ tripId: t2.id, t2: t2.placeKey === "kix2", hineno: t2.placeKey === "hineno", name: info?.guest ?? null, flight: info?.flightNo ?? null, room: r ? `${r.kanji} ${r.en}`.trim() : null }); },
         });
         eng.current.resize();
         if (wxRef.current) eng.current.weather(wxRef.current);
@@ -202,7 +206,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         // 招待くじ (お見送りの組・まだ引いていない): 着いたら自動で封筒の画面を出す。⚙ からも出せる
         const gf = j.gift && typeof j.gift.token === "string" ? { token: j.gift.token as string, name: (j.gift.name as string | null) ?? null, card: j.gift.card === true } : null;
         setGift((p) => (p?.token === gf?.token && p?.card === gf?.card ? p : gf));
-        if (gf && t.phase !== "dead" && e.tripId() === t.id && e.arrived() && giftShown.current !== gf.token) { giftShown.current = gf.token; const tk = gf.token; setTimeout(() => setGiftOpen((o) => o ?? tk), 7000); }
+        if (gf && t.phase !== "dead" && e.tripId() === t.id && e.arrived() && giftShown.current !== gf.token) { giftShown.current = gf.token; const tk = gf.token; const openGift = () => { if (eng.current?.airOn()) setTimeout(openGift, 5000); else setGiftOpen((o) => o ?? tk); }; setTimeout(openGift, 7000); }
         // スマホが声を取りに来ているか (来ていれば声はスマホから)
         e.setVoiceSeen(t.voiceSeen && typeof j.now === "number" ? Math.max(0, j.now - Date.parse(t.voiceSeen)) : null);
         // 回送中 (ゲストなし) は父向けの画面。ゲスト乗車 (phase = guest) でいつもの送迎画面へ
@@ -210,6 +214,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         if (t.phase === "dead" && dh) {
           if (e.tripId() === t.id) e.stop();
           setInTrip(true); setMenu(false);
+          e.setArriveImgs(Array.isArray(j.arrImgs) ? j.arrImgs : []);
           dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string" || typeof j.checkinLink === "string");
           // 帰り道: スマホで流している曲のカバーと歌詞
           if (j.track) trackRef.current = j.track;
@@ -234,6 +239,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           if (ckLink.current?.link !== j.checkinLink) { const link = j.checkinLink; ckLink.current = { link, img: null }; QRCode.toDataURL(link, { margin: 2, width: 560, errorCorrectionLevel: "M" }).then((img) => { const c = ckLink.current; if (c && c.link === link) { c.img = img; eng.current?.setCheckin(img); } }).catch(() => {}); }
           e.setCheckin(ckLink.current?.img ?? (typeof j.checkin === "string" ? j.checkin : null));
         } else e.setCheckin(typeof j.checkin === "string" ? j.checkin : null);
+        e.setGuest(j.gi ?? null); e.setArriveImgs(Array.isArray(j.arrImgs) ? j.arrImgs : []);
         e.aiCommand(t.aiCmd ?? null); // お父さんから ASTRAEA への指示
         // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }
@@ -399,6 +405,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           <small>{wake.err ? "光目覚ましの状態を読めませんでした（通信・ログインを確認）" : "部屋の印： 7:00 H ＝設定中 ／ ✓ ＝今朝動いた ／ ✕ ＝動かなかった"}</small>
           <h4>テスト走行（スマホなしで動きを確認）</h4>
           <div className="row"><button onClick={() => void testRun("kix", "in")}>✈ 関空T1 → 住まい</button><button onClick={() => void testRun("rinku", "out")}>住まい → りんくう</button></div>
+          <h4>到着の演出</h4>
+          <div className="row gsel"><button className={arrMode === "new" ? "on" : ""} onClick={() => setArr("new")}>✨ 新しいホログラム</button><button className={arrMode === "old" ? "on" : ""} onClick={() => setArr("old")}>🗂 以前の到着画面</button></div>
+          <small>お見送り（りんくう・関空）で着いたときと、お迎えで関空の手前に来たときの演出。「以前」にすると前の到着画面だけになります。</small>
           <h4>設定</h4>
           <div className="row"><button onClick={() => void rename()}>✎ 名前を変える</button><button onClick={() => { setMenu(false); }}>閉じる</button></div>
           <small>GPS: {gpsState === "yes" ? "この iPad の GPS を使います" : gpsState === "no" ? "GPS が無いので、お父さんのスマホの位置を使います" : "確認中…"}</small>

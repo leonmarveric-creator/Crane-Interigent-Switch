@@ -8,18 +8,31 @@
  */
 export const HOLO_PAGE = "/cabin/holo/index.html";
 /** public/cabin/holo/index.html が読み込む JS (中身を作り直したら v を合わせる) */
-export const HOLO_JS = "/cabin/holo/holo.js?v=2b0d4af5e1";
+export const HOLO_JS = "/cabin/holo/holo.js?v=be041d29ba";
 /** 建物の模型があるお部屋 (Crane Nest の 春・夏・秋・冬) */
 export const HOLO_ROOMS = ["haru", "natsu", "aki", "fuyu"] as const;
 export type HoloRoom = (typeof HOLO_ROOMS)[number];
 /** 演出の長さ (ミリ秒)。これより長く続いたら止める */
 export const HOLO_LEN_MS = 47000;
-/** 自動で出すのは、送迎が始まってからこれだけたったあと (あいさつ・お部屋の準備のセリフ・コンシェルジュの QR を先に) */
-export const HOLO_AUTO_AFTER_MS = 150000;
-/** 到着までこれより短いときは出さない (演出の途中で着いてしまう) */
-export const HOLO_MIN_ETA_MIN = 3;
-/** 次の観光案内の場所がこれより近いときは出さない (案内の声と重なる) */
-export const HOLO_POI_GAP_M = 1500;
+/* 自動で出すタイミング: 「着くちょうど前に終わる」ように、残りの時間 (残りの道のり ÷ 最近の速さ) から逆算して始める。
+   毎回のお迎えで 1 回。始める少し前から ASTRAEA の雑談を止めて、声が重ならないようにする */
+/** 演出が終わってから到着の画面・声までの間 (秒) */
+export const HOLO_END_GAP_S = 6;
+/** 到着のホログラム (お見送り・お迎え先) を、着く何秒前に始めるか (演出の本編 ≒ 85 秒。最後のひとことが着いたころに終わる) */
+export const AIR_LEAD_S = 85;
+/** 始めてよい時間の幅 (秒): 「残り = 演出の長さ + すき間」より少し早くてもよい / 遅れてもよい */
+export const HOLO_EARLY_S = 4, HOLO_LATE_S = 15;
+/** この秒数前から ASTRAEA の雑談 (AI のひと言) を止めておく */
+export const HOLO_HUSH_S = 25;
+/** 着いたときに演出の残りがこれ以下なら、最後まで見せてから到着の画面にする (秒) */
+export const HOLO_FINISH_S = 14;
+/** 残りの時間 (秒) の見積もり。速さは最近の平均 (止まっている・速すぎるときは 15〜60 km/h に丸める) */
+export function holoRemainS(remM: number, avgKmh: number): number { return remM / (Math.max(15, Math.min(60, avgKmh)) / 3.6); }
+/** 今始めると、ちょうど着く前に終わるか ("now") / まだ早い ("wait") / もう間に合わない ("late") */
+export function holoWindow(remainS: number): "wait" | "now" | "late" {
+  const need = HOLO_LEN_MS / 1000 + HOLO_END_GAP_S;
+  return remainS > need + HOLO_EARLY_S ? "wait" : remainS < need - HOLO_LATE_S ? "late" : "now";
+}
 
 const VOICES = ["boot", "scan", "orbit", "explode", "f_haru", "f_natsu", "f_aki", "f_fuyu", "r1", "r2", "room_cool", "room_heat", "room_none", "welcome"];
 const SFX = ["boot", "scan", "split", "lock", "route", "room", "welcome"];
@@ -35,30 +48,6 @@ export function holoRoomOf(room: { en?: string | null; building?: string | null 
   if (room.building && !/crane/i.test(room.building)) return null;
   const k = room.en.trim().toLowerCase();
   return (HOLO_ROOMS as readonly string[]).includes(k) ? (k as HoloRoom) : null;
-}
-
-export interface HoloScene {
-  dir: "in" | "out"; arrived: boolean; offroute: boolean;
-  /** 送迎が始まってからの時間 (ミリ秒) */
-  elapsedMs: number;
-  /** 到着までの分 (分からなければ null) */
-  etaMin: number | null;
-  /** BOOST (準備・本番・ワープ) の途中 */
-  boosting: boolean;
-  /** 声が出ている・待っている (道案内・ASTRAEA) */
-  voiceBusy: boolean;
-  /** ガイド・チェックイン・QR・曲の全画面などが前に出ている */
-  overlay: boolean;
-  /** 次の観光案内までの距離 (m)。無ければ null */
-  nextPoiM: number | null;
-}
-/** 今、自動でホログラムを出してよいか */
-export function holoQuiet(s: HoloScene): boolean {
-  if (s.dir !== "in" || s.arrived || s.boosting || s.voiceBusy || s.overlay) return false;
-  if (s.elapsedMs < HOLO_AUTO_AFTER_MS) return false;
-  if (s.etaMin != null && s.etaMin < HOLO_MIN_ETA_MIN) return false;
-  if (s.nextPoiM != null && s.nextPoiM < HOLO_POI_GAP_M) return false;
-  return true;
 }
 
 /* ---------- コンシェルジュの入口: 4 桁が合ったあとの短いホログラム (public/holo/intro.html・約 11 秒) ---------- */

@@ -25,7 +25,7 @@ import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText, CHECKIN_DEFAULT
 import QRCode from "qrcode";
 import { playSafe, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 import { createHolo } from "@/components/cabin/cabinHolo";
-import { HOLO_AUDIO, HOLO_JS, HOLO_LEN_MS, holoQuiet, holoRoomOf } from "@/lib/cabinHolo";
+import { AIR_LEAD_S, HOLO_AUDIO, HOLO_FINISH_S, HOLO_HUSH_S, HOLO_JS, HOLO_LEN_MS, holoRemainS, holoRoomOf, holoWindow } from "@/lib/cabinHolo";
 import { createAirport } from "./cabinAirport";
 
 const TILES = {
@@ -85,6 +85,14 @@ export interface Engine {
   setCheckin(url: string | null): void;
   /** 目的地に着いたか (お見送りの招待くじを出すタイミング) */
   arrived(): boolean;
+  /** 予約のゲスト名・便名 (到着のホログラム演出に出す) */
+  setGuest(g: { name: string | null; flight: string | null; pax: number | null } | null): void;
+  /** 到着演出の画像 (スマホで登録したもの。空なら最初から入っている絵) */
+  setArriveImgs(urls: string[]): void;
+  /** 回送中、迎え先 (関空) に近づいたとき: お父さん向けの到着ホログラム (最後にお出迎えボード) */
+  /** 空港案内・到着のホログラムを出しているか */
+  airOn(): boolean;
+  pickArrive(g: { name: string | null; flight: string | null; room: string | null; t2?: boolean; hineno?: boolean; tripId?: string }): void;
 }
 
 export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean }): Engine {
@@ -178,7 +186,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let bs: BoostState = { ...BOOST_INIT }, bMax = 0, bTrivI = 0, bTrivT = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
   const T_ = (ms: number, f: () => void) => { timers.push(setTimeout(f, ms)); };
-  let doneLine: any = null, car: any = null, etaNow: number | null = null;
+  let doneLine: any = null, car: any = null, etaNow: number | null = null, remNow = 0, vAvg = 35;
 
   /* ---------- 文字 ---------- */
   const setText = (id: string, s: string) => { const e = $(id); if (e) e.textContent = s; };
@@ -296,7 +304,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip) return;
     const tNow = Date.now();
     if (kmh == null && lastFeed && tNow - lastFeed.t > 500) kmh = (dist(lastFeed.ll, ll) / ((tNow - lastFeed.t) / 1000)) * 3.6;
-    lastFeed = { ll, t: tNow }; kmhNow = kmh;
+    lastFeed = { ll, t: tNow }; kmhNow = kmh; if (kmh != null && kmh > 5) vAvg = vAvg * 0.92 + Math.min(kmh, 90) * 0.08; // 最近の平均の速さ (ホログラムの開始を逆算する)
     const g = $("gpsT"); g.classList.toggle("phone", from === "phone"); (g.querySelector("span") as HTMLElement).textContent = from === "phone" ? "GPS · PHONE" : from === "demo" ? "GPS · DEMO" : "GPS · LIVE";
     moveCar(ll);
     const pr = project(R, ll, prevD);
@@ -312,7 +320,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     }
     const toDest = dist(ll, dest);
     const rem = offroute ? toDest * 1.3 : Math.max(0, R.total - d);
-    const mins = arrived ? 0 : etaMin(baseMin, rem, R.total); etaNow = mins; if (holo.on()) holo.eta(mins);
+    const mins = arrived ? 0 : etaMin(baseMin, rem, R.total); etaNow = mins; remNow = rem; airEarlyTick(rem); if (holo.on()) holo.eta(mins);
     ($("etaM").firstChild as Text).textContent = String(mins);
     setText("km", arrived ? T.arrived : T.km.replace("{k}", (rem / 1000).toFixed(1)));
     if (doneLine && !offroute) { let i = 1; while (i < R.cum.length - 1 && R.cum[i] < d) i++; doneLine.setLatLngs(R.pts.slice(0, i).concat([pointAt(R, d)])); }
@@ -329,7 +337,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       if (hit.has(p.k) || d < p.d - 30) continue;
       hit.add(p.k);
       if (p.k === "bridge" && bs.phase !== "off") continue; // 高速モードが代わりに案内する
-      holo.stop(); chime(); cap(p.k); void say(`en-${p.k}`); // ホログラムの途中なら、観光案内を優先
+      if (holo.on()) { poiLater.push(p.k); continue; } // ホログラムの途中なら、終わってから案内する (声を重ねない)
+      chime(); cap(p.k); void say(`en-${p.k}`);
       const el = root.querySelector(`[data-poi="${p.k}"]`); el?.classList.add("hit");
     }
     if (!arrived && toDest < 200) arrive();
@@ -340,16 +349,33 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
 
   /* ---------- 到着 ---------- */
+  type OutScene = "t1" | "t2" | "r1" | "r2" | "hin";
+  const outScene = (): OutScene | undefined => trip?.dir === "out" ? ({ kix: "t1", kix2: "t2", rinku: "r1", r833: "r2", hineno: "hin" } as Record<string, OutScene>)[trip.placeKey] : undefined;
+  let airEarly = false;
+  const airGo = (s: OutScene) => air.arrive({ s, name: gInfo?.name, flight: gInfo?.flight, pax: gInfo?.pax, room: room ? `${room.kanji} ${room.en}`.trim() : null });
+  /** お見送り: 到着のホログラムは走りながら始めて、着いたときにちょうど終わるように (残りの時間から逆算) */
+  function airEarlyTick(rem: number) {
+    if (!trip || airEarly || arrived || offroute || trip.dir !== "out" || trip.id.startsWith("demo") || !arriveNew() || air.on()) return;
+    const s = outScene(); if (!s) return;
+    if (holoRemainS(Math.max(0, rem - 200), vAvg) > AIR_LEAD_S) return;
+    airEarly = true; holo.stop(); byeS(); airGo(s);
+  }
   function arrive() {
-    if (!trip) return; arrived = true; const id = trip.id; cqOff(); holo.stop(); // 着いたら QR は到着画面のボタンへ
+    if (!trip) return;
+    // ホログラムがもうすぐ終わるなら、最後まで見せてから到着の画面にする
+    if (holo.on() && Date.now() - holoAt > HOLO_LEN_MS - HOLO_FINISH_S * 1000) { if (!arrWait) { arrWait = true; setTimeout(() => { if (arrWait) { arrWait = false; holo.stop(); arrive(); } }, HOLO_FINISH_S * 1000 + 1500); } return; }
+    arrWait = false; arrived = true; const id = trip.id; cqOff(); holo.stop(); // 着いたら QR は到着画面のボタンへ
     ($("etaM").firstChild as Text).textContent = "0"; setText("km", T.arrived);
+    // お見送りで りんくう / 関空 に着いたら: 到着のホログラム演出 (お別れの言葉・最後のひとこと・詳しいナビと QR はその中で)
+    const scene = outScene();
     if (trip.dir === "in") { $("ltI").className = ""; setText("ltE", T.ltOn); $("room").classList.add("lit"); roomTexts(); arriveS(); void say("en-arrive"); }
+    else if (scene && !trip.id.startsWith("demo") && arriveNew()) { if (!airEarly) { byeS(); airGo(scene); } } // 走りながら先に始めていれば、そのまま続ける
     else { byeS(); void say(byeKey); }
     $("sweep").classList.remove("on");
     T_(600, () => { $("arrive").classList.add("on"); startPtc(); });
     ai.event("arrive");
     // 2 分たったら送迎を終わりにして、待機画面へ (ガイドを見ている間は待つ)
-    const endIfIdle = () => { if (guide.on() || toilet.on() || lock.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
+    const endIfIdle = () => { if (guide.on() || toilet.on() || lock.on() || air.on()) T_(30000, endIfIdle); else hooks.onEnd(id); };
     T_(trip.dir === "out" ? 45000 : 120000, endIfIdle); // お見送りは早めに「帰り道 (回送)」へ
   }
   $("arrive").onclick = () => { $("arrive").classList.remove("on"); stopPtc(); qrHide(); };
@@ -594,7 +620,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- AI「ASTRAEA」: 状況に合わせて自分から話す ---------- */
   let aiQuiet = false, aiHumor = false, startedAt = 0, npId: string | null = null;
-  const air = createAirport({ host: () => stage, lang: () => lang, ac: () => ac(), sfx: (k) => sfx(k), duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
+  const arriveNew = () => { try { return localStorage.getItem("cabArrive") !== "old"; } catch { return true; } };
+  let gInfo: { name: string | null; flight: string | null; pax: number | null } | null = null;
+  const air = createAirport({ host: () => stage, lang: () => lang, ac: () => ac(), sfx: (k) => sfx(k), duck: (sec) => { const id = trip?.id ?? airTrip; if (id && !id.startsWith("demo")) hooks.onCmd?.(id, "duck", sec); } });
+  let airTrip: string | null = null; // 回送中 (お迎え) の到着ホログラムは、エンジンの送迎の外で出すので、音楽を小さくする送迎 ID をここに
   const ai = createAi({
     root, stage, ac, quiet: () => aiQuiet, humor: () => aiHumor, voiceBusy: () => voiceN > 0 || holo.on(),
     duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
@@ -613,27 +642,36 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       wa: !!room && /[春夏秋冬]/.test(room.kanji),
     }),
   });
-  setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on() && !holo.on()) ai.tick(); holoTick(); }, 1000);
+  setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on() && !holo.on() && !holoHush) ai.tick(); holoTick(); }, 1000);
 
   /* ---------- ホログラム (お迎えのとき・地図の枠の上に約 46 秒)。lib/cabinHolo.ts ----------
      声・効果音はほかの声と同じ道 (iPhone。来ていなければ iPad)。右側の天気・お部屋・QR はそのまま見える */
-  let holoDone = false, holoCmdN = 0;
-  const holo = createHolo({ host: () => $("map"), say: (k) => void say(k), sfx: (k) => sfx(k), onEnd: () => $("map").classList.remove("holo-on") });
+  let holoDone = false, holoCmdN = 0, holoAt = 0, holoHush = false, arrWait = false; const poiLater: PoiKey[] = [];
+  const holo = createHolo({ host: () => $("map"), say: (k) => void say(k), sfx: (k) => sfx(k), onEnd: () => {
+    $("map").classList.remove("holo-on");
+    if (arrWait) { arrWait = false; setTimeout(() => arrive(), 600); return; } // 着いて待っていた → 到着の画面へ
+    if (!arrived) poiLater.splice(0).forEach((k, i) => setTimeout(() => { if (trip && !arrived) { chime(); cap(k); void say(`en-${k}`); } }, 800 + i * 400)); else poiLater.length = 0;
+  } });
   const holoOverlay = () => guide.on() || toilet.on() || lock.on() || $("ckp").classList.contains("on") || $("qrp").classList.contains("on") || $("arrive").classList.contains("on") || (stage.classList.contains("np-on") && stage.dataset.np === "C");
   function holoStart(_manual: boolean) {
     const rk = holoRoomOf(room);
     if (!trip || trip.dir !== "in" || arrived || !rk || holo.on()) return false;
     if (!holo.start({ room: rk, lang, ac: trip.ac === "heat" ? "heat" : trip.ac === "none" ? "none" : "cool", eta: etaNow })) return false;
-    holoDone = true; $("map").classList.add("holo-on");
+    holoDone = true; holoAt = Date.now(); holoHush = false; $("map").classList.add("holo-on");
     // 効果音が聞こえるように、その間だけ音楽を小さく
     if (!trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", Math.ceil(HOLO_LEN_MS / 1000));
     return true;
   }
+  /** お迎えのとき毎回 1 回: 残りの時間から逆算して、着くちょうど前に終わるように始める。始める少し前から雑談を止める */
   function holoTick() {
-    if (!trip || holoDone || holo.on() || !holoRoomOf(room)) return;
-    const next = pois.filter((p) => !hit.has(p.k)).reduce<number | null>((m, p) => { const x = p.d - d; return x < 0 ? m : m == null ? x : Math.min(m, x); }, null);
-    if (holoQuiet({ dir: trip.dir, arrived, offroute, elapsedMs: Date.now() - startedAt, etaMin: etaNow, boosting: bs.phase === "on" || warpOn || prepSt > 0, voiceBusy: voiceN > 0 || ai.busy(), overlay: holoOverlay(), nextPoiM: next })) holoStart(false);
+    if (!trip || holoDone || holo.on() || trip.dir !== "in" || arrived || offroute || !holoRoomOf(room)) { holoHush = false; return; }
+    const sec = holoRemainS(Math.max(0, remNow - 200), vAvg), w = holoWindow(sec); // 到着の画面は 200 m 手前で出る
+    holoHush = w !== "late" && sec < HOLO_LEN_MS / 1000 + HOLO_HUSH_S + 6;
+    if (w !== "now") return;
+    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy() || holoOverlay()) return; // 声や演出が終わるのを待つ (幅の中で)
+    holoStart(false);
   }
+
   /* ---------- 🛎 コンシェルジュの QR (送迎中・右下の枠。地図はふさがない) ----------
      お迎えの送迎が始まって 20 秒後 (乗車のあいさつのあと) に自動で出す。10 分か ✕ で閉じ、小さい「🛎 QR」ボタンが残る。着いたら消す */
   let cqOn = false, cqMiniOn = false, cqT: ReturnType<typeof setTimeout> | null = null, cqImg = "", cqUrl = "";
@@ -785,7 +823,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function stop() {
     rcarOff();
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
-    air.close(); cqOff(); holo.stop(); holoDone = false; etaNow = null; trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
+    air.close(); cqOff(); holo.stop(); holoDone = false; holoHush = false; airEarly = false; arrWait = false; poiLater.length = 0; vAvg = 35; remNow = 0; etaNow = null; trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
     qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide(); stopVoice(voice);
   }
 
@@ -830,13 +868,19 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /** 画面の大きさに合わせる。iPad を縦にしたら縦の並び (820 x 1180)、横なら横の並び (1180 x 820) */
   function resize() {
-    const port = window.innerHeight > window.innerWidth * 1.05, was = stage.classList.contains("port");
+    const r = window.innerWidth / Math.max(1, window.innerHeight), port = r < 0.95, was = stage.classList.contains("port") + "" + stage.dataset.fit;
     stage.classList.toggle("port", port);
-    const W = port ? 820 : 1180, H = port ? 1180 : 820;
+    /* スマホ (縦に細長い / 横に細長い) は、舞台を画面の比率に合わせて伸ばし、文字が小さくなりすぎない大きさにする */
+    const tall = port && r < 0.62, wide = !port && r > 1.62;
+    let W = port ? 820 : 1180, H = port ? 1180 : 820;
+    if (tall) { W = 620; H = Math.min(1500, Math.round(W / r)); }
+    if (wide) { H = 640; W = Math.min(1500, Math.round(H * r)); }
+    stage.classList.toggle("tall", tall); stage.classList.toggle("wide", wide); stage.dataset.fit = tall ? "tall" : wide ? "wide" : "";
+    stage.style.width = W + "px"; stage.style.height = H + "px";
     const s = Math.min(window.innerWidth / W, window.innerHeight / H);
     stage.style.transform = `translate(-50%,-50%) scale(${s})`;
     MAP.invalidateSize();
-    if (was !== port) requestAnimationFrame(() => {
+    if (was !== port + "" + stage.dataset.fit) requestAnimationFrame(() => {
       MAP.invalidateSize();
       if (trip) { if (carLL) MAP.panTo(carLL, { animate: false }); else MAP.fitBounds(L.latLngBounds(R.pts.concat([room?.home ?? CRANE_NEST])).pad(0.18)); }
       if (ptOn) { stopPtc(); setTimeout(startPtc, 50); }
@@ -887,5 +931,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       ai.command(cmd);
     },
     arrived: () => !!trip && arrived,
+    setGuest: (g) => { gInfo = g; },
+    setArriveImgs: (u) => { air.setImgs(u); },
+    airOn: () => air.on(),
+    pickArrive: (g) => { if (!arriveNew()) return; airTrip = g.tripId ?? null; air.arrive({ s: g.hineno ? "pickh" : g.t2 ? "pick2" : "pick", name: g.name, flight: g.flight, room: g.room, lang: "ja" }); },
     setCheckin: (u) => { ckSet = u; checkinUrl = u || ckDefault; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = checkinUrl ? "" : "none"; } };
 }

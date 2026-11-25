@@ -18,6 +18,7 @@ export interface AirportCtx {
 }
 
 export function createAirport(c: AirportCtx) {
+  let imgs: string[] = [];
   let el: HTMLElement | null = null, fr: HTMLIFrameElement | null = null, duckT = 0, closeT = 0, maxT = 0;
   const lite = () => { try { return localStorage.getItem("cabAirFull") !== "1"; } catch { return true; } }; // 古い iPad でも軽く動くように、普段は軽量版
   function mount() {
@@ -52,5 +53,22 @@ export function createAirport(c: AirportCtx) {
     clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
     clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
   }
-  return { open, close, on: () => !!el?.classList.contains("on") };
+  /** 到着のホログラム演出 (お見送り: 着いたとき自動 / お迎え: 迎え先に近づいたとき)。最後に「詳しいナビ」ボタンと QR、お見送りはアストレアの最後のひとこと */
+  function arrive(o: { s: "t1" | "t2" | "r1" | "r2" | "hin" | "pick" | "pick2" | "pickh"; name?: string | null; flight?: string | null; room?: string | null; pax?: number | null; lang?: GLang }) {
+    mount(); if (!el || !fr) return;
+    const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
+    const l = o.lang ?? c.lang(), gl = GUIDE_L[l] ?? "en";
+    const q = new URLSearchParams({ s: o.s, l }); if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
+    const guestUrl = o.s === "pick" || o.s === "pick2" || o.s === "pickh" || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
+    w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 60000); };
+    fr.onload = async () => {
+      try { if (imgs.length) (fr?.contentWindow as any)?.__setImgs?.(imgs); } catch { /* ignore */ }
+      if (!guestUrl) return;
+      try { const svg = await QRCode.toString(guestUrl, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#0a1426", light: "#ffffff" } }); (fr?.contentWindow as any)?.__setQr?.(svg); } catch { /* ignore */ }
+    };
+    fr.src = `/airport/${lite() ? "arrive" : "arrive-full"}.html?${q}`; el.classList.add("on");
+    clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
+    clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
+  }
+  return { open, arrive, close, setImgs: (u: string[]) => { imgs = u.slice(0, 30); }, on: () => !!el?.classList.contains("on") };
 }

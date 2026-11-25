@@ -5,7 +5,7 @@ import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/
 import { cleanCmd } from "@/lib/cabinMusic";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { boardTrip } from "@/lib/cabinRoomPrep";
-import { aiHumorOn, boostSfxId, checkinQrUrl } from "@/lib/cabinData";
+import { aiHumorOn, arriveImageUrls, boostSfxId, checkinQrUrl } from "@/lib/cabinData";
 import { checkinLinkFor } from "@/lib/craneNest";
 import { pendingInviteFor } from "@/lib/keepsake";
 
@@ -58,7 +58,13 @@ export async function GET(req: NextRequest) {
   }
   // お見送りの組に「招待くじ」があれば (まだ引いていない)、降りる直前に iPad に出す
   const gift = trip?.dir === "out" && trip.resId ? await pendingInviteFor(trip.resId) : null;
-  return J({ ok: true, device, trip, room, track, checkin, checkinLink, humor, boostSfx, dh, gift, now: Date.now() });
+  // 到着のホログラム演出に出す: ゲスト名・便名 (予約があれば)
+  let gi: { name: string | null; flight: string | null; pax: number | null } | null = null;
+  if (trip?.resId) {
+    try { const { data: r } = await supabaseAdmin.from("reservations").select("*").eq("id", trip.resId).maybeSingle(); if (r) gi = { name: (r as any).entrance_name || (r as any).guest_name || null, flight: (r as any).flight_no || null, pax: null }; } catch { /* ignore */ }
+  }
+  const arrImgs = trip ? await arriveImageUrls().catch(() => []) : [];
+  return J({ ok: true, device, trip, room, track, checkin, checkinLink, humor, boostSfx, dh, gift, gi, arrImgs, now: Date.now() });
 }
 
 /** 登録 (初回) / 名前の変更 / 送迎の終了 (到着後に iPad から) / 音楽の操作 (iPad の再生ボタン → スマホ) */
