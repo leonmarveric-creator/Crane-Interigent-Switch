@@ -12,6 +12,8 @@ import { DH_LINES, DH_IDLE, dhSpdFor, dhAudio, callsignOf } from "@/lib/cabinDea
 import { BRIDGE, CRANE_NEST, PLACES, dist, type GLang, type LL } from "@/lib/cabinGeo";
 import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
 import { playSafe, unlockAudio, stopVoice, playFxUrl } from "@/lib/cabinAudio";
+import { parseLrc, lyricIndex, type LrcLine } from "@/lib/driverLogic";
+import { npPos, npStale, type CabinTrack, type NowPlaying } from "@/lib/cabinMusic";
 
 export interface DhInfo { guest: string | null; flightNo: string | null; flight: any; prepared: string | null; pickupAt: string | null; battery: number | null }
 export interface DhCtx {
@@ -24,7 +26,7 @@ export interface DhCtx {
   board: (tripId: string) => void;                // ゲスト乗車
   end: (tripId: string) => void;                  // 帰着 (送迎を終わりに)
 }
-export interface Deadhead { show(t: CabinTrip, room: CabinRoom | null, info: DhInfo | null, checkin: boolean): void; feed(ll: LL, kmh: number | null): void; hide(): void; on(): boolean; tripId(): string | null; unlock(): void }
+export interface Deadhead { show(t: CabinTrip, room: CabinRoom | null, info: DhInfo | null, checkin: boolean): void; nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void; feed(ll: LL, kmh: number | null): void; hide(): void; on(): boolean; tripId(): string | null; unlock(): void }
 
 const esc = (s: string) => String(s ?? "").replace(/[<&>"]/g, "");
 const LANG: Record<GLang, string> = { ja: "日本語", zh: "中文", en: "English", ko: "한국어" };
@@ -50,6 +52,11 @@ const HTML = `<div class="dhs">
   <div class="box dhveh"><h3>VEHICLE SCAN<span class="vtab"><b data-v="car" class="on">車両</b><b data-v="rad">レーダー</b><b data-v="chk">チェック</b></span></h3><div class="dg"><canvas id="dhCar"></canvas></div>
    <div class="vdat"><div><small>SPEED</small><b id="dhVS">0<em>km/h</em></b></div><div><small>LIMIT KEPT</small><b id="dhVK">--<em>%</em></b></div><div><small>DRIVE</small><b id="dhVD">00:00</b></div><div><small>HDG</small><b id="dhVH">---<em>°</em></b></div></div></div>
   <div class="box dhchk"><h3 id="dhChkH">到着前チェック · PRE-ARRIVAL</h3><div class="dhck" id="dhCk"></div></div>
+  <div class="box dhnp"><h3><i class="dhnpdot"></i>NOW PLAYING · HOLO DECK<span class="dhnpt" id="dhNpT">00:00</span></h3>
+   <div class="dhnpm"><div class="dhnpc"><svg viewBox="0 0 120 120"><circle class="b" cx="60" cy="60" r="56"/><circle class="v" id="dhNpArc" cx="60" cy="60" r="56"/></svg><i class="r1"></i><i class="r2"></i><div class="cv"><img id="dhNpCov" alt=""><i></i></div><div class="bm"></div></div>
+    <div class="dhnpi"><b id="dhNpTi"></b><small id="dhNpAr"></small><div class="dhnpq" id="dhNpQ"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+   <div class="dhnpl"><div class="p" id="dhNpP"></div><div class="c" id="dhNpC"><span></span><em></em></div><div class="n" id="dhNpN"></div></div>
+   <div class="dhnpb"><i id="dhNpB"></i></div></div>
   <div class="box dhrad"><h3>上空レーダー · SKY RADAR</h3><canvas id="dhRc" width="170" height="150"></canvas><div class="dhfl" id="dhFl"></div></div>
  </div></div>
 <div class="dhwb" id="dhWbP"><div class="w1">WELCOME</div><div class="nm" id="dhWN"></div><div class="w2" id="dhW2"></div><div class="w3" id="dhW3"></div>
@@ -281,8 +288,38 @@ export function createDeadhead(c: DhCtx): Deadhead {
   $("dhBoard").onclick = (e: Event) => { e.stopPropagation(); if (!trip) return; tone(880, 0, 0.1, 0.06); tone(1320, 0.1, 0.3, 0.06); $("dhBoard").textContent = "…"; c.board(trip.id); };
   host.onclick = (e) => e.stopPropagation();
 
+  /* ---------- 帰り道: スマホで流している曲のカバーと歌詞 (右下の枠。レーダーの代わり) ---------- */
+  let np: NowPlaying | null = null, tr: CabinTrack | null = null, lrc: LrcLine[] = [], npSkew = 0, npLi = -2, npShown = false;
+  function npSet(n: NowPlaying | null, t: CabinTrack | null, sk: number) {
+    npSkew = sk; np = n;
+    if (t && t.id !== tr?.id) {
+      tr = t; lrc = parseLrc(t.lrc); npLi = -2;
+      const im = $("dhNpCov") as HTMLImageElement; im.style.visibility = t.cover ? "" : "hidden"; if (t.cover) im.src = t.cover;
+      $("dhNpTi").textContent = t.title; $("dhNpAr").textContent = (t.artist || "Crane Nest").toUpperCase();
+    }
+  }
+  const fm = (x: number) => `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+  function npTick() {
+    const ok = back && !!np && !!tr && np.id === tr.id && !npStale(np, Date.now(), npSkew);
+    if (ok !== npShown) { npShown = ok; host.classList.toggle("np", ok); npLi = -2; }
+    if (!ok || !np) return;
+    const t = npPos(np, Date.now(), npSkew) + (np.on ? 0.3 : 0), i = lyricIndex(lrc, t);
+    host.classList.toggle("npp", !np.on);
+    if (i !== npLi) {
+      npLi = i; const cur = i >= 0 ? lrc[i]?.s || "♪" : lrc.length ? "♪" : tr!.title;
+      $("dhNpP").textContent = i > 0 ? lrc[i - 1]?.s || "" : ""; $("dhNpN").textContent = lrc[i + 1]?.s || "";
+      const c = $("dhNpC") as HTMLElement; c.querySelector("span")!.textContent = cur; c.querySelector("em")!.textContent = cur;
+      c.classList.remove("in"); void c.offsetWidth; c.classList.add("in");
+    }
+    const a = i >= 0 ? lrc[i].t : 0, b = lrc[i + 1]?.t ?? (np.dur || a + 4);
+    ($("dhNpC").querySelector("em") as HTMLElement).style.width = `${lrc.length ? Math.max(0, Math.min(1, (t - a) / Math.max(0.5, b - a - 0.4))) * 100 : 0}%`;
+    const f = np.dur > 0 ? Math.min(1, t / np.dur) : 0;
+    ($("dhNpB") as HTMLElement).style.width = `${f * 100}%`; ($("dhNpArc") as SVGCircleElement).style.strokeDashoffset = String(352 * (1 - f));
+    $("dhNpT").textContent = `${fm(t)} / ${fm(np.dur || 0)}`;
+  }
+
   let raf = 0, iv: any = null, pl: any = null;
-  function loop() { raf = requestAnimationFrame(loop); radar(); stars(); }
+  function loop() { raf = requestAnimationFrame(loop); radar(); stars(); npTick(); }
   return {
     show(t, r, inf, checkin) {
       const first = !trip || trip.id !== t.id || !onNow;
@@ -311,7 +348,8 @@ export function createDeadhead(c: DhCtx): Deadhead {
       }
     },
     feed,
-    hide() { if (!onNow) return; onNow = false; trip = null; host.classList.remove("on", "boost", "over"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); jvCar(); },
+    nowPlaying: npSet,
+    hide() { if (!onNow) return; onNow = false; trip = null; npShown = false; host.classList.remove("on", "boost", "over", "np", "npp"); c.stage.classList.remove("dh-on"); $("dhWbP").classList.remove("on"); cancelAnimationFrame(raf); clearInterval(iv); clearInterval(pl); stopVoice(el); jvCar(); },
     on: () => onNow,
     tripId: () => trip?.id ?? null,
     // 声 (audio 要素) と一緒に、効果音・合図の音 (AudioContext) も指で触れたときに動かしておく。

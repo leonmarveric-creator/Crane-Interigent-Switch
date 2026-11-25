@@ -11,8 +11,10 @@ export interface CaptainCmd { id: CaptainId; icon: string; zh: string; ja: strin
 export type CaptainId = "intro" | "status" | "joke" | "room" | "bridge" | "thanks" | "checkin";
 export const CAPTAIN_IDS: CaptainId[] = ["intro", "status", "joke", "room", "bridge", "thanks", "checkin"];
 /** お父さんの指示 (ASTRAEA が答えるもの + 入り方ガイド + 聞き取れなかった) */
-export type CaptainCmdId = CaptainId | "guide" | "unknown" | "qr" | "holo";
-export const CMD_IDS: CaptainCmdId[] = [...CAPTAIN_IDS, "guide", "unknown", "qr", "holo"];
+export type AirportCmdId = "airport_how" | "airport_r1" | "airport_r2" | "airport_t1" | "airport_t2";
+export const AIRPORT_CMDS: AirportCmdId[] = ["airport_how", "airport_r1", "airport_r2", "airport_t1", "airport_t2"];
+export type CaptainCmdId = CaptainId | "guide" | "unknown" | "qr" | "holo" | AirportCmdId;
+export const CMD_IDS: CaptainCmdId[] = [...CAPTAIN_IDS, "guide", "unknown", "qr", "holo", ...AIRPORT_CMDS];
 
 export const GUEST_Q: GuestQ[] = [
   { id: "who", icon: "🙋", q: {"ja": "あなたは誰？", "zh": "你是谁？", "en": "Who are you?", "ko": "당신은 누구예요?"}, v: [

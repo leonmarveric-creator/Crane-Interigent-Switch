@@ -26,6 +26,7 @@ import QRCode from "qrcode";
 import { playSafe, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 import { createHolo } from "@/components/cabin/cabinHolo";
 import { HOLO_AUDIO, HOLO_JS, HOLO_LEN_MS, holoQuiet, holoRoomOf } from "@/lib/cabinHolo";
+import { createAirport } from "./cabinAirport";
 
 const TILES = {
   dark: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
@@ -593,6 +594,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- AI「ASTRAEA」: 状況に合わせて自分から話す ---------- */
   let aiQuiet = false, aiHumor = false, startedAt = 0, npId: string | null = null;
+  const air = createAirport({ host: () => stage, lang: () => lang, ac: () => ac(), sfx: (k) => sfx(k), duck: (sec) => { if (trip && !trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", sec); } });
   const ai = createAi({
     root, stage, ac, quiet: () => aiQuiet, humor: () => aiHumor, voiceBusy: () => voiceN > 0 || holo.on(),
     duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
@@ -602,6 +604,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     roomLit: () => roomLit(),
     conQr: () => cqShow(),
     holo: () => { holoStart(true); },
+    airport: (c) => { holo.stop(); air.open(c); },
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
@@ -763,13 +766,26 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     // 出発の演出
     linkS(); void say(goKey); $("sweep").classList.add("on");
     cqOff(); if (t.dir === "in") T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと)
+    T_(3000, rcarOn);
     holoDone = false; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
     if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("rscanning", "tagged"); void rm.offsetWidth; rm.classList.add("rscanning"); scanS(); setTimeout(() => { rm.classList.remove("rscanning"); rm.classList.add("tagged"); }, 4200); });
     else T_(2000, () => { $("room").classList.remove("lit"); });
   }
+  /* ---------- 🚗 右下の枠の空いている所に車のホログラム (お迎え。K-OPS の JARVIS と同じ点データ・最初の 1 回だけ読む) ---------- */
+  let rcar: any = null;
+  function rcarOn() {
+    const W = window as any;
+    if (rcar || !trip) return;
+    $("rcar").classList.add("on");
+    const go = () => { if (!rcar && trip && W.JVCAR) rcar = W.JVCAR.mount($("rcarC"), { w: 440, h: 300, sc: 80, lite: () => true, speed: () => kmhNow }); };
+    if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(go, 800);
+  }
+  function rcarOff() { rcar?.stop(); rcar = null; $("rcar").classList.remove("on"); }
+
   function stop() {
+    rcarOff();
     timers.forEach(clearTimeout); timers = []; demo(true); boostReset(); stopPtc();
-    cqOff(); holo.stop(); holoDone = false; etaNow = null; trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
+    air.close(); cqOff(); holo.stop(); holoDone = false; etaNow = null; trip = null; stage.classList.remove("trip"); $("arrive").classList.remove("on"); $("sweep").classList.remove("on");
     qrHide(); npv.reset(); ai.reset(); guide.stop(); toilet.stop(); lock.stop(); hideCheckin(); trains.hide(); stopVoice(voice);
   }
 

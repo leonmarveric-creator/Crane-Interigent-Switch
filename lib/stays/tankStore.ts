@@ -34,6 +34,8 @@ import {
 import type { ParsedReservation } from "./airbnbEmail";
 
 const TANK_ID = 1; // シングルトン（自社ゲストハウス1棟）
+/** 便槽がある建物 (rooms.building)。Crane Nest 2 は便槽なしなので数えない */
+const TANK_BUILDING = (process.env.TANK_BUILDING || "Crane Nest").trim();
 
 // 便槽の「今日」「過ぎた夜」は日本時間(JST=UTC+9)基準で判定する。
 // （サーバはUTCで動くため、そのままだと日本の夜遅くに日付が1日ずれる）
@@ -151,11 +153,15 @@ async function getReservations(sinceDate: string): Promise<ReservationLite[]> {
   try {
     const { data } = await supabaseAdmin
       .from("reservations")
-      .select("check_in, check_out, status, source, guest_token")
+      .select("check_in, check_out, status, source, guest_token, room_id, assigned_room_id")
       .in("source", ["manual", "ical"])
       .neq("status", "cancelled")
       .gt("check_out", sinceIso);
     own = (data as any[]) || [];
+    // 便槽があるのは Crane Nest の建物だけ (Crane Nest 2 は便槽なし)。実際に泊まった部屋 (割り当てがあればそちら) の建物で分ける
+    const { data: rooms } = await supabaseAdmin.from("rooms").select("id, building");
+    const bld = new Map(((rooms as any[]) || []).map((r) => [r.id, String(r.building || "Crane Nest").trim()]));
+    own = own.filter((r) => { const b = bld.get(r.assigned_room_id || r.room_id); return !b || b === TANK_BUILDING; });
   } catch {
     /* noop */
   }

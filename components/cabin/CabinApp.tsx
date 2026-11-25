@@ -211,6 +211,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           if (e.tripId() === t.id) e.stop();
           setInTrip(true); setMenu(false);
           dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string" || typeof j.checkinLink === "string");
+          // 帰り道: スマホで流している曲のカバーと歌詞
+          if (j.track) trackRef.current = j.track;
+          dh.nowPlaying(t.np ?? null, t.np && trackRef.current?.id === t.np.id ? trackRef.current : null, typeof j.now === "number" ? j.now - Date.now() : 0);
           const ownF = own.current && Date.now() - own.current.t < OWN_FRESH_MS;
           if (!ownF && t.phone && Date.now() - rtx.current.posAt > 6000 && t.phone.at !== phoneAt.current && Date.now() - Date.parse(t.phone.at) < 30000) { phoneAt.current = t.phone.at; dh.feed(t.phone.ll, t.phone.kmh); }
           else if (ownF) dh.feed(own.current!.ll, own.current!.kmh);

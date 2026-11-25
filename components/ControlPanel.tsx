@@ -1995,7 +1995,7 @@ function WakeCard({
   roomSlug: string; checkOut: string; t: typeof T["en"]; lang: Lang; admin?: boolean; hasWafu?: boolean;
 }) {
   const [time, setTime] = useState("07:00");
-  const [mode, setMode] = useState<WakeLightMode>("flame_on");
+  const [mode, setMode] = useState<WakeLightMode>(hasWafu ? "horizon_rise" : "flame_on");
   const [state, setState] = useState<"idle" | "busy" | "set">("idle");
   const [err, setErr] = useState<string | null>(null);
 

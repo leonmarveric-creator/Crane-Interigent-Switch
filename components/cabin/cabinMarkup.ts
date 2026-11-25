@@ -55,7 +55,7 @@ export const TRIP_HTML = `<div class="scr">
      <div class="cmeter" id="cmeter"><div class="cl"><b id="clL"></b><small id="clS"></small></div><div class="cb"><span id="clA"></span><div class="cbar"><i id="cbar"></i></div><span id="clB"></span></div></div>
     </div>
    </div>
-   <div class="box recb" id="recBox" style="flex:1;min-height:0"><h3 id="h-rec"></h3><div class="rec" id="rec"></div></div>
+   <div class="box recb" id="recBox" style="flex:1;min-height:0"><h3 id="h-rec"></h3><div class="rec" id="rec"></div><div class="rcar" id="rcar"><div class="rcg"></div><canvas id="rcarC"></canvas><div class="rcl"><i></i>VEHICLE HOLO · HYBRID</div></div></div>
   </div>
  </div>
  ${NP_FULL}

@@ -383,6 +383,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
   };
   const [qMsg, toastQ] = useState("");
   const [talk, setTalk] = useState(false);
+  const [air, setAir] = useState(false); // ✈ 空港までの案内 (押すと選ぶ画面)
   return (
     <div className="cabbar">
       <span className="live" />
@@ -391,10 +392,56 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button className="abtn" onClick={() => { sfx.tick(); setTalk(true); }}>🎙<small>ASTRAEA</small></button>
       <button className={`qbtn ${humor ? "on" : ""}`} title={t("ユーモアモード")} onClick={() => void toggleHumor()}>{humor ? "😂" : "🙂"}<small>{humor ? t("ユーモア") : t("ふつう")}</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
+      {tr.phase !== "dead" && <button className={`airbtn ${air ? "on" : ""}`} onClick={() => { sfx.tick(); setAir((v) => !v); }}>✈<small>{t("空港")}</small></button>}
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
+      {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
       {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
       {talk && <AstraeaSheet tr={tr} cab={cab} t={t} ui={ui} onClose={() => setTalk(false)} toast={toastQ} />}
+    </div>
+  );
+}
+
+/* ================= ✈ 空港までの道順 (お見送り中。押すと iPad で ASTRAEA が降りたあとの道順を案内) =================
+   降りる場所は送迎予約から自動 (りんくう → 大屋根 / 往来北 → 5 番出口 / 関空 → ターミナル)。チップで変えられる */
+type Drop = "r1" | "r2" | "t1" | "t2";
+const DROPS: { k: Drop; icon: string; ja: string; zh: string }[] = [
+  { k: "r1", icon: "🚉", ja: "りんくう 大屋根", zh: "临空城 大雨棚" },
+  { k: "r2", icon: "🚉", ja: "りんくう 5番出口", zh: "临空城 5号出口" },
+  { k: "t1", icon: "✈", ja: "関空 第1", zh: "机场 T1" },
+  { k: "t2", icon: "✈", ja: "関空 第2", zh: "机场 T2" },
+];
+const dropOf = (tr: CabinTrip): Drop => tr.placeKey === "r833" ? "r2" : tr.placeKey === "kix2" ? "t2" : tr.placeKey === "kix" ? "t1" : "r1";
+function AirportCard({ tr, t, toast, onClose }: { tr: CabinTrip; t: T; toast: (s: string) => void; onClose: () => void }) {
+  const out = tr.dir === "out";
+  // お見送り: 降りる場所の道順 / お迎え: 「明日どうやって空港へ？」(2 つの行き方と料金 → 道順)
+  const [d, setD] = useState<Drop>(dropOf(tr)), [st, setSt] = useState<"" | "busy" | "on">(""), [m, setM] = useState<"how" | "route">(out ? "route" : "how");
+  const ui = t("帰り道") === "返程" ? "zh" : "ja";
+  const go = async (c: string) => {
+    if (st === "busy") return;
+    sfx.tick(); vib(25); setSt("busy");
+    const r = await cabinAiCmd(tr.id, c as CaptainCmdId).catch(() => ({ ok: false } as any)); rtKick(CABIN_CH);
+    if (!r?.ok) { setSt(""); sfx.error(); toast(t("送れませんでした")); return; }
+    setSt("on"); setTimeout(onClose, 1400);
+  };
+  return (
+    <div className="aircard">
+      <div className="airhd"><b>✈ {out ? t("空港までの道順") : t("明日の空港への行き方")}</b><button onClick={onClose}>✕</button></div>
+      {!out && (
+        <div className="airtab">
+          <button className={m === "how" ? "on" : ""} onClick={() => setM("how")}>🧭 {t("行き方と料金")}<small>{t("電車 / 車で直接")}</small></button>
+          <button className={m === "route" ? "on" : ""} onClick={() => setM("route")}>🚶 {t("降りたあとの道順")}<small>{t("場所を選ぶ")}</small></button>
+        </div>
+      )}
+      {m === "route" && (
+        <div className="airdrop">
+          {DROPS.map((x) => <button key={x.k} className={d === x.k ? "on" : ""} onClick={() => { sfx.tick(); setD(x.k); }}>{x.icon} {ui === "zh" ? x.zh : x.ja}</button>)}
+        </div>
+      )}
+      {m === "how" && <p className="airnote">{t("無料送迎＋電車（1人 ¥370）と、車で直接（1台 ¥1,500）を、人数に合わせて比べて見せます。最後に QR でゲストのスマホに保存できます")}</p>}
+      <button className={`airgo ${st === "on" ? "on" : ""}`} onClick={() => void go(m === "how" ? "airport_how" : "airport_" + d)}>
+        <i>✈</i><span><b>{st === "on" ? t("iPad で案内中") : t("iPad で案内する")}</b><small>{t("ASTRAEA が iPad で話します")}</small></span><em>{st === "busy" ? "…" : st === "on" ? "📡" : "▶"}</em>
+      </button>
     </div>
   );
 }

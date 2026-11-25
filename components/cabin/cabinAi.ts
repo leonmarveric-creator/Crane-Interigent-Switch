@@ -44,6 +44,7 @@ export interface AiCtx {
   roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
   conQr: () => void;               // 右下の枠にコンシェルジュの QR を出す (お父さんのスマホのボタン)
   holo: () => void;                // 地図の枠にホログラム (お父さんのスマホのボタン)
+  airport: (c: string) => void;    // ✈ 空港案内 (比較 / 降りたあとの道順) を iPad に重ねる
 }
 export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出す (話し終わったら戻る) */ prep(): Promise<boolean>; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
 
@@ -283,6 +284,7 @@ export function createAi(c: AiCtx): Ai {
     if (cmd.c === "guide") { c.guide(); return; }
     if (cmd.c === "qr") { c.conQr(); return; }
     if (cmd.c === "holo") { c.holo(); return; }
+    if (cmd.c.startsWith("airport_")) { c.airport(cmd.c); return; }
     if (cmd.c === "unknown") { const i = (lastC.unknown = ((lastC.unknown ?? -1) + 1) % UNKNOWN.length); void speak(captainAudio("unknown", i), UNKNOWN[i], { st: "TO: CAPTAIN", duck: false }); return; }
     const k = CAPTAIN.find((x) => x.id === cmd.c); if (!k) return;
     let i = Math.floor(Math.random() * k.v.length); if (k.v.length > 1 && i === lastC[k.id]) i = (i + 1) % k.v.length; lastC[k.id] = i;

@@ -672,3 +672,31 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .cabbar .prepnote .ps { flex:none; height:40px; padding:0 12px; border-radius:12px; border:1px solid rgba(255,190,110,.6); background:rgba(255,255,255,.06); color:#ffd9a8; font-weight:800; font-size:13px; }
 .drv .cabbar .prepnote .px { flex:none; width:32px; height:32px; border-radius:50%; border:0; background:rgba(255,255,255,.08); color:#ffe9cc; font-size:14px; }
 @keyframes drv-prepin { from { transform:translateY(14px); opacity:0; } to { transform:none; opacity:1; } }
+
+/* ✈ 空港案内: バーの小さいボタン → 押すと上に選ぶ画面 */
+.drv .cabbar .airbtn { min-width:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 8px; border-color:rgba(255,206,120,.75); background:linear-gradient(135deg,#ffcf6e,#ff9f2e); color:#231302; font-size:18px; line-height:1.1; box-shadow:0 0 12px rgba(255,180,70,.45); }
+.drv .cabbar .airbtn small { font-size:8.5px; font-weight:900; letter-spacing:.02em; }
+.drv .cabbar .airbtn.on { background:#2a1c08; color:#ffd99c; }
+.drv .cabbar .aircard { position:absolute; left:6px; right:6px; bottom:calc(100% + 10px); display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:20px; background:linear-gradient(160deg,rgba(58,38,8,.98),rgba(18,12,6,.98)); border:1px solid rgba(255,206,120,.7); box-shadow:0 0 26px rgba(255,170,60,.3),0 10px 30px rgba(0,0,0,.6); z-index:31; animation:drv-prepin .35s cubic-bezier(.2,1.4,.4,1); }
+.drv .cabbar .aircard .airhd { display:flex; align-items:center; justify-content:space-between; }
+.drv .cabbar .aircard .airhd b { font-size:15px; color:#ffe9cc; }
+.drv .cabbar .aircard .airhd button { min-height:34px; width:34px; padding:0; border-radius:50%; border:1px solid rgba(255,206,120,.4); background:rgba(0,0,0,.3); color:#ffd99c; }
+.drv .cabbar .aircard .airtab { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.drv .cabbar .aircard .airtab button, .drv .cabbar .aircard .airdrop button { min-height:50px; padding:4px 6px; border-radius:12px; border:1px solid rgba(255,206,120,.35); background:rgba(0,0,0,.3); color:#ffe9cc; font-size:13px; font-weight:800; line-height:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.drv .cabbar .aircard .airtab small { font-size:10px; opacity:.7; font-weight:700; }
+.drv .cabbar .aircard .airtab button.on, .drv .cabbar .aircard .airdrop button.on { background:rgba(255,190,90,.25); border-color:#ffcf6e; color:#fff; box-shadow:0 0 12px rgba(255,180,70,.4); }
+.drv .cabbar .aircard .airdrop { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.drv .cabbar .aircard .airnote { margin:0; font-size:12px; line-height:1.5; color:#ffd99c; padding:4px 2px; }
+.drv .cabbar .aircard .airgo { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; min-height:64px; width:100%; padding:0 14px; border-radius:16px; border:0; background:linear-gradient(135deg,#ffcf6e,#ff9f2e); color:#231302; text-align:left; box-shadow:0 0 22px rgba(255,180,70,.5); }
+.drv .cabbar .aircard .airgo i { font-style:normal; font-size:28px; }
+.drv .cabbar .aircard .airgo span { flex:1; min-width:0; display:flex; flex-direction:column; }
+.drv .cabbar .aircard .airgo b { font-size:17px; font-weight:900; }
+.drv .cabbar .aircard .airgo small { font-size:11px; font-weight:700; opacity:.75; }
+.drv .cabbar .aircard .airgo em { font-style:normal; font-size:20px; font-weight:900; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(35,19,2,.15); }
+.drv .cabbar .aircard .airgo.on { background:linear-gradient(135deg,#5fe3ff,#1c8fe0); color:#021422; }
+
+/* ✈ を足したのでバーを少し詰める */
+.drv .cabbar { gap:7px; padding:10px 10px; }
+.drv .cabbar .tx { min-width:64px; }
+.drv .cabbar .qbtn, .drv .cabbar .abtn, .drv .cabbar .airbtn { min-width:46px; padding:0 6px; }
+.drv .cabbar > button:last-of-type { white-space:nowrap; padding:0 10px; }
