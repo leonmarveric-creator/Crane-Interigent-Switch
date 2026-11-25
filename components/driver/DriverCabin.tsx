@@ -62,24 +62,14 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     void cabinAutoAlert(roomId, "auto_off");
   }, [confirmSay, t]);
   useEffect(() => { setTrip(initial); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  /* ---------- 📱 どちらが動かすか: iPad がつながっていれば iPad。いないときだけ、このスマホの中で車内画面を動かす ----------
-     iPad は送迎中 3 秒ごとに「ここにいます」(hb) を送ってくる。スマホの車内画面の印 (p: 1) は数えない */
-  const ipadAt = useRef(0);
-  const [ipadOn, setIpadOn] = useState(false);
-  const [phoneEng, setPhoneEng] = useState(false);
+  /* ---------- 📱 iPad を使うか / スマホだけか (出発の前に選ぶ。送迎中に iPad を探すことはしない) ----------
+     スマホだけ: このスマホの中で車内画面 (/cabin?phone=1) を動かす。iPad: 今までどおり iPad が動かす */
+  const [mode, setModeS] = useState<"ipad" | "phone">("ipad");
+  useEffect(() => { try { if (localStorage.getItem("drvCabMode") === "phone") setModeS("phone"); } catch { /* ignore */ } }, []);
+  const setMode = useCallback((m: "ipad" | "phone") => { setModeS(m); try { localStorage.setItem("drvCabMode", m); } catch { /* ignore */ } }, []);
   const [phoneHide, setPhoneHide] = useState(false); // 手で閉じた (この送迎の間)
-  useEffect(() => { rtJoinMsg(CABIN_CH, () => {}, (ev, p) => { if (ev === "hb" && p && !p.p && p.t === tripRef2.current?.id) ipadAt.current = Date.now(); }); }, []);
-  useEffect(() => {
-    if (!trip) { setPhoneEng(false); setIpadOn(false); setPhoneHide(false); return; }
-    const t0 = Date.now();
-    const tick = () => {
-      const on = Date.now() - ipadAt.current < 10000; setIpadOn(on);
-      // 出発から 8 秒たっても iPad の印が来なければ、スマホが動かし役。途中で iPad が来たら iPad に引き継ぐ (済んだことは記録で共有)
-      setPhoneEng(!on && Date.now() - t0 > 8000);
-    };
-    tick(); const id = setInterval(tick, 2000);
-    return () => clearInterval(id);
-  }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPhoneHide(false); }, [trip?.id]);
+  const phoneEng = !!trip && mode === "phone", ipadOn = mode === "ipad";
   // 合図の回線を先につないでおく (出発を押した瞬間に iPad へ届くように)
   useEffect(() => { rtJoin(CABIN_CH, () => {}); }, []);
 
@@ -157,7 +147,6 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (!live) return;
       if (r?.ok) {
         if (last) setSending("ok");
-        if (r.ipad) ipadAt.current = Date.now(); // iPad がサーバーに来ている (合図の回線が切れていても)
         if (r.np === "setup" && !warned) { warned = true; toast(t("iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください")); }
         if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
         // 回送 ⇄ ゲスト乗車 (iPad のボタンで切り替わることもある)
@@ -225,7 +214,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   boardRef.current = board;
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide };
+  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide, mode, setMode };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -469,7 +458,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button className={`qbtn ${humor ? "on" : ""}`} title={t("ユーモアモード")} onClick={() => void toggleHumor()}>{humor ? "😂" : "🙂"}<small>{humor ? t("ユーモア") : t("ふつう")}</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       {tr.phase !== "dead" && <button className={`airbtn ${air ? "on" : ""}`} onClick={() => { sfx.tick(); setAir((v) => !v); }}>✈<small>{t("空港")}</small></button>}
-      <button className={`qbtn ${cab.phoneEng && !cab.phoneHide ? "on" : ""}`} onClick={() => { sfx.tick(); cab.setPhoneHide(!cab.phoneHide); }}>{cab.ipadOn ? "📟" : "📱"}<small>{cab.ipadOn ? "iPad ✓" : cab.phoneHide ? t("画面") : t("小さく")}</small></button>
+      {cab.phoneEng && <button className={`qbtn ${!cab.phoneHide ? "on" : ""}`} onClick={() => { sfx.tick(); cab.setPhoneHide(!cab.phoneHide); }}>📱<small>{cab.phoneHide ? t("画面") : t("小さく")}</small></button>}
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
       {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} t={t} />}
@@ -824,7 +813,7 @@ export function useCabinSheet() {
 function PhoneCabin({ hidden, t }: { hidden: boolean; t: T }) {
   return (
     <div className={`pcab ${hidden ? "hide" : ""}`}>
-      <div className="pcabh"><i />{t("iPad がつながっていないので、このスマホで車内画面を動かしています")}</div>
+      <div className="pcabh"><i />{t("スマホだけの送迎：このスマホで車内画面を動かしています")}</div>
       <iframe src="/cabin?phone=1" title="cabin" allow="autoplay; geolocation; fullscreen" />
     </div>
   );

@@ -756,3 +756,7 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .sg-none{text-align:center;color:var(--muted);margin:40px 0}
 .drv .sg-man{display:block;width:100%;margin-top:16px;min-height:52px;border:1px solid rgba(120,180,255,.45);border-radius:16px;background:rgba(6,16,34,.7);color:#e6efff;font-size:16px;font-weight:700}
 .drv .sg-full{display:block;text-align:center;margin:18px 0;color:var(--muted);font-size:13px}
+.drv .sg-mode{display:flex;align-items:center;gap:6px;margin:10px 0 2px;font-size:13px;color:var(--muted)}
+.drv .sg-mode button{flex:1;min-height:40px;border-radius:12px;border:1px solid rgba(90,170,255,.55);background:rgba(5,15,32,.8);color:#cfe3ff;font-size:14px;font-weight:700}
+.drv .sg-mode button.on{background:linear-gradient(180deg,#5ff0ff,#13b9ff);color:#00121e;box-shadow:0 0 14px rgba(63,216,255,.6)}
+.drv .sg-mode button:disabled{opacity:.6}

@@ -517,7 +517,10 @@ export default function DriverApp({ data: initial, now: serverNow, simple }: { d
         <div className="sg-wrap">
           <div className="sg-hd"><b>{t("今日の送迎")}</b><span>{jstDay(nowMs).slice(5).replace("-", "/")}</span>
             <button className="sg-lang" onClick={() => setUiLang(lang === "zh" ? "ja" : "zh")}>{lang === "zh" ? "日本語" : "中文"}</button></div>
-          <div className={`sg-dev ${ipad ? "on" : ""}`}><i />{ipad ? t("車内iPad 接続中") : t("車内iPad 未接続（演出はスマホ）")}</div>
+          <div className="sg-mode"><span>{t("車内の画面")}</span>
+            <button className={cab.mode === "ipad" ? "on" : ""} disabled={!!cab.trip} onClick={() => { sfx.tick(); cab.setMode("ipad"); }}>📟 iPad</button>
+            <button className={cab.mode === "phone" ? "on" : ""} disabled={!!cab.trip} onClick={() => { sfx.tick(); cab.setMode("phone"); }}>📱 {t("スマホだけ")}</button></div>
+          {cab.mode === "ipad" && <div className={`sg-dev ${ipad ? "on" : ""}`}><i />{ipad ? t("車内iPad 接続中") : t("車内iPad が見つかりません（iPad の画面を開いてください）")}</div>}
           {jobs.length ? jobs.map(({ r, dir, at }) => {
             const done = dir === "in" ? false : at < nowMs - 3 * 3600e3;
             return (
