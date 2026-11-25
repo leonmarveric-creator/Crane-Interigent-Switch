@@ -14,7 +14,7 @@ import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
 import { BOOST_INIT, CRANE_NEST, PLACES, PLACE_KEYS, acModeFor, boostPrepDue, boostStep, dist, placeFromText, type LL, type PlaceKey } from "@/lib/cabinGeo";
 import type { DRes } from "@/lib/driverLogic";
 import type { RoomPrep } from "@/lib/cabinRoomPrep";
-import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon, cabinArriveImages, cabinArriveUploadUrl, cabinSetArriveImages , driverAllOff, cabinAutoAlert } from "@/app/driver/actions";
+import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSetQuiet, cabinSetHumor, cabinSetBoostSfx, cabinSetVoiceMode, cabinAiCmd, cabinCheckinQrUploadUrl, cabinSetCheckinQr, cabinRenameDevice, cabinDeleteDevice, cabinPhotoUploadUrl, cabinSetRoomPhoto, cabinRoomIcons, cabinIconUploadUrl, cabinSetRoomIcon, cabinArriveImages, cabinArriveUploadUrl, cabinSetArriveImages , driverAllOff, cabinAutoAlert , cabinSetPlacePoint, cabinPlacePoints } from "@/app/driver/actions";
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
@@ -26,6 +26,7 @@ import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
 
 type T = (s: string, v?: Record<string, string | number>) => string;
+const PP_KEYS = ["kix", "kix2", "rinku", "r833", "hineno"];
 /** ボタンひとつの送迎で自動にすること */
 export interface AutoPlan {
   tripId: string; roomId: string | null; roomKey: string; roomName: string; lang: "zh" | "en" | "ja" | "ko";
@@ -446,6 +447,17 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
     if (!r.ok) { setQuiet(!q); toastQ(r.error === "SETUP_AI" ? t("静かモードには Supabase の SQL（migration_cabin_ai.sql）が必要です") : t("切り替えられませんでした")); }
   };
   const [qMsg, toastQ] = useState("");
+  /** 📍 今止まっている場所を、この行き先の到着地点にする (次からここで到着の画面・ホログラムが出る) */
+  const setHere = async (k: string) => {
+    const name = (PLACES as any)[k]?.name?.[ui] ?? k;
+    if (!confirm(t("今いる場所を「{p}」の到着地点にしますか？（次から、ここに止まったら到着の演出が出ます）", { p: name }))) return;
+    if (!navigator.geolocation) { toastQ(t("位置がわかりません")); return; }
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      if (p.coords.accuracy > 60) { toastQ(t("GPS の精度が低いので、少し待ってからもう一度押してください")); return; }
+      const r = await cabinSetPlacePoint(k, [p.coords.latitude, p.coords.longitude]); rtKick(CABIN_CH);
+      sfx.chord(); toastQ(r.ok ? t("✓「{p}」の到着地点を登録しました", { p: name }) : t("登録できませんでした"));
+    }, () => toastQ(t("位置がわかりません")), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  };
   const [talk, setTalk] = useState(false);
   const [air, setAir] = useState(false); // ✈ 空港までの案内 (押すと選ぶ画面)
   return (
@@ -461,6 +473,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
       {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} t={t} />}
+      {PP_KEYS.includes(tr.placeKey) && <button className="qbtn" title={t("ここを到着地点にする")} onClick={() => void setHere(tr.placeKey)}>📍<small>{t("ここ")}</small></button>}
       {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
       {talk && <AstraeaSheet tr={tr} cab={cab} t={t} ui={ui} onClose={() => setTalk(false)} toast={toastQ} />}
@@ -590,6 +603,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       <BoostPick initial={data.cabin.boostSfx} t={t} />
       <VoicePick initial={data.cabin.voiceMode} t={t} />
       <PhoneSave t={t} toast={toast} />
+      <PlacePointList t={t} toast={toast} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
       {data.cabin.devices.map((d) => (
@@ -845,5 +859,22 @@ export function PhoneSave({ t, toast }: { t: T; toast: (s: string) => void }) {
         </div>
       )}
     </>
+  );
+}
+
+
+/** 登録した到着地点の一覧 (設定)。送迎中に送迎バーの 📍 で登録する */
+function PlacePointList({ t, toast }: { t: T; toast: (s: string) => void }) {
+  const [pts, setPts] = useState<Record<string, [number, number]>>({});
+  const load = useCallback(async () => { const r = await cabinPlacePoints(); if (r.ok) setPts(r.points); }, []);
+  useEffect(() => { void load(); }, [load]);
+  return (
+    <div className="cnote">
+      <b>📍 {t("到着地点")}</b>　{t("送迎中に車を止めた所で、送迎バーの 📍 を押すと登録できます（例：りんくうのガラスのエレベーターの前）。")}
+      {Object.keys(pts).length ? Object.entries(pts).map(([k, ll]) => (
+        <div key={k} className="fedit"><span>{(PLACES as any)[k]?.name?.ja ?? k}：{ll[0].toFixed(5)}, {ll[1].toFixed(5)}</span>
+          <button onClick={async () => { const r = await cabinSetPlacePoint(k, null); if (r.ok) { toast(t("元に戻しました")); void load(); } }}>{t("元に戻す")}</button></div>
+      )) : <div>{t("まだ登録されていません（駅は、まわりで 5 秒止まると着いたことになります）")}</div>}
+    </div>
   );
 }

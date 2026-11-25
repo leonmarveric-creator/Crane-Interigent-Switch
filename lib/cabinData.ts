@@ -172,3 +172,13 @@ export async function arriveImageUrls(): Promise<string[]> {
   if (!data) return [];
   try { const j = JSON.parse(await (data as Blob).text()); return Array.isArray(j) ? j.filter((x: unknown) => typeof x === "string" && /^cabin\/arrive\/img-/.test(x as string)).map((p: string) => cabinPublicUrl(p)) : []; } catch { return []; }
 }
+
+/** 到着地点 (お父さんが車を止めた場所で登録。Storage の cabin/places.json)。{ rinku: [lat, lng], ... } */
+export type PlacePoints = Partial<Record<"kix" | "kix2" | "rinku" | "r833" | "hineno", [number, number]>>;
+export async function placePoints(): Promise<PlacePoints> {
+  const { data } = await supabaseAdmin.storage.from("driver-music").download("cabin/places.json").catch(() => ({ data: null } as any));
+  if (!data) return {};
+  try { const j = JSON.parse(await (data as Blob).text()); const out: PlacePoints = {};
+    for (const k of ["kix", "kix2", "rinku", "r833", "hineno"] as const) { const v = j?.[k]; if (Array.isArray(v) && v.length === 2 && v.every((n: unknown) => typeof n === "number" && isFinite(n as number))) out[k] = [v[0], v[1]]; }
+    return out; } catch { return {}; }
+}

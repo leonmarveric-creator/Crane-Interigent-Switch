@@ -92,7 +92,9 @@ export interface Engine {
   /** 回送中、迎え先 (関空) に近づいたとき: お父さん向けの到着ホログラム (最後にお出迎えボード) */
   /** 空港案内・到着のホログラムを出しているか */
   airOn(): boolean;
-  pickArrive(g: { name: string | null; flight: string | null; room: string | null; t2?: boolean; hineno?: boolean; tripId?: string }): void;
+  /** お父さんが登録した到着地点 (りんくうのガラスのエレベーターの前など) */
+  setPlacePoints(pp: Record<string, [number, number]> | null): void;
+  pickArrive(g: { name: string | null; flight: string | null; room: string | null; t2?: boolean; hineno?: boolean; place?: string; tripId?: string }): void;
 }
 
 export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean ; /** もう済んだこと (案内・演出) を送迎の記録に残す (iPad ⇄ スマホの引き継ぎ用) */ onDone?: (tripId: string, p: CabinDone) => void }): Engine {
@@ -186,6 +188,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let bs: BoostState = { ...BOOST_INIT }, bMax = 0, bTrivI = 0, bTrivT = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
   const T_ = (ms: number, f: () => void) => { timers.push(setTimeout(f, ms)); };
+  let PP: Record<string, [number, number]> = {}, stopAt = 0;
+  /** 駅の中心 (止まったら着いたことにする範囲の中心) */
+  const STN_C: Record<string, LL> = { rinku: [34.41073, 135.2996], r833: [34.41073, 135.2996], hineno: [34.39109, 135.33144] };
   let doneLine: any = null, car: any = null, etaNow: number | null = null, remNow = 0, vAvg = 35;
   /** もう済んだこと: 前の担当 (iPad / スマホ) から引き継いだもの + この送迎で済ませたものを記録に残す */
   let done0: CabinDone = {};
@@ -345,7 +350,12 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       chime(); cap(p.k); void say(`en-${p.k}`);
       const el = root.querySelector(`[data-poi="${p.k}"]`); el?.classList.add("hit");
     }
-    if (!arrived && toDest < 200) arrive();
+    // 到着: 登録した到着地点 (止める場所) があればそこから 80 m 以内。無ければ目的地から 200 m 以内。
+    // 駅 (りんくう・日根野) は、駅のまわり 350 m で 5 秒以上止まったら着いたことにする (駅の真下まで行かなくても)
+    const ap = trip && trip.dir === "out" ? PP[trip.placeKey] : undefined, toArr = ap ? dist(ll, ap) : toDest;
+    const stnC = trip?.dir === "out" ? STN_C[trip.placeKey] : undefined;
+    if (kmh != null && kmh < 4) { if (!stopAt) stopAt = tNow; } else stopAt = 0;
+    if (!arrived && (toArr < (ap ? 80 : 200) || (stnC && dist(ll, stnC) < 350 && stopAt && tNow - stopAt > 5000))) arrive();
   }
   function cap(k: PoiKey) {
     const [i, t, s] = T.poi[k]; setText("capI", i); setText("capT", t); setText("capS", s);
@@ -361,7 +371,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function airEarlyTick(rem: number) {
     if (!trip || airEarly || arrived || offroute || trip.dir !== "out" || trip.id.startsWith("demo") || !arriveNew() || air.on()) return;
     const s = outScene(); if (!s) return;
-    if (holoRemainS(Math.max(0, rem - 200), vAvg) > AIR_LEAD_S) return;
+    // 残りの道のり: 到着地点を登録していれば、そこまで (直線 × 1.3 ≒ 道なり) ─ そこから 80 m で到着。無ければ道の終わりから 200 m で到着
+    const ap = PP[trip.placeKey], left = ap && carLL ? Math.max(0, dist(carLL, ap) * 1.3 - 80) : Math.max(0, rem - 200);
+    if (holoRemainS(left, vAvg) > AIR_LEAD_S) return;
     airEarly = true; holo.stop(); byeS(); airGo(s); markDone({ air: true });
   }
   function arrive() {
@@ -940,8 +952,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     },
     arrived: () => !!trip && arrived,
     setGuest: (g) => { gInfo = g; },
+    setPlacePoints: (pp) => { PP = pp ?? {}; },
     setArriveImgs: (u) => { air.setImgs(u); },
     airOn: () => air.on(),
-    pickArrive: (g) => { if (!arriveNew()) return; airTrip = g.tripId ?? null; air.arrive({ s: g.hineno ? "pickh" : g.t2 ? "pick2" : "pick", name: g.name, flight: g.flight, room: g.room, lang: "ja" }); },
+    pickArrive: (g) => { if (!arriveNew()) return; airTrip = g.tripId ?? null; air.arrive({ s: g.place === "rinku" ? "pickr1" : g.place === "r833" ? "pickr2" : g.hineno ? "pickh" : g.t2 ? "pick2" : "pick", name: g.name, flight: g.flight, room: g.room, lang: "ja" }); },
     setCheckin: (u) => { ckSet = u; checkinUrl = u || ckDefault; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = checkinUrl ? "" : "none"; } };
 }

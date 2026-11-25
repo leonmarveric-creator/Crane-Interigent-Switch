@@ -9,7 +9,7 @@ import { fetchFlight, normFlightNo } from "@/lib/flight";
 import { FLIGHT_REUSE_MS, type FlightInfo } from "@/lib/driverLogic";
 import { loadDriverData, type DriverData, type DriverDesign } from "@/lib/driverData";
 import { langOf } from "@/lib/driverLogic";
-import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots } from "@/lib/cabinData";
+import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots , placePoints } from "@/lib/cabinData";
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
 import { boardTrip, prepFromCmd, stopRoomPrep, type RoomPrep } from "@/lib/cabinRoomPrep";
@@ -453,4 +453,20 @@ export async function cabinAutoAlert(roomId: string, kind: "auto_off" | "auto_on
   if (!isId(roomId)) return fail("BAD");
   const { error } = await supabaseAdmin.from("driver_alerts").insert({ room_id: roomId, kind: kind === "auto_on" ? "auto_on" : "auto_off" });
   return error ? fail(error.message) : { ok: true };
+}
+
+/** 到着地点を登録 (今いる場所 = 車を止めた場所)。到着の反応 (到着の画面・ホログラム) はここから 80 m 以内で。null で元に戻す */
+export async function cabinSetPlacePoint(key: string, ll: [number, number] | null): Promise<R> {
+  const g = guard(); if (g) return g;
+  if (!["kix", "kix2", "rinku", "r833", "hineno"].includes(key)) return fail("BAD");
+  if (ll && !(ll.length === 2 && ll.every((n) => typeof n === "number" && isFinite(n)) && Math.abs(ll[0] - 34.4) < 0.2 && Math.abs(ll[1] - 135.3) < 0.2)) return fail("BAD_LL");
+  const cur: Record<string, unknown> = { ...(await placePoints().catch(() => ({}))) };
+  if (ll) cur[key] = [Math.round(ll[0] * 1e6) / 1e6, Math.round(ll[1] * 1e6) / 1e6]; else delete cur[key];
+  const { error } = await supabaseAdmin.storage.from("driver-music").upload("cabin/places.json", new Blob([JSON.stringify(cur)], { type: "application/json" }), { upsert: true, contentType: "application/json", cacheControl: "0" });
+  return error ? fail(error.message) : { ok: true };
+}
+/** 登録した到着地点 */
+export async function cabinPlacePoints(): Promise<R<{ points: Record<string, [number, number]> }>> {
+  const g = guard(); if (g) return g;
+  return { ok: true, points: (await placePoints().catch(() => ({}))) as Record<string, [number, number]> };
 }

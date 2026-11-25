@@ -147,7 +147,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           say: (u, s) => { const id = tripRef.current?.id; return id ? sendVoice(id, u, s) : Promise.resolve(false); },
           board: async (id) => { const r = await post({ op: "board", trip: id }); if (!r?.ok) toast(r?.error === "SETUP" ? "Supabase の SQL（migration_cabin_voice.sql）を実行してください" : "切り替えられませんでした"); else { rtKick(CABIN_CH); void poll(); } },
           end: (id) => void endTrip(id, true),
-          near: (t2, info, r) => { eng.current?.pickArrive({ tripId: t2.id, t2: t2.placeKey === "kix2", hineno: t2.placeKey === "hineno", name: info?.guest ?? null, flight: info?.flightNo ?? null, room: r ? `${r.kanji} ${r.en}`.trim() : null }); },
+          near: (t2, info, r) => { eng.current?.pickArrive({ tripId: t2.id, t2: t2.placeKey === "kix2", hineno: t2.placeKey === "hineno", place: t2.placeKey, name: info?.guest ?? null, flight: info?.flightNo ?? null, room: r ? `${r.kanji} ${r.en}`.trim() : null }); },
         });
         eng.current.resize();
         if (wxRef.current) eng.current.weather(wxRef.current);
@@ -226,6 +226,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           if (e.tripId() === t.id) e.stop();
           setInTrip(true); setMenu(false);
           e.setArriveImgs(Array.isArray(j.arrImgs) ? j.arrImgs : []);
+          dh.setPlacePoints(j.pp && typeof j.pp === "object" ? j.pp : null);
           dh.show(t, j.room, j.dh ?? null, typeof j.checkin === "string" || typeof j.checkinLink === "string");
           // 帰り道: スマホで流している曲のカバーと歌詞
           if (j.track) trackRef.current = j.track;
@@ -250,7 +251,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           if (ckLink.current?.link !== j.checkinLink) { const link = j.checkinLink; ckLink.current = { link, img: null }; QRCode.toDataURL(link, { margin: 2, width: 560, errorCorrectionLevel: "M" }).then((img) => { const c = ckLink.current; if (c && c.link === link) { c.img = img; eng.current?.setCheckin(img); } }).catch(() => {}); }
           e.setCheckin(ckLink.current?.img ?? (typeof j.checkin === "string" ? j.checkin : null));
         } else e.setCheckin(typeof j.checkin === "string" ? j.checkin : null);
-        e.setGuest(j.gi ?? null); e.setArriveImgs(Array.isArray(j.arrImgs) ? j.arrImgs : []);
+        e.setGuest(j.gi ?? null); e.setPlacePoints(j.pp && typeof j.pp === "object" ? j.pp : null); dhRef.current?.setPlacePoints(j.pp && typeof j.pp === "object" ? j.pp : null); e.setArriveImgs(Array.isArray(j.arrImgs) ? j.arrImgs : []);
         e.aiCommand(t.aiCmd ?? null); // お父さんから ASTRAEA への指示
         // 再生中の曲 (歌詞は iPad で時間を進めながら合わせる)
         if (t.npReady === false && !npWarned.current) { npWarned.current = true; toast("歌詞を出すには Supabase の SQL（migration_cabin_music.sql）を実行してください"); }

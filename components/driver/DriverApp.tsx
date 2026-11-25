@@ -45,7 +45,8 @@ function wxInfo(code: number): { e: string; ja: string; zh: string } {
   return { e: "☁", ja: "曇り", zh: "阴" };
 }
 
-export default function DriverApp({ data: initial, now: serverNow }: { data: DriverData; now: number }) {
+/** simple = お父さん専用の「今日の送迎」だけのページ (/driver/go)。今日の分だけ・ボタンひとつ */
+export default function DriverApp({ data: initial, now: serverNow, simple }: { data: DriverData; now: number; simple?: boolean }) {
   const [data, setData] = useState(initial);
   const [lang, setLang] = useState<UiLang>("zh");
   const t = useMemo(() => makeT(lang), [lang]);
@@ -251,11 +252,14 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
      押すだけで: 行き先・お部屋・言語・冷暖房を予約から入れて iPad に出す → 音楽 → (お見送り) 家から 200 m で部屋を全部オフ
      / (お迎え) 迎え先を離れたら自動で乗車 → お部屋のエアコン。りんくうはいつも 5 番出口 (ガラスのエレベーターは押したときだけ) */
   const [glass, setGlass] = useState<Record<string, boolean>>({});
+  /** 行き先を手で変えた (この送迎だけ)。kix / kix2 / rinku (りんくう: 5 番出口 か ガラス) / hineno / other (今までの画面で住所などを選ぶ) */
+  const [dst, setDst] = useState<Record<string, "kix" | "kix2" | "rinku" | "hineno" | "other">>({});
   const natLang = (n?: string | null): MLang | null => { const c = toCountryCode(n ?? null); if (!c) return null; return ["CN", "TW", "HK", "MO"].includes(c) ? "zh" : c === "KR" ? "ko" : c === "JP" ? "ja" : "en"; };
   const quickPlace = (r: DRes, dir: "in" | "out"): PlaceKey | null => {
     const drop = dir === "out" ? r.drop ?? null : null;
     let pk = drop?.dest ? placeFromText(drop.dest, drop.terminal) : placeFromText(r.pickupPlace ?? null, r.flightInfo?.terminal ?? null);
     if (!pk && dir === "in" && r.flightNo) pk = "kix";
+    const o = dst[r.id + dir]; if (o) pk = o === "other" ? "other" : o;
     if (pk === "rinku" || pk === "r833") pk = glass[r.id] ? "rinku" : "r833";
     return pk === "other" ? null : pk;
   };
@@ -282,9 +286,13 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
     const room = roomOf(r.roomId), offToday = dir === "out" && jstDay(r.checkOut) === jstDay(nowMs);
     return (
       <div className="qgo">
+        <div className="qdst qpl">
+          {(["kix", "kix2", "rinku", "hineno"] as const).map((k) => <button key={k} className={(k === "rinku" ? rin : pk === k) ? "on" : ""} onClick={() => { sfx.tick(); setDst((d) => ({ ...d, [r.id + dir]: k })); }}>{k === "kix" ? "T1" : k === "kix2" ? "T2" : k === "rinku" ? t("りんくう") : t("日根野")}</button>)}
+          <button onClick={() => { sfx.tick(); cabS.open(r, dir); }}>📍 {t("その他")}</button>
+        </div>
         {rin && (
           <div className="qdst">
-            <button className={!glass[r.id] ? "on" : ""} onClick={() => { sfx.tick(); setGlass((g) => ({ ...g, [r.id]: false })); }}>{t("5番出口")}</button>
+            <button className={!glass[r.id] ? "on" : ""} onClick={() => { sfx.tick(); setGlass((g) => ({ ...g, [r.id]: false })); }}>{t("5番出口（りんくう往来北）")}</button>
             <button className={glass[r.id] ? "on" : ""} onClick={() => { sfx.tick(); setGlass((g) => ({ ...g, [r.id]: true })); }}>{t("ガラスのエレベーター")}</button>
           </div>
         )}
@@ -493,6 +501,45 @@ export default function DriverApp({ data: initial, now: serverNow }: { data: Dri
   const nextTab = next ? rName(next) : null;
   const bootDone = booting === "done";
   const nr = (r: DRes | null) => (r ? rName(r) : "");
+
+  /* ---------------- お父さん専用: 今日の送迎だけ (/driver/go) ---------------- */
+  if (simple) {
+    type Job = { r: DRes; dir: "in" | "out"; at: number };
+    const jobs: Job[] = [
+      ...board.arrivals.filter((r) => !r.pickupNone).map((r) => ({ r, dir: "in" as const, at: Date.parse(pickupBase(r)) })),
+      ...board.departures.map((r) => ({ r, dir: "out" as const, at: r.drop?.departAt ? Date.parse(`${jstDay(nowMs)}T${r.drop.departAt}:00+09:00`) : Date.parse(r.checkOut) })),
+    ].sort((a, b) => a.at - b.at);
+    const hm = (x: number) => new Date(x + 9 * 3600e3).toISOString().slice(11, 16);
+    const ipad = data.cabin.devices.some((d) => d.lastSeen && Date.now() - Date.parse(d.lastSeen) < 120000);
+    return (
+      <div className={`drv hybrid simple t-${tod}`}>
+        <div className="sg-hero">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/driver/hd/hero.webp" alt="HIROSHI DRIVE" /></div>
+        <div className="sg-wrap">
+          <div className="sg-hd"><b>{t("今日の送迎")}</b><span>{jstDay(nowMs).slice(5).replace("-", "/")}</span>
+            <button className="sg-lang" onClick={() => setUiLang(lang === "zh" ? "ja" : "zh")}>{lang === "zh" ? "日本語" : "中文"}</button></div>
+          <div className={`sg-dev ${ipad ? "on" : ""}`}><i />{ipad ? t("車内iPad 接続中") : t("車内iPad 未接続（演出はスマホ）")}</div>
+          {jobs.length ? jobs.map(({ r, dir, at }) => {
+            const done = dir === "in" ? false : at < nowMs - 3 * 3600e3;
+            return (
+              <div key={r.id + dir} className={`sg-card ${dir} ${done ? "done" : ""}`} style={{ ["--rc" as any]: roomColor(roomOf(r.roomId)?.slug ?? "") }}>
+                <div className="sg-tm"><span className={`sg-tag ${dir}`}>{dir === "in" ? t("お迎え") : t("お見送り")}</span><b>{hm(at)}</b></div>
+                <div className="sg-nm">{r.guest ?? t("ゲスト")}<em>{rName(r)}</em></div>
+                {dir === "in" && r.flightNo ? <div className="sg-fl">✈ {r.flightNo}{r.flightInfo?.terminal ? ` · T${r.flightInfo.terminal}` : ""}</div> : null}
+                {dir === "out" ? <DropInfo d={r.drop ?? null} t={t} /> : null}
+                {QuickGo({ r, dir })}
+              </div>
+            );
+          }) : <p className="sg-none">{t("今日の送迎はありません")}</p>}
+          <button className="sg-man" onClick={() => { sfx.tick(); cabS.open(null, "in"); }}>＋ {t("予約にない送迎")}</button>
+          <a className="sg-full" href="/driver">{t("いつもの画面（HIROSHI DRIVE）へ")} ›</a>
+        </div>
+        <CabinSheet open={!!cabS.state} onClose={cabS.close} res={cabS.state?.res ?? null} dir0={cabS.state?.dir ?? "in"} data={data} cab={cab} t={t} roomName={(id) => roomOf(id)?.name ?? "—"} ui={lang} />
+        <CabinBar cab={cab} data={data} t={t} ui={lang} />
+        <MusicFull m={music} t={t} full={full} />
+        <div className={`toast ${toastMsg ? "show" : ""}`}>{toastMsg}</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`drv ${bike ? "bike" : "hybrid"} t-${tod}`}>

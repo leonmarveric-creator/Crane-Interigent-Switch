@@ -54,12 +54,12 @@ export function createAirport(c: AirportCtx) {
     clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
   }
   /** 到着のホログラム演出 (お見送り: 着いたとき自動 / お迎え: 迎え先に近づいたとき)。最後に「詳しいナビ」ボタンと QR、お見送りはアストレアの最後のひとこと */
-  function arrive(o: { s: "t1" | "t2" | "r1" | "r2" | "hin" | "pick" | "pick2" | "pickh"; name?: string | null; flight?: string | null; room?: string | null; pax?: number | null; lang?: GLang }) {
+  function arrive(o: { s: "t1" | "t2" | "r1" | "r2" | "hin" | "pick" | "pick2" | "pickh" | "pickr1" | "pickr2"; name?: string | null; flight?: string | null; room?: string | null; pax?: number | null; lang?: GLang }) {
     mount(); if (!el || !fr) return;
     const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
     const l = o.lang ?? c.lang(), gl = GUIDE_L[l] ?? "en";
     const q = new URLSearchParams({ s: o.s, l }); if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
-    const guestUrl = o.s === "pick" || o.s === "pick2" || o.s === "pickh" || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
+    const guestUrl = /^pick/.test(o.s) || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
     w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 60000); };
     fr.onload = async () => {
       try { if (imgs.length) (fr?.contentWindow as any)?.__setImgs?.(imgs); } catch { /* ignore */ }

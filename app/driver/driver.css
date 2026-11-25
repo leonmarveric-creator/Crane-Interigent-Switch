@@ -736,3 +736,23 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .psave .psc{width:min(360px,90vw);padding:18px;border-radius:16px;background:#0b1220;border:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .drv .psave .bar{height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}.drv .psave .bar i{display:block;height:100%;background:linear-gradient(90deg,#3f9bff,#5fe3ff)}
 .drv .psave iframe{position:absolute;width:2px;height:2px;opacity:0;pointer-events:none;border:0}
+.drv .qdst.qpl button{font-size:12.5px;min-height:34px}
+
+/* ===== お父さん専用「今日の送迎」(/driver/go) ===== */
+.drv.simple{padding-bottom:calc(190px + env(safe-area-inset-bottom))}
+.drv .sg-hero{position:relative;max-width:560px;margin:0 auto;overflow:hidden;max-height:260px}
+.drv .sg-hero img{display:block;width:100%}.drv .sg-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,transparent,#06101f)}
+.drv .sg-wrap{max-width:560px;margin:0 auto;padding:0 14px}
+.drv .sg-hd{display:flex;align-items:baseline;gap:10px;margin-top:-6px}.drv .sg-hd b{font-size:28px;font-weight:900;letter-spacing:.04em}.drv .sg-hd span{font-size:15px;color:var(--muted)}
+.drv .sg-lang{margin-left:auto;min-height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(120,180,255,.45);background:rgba(6,16,34,.7);color:#dbe8ff;font-size:13px}
+.drv .sg-dev{display:flex;align-items:center;gap:8px;margin:8px 0 2px;font-size:13.5px;font-weight:600}.drv .sg-dev i{width:10px;height:10px;border-radius:50%;background:#ff5a5a;box-shadow:0 0 8px #ff5a5a}.drv .sg-dev.on i{background:#46e08a;box-shadow:0 0 8px #46e08a}
+.drv .sg-card{position:relative;margin-top:14px;padding:14px 12px 8px;border-radius:20px;background:linear-gradient(180deg,rgba(22,46,88,.75),rgba(8,20,42,.88));border:1px solid rgba(90,160,255,.35);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(160,210,255,.25)}
+.drv .sg-card::before{content:"";position:absolute;left:18px;right:18px;top:-2px;height:4px;border-radius:4px;background:linear-gradient(90deg,transparent,#8fd0ff 20%,#e8f6ff 50%,#8fd0ff 80%,transparent);filter:drop-shadow(0 0 6px #4aa8ff)}
+.drv .sg-card.done{opacity:.45}
+.drv .sg-tm{display:flex;justify-content:space-between;align-items:center}.drv .sg-tm b{font-size:30px;font-weight:800;letter-spacing:.02em}
+.drv .sg-tag{padding:4px 12px;border-radius:12px;font-size:15px;font-weight:900}.drv .sg-tag.out{background:linear-gradient(180deg,#6a4a08,#3d2a04);color:#ffcc3a;border:1px solid rgba(255,200,60,.4)}.drv .sg-tag.in{background:linear-gradient(180deg,#0a4d66,#062c3d);color:#5fe8ff;border:1px solid rgba(80,220,255,.4)}
+.drv .sg-nm{font-size:22px;font-weight:900;margin:8px 0 2px;letter-spacing:.02em}.drv .sg-nm em{font-style:normal;font-size:17px;margin-left:12px;color:#cfe3ff}
+.drv .sg-fl{font-size:14px;color:#e6efff}
+.drv .sg-none{text-align:center;color:var(--muted);margin:40px 0}
+.drv .sg-man{display:block;width:100%;margin-top:16px;min-height:52px;border:1px solid rgba(120,180,255,.45);border-radius:16px;background:rgba(6,16,34,.7);color:#e6efff;font-size:16px;font-weight:700}
+.drv .sg-full{display:block;text-align:center;margin:18px 0;color:var(--muted);font-size:13px}

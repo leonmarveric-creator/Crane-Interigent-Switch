@@ -27,7 +27,7 @@ export interface DhCtx {
   end: (tripId: string) => void;                  // 帰着 (送迎を終わりに)
   near?: (t: CabinTrip, info: DhInfo | null, room: CabinRoom | null) => void; // 迎え先 (関空) のすぐ近くに来た: 到着のホログラム演出
 }
-export interface Deadhead { show(t: CabinTrip, room: CabinRoom | null, info: DhInfo | null, checkin: boolean): void; nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void; feed(ll: LL, kmh: number | null): void; hide(): void; on(): boolean; tripId(): string | null; unlock(): void }
+export interface Deadhead { setPlacePoints(pp: Record<string, [number, number]> | null): void; show(t: CabinTrip, room: CabinRoom | null, info: DhInfo | null, checkin: boolean): void; nowPlaying(np: NowPlaying | null, track: CabinTrack | null, skewMs: number): void; feed(ll: LL, kmh: number | null): void; hide(): void; on(): boolean; tripId(): string | null; unlock(): void }
 
 const esc = (s: string) => String(s ?? "").replace(/[<&>"]/g, "");
 const LANG: Record<GLang, string> = { ja: "日本語", zh: "中文", en: "English", ko: "한국어" };
@@ -245,6 +245,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
   host.querySelectorAll(".vtab b").forEach((b) => { (b as HTMLElement).onclick = (e) => { e.stopPropagation(); const v = (b as HTMLElement).dataset.v; host.querySelectorAll(".vtab b").forEach((x) => x.classList.toggle("on", x === b)); host.classList.toggle("vrad", v === "rad"); host.classList.toggle("vchk", v === "chk"); }; });
 
   /* ---------- 位置 (スマホ or iPad の GPS) ---------- */
+  let PP: Record<string, [number, number]> = {};
   let lastPan = 0, welcomeShown = false, nearDone = "";
   function feed(ll: LL, v: number | null) {
     if (!onNow || !trip) return; carLL = ll; kmh = Math.max(0, v ?? kmh);
@@ -253,11 +254,11 @@ export function createDeadhead(c: DhCtx): Deadhead {
     $("dhGps").textContent = `${ll[0].toFixed(4)} N · ${ll[1].toFixed(4)} E`; $("dhHd").textContent = `HDG ${String(Math.round((p.hd + 360) % 360)).padStart(3, "0")}°`;
     const k = Math.max(1, CUM.findIndex((x) => x >= prog * TOT)); done.setLatLngs([...RT.slice(0, k), ll]);
     if (Date.now() - lastPan > 1500) { lastPan = Date.now(); map.panTo(ll, { animate: true, duration: 0.6 }); if (map.getZoom() < 14) map.setZoom(15); }
-    const rem = Math.max(0, (1 - prog) * TOT), toEnd = dist(ll, RT[RT.length - 1]), mins = Math.max(0, Math.round(rem / (38 / 3.6) / 60));
+    const rem = Math.max(0, (1 - prog) * TOT), ppE = !back ? PP[trip.placeKey] : undefined, toEnd = dist(ll, ppE ?? RT[RT.length - 1]), mins = Math.max(0, Math.round(rem / (38 / 3.6) / 60));
     $("dhEta").innerHTML = `${mins}<em>分</em>`; $("dhKm").textContent = `約 ${(rem / 1000).toFixed(1)} km · ${tfm(new Date(Date.now() + mins * 60000))} 着`; $("dhSpd").textContent = String(Math.round(kmh));
     const cd = document.getElementById("dhCdE"); if (cd) cd.textContent = String(mins); const hm = document.getElementById("dhHomeM"); if (hm) hm.textContent = String(mins);
     // 迎え先の手前: 着くちょうどに終わるよう、残りの時間 (道のり ÷ 速さ) から逆算して到着のホログラムを始める (関空 T1/T2・日根野駅)
-    if (!back && nearDone !== trip.id && (trip.placeKey === "kix" || trip.placeKey === "kix2" || trip.placeKey === "hineno") && (toEnd < 300 || toEnd / (Math.max(15, Math.min(60, kmh || 30)) / 3.6) < 80)) { nearDone = trip.id; c.near?.(trip, info, room); }
+    if (!back && nearDone !== trip.id && (trip.placeKey === "kix" || trip.placeKey === "kix2" || trip.placeKey === "hineno" || trip.placeKey === "rinku" || trip.placeKey === "r833") && (toEnd < 300 || toEnd / (Math.max(15, Math.min(60, kmh || 30)) / 3.6) < 80)) { nearDone = trip.id; c.near?.(trip, info, room); }
     const br = onBridge(ll); if (br.on && !boosting) boostIn(); if (!br.on && boosting) boostOut();
     if (boosting) { $("dhBP").style.width = `${Math.round(Math.max(0, Math.min(1, br.t)) * 100)}%`; if (br.t > 0.45 && br.t < 0.55 && !said.bm) { said.bm = 1; void say("boostMid"); } }
     host.classList.toggle("over", kmh > LIMIT + 1);
@@ -324,6 +325,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
   let raf = 0, iv: any = null, pl: any = null;
   function loop() { raf = requestAnimationFrame(loop); radar(); stars(); npTick(); }
   return {
+    setPlacePoints(pp) { PP = pp ?? {}; },
     show(t, r, inf, checkin) {
       const first = !trip || trip.id !== t.id || !onNow;
       trip = t; room = r; info = inf; back = t.dir === "out";
