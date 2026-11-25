@@ -254,7 +254,7 @@ export async function cabinRoomPrepStop(tripId: string): Promise<R> {
   return (await stopRoomPrep(tripId).catch(() => false)) ? { ok: true } : fail("DEVICE");
 }
 /** スマホの位置を送る (3 秒ごと)。送迎が終わっていたら active = false */
-export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup"; phase?: "dead" | "guest"; prep?: RoomPrep | null }>> {
+export async function cabinPos(tripId: string, lat: number | null, lng: number | null, kmh: number | null, np?: NowPlayingIn | null): Promise<R<{ active: boolean; cmd: MusicCmdRow | null; np: "ok" | "setup"; phase?: "dead" | "guest"; prep?: RoomPrep | null; ipad?: boolean }>> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
   const up: Record<string, unknown> = {};
@@ -272,7 +272,9 @@ export async function cabinPos(tripId: string, lat: number | null, lng: number |
   }
   if (r.error) return fail(r.error.message);
   const row: any = r.data?.[0];
-  return { ok: true, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok", phase: row?.phase === "dead" ? "dead" : "guest", prep: prepFromCmd(row?.ai_cmd) };
+  // 車内 iPad が最近 (15 秒以内) 問い合わせに来ているか → スマホの車内画面を出すかどうか (合図の回線が切れていても分かるように)
+  const ipad = await supabaseAdmin.from("cabin_devices").select("id").gt("last_seen_at", new Date(Date.now() - 15000).toISOString()).limit(1).then((x) => !!x.data?.length, () => false);
+  return { ok: true, ipad, active: !!r.data?.length, cmd: row?.music_cmd && typeof row.music_cmd.n === "number" ? row.music_cmd : null, np: "ok", phase: row?.phase === "dead" ? "dead" : "guest", prep: prepFromCmd(row?.ai_cmd) };
 }
 /** お父さんから車内 iPad の ASTRAEA へ指示 (ボタン・声)。「お部屋の準備」は本当にエアコン + 照明もつける */
 export async function cabinAiCmd(tripId: string, c: CaptainCmdId): Promise<R> {

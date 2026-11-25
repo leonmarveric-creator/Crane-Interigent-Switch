@@ -725,3 +725,14 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .qnote{display:flex;flex-wrap:wrap;gap:4px 10px;margin:2px 8px 0;font-size:12px;color:var(--muted)}
 .drv .qnote b{color:var(--text)}
 @keyframes drv-hl{50%{filter:brightness(1.12) drop-shadow(0 0 6px rgba(80,200,255,.35))}}
+
+/* ===== 📱 スマホの車内画面 (iPad がつながっていないとき) ===== */
+.drv .pcab{position:fixed;left:0;right:0;top:0;bottom:calc(166px + env(safe-area-inset-bottom));z-index:29;background:#02050d;display:flex;flex-direction:column}
+.drv .pcab.hide{visibility:hidden;pointer-events:none}
+.drv .pcabh{flex:none;display:flex;align-items:center;gap:8px;padding:calc(6px + env(safe-area-inset-top)) 12px 6px;font-size:11px;color:#9fc0e6;background:rgba(4,12,26,.9)}
+.drv .pcabh i{width:8px;height:8px;border-radius:50%;background:#ffb347;box-shadow:0 0 8px #ffb347}
+.drv .pcab iframe{flex:1;width:100%;border:0;background:#000}
+.drv .psave{position:fixed;inset:0;z-index:90;background:rgba(2,6,12,.92);display:flex;align-items:center;justify-content:center}
+.drv .psave .psc{width:min(360px,90vw);padding:18px;border-radius:16px;background:#0b1220;border:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.drv .psave .bar{height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}.drv .psave .bar i{display:block;height:100%;background:linear-gradient(90deg,#3f9bff,#5fe3ff)}
+.drv .psave iframe{position:absolute;width:2px;height:2px;opacity:0;pointer-events:none;border:0}

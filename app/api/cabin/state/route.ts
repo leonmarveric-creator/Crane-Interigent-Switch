@@ -114,6 +114,18 @@ export async function POST(req: NextRequest) {
     const { error } = await supabaseAdmin.from("cabin_trips").update(up).eq("id", b.trip).eq("status", "active");
     return J(error ? { ok: false, error: /phase/.test(error.message) ? "SETUP" : error.message } : { ok: true });
   }
+  // もう済んだこと (案内した場所・ホログラム・到着の演出・BOOST・出発のあいさつ): iPad ⇄ スマホで引き継ぐとき繰り返さない
+  if (b.op === "done" && isId(b.trip)) {
+    const { data: t, error: e1 } = await supabaseAdmin.from("cabin_trips").select("done, status").eq("id", b.trip).maybeSingle();
+    if (e1) return J({ ok: false, error: /done/.test(e1.message) ? "SETUP_DONE" : e1.message });
+    if (!t || (t as any).status !== "active") return J({ ok: false, error: "NO_TRIP" });
+    const cur: any = (t as any).done && typeof (t as any).done === "object" ? (t as any).done : {}, p: any = b.p && typeof b.p === "object" ? b.p : {};
+    const next: any = { ...cur };
+    for (const k of ["holo", "air", "boost", "go"]) if (p[k] === true) next[k] = true;
+    if (Array.isArray(p.poi)) next.poi = [...new Set([...(Array.isArray(cur.poi) ? cur.poi : []), ...p.poi.filter((x: unknown) => typeof x === "string").slice(0, 30)])];
+    const { error } = await supabaseAdmin.from("cabin_trips").update({ done: next }).eq("id", b.trip);
+    return J(error ? { ok: false, error: error.message } : { ok: true });
+  }
   // iPad が話す声を、スマホで流してもらう (順番待ちに足す。古いものは 30 秒で消える)
   if (b.op === "say" && isId(b.trip)) {
     const u = String(b.u || "");

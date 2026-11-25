@@ -43,7 +43,10 @@ export interface CabinTrip {
   voiceSeen: string | null;
   /** dead = 回送 (ゲストなし: 迎えに行く途中・送ったあとの帰り道) / guest = ゲストが乗っている */
   phase: "dead" | "guest";
+  /** もう済んだこと (iPad とスマホで引き継ぐとき、同じ演出・案内を繰り返さない)。migration_cabin_done.sql */
+  done?: CabinDone | null;
 }
+export interface CabinDone { poi?: string[]; holo?: boolean; air?: boolean; boost?: boolean; go?: boolean }
 
 const SEASON: [RegExp, string, string, CabinRoom["fx"]][] = [
   [/spring|haru/, "春", "HARU", "petal"], [/summer|natsu|natu/, "夏", "NATSU", "firefly"], [/autumn|aki/, "秋", "AKI", "leaf"], [/winter|fuyu/, "冬", "FUYU", "snow"],
@@ -90,6 +93,7 @@ export function toCabinTrip(t: any): CabinTrip {
     aiCmd: t.ai_cmd && typeof t.ai_cmd === "object" && typeof t.ai_cmd.n === "number" ? { c: String(t.ai_cmd.c), n: t.ai_cmd.n, ...(t.ai_cmd.auto ? { auto: true } : {}) } : null,
     np: toNowPlaying(t.now_playing), npReady: "now_playing" in t, aiQuiet: t.ai_quiet === true, voiceSeen: t.voice_seen ?? null, phase: t.phase === "dead" ? "dead" : "guest",
     cmd: t.music_cmd && typeof t.music_cmd === "object" && typeof t.music_cmd.n === "number" ? t.music_cmd : null,
+    done: t.done && typeof t.done === "object" ? t.done : null,
   };
 }
 export function toCabinDevice(d: any): CabinDevice {

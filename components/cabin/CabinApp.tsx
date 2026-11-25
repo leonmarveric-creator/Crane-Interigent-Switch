@@ -37,6 +37,12 @@ function loadLeaflet(): Promise<void> {
   });
 }
 
+/** スマホで動かす車内画面 (/cabin?phone=1): お父さんのスマホの送迎画面の中に出す。iPad がつながっていないときだけ、こちらが「動かし役」 */
+const PHONE = typeof window !== "undefined" && /[?&]phone=1/.test(location.search);
+const PHONE_SAVE = PHONE && /[?&]save=1/.test(location.search);
+const PHONE_DEV = { id: "phone", name: "📱 PHONE" };
+const toParent = (m: Record<string, unknown>) => { try { if (window.parent !== window) window.parent.postMessage({ cab: 1, ...m }, location.origin); } catch { /* ignore */ } };
+
 export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null); // 送迎画面の中身 (React は触らない。engine が直接動かす)
@@ -84,7 +90,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     let live = true;
     try {
       const d = localStorage.getItem("cabDev");
-      if (d) setDev(JSON.parse(d)); else setNeedSetup(true);
+      if (PHONE) { setDev(PHONE_DEV); setTapped(true); } // スマホ: 登録なし (送迎はどの機器向けでも出す)。音の準備はお父さんの画面で済んでいる
+      else if (d) setDev(JSON.parse(d)); else setNeedSetup(true);
     } catch { setNeedSetup(true); }
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/cabin-sw.js", { scope: "/cabin" }).catch(() => {});
     void (async () => {
@@ -125,8 +132,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
           onLights: (id) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "lights", trip: id }) }).catch(() => {}),
           // 声はスマホ (Bluetooth) から流す
           onSay: (id, u, s) => sendVoice(id, u, s),
+          // もう済んだこと (引き継ぎ用)。SQL (migration_cabin_done.sql) がまだなら何もしない
+          onDone: (id, p) => void fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "done", trip: id, p }) }).catch(() => {}),
           phoneOk,
         });
+        if (PHONE_SAVE) setTimeout(() => void saveAll(), 900); // 「このスマホに保存」で開いたとき
+        if (PHONE) toParent({ ready: 1 });
         // 回送モード (ゲストが乗っていない区間。お父さん向けの画面)
         const post = (b: any) => fetch("/api/cabin/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((x) => x.json()).catch(() => null);
         dhRef.current = createDeadhead({
@@ -192,12 +203,12 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     if (!dev) return;
     const g = gps.current.has === null ? "" : gps.current.has ? "&gps=1" : "&gps=0";
     try {
-      const r = await fetch(`/api/cabin/state?d=${dev.id}${g}&np=${trackRef.current?.id ?? ""}`, { cache: "no-store" });
+      const r = await fetch(PHONE ? `/api/cabin/state?np=${trackRef.current?.id ?? ""}` : `/api/cabin/state?d=${dev.id}${g}&np=${trackRef.current?.id ?? ""}`, { cache: "no-store" });
       if (r.status === 401) { location.href = "/staff/login?next=/cabin"; return; }
       const j = await r.json(); setOnline(true);
       if (!j.ok) { if (j.error === "SETUP") toast("Supabase の SQL（migration_cabin.sql）がまだ実行されていません"); return; }
-      if (!j.device) { try { localStorage.removeItem("cabDev"); } catch { /* ignore */ } setDev(null); setNeedSetup(true); return; }
-      if (j.device.name !== dev.name) { const d = { id: dev.id, name: j.device.name }; setDev(d); try { localStorage.setItem("cabDev", JSON.stringify(d)); } catch { /* ignore */ } }
+      if (!j.device && !PHONE) { try { localStorage.removeItem("cabDev"); } catch { /* ignore */ } setDev(null); setNeedSetup(true); return; }
+      if (j.device && j.device.name !== dev.name) { const d = { id: dev.id, name: j.device.name }; setDev(d); try { localStorage.setItem("cabDev", JSON.stringify(d)); } catch { /* ignore */ } }
       const e = eng.current; if (!e) return;
       const t: CabinTrip | null = j.trip;
       if (t) {
@@ -276,7 +287,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       }
     });
     // スマホへ「iPad はここにいます」の印 (3 秒ごと・送迎中だけ)。スマホはこれが届いている間、サーバーへの問い合わせを減らす
-    const hb = setInterval(() => { const t = tripRef.current; if (live && t && !t.id.startsWith("demo")) rtSend(CABIN_CH, "hb", { t: t.id }); }, 3000);
+    const hb = setInterval(() => { const t = tripRef.current; if (live && t && !t.id.startsWith("demo")) rtSend(CABIN_CH, "hb", PHONE ? { t: t.id, p: 1 } : { t: t.id }); }, 3000); // p = スマホの車内画面 (お父さんの画面は iPad の印と区別する)
     const onVis = () => { if (!document.hidden) now(); };
     document.addEventListener("visibilitychange", onVis); document.addEventListener("pointerdown", now, true);
     void loop();
@@ -310,6 +321,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
   }
 
   /* ---------- この iPad に保存 (声・効果音・写真・地図の部品 → 地図) ---------- */
+  // スマホの「このスマホに保存」: 進み具合をお父さんの画面へ
+  useEffect(() => { if (PHONE) toParent({ prog }); }, [prog]);
   async function saveAll() {
     const e = eng.current; if (!e) return;
     e.unlock();
@@ -335,7 +348,8 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     setProg({ label: "地図", p: 0 });
     const res = await e.saveOffline((d, n) => setProg({ label: "地図", p: d / n }));
     setProg(null); setSaved(res.tiles);
-    toast(`✓ この iPad に保存しました（地図 ${res.tiles} 枚・約 ${res.mb.toFixed(1)} MB${res.fail ? `・失敗 ${res.fail}` : ""}）`);
+    toast(`✓ この${PHONE ? "スマホ" : " iPad "}に保存しました（地図 ${res.tiles} 枚・約 ${res.mb.toFixed(1)} MB${res.fail ? `・失敗 ${res.fail}` : ""}）`);
+    toParent({ saved: { tiles: res.tiles, mb: Math.round(res.mb * 10) / 10, fail: res.fail } });
   }
 
   /* ---------- 手動ガイド (待機中に ⚙ から。トイレやドアの前でゲストと一緒に聞く) ---------- */

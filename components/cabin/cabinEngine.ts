@@ -10,7 +10,7 @@ import {
   makeRoute, pointAt, poisFor, project, type BoostState, type GLang, type LL, type PoiKey, type Route,
 } from "@/lib/cabinGeo";
 import { CABIN_T, type CabinText } from "@/lib/cabinI18n";
-import type { CabinRoom, CabinTrip } from "@/lib/cabinData";
+import type { CabinDone, CabinRoom, CabinTrip } from "@/lib/cabinData";
 import { CON_T, CQ_T, MUSIC_T, qrUrls, type CabinTrack, type MusicCmd, type NowPlaying } from "@/lib/cabinMusic";
 import { createNowPlaying } from "@/components/cabin/cabinNowPlaying";
 import { createAi } from "@/components/cabin/cabinAi";
@@ -95,7 +95,7 @@ export interface Engine {
   pickArrive(g: { name: string | null; flight: string | null; room: string | null; t2?: boolean; hineno?: boolean; tripId?: string }): void;
 }
 
-export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean }): Engine {
+export function createEngine(root: HTMLElement, routes: Record<string, [number, number][]>, hooks: { onEnd: (tripId: string) => void; onCmd?: (tripId: string, c: MusicCmd, v: number | null) => void; onLights?: (tripId: string) => void; onSay?: (tripId: string, url: string, text: string) => Promise<boolean> | void; /** スマホが最近ちゃんと返事をしている (返事が無かった直後は false) */ phoneOk?: () => boolean ; /** もう済んだこと (案内・演出) を送迎の記録に残す (iPad ⇄ スマホの引き継ぎ用) */ onDone?: (tripId: string, p: CabinDone) => void }): Engine {
   const L = (window as any).L;
   const $ = (id: string) => root.querySelector("#" + id) as HTMLElement;
   const stage = root.querySelector(".stage") as HTMLElement;
@@ -187,6 +187,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let timers: ReturnType<typeof setTimeout>[] = [];
   const T_ = (ms: number, f: () => void) => { timers.push(setTimeout(f, ms)); };
   let doneLine: any = null, car: any = null, etaNow: number | null = null, remNow = 0, vAvg = 35;
+  /** もう済んだこと: 前の担当 (iPad / スマホ) から引き継いだもの + この送迎で済ませたものを記録に残す */
+  let done0: CabinDone = {};
+  const markDone = (p: CabinDone) => { if (!trip || trip.id.startsWith("demo")) return; try { hooks.onDone?.(trip.id, p); } catch { /* 記録できなくても続ける */ } };
 
   /* ---------- 文字 ---------- */
   const setText = (id: string, s: string) => { const e = $(id); if (e) e.textContent = s; };
@@ -337,6 +340,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       if (hit.has(p.k) || d < p.d - 30) continue;
       hit.add(p.k);
       if (p.k === "bridge" && bs.phase !== "off") continue; // 高速モードが代わりに案内する
+      markDone({ poi: [p.k] });
       if (holo.on()) { poiLater.push(p.k); continue; } // ホログラムの途中なら、終わってから案内する (声を重ねない)
       chime(); cap(p.k); void say(`en-${p.k}`);
       const el = root.querySelector(`[data-poi="${p.k}"]`); el?.classList.add("hit");
@@ -358,7 +362,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip || airEarly || arrived || offroute || trip.dir !== "out" || trip.id.startsWith("demo") || !arriveNew() || air.on()) return;
     const s = outScene(); if (!s) return;
     if (holoRemainS(Math.max(0, rem - 200), vAvg) > AIR_LEAD_S) return;
-    airEarly = true; holo.stop(); byeS(); airGo(s);
+    airEarly = true; holo.stop(); byeS(); airGo(s); markDone({ air: true });
   }
   function arrive() {
     if (!trip) return;
@@ -369,7 +373,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     // お見送りで りんくう / 関空 に着いたら: 到着のホログラム演出 (お別れの言葉・最後のひとこと・詳しいナビと QR はその中で)
     const scene = outScene();
     if (trip.dir === "in") { $("ltI").className = ""; setText("ltE", T.ltOn); $("room").classList.add("lit"); roomTexts(); arriveS(); void say("en-arrive"); }
-    else if (scene && !trip.id.startsWith("demo") && arriveNew()) { if (!airEarly) { byeS(); airGo(scene); } } // 走りながら先に始めていれば、そのまま続ける
+    else if (scene && !trip.id.startsWith("demo") && arriveNew()) { if (!airEarly) { byeS(); airGo(scene); markDone({ air: true }); } } // 走りながら先に始めていれば、そのまま続ける
     else { byeS(); void say(byeKey); }
     $("sweep").classList.remove("on");
     T_(600, () => { $("arrive").classList.add("on"); startPtc(); });
@@ -517,6 +521,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     else { prepSt = 2; prepT = setTimeout(() => { if (my === prepTok && prepSt === 2) prepSt = 0; }, 20000); }
   }
   function boostOn() {
+    if (done0.boost) return; // 前の担当がもう BOOST を出した (引き継ぎ)
+    markDone({ boost: true });
     holo.stop(); const m = $("map"), h = $("bhud"); bMax = 0; boostLive = true;
     hit.add("bridge");
     sfx("boost-sfx");
@@ -657,7 +663,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const rk = holoRoomOf(room);
     if (!trip || trip.dir !== "in" || arrived || !rk || holo.on()) return false;
     if (!holo.start({ room: rk, lang, ac: trip.ac === "heat" ? "heat" : trip.ac === "none" ? "none" : "cool", eta: etaNow })) return false;
-    holoDone = true; holoAt = Date.now(); holoHush = false; $("map").classList.add("holo-on");
+    holoDone = true; holoAt = Date.now(); holoHush = false; $("map").classList.add("holo-on"); markDone({ holo: true });
     // 効果音が聞こえるように、その間だけ音楽を小さく
     if (!trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", Math.ceil(HOLO_LEN_MS / 1000));
     return true;
@@ -802,10 +808,12 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     stage.classList.add("trip"); startedAt = Date.now(); ai.reset(); npId = null;
     setTimeout(() => MAP.invalidateSize(), 50);
     // 出発の演出
-    linkS(); void say(goKey); $("sweep").classList.add("on");
+    // 引き継ぎ (iPad ⇄ スマホ): もう済んだ案内・あいさつ・演出は繰り返さない
+    done0 = t.done ?? {}; (done0.poi ?? []).forEach((k) => hit.add(k as PoiKey));
+    if (done0.go) $("sweep").classList.add("on"); else { linkS(); void say(goKey); $("sweep").classList.add("on"); markDone({ go: true }); }
     cqOff(); if (t.dir === "in") T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと)
     T_(3000, rcarOn);
-    holoDone = false; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
+    holoDone = !!done0.holo; airEarly = !!done0.air; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
     if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("rscanning", "tagged"); void rm.offsetWidth; rm.classList.add("rscanning"); scanS(); setTimeout(() => { rm.classList.remove("rscanning"); rm.classList.add("tagged"); }, 4200); });
     else T_(2000, () => { $("room").classList.remove("lit"); });
   }

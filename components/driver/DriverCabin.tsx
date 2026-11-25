@@ -61,6 +61,24 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     void cabinAutoAlert(roomId, "auto_off");
   }, [confirmSay, t]);
   useEffect(() => { setTrip(initial); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* ---------- 📱 どちらが動かすか: iPad がつながっていれば iPad。いないときだけ、このスマホの中で車内画面を動かす ----------
+     iPad は送迎中 3 秒ごとに「ここにいます」(hb) を送ってくる。スマホの車内画面の印 (p: 1) は数えない */
+  const ipadAt = useRef(0);
+  const [ipadOn, setIpadOn] = useState(false);
+  const [phoneEng, setPhoneEng] = useState(false);
+  const [phoneHide, setPhoneHide] = useState(false); // 手で閉じた (この送迎の間)
+  useEffect(() => { rtJoinMsg(CABIN_CH, () => {}, (ev, p) => { if (ev === "hb" && p && !p.p && p.t === tripRef2.current?.id) ipadAt.current = Date.now(); }); }, []);
+  useEffect(() => {
+    if (!trip) { setPhoneEng(false); setIpadOn(false); setPhoneHide(false); return; }
+    const t0 = Date.now();
+    const tick = () => {
+      const on = Date.now() - ipadAt.current < 10000; setIpadOn(on);
+      // 出発から 8 秒たっても iPad の印が来なければ、スマホが動かし役。途中で iPad が来たら iPad に引き継ぐ (済んだことは記録で共有)
+      setPhoneEng(!on && Date.now() - t0 > 8000);
+    };
+    tick(); const id = setInterval(tick, 2000);
+    return () => clearInterval(id);
+  }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // 合図の回線を先につないでおく (出発を押した瞬間に iPad へ届くように)
   useEffect(() => { rtJoin(CABIN_CH, () => {}); }, []);
 
@@ -138,6 +156,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       if (!live) return;
       if (r?.ok) {
         if (last) setSending("ok");
+        if (r.ipad) ipadAt.current = Date.now(); // iPad がサーバーに来ている (合図の回線が切れていても)
         if (r.np === "setup" && !warned) { warned = true; toast(t("iPad に歌詞を出すには、Supabase の SQL（migration_cabin_music.sql）を実行してください")); }
         if (!r.active) { setTrip(null); toast(t("送迎が終わりました（iPad は待機画面に戻りました）")); return; }
         // 回送 ⇄ ゲスト乗車 (iPad のボタンで切り替わることもある)
@@ -205,7 +224,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   boardRef.current = board;
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null) };
+  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -438,8 +457,10 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button className={`qbtn ${humor ? "on" : ""}`} title={t("ユーモアモード")} onClick={() => void toggleHumor()}>{humor ? "😂" : "🙂"}<small>{humor ? t("ユーモア") : t("ふつう")}</small></button>
       <button className={`qbtn ${quiet ? "on" : ""}`} title={t("静かモード")} onClick={() => void toggleQuiet()}>{quiet ? "🤫" : "✦"}<small>{quiet ? t("静か") : "AI"}</small></button>
       {tr.phase !== "dead" && <button className={`airbtn ${air ? "on" : ""}`} onClick={() => { sfx.tick(); setAir((v) => !v); }}>✈<small>{t("空港")}</small></button>}
+      <button className={`qbtn ${cab.phoneEng && !cab.phoneHide ? "on" : ""}`} onClick={() => { sfx.tick(); cab.setPhoneHide(!cab.phoneHide); }}>{cab.ipadOn ? "📟" : "📱"}<small>{cab.ipadOn ? "iPad ✓" : cab.phoneHide ? t("画面") : t("小さく")}</small></button>
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
+      {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} t={t} />}
       {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
       {talk && <AstraeaSheet tr={tr} cab={cab} t={t} ui={ui} onClose={() => setTalk(false)} toast={toastQ} />}
@@ -568,6 +589,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       <HumorPick initial={data.cabin.humor} t={t} />
       <BoostPick initial={data.cabin.boostSfx} t={t} />
       <VoicePick initial={data.cabin.voiceMode} t={t} />
+      <PhoneSave t={t} toast={toast} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
       {data.cabin.devices.map((d) => (
@@ -779,4 +801,49 @@ function PhotoEditor({ room, t, toast, onClose, onSaved }: { room: CabinRoom; t:
 export function useCabinSheet() {
   const [s, setS] = useState<{ res: DRes | null; dir: "in" | "out" } | null>(null);
   return useMemo(() => ({ state: s, open: (res: DRes | null, dir: "in" | "out") => { sfx.blip(); setS({ res, dir }); }, close: () => setS(null) }), [s]);
+}
+
+
+/* ================= 📱 スマホの車内画面 (iPad がつながっていないとき) =================
+   iPad と同じ車内画面 (/cabin?phone=1) を、この画面の中で動かす。声・効果音は今までどおりこのスマホの音楽と同じ道 (CarPlay) で流れる。
+   隠しても動き続ける (観光案内・BOOST・ホログラムの判断はこちらが続ける) */
+function PhoneCabin({ hidden, t }: { hidden: boolean; t: T }) {
+  return (
+    <div className={`pcab ${hidden ? "hide" : ""}`}>
+      <div className="pcabh"><i />{t("iPad がつながっていないので、このスマホで車内画面を動かしています")}</div>
+      <iframe src="/cabin?phone=1" title="cabin" allow="autoplay; geolocation; fullscreen" />
+    </div>
+  );
+}
+
+/** 📥 このスマホに保存 (車内画面の声・効果音・ホログラム・写真・地図)。家の Wi-Fi で 1 回 */
+export function PhoneSave({ t, toast }: { t: T; toast: (s: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [p, setP] = useState<{ label: string; p: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const f = (e: MessageEvent) => {
+      if (e.origin !== location.origin || !e.data || e.data.cab !== 1) return;
+      if (e.data.prog !== undefined) setP(e.data.prog);
+      if (e.data.saved) { const s = e.data.saved; sfx.chord(); toast(t("✓ このスマホに保存しました（地図 {n} 枚・約 {mb} MB）", { n: s.tiles, mb: s.mb })); setTimeout(() => setOpen(false), 1200); }
+    };
+    window.addEventListener("message", f); return () => window.removeEventListener("message", f);
+  }, [open, t, toast]);
+  return (
+    <>
+      <button className="btn" onClick={() => { sfx.tick(); setP(null); setOpen(true); }}>📥 {t("このスマホに保存（車内画面・声・ホログラム・地図）")}</button>
+      <div className="cnote">{t("家の Wi-Fi で 1 回押してください。iPad が無いとき、走行中は通信なし・待ち時間なしで出ます。iPhone はこの画面をホーム画面に追加しておくと、保存が消えにくくなります。")}</div>
+      {open && (
+        <div className="psave">
+          <div className="psc">
+            <b>📥 {t("このスマホに保存しています…")}</b>
+            <small>{p ? `${p.label} ${Math.round(p.p * 100)}%` : t("準備中…")}</small>
+            <div className="bar"><i style={{ width: `${Math.round((p?.p ?? 0) * 100)}%` }} /></div>
+            <button className="btn" onClick={() => setOpen(false)}>{t("閉じる")}</button>
+          </div>
+          <iframe src="/cabin?phone=1&save=1" title="save" />
+        </div>
+      )}
+    </>
+  );
 }
