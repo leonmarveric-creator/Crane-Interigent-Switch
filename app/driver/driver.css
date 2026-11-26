@@ -760,3 +760,36 @@ body:has(.drv) { margin:0; background:#04070d; }
 .drv .sg-mode button{flex:1;min-height:40px;border-radius:12px;border:1px solid rgba(90,170,255,.55);background:rgba(5,15,32,.8);color:#cfe3ff;font-size:14px;font-weight:700}
 .drv .sg-mode button.on{background:linear-gradient(180deg,#5ff0ff,#13b9ff);color:#00121e;box-shadow:0 0 14px rgba(63,216,255,.6)}
 .drv .sg-mode button:disabled{opacity:.6}
+/* /driver/go は下のタブが無いので、送迎バーを一番下に。スマホの車内画面を広く */
+.drv.simple .cabbar{bottom:calc(10px + env(safe-area-inset-bottom))}
+.drv.simple .pcab{bottom:calc(84px + env(safe-area-inset-bottom))}
+/* スマホを横にしたとき: 送迎バーを細く、車内画面を高く */
+@media (orientation:landscape) and (max-height:520px){
+ .drv .cabbar{bottom:calc(6px + env(safe-area-inset-bottom));padding-top:4px;padding-bottom:4px}
+ .drv .pcab{bottom:calc(64px + env(safe-area-inset-bottom))}
+ .drv .pcabh{padding-top:4px;padding-bottom:4px}
+}
+
+/* 📱 スマホだけの送迎: 車内画面を画面いっぱいに (縦・横) */
+.pcabF{position:fixed;inset:0;z-index:2147483000;background:#000;display:flex}
+.pcabF.hide{visibility:hidden;pointer-events:none}
+.pcabF iframe{flex:1;width:100%;height:100%;border:0;background:#000}
+.pcabF .pcm{position:absolute;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:6px;border-radius:18px;background:rgba(4,12,26,.86);border:1px solid rgba(120,200,255,.35);box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .4s;max-width:calc(100vw - 16px);font-family:-apple-system,"Hiragino Sans",sans-serif}
+.pcabF .pcm.dim{opacity:.32}
+.pcabF .pcm>button{min-width:48px;min-height:48px;border-radius:13px;border:1px solid rgba(120,200,255,.3);background:#0d1a2e;color:#e8f4ff;font-size:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px}
+.pcabF .pcm>button small{font-size:10px;color:#9fc0e6}
+.pcabF .pcm .pp{background:linear-gradient(135deg,#8fe6ff,#3aa8ff);color:#02101a;border:0}
+.pcabF .pcm .pct{flex-direction:row;gap:6px;font-size:14px;max-width:38vw;justify-content:flex-start}
+.pcabF .pcm .pct span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pcabF .pcl{position:absolute;bottom:calc(100% + 8px);left:0;right:0;max-height:min(60vh,380px);overflow:auto;padding:8px;border-radius:16px;background:rgba(6,14,28,.96);border:1px solid rgba(120,200,255,.35);display:flex;flex-direction:column;gap:6px}
+.pcabF .pcls{display:flex;flex-wrap:wrap;gap:6px}
+.pcabF .pcls b{padding:9px 12px;border-radius:10px;background:#13223a;color:#9fc0e6;font-size:13px}
+.pcabF .pcls b.on{background:#ffb347;color:#231302}
+.pcabF .pcl>button{min-height:48px;text-align:left;padding:6px 12px;border-radius:10px;border:1px solid #1f2f4a;background:#0d1a2e;color:#fff;font-size:15px}
+.pcabF .pcl>button.on{border-color:#8fe6ff;background:rgba(72,200,255,.16)}
+.pcabF .pcl>button small{display:block;font-size:11px;color:#8fa8c6}
+.pcabF .pcl em{font-style:normal;color:#9fc0e6;font-size:13px;padding:8px}
+@media (orientation:landscape) and (max-height:500px){.pcabF .pcm{left:auto;right:calc(8px + env(safe-area-inset-right));transform:none}}
+
+/* 車内画面を全画面で出している間は、うしろの送迎の画面を描かない (軽く) */
+body.pcab-on .drv{visibility:hidden}

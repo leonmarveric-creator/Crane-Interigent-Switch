@@ -41,6 +41,11 @@ function loadLeaflet(): Promise<void> {
 const PHONE = typeof window !== "undefined" && /[?&]phone=1/.test(location.search);
 const PHONE_SAVE = PHONE && /[?&]save=1/.test(location.search);
 const PHONE_DEV = { id: "phone", name: "📱 PHONE" };
+/* スマホ: 軽量モード (重いとクラッシュするので)。お父さんの画面で「戻る」で隠している間は、描くのを止める */
+if (PHONE) {
+  const W = window as any; W.__CAB_LITE = 1; document.documentElement.classList.add("lite");
+  window.addEventListener("message", (e) => { if (e.origin === location.origin && e.data && typeof e.data.cabBg === "boolean") { W.__CAB_BG = e.data.cabBg; document.documentElement.classList.toggle("bg", e.data.cabBg); } });
+}
 const toParent = (m: Record<string, unknown>) => { try { if (window.parent !== window) window.parent.postMessage({ cab: 1, ...m }, location.origin); } catch { /* ignore */ } };
 
 export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {

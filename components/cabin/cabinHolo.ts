@@ -27,7 +27,7 @@ export function createHolo(c: { host: () => HTMLElement | null; say: (k: string)
   function start(o: { room: HoloRoom; lang: string; ac: string; eta: number | null }) {
     const host = c.host(); if (!host || fr) return false;
     opts = o; window.addEventListener("message", onMsg);
-    fr = document.createElement("iframe"); fr.className = "holoFr"; fr.src = HOLO_PAGE; fr.title = "Crane Nest hologram";
+    fr = document.createElement("iframe"); fr.className = "holoFr"; fr.src = HOLO_PAGE + ((window as any).__CAB_LITE ? "?lite=1" : ""); fr.title = "Crane Nest hologram";
     fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
     host.appendChild(fr);
     timers.push(setTimeout(() => { if (fr && !fr.classList.contains("on")) stop(); }, 9000)); // 読み込めない (電波が無い) → やめる

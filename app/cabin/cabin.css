@@ -1276,3 +1276,7 @@
 .cab .stage.tall #cq .cqs,.cab .stage.wide #cq .cqs{display:none}
 .cab .stage.tall #cq .cqm,.cab .stage.wide #cq .cqm{justify-content:center}
 .cab .stage.tall #cq .cqt,.cab .stage.wide #cq .cqt{font-size:15px;margin:6px 0}
+
+/* 📱 スマホ (軽量): ぼかしは重いので切る。お父さんの画面で隠している間はアニメを止める */
+html.lite *,html.lite *::before,html.lite *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.bg *,html.bg *::before,html.bg *::after{animation-play-state:paused!important}

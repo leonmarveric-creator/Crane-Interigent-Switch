@@ -241,7 +241,7 @@ export function createNowPlaying(c: NpCtx): NpView {
       if (open) { stage.dataset.np = "C"; requestAnimationFrame(() => { if (!sceneDone) sceneDone = scene(); moveIn(); texts(); side(); fLi = -2; requestAnimationFrame(fx); }); }
       else moveOut();
     }
-    if (isOn) { if (mode === "H") holo(); else if (open) { full(); if (now - sideT > 1000) { sideT = now; side(); } } }
+    if (isOn && !(window as any).__CAB_BG) { if (mode === "H") holo(); else if (open) { full(); if (now - sideT > 1000) { sideT = now; side(); } } }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

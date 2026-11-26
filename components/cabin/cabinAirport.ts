@@ -58,7 +58,7 @@ export function createAirport(c: AirportCtx) {
     mount(); if (!el || !fr) return;
     const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
     const l = o.lang ?? c.lang(), gl = GUIDE_L[l] ?? "en";
-    const q = new URLSearchParams({ s: o.s, l }); if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
+    const q = new URLSearchParams({ s: o.s, l }); if ((window as any).__CAB_LITE) q.set("lt", "1"); if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
     const guestUrl = /^pick/.test(o.s) || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
     w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 60000); };
     fr.onload = async () => {

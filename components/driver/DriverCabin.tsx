@@ -8,6 +8,7 @@
  *   ・設定: iPad の一覧 / 部屋の写真 (iPad 用) と エアコン・照明・Wi-Fi の位置
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { DriverData } from "@/lib/driverData";
 import type { CabinRoom, CabinSpots, CabinTrip } from "@/lib/cabinData";
 import { BUILTIN_PHOTOS } from "@/lib/cabinPhotos";
@@ -203,7 +204,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     if (!r.ok) { toast(r.error === "SETUP_VOICE" ? t("回送モードには Supabase の SQL（migration_cabin_voice.sql）が必要です") : t("切り替えられませんでした")); return; }
     setTrip({ ...tr, phase: "guest" });
     if (isAuto) toast(t("🚗 迎え先を離れたので、自動で乗車にしました"));
-    if (a?.lang) setTimeout(() => { try { mRef.current.startWith("in", a.lang); } catch { /* */ } }, 6000); // 乗ったらゲストの言語のお迎え用の音楽へ
+    if (a?.lang) setTimeout(() => { try { const m = mRef.current; if (!(m.playing && m.cur.p === "in" && m.cur.l === a.lang)) m.startWith("in", a.lang); } catch { /* */ } }, 6000); // 乗ったらゲストの言語のお迎え用の音楽へ
     if (r.prep) {
       showPrep(r.prep);
       const rk = a?.roomKey ?? "room", nm = a?.roomName ?? "";
@@ -214,7 +215,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   boardRef.current = board;
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide, mode, setMode };
+  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide, mode, setMode, mus: () => mRef.current };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -363,6 +364,7 @@ export function CabinSheet({ open, onClose, res, dir0, data, cab, t, roomName, u
     if (place === "other" && !other) { sfx.error(); return; }
     setBusy(true);
     try { if (dev) localStorage.setItem("drvCabDev", dev); } catch { /* ignore */ }
+    try { if (["ja", "en", "zh", "ko"].includes(lang)) cab.mus().startWith(dir, lang as "ja" | "en" | "zh" | "ko"); } catch { /* ignore */ } // 押した瞬間に音楽 (iPhone は指で押した流れでないと鳴らない)
     const ok = await cab.start({ deviceId: dev, resId: res?.id ?? null, dir, placeKey: place, placeName: place === "other" ? other!.name : null, placeLL: place === "other" ? other!.ll : null, roomId, lang, ac, phase: dir === "in" ? "dead" : "guest" });
     setBusy(false); if (ok) onClose();
   };
@@ -461,7 +463,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       {cab.phoneEng && <button className={`qbtn ${!cab.phoneHide ? "on" : ""}`} onClick={() => { sfx.tick(); cab.setPhoneHide(!cab.phoneHide); }}>📱<small>{cab.phoneHide ? t("画面") : t("小さく")}</small></button>}
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
-      {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} t={t} />}
+      {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} cab={cab} t={t} />}
       {PP_KEYS.includes(tr.placeKey) && <button className="qbtn" title={t("ここを到着地点にする")} onClick={() => void setHere(tr.placeKey)}>📍<small>{t("ここ")}</small></button>}
       {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
@@ -533,6 +535,7 @@ const GUIDE_BTN = { id: "guide" as const, icon: "🔑", zh: "进门方法", ja: 
 const QR_BTN = { id: "qr" as const, icon: "🛎", zh: "显示礼宾二维码", ja: "QR を出す" };
 /** iPad の地図の枠に建物のホログラム (お迎えのとき・約 46 秒。声は iPhone から) */
 const HOLO_BTN = { id: "holo" as const, icon: "🛰", zh: "显示全息投影", ja: "ホログラム" };
+const AIR_BTN = { id: "airport_how" as const, icon: "✈", zh: "去机场的方法", ja: "空港への行き方" };
 function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: Cabin; t: T; ui: "zh" | "ja"; onClose: () => void; toast: (s: string) => void }) {
   const [listen, setListen] = useState(false), [heard, setHeard] = useState(""), [sent, setSent] = useState(""), [btns, setBtns] = useState(false);
   const rec = useRef<any>(null);
@@ -556,7 +559,7 @@ function AstraeaSheet({ tr, cab, t, ui, onClose, toast }: { tr: CabinTrip; cab: 
       rec.current = null; setListen(false); cab.duck(false);
       const s = (fin || "").trim() || heardRef.current.trim(); if (!s) return;
       const id = matchCaptain(s);
-      if (id) { const b = id === "guide" ? GUIDE_BTN : id === "qr" ? QR_BTN : id === "holo" ? HOLO_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
+      if (id) { const b = id === "guide" ? GUIDE_BTN : id === "qr" ? QR_BTN : id === "holo" ? HOLO_BTN : id === "airport_how" ? AIR_BTN : CAPTAIN.find((x) => x.id === id)!; void send(id, `${b.icon} ${ui === "zh" ? b.zh : b.ja}`); }
       else void send("unknown", "？");
     };
     setHeard(""); setListen(true); cab.duck(true); sfx.tick();
@@ -810,13 +813,45 @@ export function useCabinSheet() {
 /* ================= 📱 スマホの車内画面 (iPad がつながっていないとき) =================
    iPad と同じ車内画面 (/cabin?phone=1) を、この画面の中で動かす。声・効果音は今までどおりこのスマホの音楽と同じ道 (CarPlay) で流れる。
    隠しても動き続ける (観光案内・BOOST・ホログラムの判断はこちらが続ける) */
-function PhoneCabin({ hidden, t }: { hidden: boolean; t: T }) {
-  return (
-    <div className={`pcab ${hidden ? "hide" : ""}`}>
-      <div className="pcabh"><i />{t("スマホだけの送迎：このスマホで車内画面を動かしています")}</div>
-      <iframe src="/cabin?phone=1" title="cabin" allow="autoplay; geolocation; fullscreen" />
-    </div>
-  );
+function PhoneCabin({ hidden, cab, t }: { hidden: boolean; cab: Cabin; t: T }) {
+  // 画面いっぱい (iPhone の縦・横)。親の枠 (cabbar) の中だと小さくなるので、body の直下に出す
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHost(document.body); }, []);
+  const m = cab.mus();
+  const [dim, setDim] = useState(false), [lst, setLst] = useState(false);
+  const dT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wake = () => { setDim(false); if (dT.current) clearTimeout(dT.current); dT.current = setTimeout(() => { setDim(true); setLst(false); }, 5000); };
+  useEffect(() => { wake(); return () => { if (dT.current) clearTimeout(dT.current); }; }, []);
+  useEffect(() => { if (hidden) return; const o = document.body.style.overflow; document.body.style.overflow = "hidden"; document.body.classList.add("pcab-on"); return () => { document.body.style.overflow = o; document.body.classList.remove("pcab-on"); }; }, [hidden]);
+  // 隠している間 (と画面が消えている間) は、車内画面に「描かなくていい」と伝える (動き・声・判断は続く)。軽くしてクラッシュを防ぐ
+  const frR = useRef<HTMLIFrameElement | null>(null);
+  useEffect(() => {
+    const post = () => { try { frR.current?.contentWindow?.postMessage({ cabBg: hidden || document.visibilityState !== "visible" }, location.origin); } catch { /* ignore */ } };
+    post(); const iv = setInterval(post, 3000); document.addEventListener("visibilitychange", post);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", post); };
+  }, [hidden]);
+  if (!host) return null;
+  const tap = (f: () => void) => () => { sfx.tick(); wake(); f(); };
+  return createPortal(
+    <div className={`pcabF ${hidden ? "hide" : ""}`}>
+      <iframe ref={frR} src="/cabin?phone=1" title="cabin" allow="autoplay; geolocation; fullscreen" />
+      <div className={`pcm ${dim ? "dim" : ""}`} onPointerDown={wake}>
+        <button className="pcx" onClick={tap(() => cab.setPhoneHide(true))}>✕<small>{t("戻る")}</small></button>
+        <button className="pct" onClick={tap(() => setLst((v) => !v))}><i>🎵</i><span>{m.track ? m.track.title : t("曲がありません")}</span></button>
+        <button onClick={tap(() => m.prev())}>⏮</button>
+        <button className="pp" onClick={tap(() => m.toggle())}>{m.playing ? "⏸" : "▶"}</button>
+        <button onClick={tap(() => m.next())}>⏭</button>
+        {lst && (
+          <div className="pcl">
+            <div className="pcls">
+              {(["in", "out"] as const).map((p) => <b key={p} className={m.cur.p === p ? "on" : ""} onClick={tap(() => m.setPlaylist(p, m.cur.l, true))}>{p === "in" ? t("お迎え用") : t("お見送り用")}</b>)}
+              {(["ja", "en", "zh", "ko"] as const).map((l) => <b key={l} className={m.cur.l === l ? "on" : ""} onClick={tap(() => m.setPlaylist(m.cur.p, l, true))}>{l === "ja" ? "日本語" : l === "en" ? "EN" : l === "zh" ? "中文" : "한국어"}</b>)}
+            </div>
+            {m.list.length ? m.list.map((x, i) => <button key={x.id} className={m.track?.id === x.id ? "on" : ""} onClick={tap(() => { m.pick(i); setLst(false); })}>{m.track?.id === x.id && m.playing ? "▶ " : ""}{x.title}<small>{x.artist ?? ""}</small></button>) : <em>{t("この言語の曲はまだありません。設定から追加できます。")}</em>}
+          </div>
+        )}
+      </div>
+    </div>, host);
 }
 
 /** 📥 このスマホに保存 (車内画面の声・効果音・ホログラム・写真・地図)。家の Wi-Fi で 1 回 */

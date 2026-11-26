@@ -232,6 +232,7 @@ export function createDeadhead(c: DhCtx): Deadhead {
     const W = window as any;
     if (!jv || !onNow) { jcar?.stop(); jcar = null; return; }
     if (jcar) return;
+    if ((window as any).__CAB_LITE) return; // スマホは車の点の絵を出さない (重い)
     const go = () => { if (jv && onNow && !jcar && W.JVCAR) jcar = W.JVCAR.mount($("dhCar"), { w: 440, h: 340, sc: 88, speed: () => kmh }); };
     if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(jvCar, 600);
   }
@@ -323,7 +324,8 @@ export function createDeadhead(c: DhCtx): Deadhead {
   }
 
   let raf = 0, iv: any = null, pl: any = null;
-  function loop() { raf = requestAnimationFrame(loop); radar(); stars(); npTick(); }
+  let lf = 0;
+  function loop(n?: number) { raf = requestAnimationFrame(loop); const W = window as any; if (W.__CAB_BG) return; if (W.__CAB_LITE) { const t = n ?? 0; if (t - lf < 60) return; lf = t; } radar(); stars(); npTick(); } // スマホは 1 秒 16 コマ
   return {
     setPlacePoints(pp) { PP = pp ?? {}; },
     show(t, r, inf, checkin) {

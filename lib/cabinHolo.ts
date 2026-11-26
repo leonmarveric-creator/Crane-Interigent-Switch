@@ -14,6 +14,8 @@ export const HOLO_ROOMS = ["haru", "natsu", "aki", "fuyu"] as const;
 export type HoloRoom = (typeof HOLO_ROOMS)[number];
 /** 演出の長さ (ミリ秒)。これより長く続いたら止める */
 export const HOLO_LEN_MS = 47000;
+/** お部屋紹介のホログラムは、ゲストが乗って (お迎えの送迎が始まって) この秒数のあと (乗車のあいさつが終わってから) */
+export const HOLO_AFTER_S = 9;
 /* 自動で出すタイミング: 「着くちょうど前に終わる」ように、残りの時間 (残りの道のり ÷ 最近の速さ) から逆算して始める。
    毎回のお迎えで 1 回。始める少し前から ASTRAEA の雑談を止めて、声が重ならないようにする */
 /** 演出が終わってから到着の画面・声までの間 (秒) */

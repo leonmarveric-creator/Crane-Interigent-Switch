@@ -111,8 +111,10 @@ const WORDS: [CaptainId | "guide", RegExp][] = [
   ["thanks", /お礼|ありがとう|さようなら|バイバイ|感谢|感謝|谢谢|謝謝|再见|再見|goodbye|thank/i],
   ["room", /部屋|へや|準備|房间|房間|准备|準備|room|prepare/i],
 ];
-export function matchCaptain(text: string): CaptainId | "guide" | "qr" | "holo" | null {
+export function matchCaptain(text: string): CaptainId | "guide" | "qr" | "holo" | "airport_how" | null {
   const s = String(text || "");
+  // 「明日どうやって空港へ？」→ iPad (スマホだけのときはスマホ) で 2 つの行き方と料金を比べる演出 → 道順の QR
+  if (/空港|くうこう|関空|かんくう|机场|機場|airport|KIX/i.test(s)) return "airport_how";
   // 「ホログラムを出して」→ 地図の枠に建物のホログラム
   if (/ホログラム|ほろぐらむ|全息|hologram|holo/i.test(s)) return "holo";
   // 「QR を出して」→ iPad の右下にコンシェルジュの QR

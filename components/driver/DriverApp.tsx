@@ -272,13 +272,15 @@ export default function DriverApp({ data: initial, now: serverNow, simple }: { d
     const room = roomOf(r.roomId), rk = roomKeyOf(room?.slug);
     const lang = (dir === "out" ? natLang(r.drop?.nationality) : null) ?? ((["zh", "en", "ja", "ko"].includes(r.lang) ? r.lang : "en") as MLang);
     const checkoutToday = jstDay(r.checkOut) === jstDay(Date.now());
+    // 音楽は押した瞬間に始める (iPhone は指で押した流れの中でないと自動で鳴らせない)。お迎えは乗る前からゲストの言語のお迎え用の曲
+    try { music.startWith(dir, lang); } catch { /* ignore */ }
     const ok = await cab.start(
       { deviceId: dev, resId: r.id, dir, placeKey: pk, placeName: null, placeLL: null, roomId: r.roomId, lang, ac: acModeFor(Date.now()), phase: dir === "in" ? "dead" : "guest" },
       { roomId: r.roomId, roomKey: rk, roomName: room?.name ?? "", lang,
         off: dir === "out" && checkoutToday && room ? { roomId: room.id, resId: r.id, room: rk, name: room.name } : null,
         pick: dir === "in" ? { ll: PLACES[pk as Exclude<PlaceKey, "other">].ll, kix: pk === "kix" || pk === "kix2" } : null },
     );
-    if (ok && dir === "out") setTimeout(() => music.startWith("out", lang), 1500);
+    if (!ok) { try { music.pause(); } catch { /* ignore */ } }
   };
   /** ヘッドライトのボタン (画像のデザイン) と、りんくうの 5 番出口 / ガラスのエレベーター */
   const QuickGo = ({ r, dir }: { r: DRes; dir: "in" | "out" }) => {

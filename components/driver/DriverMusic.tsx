@@ -108,10 +108,12 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       if (graph.current && graph.current.ctx.state !== "running") void graph.current.ctx.resume();
     } catch { graph.current = null; }
     const ve = (vEl.current ??= (() => { const v = new Audio(); v.preload = "auto"; return v; })());
+    // iPhone: 1 回でも「指で押した流れ」で再生した要素だけ、あとで自動で鳴らせる。曲が読み込み済み (src あり) でも、まだ一度も鳴らしていなければ無音で 1 回鳴らしておく
     for (const x of [main(), plainEl(), ve]) {
-      if (x.dataset.primed || x.src) continue;
-      x.dataset.primed = "1"; x.muted = true; x.src = "/audio/driver/prep.mp3";
-      x.play().then(() => { x.pause(); x.muted = false; }).catch(() => { x.muted = false; });
+      if (x.dataset.primed || !x.paused) continue;
+      x.dataset.primed = "1"; x.dataset.pr = "1"; if (!x.src) x.src = "/audio/driver/prep.mp3";
+      const t0 = x.currentTime || 0; x.muted = true;
+      x.play().then(() => { if (x.dataset.pr) { x.pause(); try { x.currentTime = t0; } catch { /* ignore */ } } x.muted = false; delete x.dataset.pr; }).catch(() => { x.muted = false; delete x.dataset.pr; delete x.dataset.primed; });
     }
   };
   /** 普通の再生 (画面が消えていた間) から、音量を下げられる再生 (Web Audio) へ戻す。曲の変わり目か、声が入る瞬間にだけ行う */
@@ -165,7 +167,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
     if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; }
     const src = await cachedUrl(tr.url);
     if (src.startsWith("blob:")) blobUrl.current = src;
-    a.src = src; setPos(0);
+    delete a.dataset.pr; a.muted = false; a.src = src; setPos(0);
     // もう一方 (画面が消えたとき用) にも同じ曲を読み込んでおく → 切り替えが一瞬で済む
     if (graph.current) { const o = onPlain.current ? main() : plainEl(); if (o !== a) { o.src = src; o.preload = "auto"; try { o.load(); } catch { /* ignore */ } } }
     if (play) { route(); setLevel(0.05); a.play().then(() => fadeTo(vol.current, 2000)).catch(() => {}); }

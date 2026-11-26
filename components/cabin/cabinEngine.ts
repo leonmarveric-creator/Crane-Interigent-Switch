@@ -25,7 +25,7 @@ import { CHECKIN_T, roomGuideOf, GUEST_WIFI, WIFI_T, wifiQrText, CHECKIN_DEFAULT
 import QRCode from "qrcode";
 import { playSafe, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 import { createHolo } from "@/components/cabin/cabinHolo";
-import { AIR_LEAD_S, HOLO_AUDIO, HOLO_FINISH_S, HOLO_HUSH_S, HOLO_JS, HOLO_LEN_MS, holoRemainS, holoRoomOf, holoWindow } from "@/lib/cabinHolo";
+import { AIR_LEAD_S, HOLO_AFTER_S, HOLO_AUDIO, HOLO_FINISH_S, HOLO_HUSH_S, HOLO_JS, HOLO_LEN_MS, holoRemainS, holoRoomOf, holoWindow } from "@/lib/cabinHolo";
 import { createAirport } from "./cabinAirport";
 
 const TILES = {
@@ -664,9 +664,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
 
   /* ---------- ホログラム (お迎えのとき・地図の枠の上に約 46 秒)。lib/cabinHolo.ts ----------
      声・効果音はほかの声と同じ道 (iPhone。来ていなければ iPad)。右側の天気・お部屋・QR はそのまま見える */
-  let holoDone = false, holoCmdN = 0, holoAt = 0, holoHush = false, arrWait = false; const poiLater: PoiKey[] = [];
+  let holoDone = false, holoQr = false, holoCmdN = 0, holoAt = 0, holoHush = false, arrWait = false; const poiLater: PoiKey[] = [];
   const holo = createHolo({ host: () => $("map"), say: (k) => void say(k), sfx: (k) => sfx(k), onEnd: () => {
     $("map").classList.remove("holo-on");
+    if (trip && trip.dir === "in" && !arrived && holoQr) { holoQr = false; setTimeout(() => { if (trip && !arrived) cqShow(); }, 2500); } // 部屋紹介のあとに QR
     if (arrWait) { arrWait = false; setTimeout(() => arrive(), 600); return; } // 着いて待っていた → 到着の画面へ
     if (!arrived) poiLater.splice(0).forEach((k, i) => setTimeout(() => { if (trip && !arrived) { chime(); cap(k); void say(`en-${k}`); } }, 800 + i * 400)); else poiLater.length = 0;
   } });
@@ -680,13 +681,16 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip.id.startsWith("demo")) hooks.onCmd?.(trip.id, "duck", Math.ceil(HOLO_LEN_MS / 1000));
     return true;
   }
-  /** お迎えのとき毎回 1 回: 残りの時間から逆算して、着くちょうど前に終わるように始める。始める少し前から雑談を止める */
+  /** お迎えのとき毎回 1 回: ゲストが乗ってすぐ (乗車のあいさつが終わったら) お部屋の紹介。関空で橋の入口で乗車になったときは BOOST が終わってから。着く前の到着の演出とは重ならない。
+      残りが短すぎる (着くまでに終わらない) ときは出さずに、すぐ QR へ */
   function holoTick() {
-    if (!trip || holoDone || holo.on() || trip.dir !== "in" || arrived || offroute || !holoRoomOf(room)) { holoHush = false; return; }
-    const sec = holoRemainS(Math.max(0, remNow - 200), vAvg), w = holoWindow(sec); // 到着の画面は 200 m 手前で出る
-    holoHush = w !== "late" && sec < HOLO_LEN_MS / 1000 + HOLO_HUSH_S + 6;
-    if (w !== "now") return;
-    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy() || holoOverlay()) return; // 声や演出が終わるのを待つ (幅の中で)
+    if (!trip || holoDone || holo.on() || trip.dir !== "in" || arrived || !holoRoomOf(room)) { holoHush = false; return; }
+    const since = (Date.now() - startedAt) / 1000;
+    holoHush = since > HOLO_AFTER_S - 4 && since < HOLO_AFTER_S + 300;
+    if (since < HOLO_AFTER_S) return;
+    const sec = holoRemainS(Math.max(0, remNow - 200), vAvg);
+    if (sec < HOLO_LEN_MS / 1000 + 75 || since > HOLO_AFTER_S + 300) { holoDone = true; holoHush = false; if (holoQr) { holoQr = false; cqShow(); } return; } // 間に合わない → 出さない
+    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy() || holoOverlay()) return; // 声や演出が終わるのを待つ
     holoStart(false);
   }
 
@@ -823,7 +827,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     // 引き継ぎ (iPad ⇄ スマホ): もう済んだ案内・あいさつ・演出は繰り返さない
     done0 = t.done ?? {}; (done0.poi ?? []).forEach((k) => hit.add(k as PoiKey));
     if (done0.go) $("sweep").classList.add("on"); else { linkS(); void say(goKey); $("sweep").classList.add("on"); markDone({ go: true }); }
-    cqOff(); if (t.dir === "in") T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと)
+    cqOff(); holoQr = t.dir === "in" && !done0.holo && !!holoRoomOf(r); if (t.dir === "in" && !holoQr) T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと。部屋紹介があるときは、その終わったあと)
     T_(3000, rcarOn);
     holoDone = !!done0.holo; airEarly = !!done0.air; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
     if (t.dir === "in") T_(1800, () => { const rm = $("room"); rm.classList.remove("rscanning", "tagged"); void rm.offsetWidth; rm.classList.add("rscanning"); scanS(); setTimeout(() => { rm.classList.remove("rscanning"); rm.classList.add("tagged"); }, 4200); });
@@ -833,7 +837,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let rcar: any = null;
   function rcarOn() {
     const W = window as any;
-    if (rcar || !trip) return;
+    if (rcar || !trip || (window as any).__CAB_LITE) return; // スマホは出さない (重い)
     $("rcar").classList.add("on");
     const go = () => { if (!rcar && trip && W.JVCAR) rcar = W.JVCAR.mount($("rcarC"), { w: 440, h: 300, sc: 80, lite: () => true, speed: () => kmhNow }); };
     if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(go, 800);

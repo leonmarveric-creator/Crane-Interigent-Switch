@@ -316,7 +316,7 @@ export function createAi(c: AiCtx): Ai {
   let lastF = 0;
   const loop = (n: number) => {
     requestAnimationFrame(loop);
-    if (!c.stage.classList.contains("trip") || n - lastF < 45) return; lastF = n; // 毎秒 22 コマほど
+    if (!c.stage.classList.contains("trip") || n - lastF < 45 || (window as any).__CAB_BG) return; lastF = n; // 毎秒 22 コマほど
     let lv = 0; if (speaking && an) { an.getByteFrequencyData(FB); for (let i = 1; i < 24; i++) lv += FB[i]; lv /= 23 * 255; }
     const k = n / 1000;
     draw($("aiDotC") as HTMLCanvasElement, false, lv, k);
