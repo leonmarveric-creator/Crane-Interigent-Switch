@@ -522,7 +522,7 @@ export default function DriverApp({ data: initial, now: serverNow, simple }: { d
           <div className="sg-mode"><span>{t("車内の画面")}</span>
             <button className={cab.mode === "ipad" ? "on" : ""} disabled={!!cab.trip} onClick={() => { sfx.tick(); cab.setMode("ipad"); }}>📟 iPad</button>
             <button className={cab.mode === "phone" ? "on" : ""} disabled={!!cab.trip} onClick={() => { sfx.tick(); cab.setMode("phone"); }}>📱 {t("スマホだけ")}</button></div>
-          {cab.mode === "phone" && !cab.trip && <div className="sg-save"><PhoneSave t={t} toast={toast} /><HoloQPick t={t} /></div>}
+          {cab.mode === "phone" && !cab.trip && <div className="sg-save"><PhoneSave t={t} toast={toast} mus={music} /><HoloQPick t={t} /></div>}
           {cab.mode === "ipad" && <div className={`sg-dev ${ipad ? "on" : ""}`}><i />{ipad ? t("車内iPad 接続中") : t("車内iPad が見つかりません（iPad の画面を開いてください）")}</div>}
           {jobs.length ? jobs.map(({ r, dir, at }) => {
             const done = dir === "in" ? false : at < nowMs - 3 * 3600e3;

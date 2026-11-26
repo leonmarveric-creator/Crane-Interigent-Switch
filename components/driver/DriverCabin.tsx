@@ -870,7 +870,8 @@ export function HoloQPick({ t }: { t: T }) {
 }
 
 /** 📥 このスマホに保存 (車内画面の声・効果音・ホログラム・写真・地図)。家の Wi-Fi で 1 回 */
-export function PhoneSave({ t, toast }: { t: T; toast: (s: string) => void }) {
+export function PhoneSave({ t, toast, mus }: { t: T; toast: (s: string) => void; mus?: Music }) {
+  const musR = useRef(mus); musR.current = mus;
   const [open, setOpen] = useState(false);
   const [p, setP] = useState<{ label: string; p: number } | null>(null);
   useEffect(() => {
@@ -878,13 +879,18 @@ export function PhoneSave({ t, toast }: { t: T; toast: (s: string) => void }) {
     const f = (e: MessageEvent) => {
       if (e.origin !== location.origin || !e.data || e.data.cab !== 1) return;
       if (e.data.prog !== undefined) setP(e.data.prog);
-      if (e.data.saved) { const s = e.data.saved; sfx.chord(); toast(t("✓ このスマホに保存しました（地図 {n} 枚・約 {mb} MB）", { n: s.tiles, mb: s.mb })); setTimeout(() => setOpen(false), 1200); }
+      if (e.data.saved) {
+        const s = e.data.saved, m = musR.current;
+        const fin = (n: number) => { sfx.chord(); toast(t("✓ このスマホに保存しました（地図 {n} 枚・約 {mb} MB）", { n: s.tiles, mb: s.mb }) + (n ? " ・ " + t("曲 {n} 曲", { n }) : "")); setTimeout(() => setOpen(false), 1200); };
+        // 続けて音楽 (曲とカバー) も保存 → 走行中もギガを使わず、すぐ流れる
+        if (m) void m.saveOffline((d, n) => setP({ label: t("音楽"), p: d / Math.max(1, n) })).then(() => fin(m.tracks.length)).catch(() => fin(0)); else fin(0);
+      }
     };
     window.addEventListener("message", f); return () => window.removeEventListener("message", f);
   }, [open, t, toast]);
   return (
     <>
-      <button className="btn" onClick={() => { sfx.tick(); setP(null); setOpen(true); }}>📥 {t("このスマホに保存（車内画面・声・ホログラム・地図）")}</button>
+      <button className="btn" onClick={() => { sfx.tick(); setP(null); setOpen(true); }}>📥 {mus ? t("このスマホに保存（車内画面・声・ホログラム・地図・音楽）") : t("このスマホに保存（車内画面・声・ホログラム・地図）")}</button>
       <div className="cnote">{t("家の Wi-Fi で 1 回押してください。iPad が無いとき、走行中は通信なし・待ち時間なしで出ます。iPhone はこの画面をホーム画面に追加しておくと、保存が消えにくくなります。")}</div>
       {open && (
         <div className="psave">
