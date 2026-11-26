@@ -19,6 +19,7 @@ import { cabinStart, cabinBoard, cabinRoomPrepStop, cabinPos, cabinEnd, cabinSet
 import { compressRoomPhoto, compressRoomIcon } from "@/lib/driverCover";
 import { sfx, vib } from "@/lib/driverSfx";
 import { BOOST_SFX, boostSfxFile } from "@/lib/boostSfx";
+import { HOLO_Q_KEY, isHoloQ, type HoloQ } from "@/lib/cabinHolo";
 import { VOICE_MODES, isVoiceMode, voiceClear, type VoiceMode } from "@/lib/cabinVoice";
 import { onVoiceCache, syncVoiceCache, voiceCacheState, type VoiceCacheState } from "@/lib/driverVoiceCache";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
@@ -595,6 +596,7 @@ export function CabinSettings({ data, t, toast, refresh, onStart }: { data: Driv
       <BoostPick initial={data.cabin.boostSfx} t={t} />
       <VoicePick initial={data.cabin.voiceMode} t={t} />
       <PhoneSave t={t} toast={toast} />
+      <HoloQPick t={t} />
       <PlacePointList t={t} toast={toast} />
       {data.cabin.missing ? <p className="note warn">{t("先に Supabase の SQL（migration_cabin.sql）を実行してください")}</p> : null}
       <div className="cnote">{t("iPad の Safari で {u} を開いてログインし、名前（1号車 など）を付けて登録します。ホーム画面に追加すると全画面で使えます。", { u: typeof location !== "undefined" ? location.origin + "/cabin" : "/cabin" })}</div>
@@ -834,7 +836,7 @@ function PhoneCabin({ hidden, cab, t }: { hidden: boolean; cab: Cabin; t: T }) {
   const tap = (f: () => void) => () => { sfx.tick(); wake(); f(); };
   return createPortal(
     <div className={`pcabF ${hidden ? "hide" : ""}`}>
-      <iframe ref={frR} src="/cabin?phone=1" title="cabin" allow="autoplay; geolocation; fullscreen" />
+      <iframe ref={frR} src={`/cabin?phone=1&hq=${holoQ()}`} title="cabin" allow="autoplay; geolocation; fullscreen" />
       <div className={`pcm ${dim ? "dim" : ""}`} onPointerDown={wake}>
         <button className="pcx" onClick={tap(() => cab.setPhoneHide(true))}>✕<small>{t("戻る")}</small></button>
         <button className="pct" onClick={tap(() => setLst((v) => !v))}><i>🎵</i><span>{m.track ? m.track.title : t("曲がありません")}</span></button>
@@ -852,6 +854,19 @@ function PhoneCabin({ hidden, cab, t }: { hidden: boolean; cab: Cabin; t: T }) {
         )}
       </div>
     </div>, host);
+}
+
+/** スマホだけのときのホログラムの画質 (このスマホに保存。最初は超軽量) */
+function holoQ(): HoloQ { try { const v = localStorage.getItem(HOLO_Q_KEY); if (isHoloQ(v)) return v; } catch { /* ignore */ } return "ul"; }
+export function HoloQPick({ t }: { t: T }) {
+  const [q, setQ] = useState<HoloQ>("ul");
+  useEffect(() => { setQ(holoQ()); }, []);
+  const L: [HoloQ, string][] = [["std", t("標準")], ["lite", t("軽量")], ["ul", t("超軽量")]];
+  return (
+    <div className="hqp"><span>{t("ホログラムの画質（スマホだけのとき）")}</span>
+      <div>{L.map(([k, n]) => <button key={k} className={q === k ? "on" : ""} onClick={() => { sfx.tick(); setQ(k); try { localStorage.setItem(HOLO_Q_KEY, k); } catch { /* ignore */ } }}>{n}</button>)}</div>
+      <small>{t("超軽量 = 画質を下げて 1 秒 30 コマ（iPhone 12 など）。次の送迎から変わります")}</small></div>
+  );
 }
 
 /** 📥 このスマホに保存 (車内画面の声・効果音・ホログラム・写真・地図)。家の Wi-Fi で 1 回 */

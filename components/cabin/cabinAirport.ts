@@ -40,7 +40,8 @@ export function createAirport(c: AirportCtx) {
     const guestUrl = `${location.origin}/airport/guide.html#${gl}`;
     w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 45000); }; // 比較が終わったら QR を 45 秒見せて閉じる
     let src: string;
-    if (cmd === "airport_how") src = `/airport/${lite() ? "compare-lite" : "compare"}.html?l=${l}`;
+    const hq = (window as any).__CAB_HQ as string | undefined, qq = hq ? `&q=${hq}${hq !== "std" ? "&lt=1" : ""}` : "";
+    if (cmd === "airport_how") src = `/cabin/air/${lite() ? "arrive" : "arrive-full"}.html?s=cmp&l=${l}${qq}`; // 新しい比較 (ルート A: 車 → 乗り換え → 電車)
     else {
       const d = cmd.slice(8); // r1 r2 t1 t2
       src = d === "r1" || d === "r2" ? `/airport/guide.html#cab&l=${gl}&m=train&d=t1&r=${d === "r2" ? 2 : 1}&s=2` : `/airport/guide.html#cab&l=${gl}&m=car&d=${d}&r=1&s=3`;
@@ -58,7 +59,7 @@ export function createAirport(c: AirportCtx) {
     mount(); if (!el || !fr) return;
     const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
     const l = o.lang ?? c.lang(), gl = GUIDE_L[l] ?? "en";
-    const q = new URLSearchParams({ s: o.s, l }); if ((window as any).__CAB_LITE) q.set("lt", "1"); if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
+    const q = new URLSearchParams({ s: o.s, l }); const hq = (window as any).__CAB_HQ as string | undefined; if (hq) { q.set("q", hq); if (hq !== "std") q.set("lt", "1"); } if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
     const guestUrl = /^pick/.test(o.s) || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
     w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 60000); };
     fr.onload = async () => {
@@ -66,7 +67,7 @@ export function createAirport(c: AirportCtx) {
       if (!guestUrl) return;
       try { const svg = await QRCode.toString(guestUrl, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#0a1426", light: "#ffffff" } }); (fr?.contentWindow as any)?.__setQr?.(svg); } catch { /* ignore */ }
     };
-    fr.src = `/airport/${lite() ? "arrive" : "arrive-full"}.html?${q}`; el.classList.add("on");
+    fr.src = `/cabin/air/${lite() ? "arrive" : "arrive-full"}.html?${q}`; // /cabin/ の下 = 「このスマホに保存」で保存される el.classList.add("on");
     clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
     clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
   }

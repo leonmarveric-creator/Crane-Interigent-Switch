@@ -1,5 +1,11 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<html lang="ja"><head><script>/* ホログラムの画質: q=std (そのまま) / lite (画質 1 倍) / ul (画質 0.6 倍・30 コマ・光のにじみ無し)。window.__Q か URL の q */
+(function(){var s=(window.__Q||location.search||"")+"",m=s.match(/[?&]q=(std|lite|ul)/),q=m?m[1]:(/[?&](lite|lt)=?1?/.test(s)?"lite":"std");window.__HQ=q;
+ if(q!=="std"){var pr=q==="ul"?0.6:1;try{Object.defineProperty(window,"devicePixelRatio",{get:function(){return pr},configurable:true})}catch(e){}
+  var gc=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t,o){if(/webgl/.test(t)){o=Object.assign({},o||{},{antialias:false,powerPreference:"low-power"})}return gc.call(this,t,o)}}
+ if(q==="ul"){var raf=window.requestAnimationFrame.bind(window),P=1000/30;window.requestAnimationFrame=function(cb){return raf(function f(t){if(Math.floor(t/P)===Math.floor((t-1000/60)/P))return raf(f);cb(t)})}}
+ var n=0,t0=0;(function c(t){window.requestAnimationFrame(c);n++;if(t-t0>1000){window.__fps=n;n=0;t0=t}})(0)})();
+</script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>到着ホログラム サンプル</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=Cinzel:wght@600&display=swap">
 <style>
@@ -214,7 +220,7 @@ let SC="t1",LG="zh";
 [["sgS","s"],["sgL","l"]].forEach(([id,k])=>document.querySelectorAll(`#${id} b`).forEach(b=>b.onclick=()=>{document.querySelectorAll(`#${id} b`).forEach(x=>x.classList.toggle("on",x===b));if(k==="s")SC=b.dataset.s;else LG=b.dataset.l}));
 setInterval(()=>{$("clk").textContent=new Date().toLocaleTimeString("ja-JP",{hour12:false})},500);
 /* ===== three ===== */
-const LT=/[?&]lt=1/.test(window.__Q||location.search);const W=SW,H=SH,R=new THREE.WebGLRenderer({canvas:$("gl"),antialias:!LT});const PR=LT?1:Math.min(2,devicePixelRatio||1);R.setPixelRatio(PR);R.setSize(W,H,false);R.setClearColor(0x02060c,1);
+const UL=window.__HQ==="ul",LT=UL||window.__HQ==="lite"||/[?&]lt=1/.test(window.__Q||location.search);const W=SW,H=SH,R=new THREE.WebGLRenderer({canvas:$("gl"),antialias:!LT});const PR=LT?1:Math.min(2,devicePixelRatio||1);R.setPixelRatio(PR);R.setSize(W,H,false);R.setClearColor(0x02060c,1);
 const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(38,W/H,1,8000);
 let composer=null;if(!LT)try{composer=new THREE.EffectComposer(R);composer.addPass(new THREE.RenderPass(scene,cam));composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(W,H),.62,.45,.42))}catch(e){}
 const V=(x,y,z)=>new THREE.Vector3(x,y,z),HC=new THREE.Color(0x48c8ff),GC=new THREE.Color(0xffb347),WC=new THREE.Color(0xbff2ff);
@@ -250,7 +256,7 @@ const beam=(()=>{const g=new THREE.CylinderGeometry(360,330,700,64,1,true);const
  fragmentShader:"varying vec2 vU;uniform float t,o;void main(){float a=pow(1.-vU.y,3.)*.12+.05*smoothstep(.97,1.,fract(vU.x*40.+t*.05))*(1.-vU.y);gl_FragColor=vec4(.28,.78,1.,a*o);}"});
  const b=new THREE.Mesh(g,m);b.position.y=350;scene.add(b);return b})();
 /* 粒: 台から立ちのぼる / 道を流れる */
-const dust=(()=>{const N=LT?600:1600,p=new Float32Array(N*3),s=new Float32Array(N);for(let i=0;i<N;i++){const a=Math.random()*6.283,r=Math.sqrt(Math.random())*360;p[i*3]=Math.cos(a)*r;p[i*3+1]=Math.random()*500;p[i*3+2]=Math.sin(a)*r;s[i]=Math.random()}
+const dust=(()=>{const N=UL?250:LT?600:1600,p=new Float32Array(N*3),s=new Float32Array(N);for(let i=0;i<N;i++){const a=Math.random()*6.283,r=Math.sqrt(Math.random())*360;p[i*3]=Math.cos(a)*r;p[i*3+1]=Math.random()*500;p[i*3+2]=Math.sin(a)*r;s[i]=Math.random()}
  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(p,3));g.setAttribute("s",new THREE.BufferAttribute(s,1));
  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{t:{value:0},o:{value:0},px:{value:PR}},
   vertexShader:"attribute float s;uniform float t,px;varying float vA;void main(){vec3 p=position;p.y=mod(p.y+t*(12.+s*30.),520.);vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=min((1.2+s*2.2)*px*(500./-mv.z),5.*px);vA=(1.-p.y/520.)*(.4+.6*sin(t*3.+s*40.));}",
@@ -477,8 +483,9 @@ function build(k){HC.set(k==="pick"?0xffb347:0x48c8ff);scene.remove(model);model
  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{...U},
   vertexShader:"uniform float uMode;uniform vec2 uAx,uOr;attribute float aH;varying vec3 vL;varying float vY,vH;void main(){vL=position;vH=aH;vec4 w=modelMatrix*instanceMatrix*vec4(position,1.);vY=uMode<.5?w.y:uMode<1.5?dot(w.xz,uAx):length(w.xz-uOr);gl_Position=projectionMatrix*viewMatrix*w;}",
   fragmentShader:"uniform float uCut,uO;varying vec3 vL;varying float vY,vH;void main(){float d=uCut-vY;if(d<0.)discard;vec3 q=abs(vL-vec3(0.,.5,0.));float e1=step(.46,q.x)+step(.46,q.z)+step(.96,vL.y)+step(vL.y,.04);float edge=step(1.5,e1);float s=smoothstep(4.,0.,d);float tall=smoothstep(10.,40.,vH);vec3 c=mix(vec3(.25,.7,1.),vec3(.75,.95,1.),tall);gl_FragColor=vec4(c*(.35+edge*1.1)+vec3(.8,.95,1.)*s,(.05+edge*.32+tall*.06+s*.6)*uO);}"});
- const im=new THREE.InstancedMesh(g,m,n),M4=new THREE.Matrix4(),Q=new THREE.Quaternion(),AX=new THREE.Vector3(0,1,0),aH=new Float32Array(n);
- for(let i=0;i<n;i++){const o=i*7,p=P(BD[o],BD[o+1]),h=BD[o+5];aH[i]=h;Q.setFromAxisAngle(AX,-BD[o+4]*Math.PI/180);M4.compose(p,Q,new THREE.Vector3(BD[o+2]*sc*1.15,Math.max(.25,h*sc*2.2),BD[o+3]*sc*1.15));im.setMatrixAt(i,M4)}
+ const ids=[];for(let i=0;i<GSIC.nb;i++)if(!UL||BD[i*7+5]>=12||i%4===0)ids.push(i);/* 超軽量: 低い建物は 4 棟に 1 棟 */
+ const im=new THREE.InstancedMesh(g,m,ids.length),M4=new THREE.Matrix4(),Q=new THREE.Quaternion(),AX=new THREE.Vector3(0,1,0),aH=new Float32Array(ids.length);
+ for(let j=0;j<ids.length;j++){const i=ids[j],o=i*7,p=P(BD[o],BD[o+1]),h=BD[o+5];aH[j]=h;Q.setFromAxisAngle(AX,-BD[o+4]*Math.PI/180);M4.compose(p,Q,new THREE.Vector3(BD[o+2]*sc*1.15,Math.max(.25,h*sc*2.2),BD[o+3]*sc*1.15));im.setMatrixAt(j,M4)}
  g.setAttribute("aH",new THREE.InstancedBufferAttribute(aH,1));im.frustumCulled=false;model.add(im)}
  G2.rwy.forEach(r=>{pl(r,2.8,WC,1);const a=P(r[0],r[1],2.8),b=P(r[2],r[3],2.8),t=[];for(let u=0;u<1;u+=.03){const p=a.clone().lerp(b,u),q=a.clone().lerp(b,u+.012);t.push(p.x,p.y,p.z,q.x,q.y,q.z)}lines(t,WC,.6)});
   G2.rail.forEach(a=>pl(a,1.4,new THREE.Color(0x9fe8ff),.55));
@@ -501,7 +508,7 @@ function build(k){HC.set(k==="pick"?0xffb347:0x48c8ff);scene.remove(model);model
   S.cos=[[cn.clone().setY(28),"CRANE NEST","泉佐野 · 上之郷",""],[rk.clone().setY(12),"RINKU TOWN STA.","りんくうタウン駅 · ゲートタワー",""],[S.bridge.clone().setY(6),"SKY GATE BRIDGE R","関空連絡橋 · 3.75 km",""],[kx.clone().setY(8),"KANSAI AIRPORT","T1 / T2",""]];
  }
  // 粒子で組み上がる
- particlesFor(Math.round((k==="cmp"?7000:9000)*(LT?.4:1)));
+ particlesFor(Math.round((k==="cmp"?7000:9000)*(UL?.18:LT?.4:1)));
  return S}
 /* ===== 音 ===== */
 let ac=null,master=null,rev=null;const BUF={};
@@ -1126,6 +1133,6 @@ $("go").onclick=()=>{A().resume();VA.play().catch(()=>{});play()};
 $("again").onclick=()=>{$("stopB").click();return;reset();S=null;beam.material.uniforms.o.value=0;dust.material.uniforms.o.value=0;scene.remove(model);$("start").style.display="flex";$("again").style.display="none"};
 cam.position.set(0,420,760);cam.lookAt(0,60,0);
 </script>
-<script>(function(){const q=new URLSearchParams((window.__Q||location.search));const l=q.get("l");if(["zh","ja","en","ko"].includes(l))LG=l;const s=q.get("s");if(["t1","t2","r1","r2","pick","pick2","hin","pickh","pickr1","pickr2","dep_t1","dep_t2","dep_r","dep_h","bst"].includes(s))SC=s;
+<script>(function(){const q=new URLSearchParams((window.__Q||location.search));const l=q.get("l");if(["zh","ja","en","ko"].includes(l))LG=l;const s=q.get("s");if(["t1","t2","r1","r2","pick","pick2","hin","pickh","pickr1","pickr2","dep_t1","dep_t2","dep_r","dep_h","bst","cmp"].includes(s))SC=s;
  window.__setImgs=a=>{if(Array.isArray(a)&&a.length){IM.length=0;a.forEach(x=>IM.push(x))}};window.__setQr=v=>{const b=document.querySelector("#nav .qr svg");if(b)b.outerHTML=v;const n=document.querySelector("#nav .qr svg");if(n){n.style.width="84px";n.style.height="84px";n.style.background="#fff"}};
  setTimeout(()=>{try{A().resume()}catch(e){}play()},700)})();</script></body></html>

@@ -41,9 +41,10 @@ function loadLeaflet(): Promise<void> {
 const PHONE = typeof window !== "undefined" && /[?&]phone=1/.test(location.search);
 const PHONE_SAVE = PHONE && /[?&]save=1/.test(location.search);
 const PHONE_DEV = { id: "phone", name: "📱 PHONE" };
+const THREE_URLS = ["https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", ...["shaders/CopyShader", "shaders/LuminosityHighPassShader", "postprocessing/EffectComposer", "postprocessing/RenderPass", "postprocessing/ShaderPass", "postprocessing/UnrealBloomPass"].map((p) => `https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/${p}.js`)];
 /* スマホ: 軽量モード (重いとクラッシュするので)。お父さんの画面で「戻る」で隠している間は、描くのを止める */
 if (PHONE) {
-  const W = window as any; W.__CAB_LITE = 1; document.documentElement.classList.add("lite");
+  const W = window as any; W.__CAB_LITE = 1; { const m = location.search.match(/[?&]hq=(std|lite|ul)/); W.__CAB_HQ = m ? m[1] : "ul"; } document.documentElement.classList.add("lite");
   window.addEventListener("message", (e) => { if (e.origin === location.origin && e.data && typeof e.data.cabBg === "boolean") { W.__CAB_BG = e.data.cabBg; document.documentElement.classList.toggle("bg", e.data.cabBg); } });
 }
 const toParent = (m: Record<string, unknown>) => { try { if (window.parent !== window) window.parent.postMessage({ cab: 1, ...m }, location.origin); } catch { /* ignore */ } };
@@ -337,7 +338,9 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       ...(Object.keys(TOILET_VOICE) as ToiletKey[]).map(toiletAudio), ...Object.values(TOILET_IMG),
       ...(Object.keys(LOCK_VOICE) as LockKey[]).map(lockAudio), ...Object.values(LOCK_IMG),
       ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3", e.boostSfxUrl(),
-      "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css", "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
+      "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css",
+      // ホログラム (部屋紹介・到着・比較) のページと 3D の部品も保存 → 走行中は通信なしで出る
+      "/cabin/holo/index.html", "/cabin/air/arrive.html", ...THREE_URLS, "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });
     const reg = await navigator.serviceWorker?.ready.catch(() => null);
@@ -346,7 +349,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
         const ch = new MessageChannel();
         ch.port1.onmessage = (m) => { setProg({ label: "声・効果音・写真", p: m.data.done / m.data.total }); if (m.data.done >= m.data.total) ok(); };
         reg.active!.postMessage({ type: "precache", urls }, [ch.port2]);
-        setTimeout(ok, 60000);
+        setTimeout(ok, 240000); // 到着の演出 (約 7 MB) があるので長めに
       });
     } else { for (let i = 0; i < urls.length; i++) { await fetch(urls[i]).catch(() => null); setProg({ label: "声・効果音・写真", p: (i + 1) / urls.length }); } }
     // 写真は先に読み込んで、表示のときに待たないように

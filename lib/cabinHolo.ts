@@ -8,7 +8,11 @@
  */
 export const HOLO_PAGE = "/cabin/holo/index.html";
 /** public/cabin/holo/index.html が読み込む JS (中身を作り直したら v を合わせる) */
-export const HOLO_JS = "/cabin/holo/holo.js?v=be041d29ba";
+export const HOLO_JS = "/cabin/holo/holo.js?v=674f4f0643";
+/** ホログラムの画質: std = 標準 (iPad) / lite = 軽量 / ul = 超軽量 (画質 0.6 倍・30 コマ・にじみ無し。スマホの最初の値) */
+export type HoloQ = "std" | "lite" | "ul";
+export const HOLO_Q_KEY = "drvHoloQ";
+export const isHoloQ = (v: unknown): v is HoloQ => v === "std" || v === "lite" || v === "ul";
 /** 建物の模型があるお部屋 (Crane Nest の 春・夏・秋・冬) */
 export const HOLO_ROOMS = ["haru", "natsu", "aki", "fuyu"] as const;
 export type HoloRoom = (typeof HOLO_ROOMS)[number];

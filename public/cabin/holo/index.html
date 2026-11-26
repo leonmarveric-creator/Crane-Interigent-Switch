@@ -1,6 +1,12 @@
 <!doctype html>
 <!-- 車内 iPad (HIROSHI DRIVE) のホログラム演出。送迎画面の地図の上に iframe で出す。音はこのページでは鳴らさず、親に知らせて iPhone から流す。
-     元: 作業用の holo5.js を esbuild でまとめたもの (public/cabin/holo/holo.js)。 --><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crane Nest Hologram</title>
+     元: 作業用の holo5.js を esbuild でまとめたもの (public/cabin/holo/holo.js)。 --><html lang="ja"><head><script>/* ホログラムの画質: q=std (そのまま) / lite (画質 1 倍) / ul (画質 0.6 倍・30 コマ・光のにじみ無し)。window.__Q か URL の q */
+(function(){var s=(window.__Q||location.search||"")+"",m=s.match(/[?&]q=(std|lite|ul)/),q=m?m[1]:(/[?&](lite|lt)=?1?/.test(s)?"lite":"std");window.__HQ=q;
+ if(q!=="std"){var pr=q==="ul"?0.6:1;try{Object.defineProperty(window,"devicePixelRatio",{get:function(){return pr},configurable:true})}catch(e){}
+  var gc=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t,o){if(/webgl/.test(t)){o=Object.assign({},o||{},{antialias:false,powerPreference:"low-power"})}return gc.call(this,t,o)}}
+ if(q==="ul"){var raf=window.requestAnimationFrame.bind(window),P=1000/30;window.requestAnimationFrame=function(cb){return raf(function f(t){if(Math.floor(t/P)===Math.floor((t-1000/60)/P))return raf(f);cb(t)})}}
+ var n=0,t0=0;(function c(t){window.requestAnimationFrame(c);n++;if(t-t0>1000){window.__fps=n;n=0;t0=t}})(0)})();
+</script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crane Nest Hologram</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
@@ -123,5 +129,5 @@ body{background:var(--void);color:var(--ink);font-family:var(--jp)}
 <div id="glitch"></div>
 <div id="sub"><canvas id="vring" width="116" height="116"></canvas><div><small>ASTRAEA</small><span id="subJa"></span><span id="subEn"></span></div></div>
 
-<script src="/cabin/holo/holo.js?v=be041d29ba"></script>
+<script src="/cabin/holo/holo.js?v=674f4f0643"></script>
 </body></html>

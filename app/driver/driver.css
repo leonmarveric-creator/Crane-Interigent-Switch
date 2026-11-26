@@ -793,3 +793,10 @@ body:has(.drv) { margin:0; background:#04070d; }
 
 /* 車内画面を全画面で出している間は、うしろの送迎の画面を描かない (軽く) */
 body.pcab-on .drv{visibility:hidden}
+
+/* スマホだけ: 保存ボタン・ホログラムの画質 */
+.drv .sg-save{display:flex;flex-direction:column;gap:8px;margin:4px 0 10px;padding:10px;border:1px solid #2a3a58;border-radius:14px;background:#0e1626}
+.drv .sg-save .cnote{font-size:11px;color:#8aa3c0;line-height:1.5}
+.drv .hqp{display:flex;flex-direction:column;gap:6px;font-size:13px}.drv .hqp>div{display:flex;gap:6px}
+.drv .hqp button{flex:1;min-height:42px;border-radius:10px;border:1px solid #2a3a58;background:#13223a;color:#cfe3ff;font-size:14px}.drv .hqp button.on{background:#8fe6c8;color:#032;font-weight:700;border-color:#8fe6c8}
+.drv .hqp small{font-size:11px;color:#8aa3c0}

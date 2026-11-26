@@ -1,7 +1,7 @@
 /* 車内 iPad (/cabin): 声・効果音・部屋の写真・地図の部品を iPad に保存して、2 回目からは通信なし・待ち時間なしで出す。
  * 対象: /cabin/** の静的ファイル と Supabase に上げた部屋の写真 (driver-music/rooms/)。ページ本体や API は保存しない (いつも最新)。
  * 中身を差し替えたら VERSION を上げる。 */
-const VERSION = "cabin-static-v5"; // v5: 声を元に戻す (聞き取りやすくはスマホでその場で)、BOOST の起動音を選べるように
+const VERSION = "cabin-static-v6"; // v6: ホログラムのページ (/cabin/holo・/cabin/air) と 3D の部品 (three.js) も保存 // v5: 声を元に戻す (聞き取りやすくはスマホでその場で)、BOOST の起動音を選べるように
 // v3: 入り方ガイドの声 (外から・スマホの電池切れのとき)
 
 self.addEventListener("install", () => { self.skipWaiting(); });
@@ -12,7 +12,12 @@ self.addEventListener("activate", (e) => {
   })());
 });
 
+// ホログラムのページ: ?s=…&q=… が違っても同じ保存を使う。中身は保存したものを出しつつ、裏で新しくする
+const isPage = (u) => u.origin === self.location.origin && /^\/cabin\/(holo|air)\/[\w-]+\.html$/.test(u.pathname);
+const THREE_CDN = (u) => /^https:\/\/(cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\/r128\/|cdn\.jsdelivr\.net\/npm\/three@0\.128\.0\/examples\/js\/)/.test(u.href);
+const keyOf = (u) => isPage(u) ? u.origin + u.pathname : u.origin + u.pathname + u.search;
 const isStatic = (u) =>
+  isPage(u) || THREE_CDN(u) ||
   (u.origin === self.location.origin && /^\/cabin\/.+\.(mp3|webp|jpg|png|js|css|json)$/.test(u.pathname)) || // ホログラムの JS (/cabin/holo/holo.js?v=…) もここ
   /\/storage\/v1\/object\/public\/driver-music\/rooms\//.test(u.pathname);
 
@@ -23,7 +28,7 @@ self.addEventListener("message", (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(VERSION); let done = 0, fail = 0;
     for (const url of e.data.urls) {
-      try { if (!(await cache.match(url))) { const r = await fetch(url, { mode: "cors" }); if (r.ok && r.status === 200) await cache.put(url, r); else fail++; } } catch { fail++; }
+      try { const k = keyOf(new URL(url)); if (!(await cache.match(k)) || isPage(new URL(url))) { const r = await fetch(url, { mode: "cors", cache: "no-cache" }); if (r.ok && r.status === 200) await cache.put(k, r); else fail++; } } catch { fail++; }
       done++; port && port.postMessage({ done, total: e.data.urls.length, fail });
     }
   })());
@@ -36,11 +41,12 @@ self.addEventListener("fetch", (e) => {
   if (!isStatic(u)) return;
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
-    const key = u.origin + u.pathname + u.search;
+    const key = keyOf(u);
     let res = await cache.match(key);
+    if (res && isPage(u)) { e.waitUntil(fetch(u.origin + u.pathname, { cache: "no-cache" }).then((n) => n.ok && n.status === 200 ? cache.put(key, n) : null).catch(() => {})); return res; }
     if (!res) {
       try {
-        const net = await fetch(req.url, { mode: u.origin === self.location.origin ? "same-origin" : "cors" });
+        const net = await fetch(isPage(u) ? u.origin + u.pathname + u.search : req.url, { mode: u.origin === self.location.origin ? "same-origin" : "cors" });
         if (net.ok && net.status === 200) { await cache.put(key, net.clone()); res = net; } else return net;
       } catch (err) { return Response.error(); }
     }
