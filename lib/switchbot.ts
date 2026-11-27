@@ -137,6 +137,17 @@ export function deviceTurnOff(creds: SwitchBotCreds, deviceId: string) {
   return sendCommand(creds, deviceId, { command: "turnOff" });
 }
 
+/** Wi-Fi の実機 (スマート電球など) の今の状態。power = "on" / "off" (読めなければ null)。IR (仮想) は状態が無いので null */
+export async function deviceStatus(creds: SwitchBotCreds, deviceId: string): Promise<{ power: "on" | "off" | null }> {
+  if (isIrDevice(deviceId)) return { power: null };
+  try {
+    const res = await fetch(`${BASE}/devices/${deviceId}/status`, { headers: authHeaders(creds), cache: "no-store" });
+    const p: any = await res.json().catch(() => null);
+    const pw = String(p?.body?.power ?? "").toLowerCase();
+    return { power: pw === "on" ? "on" : pw === "off" ? "off" : null };
+  } catch { return { power: null }; }
+}
+
 /** 仮想IR照明: ON / OFF。光目覚ましもこれを使用。 */
 export function lightTurnOn(creds: SwitchBotCreds, deviceId: string) {
   return sendCommand(creds, deviceId, { command: "turnOn" });

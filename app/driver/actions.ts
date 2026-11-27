@@ -13,6 +13,7 @@ import { aiHumorOn, toCabinTrip, type CabinTrip, type CabinSpots , placePoints }
 import { cleanNowPlaying, type MusicCmdRow, type NowPlayingIn } from "@/lib/cabinMusic";
 import { CMD_IDS, type CaptainCmdId } from "@/lib/cabinAiTalk";
 import { boardTrip, prepFromCmd, stopRoomPrep, type RoomPrep } from "@/lib/cabinRoomPrep";
+import { driveOffFallback } from "@/lib/driveOffFallback";
 import { iconPrefix, isIconPath, roomIcon, uploadedIcons } from "@/lib/roomIcon";
 
 type R<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
@@ -62,11 +63,12 @@ export async function driverPrepare(resIds: string[], mode: "welcome" | "wafu" =
 }
 
 /** 部屋の設備を全部 OFF (エアコン・照明・和風ライト・ギャラクシー・NEST)。鍵はそのまま。準備済みの記録も外す */
-export async function driverAllOff(roomId: string, resId?: string): Promise<R> {
+export async function driverAllOff(roomId: string, resId?: string, auto?: boolean): Promise<R> {
   const g = guard(); if (g) return g;
   const room = await roomById(roomId); if (!room) return fail("NO_ROOM");
   const r = await executeDeviceAction(room, "away", "Driver All Off").catch(() => ({ ok: false }));
-  await logDevice({ room_id: room.id, reservation_id: resId ?? null, action: "away", source: "admin", success: r.ok });
+  // auto = お見送りで家から離れたときの自動オフ (履歴に「送迎で自動OFF」と出す)
+  await logDevice({ room_id: room.id, reservation_id: resId ?? null, action: auto ? "drive_off" : "away", source: auto ? "cron" : "admin", success: r.ok });
   if (resId) await supabaseAdmin.from("reservations").update({ prepared_at: null }).eq("id", resId).then(() => {}, () => {});
   return r.ok ? { ok: true } : fail("DEVICE");
 }
@@ -348,6 +350,7 @@ export async function cabinEnd(tripId: string): Promise<R> {
   const g = guard(); if (g) return g;
   if (!isId(tripId)) return fail("BAD");
   const { error } = await supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", tripId);
+  if (!error) await driveOffFallback(tripId); // お見送り: 出発後の自動 OFF を見逃していたら、ここで (チェックアウトの日だけ)
   return error ? fail(error.message) : { ok: true };
 }
 export async function cabinRenameDevice(id: string, name: string): Promise<R> {

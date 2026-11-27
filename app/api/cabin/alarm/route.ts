@@ -57,7 +57,7 @@ export async function GET() {
   const logs: Record<string, { at: string; action: string; ok: boolean }[]> = {};
   try {
     const { data: lg } = await supabaseAdmin.from("device_logs").select("room_id, action, success, created_at")
-      .eq("source", "cron").in("action", ["light_on", "wafu_prewake"]).gte("created_at", new Date(now - 3 * 86400e3).toISOString())
+      .eq("source", "cron").in("action", ["light_on", "wafu_prewake", "wake_auto", "wake_manual"]).gte("created_at", new Date(now - 3 * 86400e3).toISOString())
       .order("created_at", { ascending: false }).limit(200);
     for (const l of (lg ?? []) as any[]) (logs[l.room_id] ||= []).push({ at: l.created_at, action: l.action, ok: !!l.success });
   } catch { /* 記録が読めなくても設定は出す */ }

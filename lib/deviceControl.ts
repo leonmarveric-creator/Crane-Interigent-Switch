@@ -1,7 +1,7 @@
 import { sendSesameCommand, SESAME_CMD } from "./sesame";
 import {
   acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, deviceTurnOn, deviceTurnOff,
-  bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, irCustomButton, type SwitchBotCreds,
+  bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, irCustomButton, deviceStatus, isIrDevice, type SwitchBotCreds,
 } from "./switchbot";
 import { acModeFor } from "./acClimate";
 import { supabaseAdmin } from "./supabaseAdmin";
@@ -150,7 +150,20 @@ export async function executeDeviceAction(
   const safe = async (fn: () => Promise<boolean>) => { try { return await fn(); } catch { return false; } };
   const offLight = () => safe(async () => !room.switchbot_light_device_id || (await lightTurnOff(sbCreds, room.switchbot_light_device_id)).ok);
   const offNest = () => safe(async () => !room.switchbot_nest_device_id || (await deviceTurnOff(sbCreds, room.switchbot_nest_device_id)).ok);
-  const offWafu = () => safe(async () => !room.switchbot_wafu_device_id || (await deviceTurnOff(sbCreds, room.switchbot_wafu_device_id)).ok);
+  /* 和風ライト (スマート電球) を消す。電球は今の状態を読めるので、本当に消えたか確かめて、まだ点いていればもう一度 (最大 3 回) */
+  const offWafu = () => safe(async () => {
+    const id = room.switchbot_wafu_device_id; if (!id) return true;
+    let sent = false;
+    for (let i = 0; i < 3; i++) {
+      const r = await deviceTurnOff(sbCreds, id); sent = sent || r.ok;
+      if (isIrDevice(id)) return r.ok;
+      await new Promise((ok) => setTimeout(ok, 1500));
+      const st = await deviceStatus(sbCreds, id);
+      if (st.power === "off") return true;
+      if (st.power == null) return r.ok; // 状態が読めない → 送れたかどうかで判断
+    }
+    return false; // 3 回送っても点いたまま
+  });
   const offGalaxy = () => safe(async () => {
     if (!room.switchbot_galaxy_device_id) return true;
     const r = await deviceTurnOff(sbCreds, room.switchbot_galaxy_device_id);

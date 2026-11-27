@@ -46,7 +46,7 @@ export interface CabinTrip {
   /** もう済んだこと (iPad とスマホで引き継ぐとき、同じ演出・案内を繰り返さない)。migration_cabin_done.sql */
   done?: CabinDone | null;
 }
-export interface CabinDone { poi?: string[]; holo?: boolean; air?: boolean; boost?: boolean; go?: boolean }
+export interface CabinDone { poi?: string[]; holo?: boolean; air?: boolean; boost?: boolean; go?: boolean; sl?: boolean }
 
 const SEASON: [RegExp, string, string, CabinRoom["fx"]][] = [
   [/spring|haru/, "春", "HARU", "petal"], [/summer|natsu|natu/, "夏", "NATSU", "firefly"], [/autumn|aki/, "秋", "AKI", "leaf"], [/winter|fuyu/, "冬", "FUYU", "snow"],

@@ -40,6 +40,8 @@ export interface AutoPlan {
 const LANGS: [string, string][] = [["zh", "中文"], ["en", "EN"], ["ja", "日本語"], ["ko", "한국어"]];
 
 /* ================= 送迎中 (GPS を送る・BOOST の音楽) ================= */
+/** 車内画面の声をこのスマホで流している最中か (お父さん向けの確認の声を重ねないため) */
+let cabVoiceOn = false;
 export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: string) => void, t: T, voiceMode?: string) {
   useEffect(() => { if (isVoiceMode(voiceMode)) voiceModeNow = voiceMode; }, [voiceMode]);
   const [trip, setTrip] = useState<CabinTrip | null>(initial);
@@ -50,12 +52,14 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const boardRef = useRef<(auto?: boolean) => Promise<void>>(async () => {});
   /** アストレアの確認の声 (英語) + 画面の字幕 (お父さんの言語) */
   const confirmSay = useCallback((key: string, room: string, msg: string) => {
-    toast(msg); try { void mRef.current.voiceOver(`/cabin/audio/room/${key}-${room}.mp3`, () => {}); } catch { /* 音が出せない */ }
+    toast(msg);
+    // 車内画面の声 (ASTRAEA・あいさつ) が流れている間は待ってから (声を重ねない。最大 20 秒)
+    void (async () => { for (let i = 0; i < 80 && cabVoiceOn; i++) await new Promise((r) => setTimeout(r, 250)); try { void mRef.current.voiceOver(`/cabin/audio/room/${key}-${room}.mp3`, () => {}); } catch { /* 音が出せない */ } })();
   }, [toast]);
   const autoOff = useCallback(async (a: AutoPlan) => {
     if (!a.off) return; const { roomId, resId, room, name } = a.off;
     for (let i = 0; i < 3; i++) {
-      const r = await driverAllOff(roomId, resId).catch(() => ({ ok: false }));
+      const r = await driverAllOff(roomId, resId, true).catch(() => ({ ok: false }));
       if (r.ok) { sfx.chord(); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
       if (i === 0) { sfx.error(); confirmSay("offFail", room, t("{r} が応答しません。もう一度送ります", { r: name })); }
       await new Promise((ok) => setTimeout(ok, 6000));
@@ -119,7 +123,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
         if (/(en-boost-on|dh\/boostIn)\.mp3$/.test(u)) { clearTimeout(gT); if (!mRef.current.inBoost()) boosting = mRef.current.boostIn(300); }
         else if (/(en-boost-off|dh\/boostOut)\.mp3$/.test(u)) { clearTimeout(gT); if (mRef.current.inBoost()) { boosting = false; mRef.current.boostOut(); } }
       },
-      onStart: () => mRef.current.duck(true), onEnd: () => mRef.current.duck(false), onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")),
+      onStart: () => { cabVoiceOn = true; mRef.current.duck(true); }, onEnd: () => { cabVoiceOn = false; mRef.current.duck(false); }, onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")),
       // iPhone が音を止めていた (電話・Siri・画面オフのあとなど)。この声は iPad が代わりに鳴らす。画面に触れれば戻る
       onBlocked: () => { if (Date.now() - blockedAt > 30000) { blockedAt = Date.now(); toast(t("🔇 スマホの音が止まっています。画面をタップすると ASTRAEA の声が戻ります（今は iPad が話します）")); } } });
     let blockedAt = 0;

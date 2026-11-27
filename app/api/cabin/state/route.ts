@@ -5,6 +5,7 @@ import { activeTrip, cabinRoomById, cabinTrackById, toCabinDevice } from "@/lib/
 import { cleanCmd } from "@/lib/cabinMusic";
 import { executeDeviceAction, logDevice } from "@/lib/deviceControl";
 import { boardTrip } from "@/lib/cabinRoomPrep";
+import { driveOffFallback } from "@/lib/driveOffFallback";
 import { aiHumorOn, arriveImageUrls, placePoints, boostSfxId, checkinQrUrl } from "@/lib/cabinData";
 import { checkinLinkFor } from "@/lib/craneNest";
 import { pendingInviteFor } from "@/lib/keepsake";
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
   }
   if (b.op === "end" && isId(b.trip)) {
     const { error } = await supabaseAdmin.from("cabin_trips").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", b.trip).eq("status", "active");
+    if (!error) await driveOffFallback(b.trip); // お見送り: 出発後の自動 OFF を見逃していたら、ここで
     return J(error ? { ok: false, error: error.message } : { ok: true });
   }
   // ゲストが iPad で「お部屋の明かりをつけて」(送迎中のお迎えだけ)
@@ -122,7 +124,7 @@ export async function POST(req: NextRequest) {
     if (!t || (t as any).status !== "active") return J({ ok: false, error: "NO_TRIP" });
     const cur: any = (t as any).done && typeof (t as any).done === "object" ? (t as any).done : {}, p: any = b.p && typeof b.p === "object" ? b.p : {};
     const next: any = { ...cur };
-    for (const k of ["holo", "air", "boost", "go"]) if (p[k] === true) next[k] = true;
+    for (const k of ["holo", "air", "boost", "go", "sl"]) if (p[k] === true) next[k] = true;
     if (Array.isArray(p.poi)) next.poi = [...new Set([...(Array.isArray(cur.poi) ? cur.poi : []), ...p.poi.filter((x: unknown) => typeof x === "string").slice(0, 30)])];
     const { error } = await supabaseAdmin.from("cabin_trips").update({ done: next }).eq("id", b.trip);
     return J(error ? { ok: false, error: error.message } : { ok: true });

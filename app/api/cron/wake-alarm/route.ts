@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
 
   const { data: due } = await supabaseAdmin
     .from("alarms")
-    .select("id, room_id")
+    .select("id, room_id, source")
     .eq("is_enabled", true)
     .is("triggered_at", null)
     .lte("fire_at", nowIso);
@@ -147,7 +147,8 @@ export async function GET(req: NextRequest) {
       ok = false;
     }
 
-    await logDevice({ room_id: alarm.room_id, action: "light_on", source: "cron", success: ok });
+    // 履歴に「光目覚まし」として残す (自動でセットされたもの / 手でセットしたもの)
+    await logDevice({ room_id: alarm.room_id, action: /^auto/.test(String((alarm as any).source ?? "")) ? "wake_auto" : "wake_manual", source: "cron", success: ok });
 
     if (ok) {
       fired++;

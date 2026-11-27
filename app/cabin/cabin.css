@@ -1280,3 +1280,27 @@
 /* 📱 スマホ (軽量): ぼかしは重いので切る。お父さんの画面で隠している間はアニメを止める */
 html.lite *,html.lite *::before,html.lite *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 html.bg *,html.bg *::before,html.bg *::after{animation-play-state:paused!important}
+
+/* 📱 スマホ (軽量): 地図の色は画像を読み込んだときに付けてあるので、CSS の色変えは BOOST の差の分だけ */
+html.lite .cab .mode-dark .leaflet-tile-pane,html.lite .cab .mode-photo .leaflet-tile-pane,html.lite .cab .dhmap .leaflet-tile-pane{filter:none}
+html.lite .cab .mode-dark.boost .leaflet-tile-pane{filter:hue-rotate(45deg) saturate(1.18)}
+html.lite .cab .mode-photo.boost .leaflet-tile-pane{filter:brightness(.67) saturate(1.3) contrast(1.1) hue-rotate(-25deg)}
+html.lite .cab .map.boost-charge .leaflet-tile-pane{filter:brightness(.65) saturate(.75)!important}
+html.lite .cab .leaflet-tile>canvas{display:block;width:100%;height:100%}
+/* 右側の「ASTRAEA · TELEMETRY」(cabinTelemetry.ts): 向き・現在地・速さ・日の入り */
+.cab .rec.tm{display:flex;flex-direction:column;gap:7px;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.cab .rec.tm .tmr{position:relative;display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:10px;background:linear-gradient(90deg,rgba(95,227,255,.07),rgba(95,227,255,.015));box-shadow:inset 0 0 0 1px rgba(95,227,255,.16);overflow:hidden}
+.cab .rec.tm .tmr:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(95,227,255,.10),transparent);transform:translateX(-100%);animation:tm-scan 6s linear infinite}
+.cab .rec.tm .tmr:nth-child(2):after{animation-delay:1.5s}.cab .rec.tm .tmr:nth-child(3):after{animation-delay:3s}.cab .rec.tm .tmr:nth-child(4):after{animation-delay:4.5s}
+@keyframes tm-scan{0%{transform:translateX(-100%)}40%,100%{transform:translateX(100%)}}
+.cab .rec.tm .tmr>span:last-child{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.cab .rec.tm small.k{font-size:9px;letter-spacing:.22em;color:#5fe3ff;opacity:.85}.cab .rec.tm small.k i{font-style:normal;letter-spacing:.04em;color:#8fb2d9;font-family:-apple-system,"Hiragino Sans","PingFang SC",sans-serif}
+.cab .rec.tm b{font-size:15px;font-weight:600;color:#e9f7ff;letter-spacing:.06em;text-shadow:0 0 12px rgba(95,227,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .rec.tm em{font-style:normal;font-size:10px;color:#8fb2d9;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab .rec.tm .tmc{width:42px;height:42px;flex:none}
+.cab .rec.tm .tmc circle{fill:none;stroke:rgba(95,227,255,.45);stroke-width:.8}.cab .rec.tm .tmc .r2{stroke-dasharray:2 2;stroke:rgba(95,227,255,.3)}
+.cab .rec.tm .tmc .tk line{stroke:rgba(95,227,255,.7);stroke-width:.8}.cab .rec.tm .tmc .n{font-size:5px;fill:#ffb347;text-anchor:middle;font-family:ui-monospace,monospace}
+.cab .rec.tm .tmc .nd{transition:transform 1s ease}.cab .rec.tm .tmc .nd path{fill:#5fe3ff;filter:drop-shadow(0 0 2px #5fe3ff)}
+.cab .rec.tm .tms{width:42px;height:30px;flex:none;border-bottom:1px solid rgba(95,227,255,.3)}.cab .rec.tm .tms polyline{fill:none;stroke:#7dffb2;stroke-width:1.4;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px #7dffb2)}
+.cab .rec.tm .ic{width:42px;flex:none;text-align:center;font-size:24px;color:#5fe3ff;text-shadow:0 0 10px rgba(95,227,255,.7)}.cab .rec.tm .ic.sun{color:#ffb347;text-shadow:0 0 12px rgba(255,179,71,.7)}
+html.lite .cab .rec.tm .tmr:after{animation:none;display:none}

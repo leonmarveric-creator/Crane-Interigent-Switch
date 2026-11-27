@@ -502,6 +502,11 @@ function HistoryTab({ logs, rooms, t, lang }: { logs: LogEntry[]; rooms: Room[];
     galaxy_on: t.galaxyOn, galaxy_off: t.galaxyOff, nest_on: t.nestOn, nest_off: t.nestOff, wafu_on: t.wafuOn, wafu_off: t.wafuOff,
     wafu_on_warm: t.wafuOn, wafu_warm: t.wafuWarm, wafu_brightness: t.wafuBrightness,
     wafu_temp: t.wafuTemp, wafu_color: t.wafuColor, welcome: t.welcomeScene, welcome_cozy: t.cozyScene, good_night: t.goodNightScene, away: t.checkoutOff,
+    ...({
+      ja: { wake_auto: "☀ 光目覚まし（自動セット）", wake_manual: "☀ 光目覚まし（手動セット）", wake_no_light: "☀ 光目覚まし（照明が未登録）", wafu_prewake: "☀ 光目覚まし・和風ライトを先に", wafu_wake_auto_off: "☀ 光目覚まし後の自動消灯", drive_off: "🚗 送迎で自動OFF（出発後）", ac_comfort: "🚗 送迎でエアコンON（乗車）" },
+      en: { wake_auto: "☀ Wake light (auto)", wake_manual: "☀ Wake light (manual)", wake_no_light: "☀ Wake light (no light set)", wafu_prewake: "☀ Wake · lamp pre-glow", wafu_wake_auto_off: "☀ Wake · auto off", drive_off: "🚗 Auto OFF after departure", ac_comfort: "🚗 AC ON at pickup" },
+      zh: { wake_auto: "☀ 光唤醒（自动设定）", wake_manual: "☀ 光唤醒（手动设定）", wake_no_light: "☀ 光唤醒（未登记灯）", wafu_prewake: "☀ 光唤醒·和风灯预亮", wafu_wake_auto_off: "☀ 光唤醒后自动关灯", drive_off: "🚗 接送出发后自动关闭", ac_comfort: "🚗 接送上车开空调" },
+    } as Record<string, Record<string, string>>)[lang] ?? {},
   };
   const srcLabel: Record<string, string> = { guest: t.srcGuest, admin: t.srcAdmin, cron: t.srcCron };
   const shown = useMemo(() => logs.filter((l) => filter === "all" || l.room_slug === filter), [logs, filter]);

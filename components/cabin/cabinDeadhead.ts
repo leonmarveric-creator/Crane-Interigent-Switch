@@ -7,6 +7,7 @@
  *   Leaflet は先に読み込んでおくこと (window.L)。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { TINT, tintTile } from "@/lib/cabinTint";
 import { SFX_MARK } from "@/lib/remoteVoice";
 import { DH_LINES, DH_IDLE, dhSpdFor, dhAudio, callsignOf } from "@/lib/cabinDeadheadLines";
 import { BRIDGE, CRANE_NEST, PLACES, dist, type GLang, type LL } from "@/lib/cabinGeo";
@@ -105,7 +106,11 @@ export function createDeadhead(c: DhCtx): Deadhead {
     if (map) return;
     map = L.map($("dhMap"), { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, keyboard: false }).setView(CRANE_NEST, 13); // 先に表示位置を決めておく (未設定のまま線や車を足すと描けない)
     // 地図は国土地理院 (淡色)。CSS で暗い青のホログラム風にして、少し奥へ傾ける (cabin.css の .dhmap)
-    L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+    const PALE = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png";
+    if ((window as any).__CAB_LITE) { // スマホ (軽量): 色は読み込んだときに 1 回だけ (見た目は同じ)
+      const T = L.GridLayer.extend({ createTile(c: any, done: any) { return tintTile(L.Util.template(PALE, c), TINT.dh, done); } });
+      new T({ maxZoom: 18, keepBuffer: 2 }).addTo(map);
+    } else L.tileLayer(PALE, { maxZoom: 18 }).addTo(map);
     L.polyline([CRANE_NEST, CRANE_NEST], { color: "#2f8fff", weight: 18, opacity: 0.22, className: "dhbg" }).addTo(map);
     dash = L.polyline([CRANE_NEST, CRANE_NEST], { color: "#5fe3ff", weight: 5, opacity: 0.9, dashArray: "2 14", lineCap: "round", className: "dhflow" }).addTo(map);
     done = L.polyline([CRANE_NEST], { color: "#eafaff", weight: 6, className: "dhdone2" }).addTo(map);
@@ -232,7 +237,6 @@ export function createDeadhead(c: DhCtx): Deadhead {
     const W = window as any;
     if (!jv || !onNow) { jcar?.stop(); jcar = null; return; }
     if (jcar) return;
-    if ((window as any).__CAB_LITE) return; // スマホは車の点の絵を出さない (重い)
     const go = () => { if (jv && onNow && !jcar && W.JVCAR) jcar = W.JVCAR.mount($("dhCar"), { w: 440, h: 340, sc: 88, speed: () => kmh }); };
     if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(jvCar, 600);
   }

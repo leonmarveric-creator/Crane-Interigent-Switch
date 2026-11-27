@@ -23,6 +23,7 @@ export interface AiState {
   kmh: number | null; ll: LL | null;
   arrived: boolean; offroute: boolean;
   boosting: boolean;               // 高速モードの演出中
+  prep?: boolean;                  // BOOST の準備〜起動の音まで (この間はほかのひと言を言わない)
   crossesBridge: boolean; hasIzumiPoi: boolean;
   wa?: boolean;                    // 和室 (春・夏・秋・冬) のお部屋か
   weather: { temp: number; code: number; days?: { code: number; max: number }[] } | null;
@@ -46,7 +47,7 @@ export interface AiCtx {
   holo: () => void;                // 地図の枠にホログラム (お父さんのスマホのボタン)
   airport: (c: string) => void;    // ✈ 空港案内 (比較 / 降りたあとの道順) を iPad に重ねる
 }
-export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出す (話し終わったら戻る) */ prep(): Promise<boolean>; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; closeMenu(): void; unlock(): void }
+export interface Ai { tick(): void; /** BOOST の準備のセリフを必ず出す (話し終わったら戻る) */ prep(): Promise<boolean>; event(e: "arrive" | "song" | "boostEnd"): void; reset(): void; preload(): void; urls(): string[]; command(cmd: { c: string; n: number } | null): void; busy(): boolean; /** お父さんの指示 (乗車時のお部屋の準備など) を話す順番待ち */ waiting(): boolean; /** お見送りの出発: 忘れ物チェックを今すぐ (話し終わったら true) */ forgot(): Promise<boolean>; closeMenu(): void; unlock(): void }
 
 const rainy = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 const JST = (ms: number) => new Date(ms + 9 * 3600e3);
@@ -62,7 +63,7 @@ export function createAi(c: AiCtx): Ai {
   let stopT = 0, stopSaid = false, shopSaid = false, offT = 0, lastBt: number | null = null;
   let spdLv = 0, spdN = 0, spdAt = 0, chatUsed = new Set<number>(), chatAt = 0, boostEndAt = 0;
 
-  function reset() { stopVoice(el); lastCmd = null; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; spdLv = 0; spdN = 0; spdAt = 0; chatUsed = new Set(); chatAt = 0; boostEndAt = 0; }
+  function reset() { stopVoice(el); lastCmd = null; cmdWait = 0; closeMenu(); done = new Set(); lastAt = 0; lastAny = 0; stopT = 0; stopSaid = false; shopSaid = false; offT = 0; lastBt = null; spdLv = 0; spdN = 0; spdAt = 0; chatUsed = new Set(); chatAt = 0; boostEndAt = 0; }
 
   /* ---------- 話す ---------- */
   async function say(id: AiId, opt: { force?: boolean; duck?: boolean; i?: number } = {}) {
@@ -72,6 +73,7 @@ export function createAi(c: AiCtx): Ai {
     if (!opt.force) {
       if (c.quiet() && id !== "tap" && id !== "tapmany") return false;
       if (c.voiceBusy() || (s.boosting && id !== "bridge" && id !== "bridgeIn" && !spd)) return false;
+      if (s.prep && id !== "bridge" && id !== "bridgeIn") return false; // 起動の効果音と重ねない
       if (!prio && !spd && now - lastAt < AI_GAP_MS) return false;
     }
     const i = opt.i ?? aiPick(id, last[id], Math.random(), c.humor()); if (i < 0) return false; last[id] = i;
@@ -275,26 +277,30 @@ export function createAi(c: AiCtx): Ai {
   }
 
   /* ---------- お父さんの指示 (スマホのボタン・声) ---------- */
-  let lastCmd: number | null = null; const lastC: Record<string, number> = {};
+  let lastCmd: number | null = null, cmdWait = 0; const lastC: Record<string, number> = {};
   function command(cmd: { c: string; n: number; auto?: boolean } | null) {
     if (!cmd || typeof cmd.n !== "number") return;
     if (lastCmd == null) { lastCmd = cmd.n; if (Date.now() - cmd.n > 20000) return; } // 前の送迎の指示は実行しない
     else if (cmd.n <= lastCmd) return;
     lastCmd = cmd.n;
-    if (cmd.c === "guide") { c.guide(); return; }
-    if (cmd.c === "qr") { c.conQr(); return; }
-    if (cmd.c === "holo") { c.holo(); return; }
-    if (cmd.c.startsWith("airport_")) { c.airport(cmd.c); return; }
+    // 画面を出す指示も、声・演出 (部屋紹介・Starlink など) が終わってから (演出を途中で切らない。最大 3 分待つ)
+    const whenFree = (f: () => void) => { const t0 = Date.now(); const g = () => { if ((speaking || c.voiceBusy()) && Date.now() - t0 < 180000) { setTimeout(g, 500); return; } f(); }; g(); };
+    if (cmd.c === "guide") { whenFree(() => c.guide()); return; }
+    if (cmd.c === "qr") { c.conQr(); return; } // QR は右下の枠 (演出のじゃまをしない) なので、すぐ
+    if (cmd.c === "holo") { whenFree(() => c.holo()); return; }
+    if (cmd.c.startsWith("airport_")) { whenFree(() => c.airport(cmd.c)); return; }
     if (cmd.c === "unknown") { const i = (lastC.unknown = ((lastC.unknown ?? -1) + 1) % UNKNOWN.length); void speak(captainAudio("unknown", i), UNKNOWN[i], { st: "TO: CAPTAIN", duck: false }); return; }
     const k = CAPTAIN.find((x) => x.id === cmd.c); if (!k) return;
     let i = Math.floor(Math.random() * k.v.length); if (k.v.length > 1 && i === lastC[k.id]) i = (i + 1) % k.v.length; lastC[k.id] = i;
     if (k.id === "checkin") setTimeout(() => c.checkin(), 700);
-    // 乗車時の自動準備 (auto) は、乗車のあいさつが終わるころ (約 20 秒後) に話す
-    const wait = cmd.auto ? 20000 : 0;
+    // 乗車時の自動準備 (auto) は、乗車のあいさつが終わってから話す (下の go が、ほかの声・ホログラムが終わるのを待つ)
+    const wait = cmd.auto ? 3000 : 0;
     // 乗車時の自動準備はエアコンだけ (明かりは着いてから) なので、iPad のお部屋の明かりは点けない
     if (k.id === "room" && !cmd.auto) setTimeout(() => c.roomLit(), 4000);
     // 話している途中なら、終わってから
-    const go = () => { if (speaking) { setTimeout(go, 500); return; } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
+    // ほかの声 (道案内・あいさつ)・部屋紹介ホログラムの途中なら、それが終わってから (声を重ねない。最大 2 分待つ)
+    const t0 = Date.now(); cmdWait++; let counted = true;
+    const go = () => { if (speaking || (c.voiceBusy() && Date.now() - t0 < 120000)) { setTimeout(go, 500); return; } if (counted) { counted = false; cmdWait = Math.max(0, cmdWait - 1); } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
     if (wait) setTimeout(go, wait); else go();
   }
 
@@ -335,5 +341,11 @@ export function createAi(c: AiCtx): Ai {
     if (speaking) { stopVoice(el); try { (el.onended as any)?.call(el, new Event("ended")); } catch { /* */ } for (let i = 0; i < 20 && speaking; i++) await new Promise((r) => setTimeout(r, 100)); }
     return say("bridge", { force: true, duck: false });
   }
-  return { tick, event, prep, reset, preload, urls, command, busy: () => speaking, closeMenu, unlock: () => unlockAudio(el, urls()[0]) };
+  async function forgot(): Promise<boolean> {
+    if (done.has("depart")) return false;
+    done.add("depart");
+    for (let i = 0; i < 60 && speaking; i++) await new Promise((r) => setTimeout(r, 250));
+    return say("forgot", { force: true });
+  }
+  return { tick, event, prep, reset, preload, urls, command, forgot, waiting: () => cmdWait > 0, busy: () => speaking, closeMenu, unlock: () => unlockAudio(el, urls()[0]) };
 }

@@ -27,6 +27,8 @@ import { playSafe, stopVoice, playFxUrl } from "@/lib/cabinAudio";
 import { createHolo } from "@/components/cabin/cabinHolo";
 import { AIR_LEAD_S, HOLO_AFTER_S, HOLO_AUDIO, HOLO_FINISH_S, HOLO_HUSH_S, HOLO_JS, HOLO_LEN_MS, holoRemainS, holoRoomOf, holoWindow } from "@/lib/cabinHolo";
 import { createAirport } from "./cabinAirport";
+import { createTelemetry } from "./cabinTelemetry";
+import { TINT, tintTile } from "@/lib/cabinTint";
 
 const TILES = {
   dark: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
@@ -107,6 +109,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     createTile(c: any, done: any) {
       const img = document.createElement("img"); img.alt = ""; img.setAttribute("role", "presentation");
       const url = this.getTileUrl(c);
+      // スマホ (軽量): 色を読み込んだときに 1 回だけ付ける (見た目は同じ。走行中の CSS の色変えをやめて軽く)
+      if ((window as any).__CAB_LITE) { const f = TINT[this.options.tint as "dark" | "photo"] ?? TINT.dark; const box = document.createElement("div"); void tget(url).then((b) => { const cv = tintTile(b ? URL.createObjectURL(b) : url, f, (e, el) => done(e, box)); box.appendChild(cv); }); return box; }
       void tget(url).then((b) => {
         img.onload = () => { if (b) URL.revokeObjectURL(img.src); done(null, img); };
         img.onerror = (e: any) => done(e, img);
@@ -120,7 +124,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   try { if (localStorage.getItem("cabMap") === "dark") mode = "dark"; } catch { /* ignore */ }
   const setMode = (m: "photo" | "dark") => {
     mode = m; if (base) MAP.removeLayer(base);
-    base = new CachedLayer(TILES[m], { maxZoom: 18, maxNativeZoom: 18, crossOrigin: true, keepBuffer: 4 }).addTo(MAP);
+    base = new CachedLayer(TILES[m], { maxZoom: 18, maxNativeZoom: 18, crossOrigin: true, keepBuffer: (window as any).__CAB_LITE ? 2 : 4, tint: m }).addTo(MAP);
     $("map").classList.toggle("mode-dark", m === "dark"); $("map").classList.toggle("mode-photo", m === "photo");
     $("mDark").classList.toggle("on", m === "dark"); $("mPhoto").classList.toggle("on", m === "photo");
     try { localStorage.setItem("cabMap", m); } catch { /* ignore */ }
@@ -167,6 +171,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     voiceN++;
     Q = Q.then(async () => {
       if (!trip) return; /* 送迎が終わったあとに残っていた声は流さない */
+      // ASTRAEA (AI) が話している途中なら、話し終わるまで待つ (声を重ねない。最大 15 秒)
+      for (let i = 0; i < 75 && ai.busy(); i++) await new Promise((r) => setTimeout(r, 200));
+      if (!trip) return;
       const rm = await viaPhone(AUDIO + k + ".mp3", "");
       if (!trip) return;
       await new Promise<void>((r) => { voice.muted = rm; voice.src = src(k); voice.onended = () => r(); voice.onerror = () => r(); playSafe(voice, () => ac(), () => r()); setTimeout(r, 15000); });
@@ -203,12 +210,15 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const p = (PLACES as any)[trip.placeKey];
     return p ? p.name[lang] : (trip.placeName || T.dest);
   };
+  /* ---------- 右側の枠: ASTRAEA · TELEMETRY (向き・現在地・速さ・日の入り・時刻)。cabinTelemetry.ts ---------- */
+  const tele = createTelemetry({ el: () => $("rec"), head: () => $("h-rec"), lang: () => lang, on: () => !!trip });
+  function cnGuide() { if (trip) tele.mount(); }
   function texts() {
     if (!trip) return;
     const O = trip.dir === "out";
     setText("etaL", O ? T.etaTo.replace("{p}", trip.placeKey === "other" ? T.dest : placeName()) : T.etaIn); setText("etaU", T.u);
-    setText("h-wx", T.wx); setText("h-rec", T.rec); if (cqOn || cqMiniOn) void cqRender();
-    $("rec").innerHTML = T.recs.map(([e, b, s]) => `<div><span class="e">${e}</span><span><b>${b}</b><small>${s}</small></span></div>`).join("");
+    setText("h-wx", T.wx); if (cqOn || cqMiniOn) void cqRender();
+    cnGuide();
     setText("rtChip", O ? `CRANE NEST → ${placeName()}` : `${placeName()} → CRANE NEST`);
     roomTexts();
     setText("arrT1", O ? placeName() : "CRANE NEST"); setText("arrT2", O ? "HAVE A SAFE TRIP" : "WELCOME HOME");
@@ -312,6 +322,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (!trip) return;
     const tNow = Date.now();
     if (kmh == null && lastFeed && tNow - lastFeed.t > 500) kmh = (dist(lastFeed.ll, ll) / ((tNow - lastFeed.t) / 1000)) * 3.6;
+    tele.feed(ll, kmh, bs.phase === "on" || (bridgePos(ll).lat < 150 && bridgePos(ll).t > 0 && bridgePos(ll).t < 1));
     lastFeed = { ll, t: tNow }; kmhNow = kmh; if (kmh != null && kmh > 5) vAvg = vAvg * 0.92 + Math.min(kmh, 90) * 0.08; // 最近の平均の速さ (ホログラムの開始を逆算する)
     const g = $("gpsT"); g.classList.toggle("phone", from === "phone"); (g.querySelector("span") as HTMLElement).textContent = from === "phone" ? "GPS · PHONE" : from === "demo" ? "GPS · DEMO" : "GPS · LIVE";
     moveCar(ll);
@@ -346,7 +357,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       hit.add(p.k);
       if (p.k === "bridge" && bs.phase !== "off") continue; // 高速モードが代わりに案内する
       markDone({ poi: [p.k] });
-      if (holo.on()) { poiLater.push(p.k); continue; } // ホログラムの途中なら、終わってから案内する (声を重ねない)
+      if (holo.on() || air.on()) { poiLater.push(p.k); continue; } // ホログラム・出発/到着の演出の途中なら、終わってから案内する (声を重ねない)
       chime(); cap(p.k); void say(`en-${p.k}`);
       const el = root.querySelector(`[data-poi="${p.k}"]`); el?.classList.add("hit");
     }
@@ -370,6 +381,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   /** お見送り: 到着のホログラムは走りながら始めて、着いたときにちょうど終わるように (残りの時間から逆算) */
   function airEarlyTick(rem: number) {
     if (!trip || airEarly || arrived || offroute || trip.dir !== "out" || trip.id.startsWith("demo") || !arriveNew() || air.on()) return;
+    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy()) return; // BOOST・ほかの声の途中は待つ (重ねない。間に合わなければ着いたときに出す)
     const s = outScene(); if (!s) return;
     // 残りの道のり: 到着地点を登録していれば、そこまで (直線 × 1.3 ≒ 道なり) ─ そこから 80 m で到着。無ければ道の終わりから 200 m で到着
     const ap = PP[trip.placeKey], left = ap && carLL ? Math.max(0, dist(carLL, ap) * 1.3 - 80) : Math.max(0, rem - 200);
@@ -378,8 +390,11 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
   function arrive() {
     if (!trip) return;
-    // ホログラムがもうすぐ終わるなら、最後まで見せてから到着の画面にする
-    if (holo.on() && Date.now() - holoAt > HOLO_LEN_MS - HOLO_FINISH_S * 1000) { if (!arrWait) { arrWait = true; setTimeout(() => { if (arrWait) { arrWait = false; holo.stop(); arrive(); } }, HOLO_FINISH_S * 1000 + 1500); } return; }
+    // 部屋紹介ホログラム・Starlink の途中なら、最後まで見せてから到着の画面にする (演出は途中で切らない。最大 70 秒)
+    if (holo.on() || (air.on() && slNext)) {
+      if (!arrWait) { arrWait = true; const t0 = Date.now(), iv = setInterval(() => { if (!arrWait) { clearInterval(iv); return; } if ((!holo.on() && !(air.on() && slNext)) || Date.now() - t0 > 70000) { clearInterval(iv); arrWait = false; holo.stop(); arrive(); } }, 500); }
+      return;
+    }
     arrWait = false; arrived = true; const id = trip.id; cqOff(); holo.stop(); // 着いたら QR は到着画面のボタンへ
     ($("etaM").firstChild as Text).textContent = "0"; setText("km", T.arrived);
     // お見送りで りんくう / 関空 に着いたら: 到着のホログラム演出 (お別れの言葉・最後のひとこと・詳しいナビと QR はその中で)
@@ -521,12 +536,14 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   const kmhStr = () => (kmhNow != null ? `${Math.round(kmhNow)} km/h` : "OK");
   /* 準備: スマホの曲をゆっくり止める (boost-prep は無音の合図) → 準備のセリフ → 続けて起動 (効果音)。
      起動の場所にまだ来ていなければ 20 秒だけ待つ (遅くなって起動しなかったら、スマホが自分で元の曲に戻す) */
-  let prepSt: 0 | 1 | 2 = 0, prepTok = 0, prepT: ReturnType<typeof setTimeout> | undefined, boostLive = false;
+  let boostAt = 0, boostEndAt = 0, prepSt: 0 | 1 | 2 = 0, prepTok = 0, prepT: ReturnType<typeof setTimeout> | undefined, boostLive = false;
   async function boostPrep() {
-    holo.stop(); const my = ++prepTok; prepSt = 1;
+    const my = ++prepTok; prepSt = 1;
     const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    yieldToBoost(); // BOOST が優先: 部屋紹介・Starlink の途中なら、いったん閉じて BOOST のあとで最初からもう一度
     sfx("boost-prep");
     await wait(2500); if (my !== prepTok) return;
+    for (let i = 0; i < 24 && voiceN > 0; i++) { await wait(250); if (my !== prepTok) return; } // 道案内の声の途中なら、話し終わってから (最大 6 秒)
     await ai.prep().catch(() => false); if (my !== prepTok) return;
     await wait(500); if (my !== prepTok) return;
     if (bs.phase === "on") { prepSt = 0; boostOn(); }
@@ -534,8 +551,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
   function boostOn() {
     if (done0.boost) return; // 前の担当がもう BOOST を出した (引き継ぎ)
+    yieldToBoost();
     markDone({ boost: true });
-    holo.stop(); const m = $("map"), h = $("bhud"); bMax = 0; boostLive = true;
+    holo.stop(); const m = $("map"), h = $("bhud"); bMax = 0; boostLive = true; boostAt = Date.now();
     hit.add("bridge");
     sfx("boost-sfx");
     setText("bmodeV", "NORMAL"); $("bmode").className = "bmode"; setText("bLbl", "CHARGE"); [0, 1, 2].forEach((i) => $("rg" + i).setAttribute("transform", "rotate(0)"));
@@ -562,7 +580,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     const n = performance.now(); if (n - bTrivT > 6000) { bTrivT = n; bTrivI++; const e = $("bTriv"); e.classList.remove("in"); void e.offsetWidth; e.textContent = T.bTriv[bTrivI % 3]; e.classList.add("in"); }
   }
   function boostOff() {
-    boostLive = false;
+    boostLive = false; boostEndAt = Date.now();
     timers.forEach(clearTimeout); timers = []; if (chg) chg.stop = true;
     const m = $("map"), h = $("bhud");
     sfx("boost-end"); ai.event("boostEnd");
@@ -640,10 +658,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let aiQuiet = false, aiHumor = false, startedAt = 0, npId: string | null = null;
   const arriveNew = () => { try { return localStorage.getItem("cabArrive") !== "old"; } catch { return true; } };
   let gInfo: { name: string | null; flight: string | null; pax: number | null } | null = null;
-  const air = createAirport({ host: () => stage, lang: () => lang, ac: () => ac(), sfx: (k) => sfx(k), duck: (sec) => { const id = trip?.id ?? airTrip; if (id && !id.startsWith("demo")) hooks.onCmd?.(id, "duck", sec); } });
+  const air = createAirport({ host: () => stage, lang: () => lang, ac: () => ac(), sfx: (k) => sfx(k), onClose: () => airClosed(), duck: (sec) => { const id = trip?.id ?? airTrip; if (id && !id.startsWith("demo")) hooks.onCmd?.(id, "duck", sec); } });
   let airTrip: string | null = null; // 回送中 (お迎え) の到着ホログラムは、エンジンの送迎の外で出すので、音楽を小さくする送迎 ID をここに
   const ai = createAi({
-    root, stage, ac, quiet: () => aiQuiet, humor: () => aiHumor, voiceBusy: () => voiceN > 0 || holo.on(),
+    root, stage, ac, quiet: () => aiQuiet, humor: () => aiHumor, voiceBusy: () => voiceN > 0 || holo.on() || air.on(),
     duck: (sec) => { if (trip && !trip.id.startsWith("demo") && !remote()) hooks.onCmd?.(trip.id, "duck", sec); },
     remote, send: (url, text) => viaPhone(url, text),
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
@@ -655,22 +673,65 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     state: () => ({
       tripId: trip?.id ?? null, dir: trip?.dir ?? "in", placeKey: trip?.placeKey ?? "", lang,
       started: startedAt, paceStart: rerouteBase || startedAt, total: R.total, d, toDest: carLL ? dist(carLL, dest) : R.total, baseMin, kmh: kmhNow, ll: carLL,
-      arrived, offroute, boosting: bs.phase === "on" || warpOn || prepSt > 0, // "done" (橋を渡り終えた直後) は話してよい
+      arrived, offroute, boosting: bs.phase === "on" || warpOn || prepSt > 0, prep: prepSt > 0 || (boostLive && Date.now() - boostAt < 9000), // "done" (橋を渡り終えた直後) は話してよい
       crossesBridge: pois.some((p) => p.k === "bridge"), hasIzumiPoi: pois.some((p) => p.k === "izumi"), weather: lastWx,
       wa: !!room && /[春夏秋冬]/.test(room.kanji),
     }),
   });
-  setInterval(() => { if (!guide.on() && !toilet.on() && !lock.on() && !holo.on() && !holoHush) ai.tick(); holoTick(); }, 1000);
+  setInterval(() => { slTick(); if (!guide.on() && !toilet.on() && !lock.on() && !holo.on() && !air.on() && !holoHush) ai.tick(); holoTick(); }, 1000);
 
   /* ---------- ホログラム (お迎えのとき・地図の枠の上に約 46 秒)。lib/cabinHolo.ts ----------
      声・効果音はほかの声と同じ道 (iPhone。来ていなければ iPad)。右側の天気・お部屋・QR はそのまま見える */
   let holoDone = false, holoQr = false, holoCmdN = 0, holoAt = 0, holoHush = false, arrWait = false; const poiLater: PoiKey[] = [];
   const holo = createHolo({ host: () => $("map"), say: (k) => void say(k), sfx: (k) => sfx(k), onEnd: () => {
     $("map").classList.remove("holo-on");
-    if (trip && trip.dir === "in" && !arrived && holoQr) { holoQr = false; setTimeout(() => { if (trip && !arrived) cqShow(); }, 2500); } // 部屋紹介のあとに QR
+    if (trip && trip.dir === "in" && !arrived && holoQr) { holoQr = false; setTimeout(() => { if (trip && !arrived) void slThenQr(); }, 2500); } // 部屋紹介のあとに Starlink → QR
     if (arrWait) { arrWait = false; setTimeout(() => arrive(), 600); return; } // 着いて待っていた → 到着の画面へ
-    if (!arrived) poiLater.splice(0).forEach((k, i) => setTimeout(() => { if (trip && !arrived) { chime(); cap(k); void say(`en-${k}`); } }, 800 + i * 400)); else poiLater.length = 0;
+    flushPoi();
   } });
+  function flushPoi() { if (!arrived) poiLater.splice(0).forEach((k, i) => setTimeout(() => { if (trip && !arrived && !holo.on() && !air.on()) { chime(); cap(k); void say(`en-${k}`); } }, 800 + i * 400)); else poiLater.length = 0; }
+  /* ---------- 🛰 Starlink の衛星リンク (お迎え: 部屋紹介が終わったあと → コンシェルジュ / Wi-Fi の QR)。1 回の送迎で 1 回。
+     着くまでに終わらないとき・BOOST (橋) が近いときは出さずに、すぐ QR */
+  const SL_LEN_S = 48;
+  let slDone = false, slPending = false, slNext: (() => void) | null = null;
+  function slOk() {
+    if (!trip || trip.dir !== "in" || arrived || slDone || air.on() || holo.on() || bs.phase === "on" || warpOn || prepSt > 0) return false;
+    if (holoRemainS(Math.max(0, remNow - 200), vAvg) < SL_LEN_S * 0.6) return false; // もう着く (着いたら最後まで見せてから到着の画面)
+    return bridgeClear(SL_LEN_S + 20);
+  }
+  /** 橋 (BOOST の準備の場所) に着くまでに、sec 秒の演出が終わるか。橋を渡り終えたあと・橋の無い道は true */
+  function bridgeClear(sec: number) {
+    const bp = pois.find((p) => p.k === "bridge");
+    if (!bp || hit.has("bridge") || bs.phase !== "off" || d >= bp.d) return bs.phase !== "on" && !warpOn && prepSt === 0 && Date.now() - boostEndAt > 15000; // "done" = 橋を渡り終えた (終わりの声・効果音のあと 15 秒あける)
+    return holoRemainS(Math.max(0, bp.d - 2500 - d), vAvg) > sec;
+  }
+  async function slThenQr() {
+    const id = trip?.id;
+    for (let i = 0; i < 80 && (voiceN > 0 || ai.busy() || ai.waiting()); i++) await new Promise((r) => setTimeout(r, 250)); // 声が終わってから (重ねない)
+    if (!trip || trip.id !== id || arrived) return;
+    if (slOk()) { slDone = true; markDone({ sl: true }); slNext = () => { if (trip && !arrived) cqShow(); }; air.starlink(); return; }
+    cqShow(); if (trip.dir === "in" && !slDone) slPending = true; // 今は橋が近い → QR を先に。Starlink は BOOST のあとで
+  }
+  /** BOOST が優先。部屋紹介・Starlink の途中なら閉じて、BOOST が終わってから最初から流し直す (演出は省かない) */
+  function yieldToBoost() {
+    if (holo.on()) { const q = holoQr; holoQr = false; holo.stop(); holoDone = false; if (q) { cqShow(); if (!slDone) slPending = true; } } // holoTick が BOOST のあと (15 秒あけて) にもう一度。QR は先に出しておき、Starlink は部屋紹介のあと
+    if (air.on() && slNext) { slNext = null; air.close(); slDone = false; slPending = true; } // slTick が BOOST のあとに
+  }
+  /** 後回しにした Starlink を、声・演出・BOOST が無いときに出す (1 秒ごと) */
+  function slTick() {
+    if (!slPending) return;
+    if (!trip || arrived || slDone) { slPending = false; return; }
+    if (voiceN > 0 || ai.busy() || ai.waiting() || holo.on() || air.on() || holoOverlay()) return;
+    if (!holoDone && holoRoomOf(room)) return; // 部屋紹介がまだ (BOOST のあとに流し直す) → そのあとで
+    if (!slOk()) return;
+    slPending = false; slDone = true; markDone({ sl: true }); slNext = () => {}; air.starlink();
+  }
+  /** 空港案内・出発/到着の演出・Starlink の枠を閉じたとき */
+  function airClosed() {
+    const f = slNext; slNext = null;
+    if (f) setTimeout(f, 1500);
+    if (!holo.on()) setTimeout(flushPoi, 2000);
+  }
   const holoOverlay = () => guide.on() || toilet.on() || lock.on() || $("ckp").classList.contains("on") || $("qrp").classList.contains("on") || $("arrive").classList.contains("on") || (stage.classList.contains("np-on") && stage.dataset.np === "C");
   function holoStart(_manual: boolean) {
     const rk = holoRoomOf(room);
@@ -686,11 +747,12 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function holoTick() {
     if (!trip || holoDone || holo.on() || trip.dir !== "in" || arrived || !holoRoomOf(room)) { holoHush = false; return; }
     const since = (Date.now() - startedAt) / 1000;
-    holoHush = since > HOLO_AFTER_S - 4 && since < HOLO_AFTER_S + 300;
+    holoHush = since > HOLO_AFTER_S - 4 && since < HOLO_AFTER_S + 20;
     if (since < HOLO_AFTER_S) return;
     const sec = holoRemainS(Math.max(0, remNow - 200), vAvg);
-    if (sec < HOLO_LEN_MS / 1000 + 75 || since > HOLO_AFTER_S + 300) { holoDone = true; holoHush = false; if (holoQr) { holoQr = false; cqShow(); } return; } // 間に合わない → 出さない
-    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy() || holoOverlay()) return; // 声や演出が終わるのを待つ
+    if (sec < 30) { holoDone = true; holoHush = false; if (holoQr) { holoQr = false; cqShow(); } return; } // もう着く → 出さない (着いたあとは到着の画面)
+    if (!bridgeClear(HOLO_LEN_MS / 1000 + 15)) { if (holoQr && since > HOLO_AFTER_S + 15) { holoQr = false; cqShow(); } return; } // 橋 (BOOST) の前に終わらない → BOOST のあとで。QR は先に出しておく
+    if (bs.phase === "on" || warpOn || prepSt > 0 || voiceN > 0 || ai.busy() || ai.waiting() || air.on() || holoOverlay()) return; // 声や演出 (乗車時のお部屋の準備のひと言も) が終わるのを待つ
     holoStart(false);
   }
 
@@ -793,11 +855,22 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   $("ckx").onclick = (e) => { e.stopPropagation(); hideCheckin(); };
   $("ckp").onclick = (e) => { e.stopPropagation(); if ((e.target as HTMLElement).id === "ckp") hideCheckin(); };
 
+  /* ---------- お見送りの出発: まず忘れ物チェック (まだ家の前で引き返せるうちに)、話し終わったら出発のホログラム (約 35 秒) → 地図 ---------- */
+  const DEP_SCENE: Record<string, "dep_t1" | "dep_t2" | "dep_r" | "dep_h"> = { kix: "dep_t1", kix2: "dep_t2", rinku: "dep_r", r833: "dep_r", hineno: "dep_h" };
+  async function depart(id: string, s: "dep_t1" | "dep_t2" | "dep_r" | "dep_h") {
+    await new Promise((r) => setTimeout(r, 1500));
+    if (trip?.id !== id) return;
+    await ai.forgot();
+    for (let i = 0; i < 40 && (voiceN > 0 || ai.busy()); i++) await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 700));
+    if (trip?.id !== id || arrived || air.on() || airEarly) return;
+    air.arrive({ s, name: gInfo?.name, pax: gInfo?.pax, room: room ? `${room.kanji} ${room.en}`.trim() : null, closeMs: 2500 });
+  }
   /* ---------- 送迎の開始・終了 ---------- */
   async function start(t: CabinTrip, r: CabinRoom | null) {
     if (trip?.id === t.id) { if (r && room?.id !== r.id) { room = r; roomTexts(); } return; }
     stop();
-    trip = t; room = r; lang = t.lang; T = CABIN_T[lang] ?? CABIN_T.en;
+    trip = t; room = r; lang = t.lang; T = CABIN_T[lang] ?? CABIN_T.en; tele.reset();
     arrived = false; d = 0; prevD = undefined; carLL = null; lastFeed = null; hit = new Set(); offroute = false; backN = 0; offT = 0; rerouteAt = 0; rerouteBase = 0; bs = { ...BOOST_INIT };
     const home = r?.home ?? CRANE_NEST, known = (PLACES as any)[t.placeKey] as { ll: LL } | undefined;
     const place: LL = known?.ll ?? t.placeLL ?? home;
@@ -826,7 +899,11 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     // 出発の演出
     // 引き継ぎ (iPad ⇄ スマホ): もう済んだ案内・あいさつ・演出は繰り返さない
     done0 = t.done ?? {}; (done0.poi ?? []).forEach((k) => hit.add(k as PoiKey));
-    if (done0.go) $("sweep").classList.add("on"); else { linkS(); void say(goKey); $("sweep").classList.add("on"); markDone({ go: true }); }
+    const depS = t.dir === "out" && arriveNew() ? DEP_SCENE[t.placeKey] : undefined;
+    if (done0.go) $("sweep").classList.add("on");
+    else if (depS) { linkS(); $("sweep").classList.add("on"); markDone({ go: true }); void depart(t.id, depS); } // お見送り: 忘れ物チェック → 出発のホログラム (出発のセリフはその中で)
+    else { linkS(); void say(goKey); $("sweep").classList.add("on"); markDone({ go: true }); }
+    slDone = !!done0.sl; slNext = null; slPending = false;
     cqOff(); holoQr = t.dir === "in" && !done0.holo && !!holoRoomOf(r); if (t.dir === "in" && !holoQr) T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと。部屋紹介があるときは、その終わったあと)
     T_(3000, rcarOn);
     holoDone = !!done0.holo; airEarly = !!done0.air; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
@@ -837,7 +914,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   let rcar: any = null;
   function rcarOn() {
     const W = window as any;
-    if (rcar || !trip || (window as any).__CAB_LITE) return; // スマホは出さない (重い)
+    if (rcar || !trip) return;
     $("rcar").classList.add("on");
     const go = () => { if (!rcar && trip && W.JVCAR) rcar = W.JVCAR.mount($("rcarC"), { w: 440, h: 300, sc: 80, lite: () => true, speed: () => kmhNow }); };
     if (W.JVCAR) go(); else if (!document.getElementById("jvcarJs")) { const sc = document.createElement("script"); sc.id = "jvcarJs"; sc.src = "/kops/jvcar.js?v=1"; sc.onload = go; document.head.appendChild(sc); } else setTimeout(go, 800);
@@ -951,7 +1028,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     aiCommand: (cmd) => {
       if (!trip) return;
       // お父さんの新しい指示 (ホログラム以外) が来たら、ホログラムをやめてそちらを優先 (同じ指示は何度も届くので、新しいものだけ)
-      if (cmd && cmd.n > holoCmdN) { holoCmdN = cmd.n; if (cmd.c !== "holo" && holo.on() && Date.now() - cmd.n < 20000) holo.stop(); }
+      if (cmd && cmd.n > holoCmdN) holoCmdN = cmd.n; // 演出の途中でも止めない (指示は演出が終わってから: cabinAi の command)
       ai.command(cmd);
     },
     arrived: () => !!trip && arrived,

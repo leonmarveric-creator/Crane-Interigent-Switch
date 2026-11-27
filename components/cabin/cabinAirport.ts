@@ -15,6 +15,8 @@ export interface AirportCtx {
   ac: () => AudioContext | null;          // iPad アプリの AudioContext (タップで解錠済み)
   duck: (sec: number) => void;            // スマホの音楽を小さくする (秒)
   sfx: (k: string) => void;
+  /** 枠を閉じたとき (あとの案内・QR を続ける) */
+  onClose?: () => void;
 }
 
 export function createAirport(c: AirportCtx) {
@@ -32,6 +34,7 @@ export function createAirport(c: AirportCtx) {
     clearInterval(duckT); clearTimeout(closeT); clearTimeout(maxT); duckT = closeT = maxT = 0;
     el.classList.remove("on"); const f = fr; setTimeout(() => { if (f && !el?.classList.contains("on")) f.src = "about:blank"; }, 500);
     c.duck(1); // すぐ音楽を戻す (1 秒後)
+    try { c.onClose?.(); } catch { /* */ }
   }
   function open(cmd: string) {
     mount(); if (!el || !fr) return;
@@ -55,21 +58,32 @@ export function createAirport(c: AirportCtx) {
     clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
   }
   /** 到着のホログラム演出 (お見送り: 着いたとき自動 / お迎え: 迎え先に近づいたとき)。最後に「詳しいナビ」ボタンと QR、お見送りはアストレアの最後のひとこと */
-  function arrive(o: { s: "t1" | "t2" | "r1" | "r2" | "hin" | "pick" | "pick2" | "pickh" | "pickr1" | "pickr2"; name?: string | null; flight?: string | null; room?: string | null; pax?: number | null; lang?: GLang }) {
+  function arrive(o: { s: "t1" | "t2" | "r1" | "r2" | "hin" | "pick" | "pick2" | "pickh" | "pickr1" | "pickr2" | "dep_t1" | "dep_t2" | "dep_r" | "dep_h"; name?: string | null; flight?: string | null; room?: string | null; pax?: number | null; lang?: GLang; /** 終わってから閉じるまで (ms)。出発の演出はすぐ閉じて地図へ */ closeMs?: number }) {
     mount(); if (!el || !fr) return;
     const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
     const l = o.lang ?? c.lang(), gl = GUIDE_L[l] ?? "en";
     const q = new URLSearchParams({ s: o.s, l }); const hq = (window as any).__CAB_HQ as string | undefined; if (hq) { q.set("q", hq); if (hq !== "std") q.set("lt", "1"); } if (o.name) q.set("nm", o.name); if (o.flight) q.set("fl", o.flight); if (o.room) q.set("rm", o.room); if (o.pax) q.set("np", String(o.pax));
-    const guestUrl = /^pick/.test(o.s) || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い
-    w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 60000); };
+    const guestUrl = /^(pick|dep_)/.test(o.s) || o.s === "hin" ? null : `${location.origin}/airport/guide.html#${gl}`; // 日根野駅は詳しいナビがまだ無い (出発の演出は QR なし)
+    w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, o.closeMs ?? 60000); };
     fr.onload = async () => {
       try { if (imgs.length) (fr?.contentWindow as any)?.__setImgs?.(imgs); } catch { /* ignore */ }
       if (!guestUrl) return;
       try { const svg = await QRCode.toString(guestUrl, { type: "svg", errorCorrectionLevel: "M", margin: 2, color: { dark: "#0a1426", light: "#ffffff" } }); (fr?.contentWindow as any)?.__setQr?.(svg); } catch { /* ignore */ }
     };
-    fr.src = `/cabin/air/${lite() ? "arrive" : "arrive-full"}.html?${q}`; // /cabin/ の下 = 「このスマホに保存」で保存される el.classList.add("on");
+    fr.src = `/cabin/air/${lite() ? "arrive" : "arrive-full"}.html?${q}`; el.classList.add("on"); // /cabin/ の下 = 「このスマホに保存」で保存される
     clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
     clearTimeout(maxT); maxT = window.setTimeout(close, 6 * 60 * 1000);
   }
-  return { open, arrive, close, setImgs: (u: string[]) => { imgs = u.slice(0, 30); }, on: () => !!el?.classList.contains("on") };
+  /** 🛰 Starlink の衛星リンク (お迎え: 部屋紹介のあと → Wi-Fi の QR へ)。public/cabin/air/starlink.html */
+  function starlink() {
+    mount(); if (!el || !fr) return;
+    const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
+    const hq = (window as any).__CAB_HQ as string | undefined;
+    w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 1200); };
+    fr.onload = null;
+    fr.src = `/cabin/air/starlink.html?l=${c.lang()}${hq ? `&q=${hq}` : ""}`; el.classList.add("on");
+    clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
+    clearTimeout(maxT); maxT = window.setTimeout(close, 90 * 1000);
+  }
+  return { open, arrive, starlink, close, setImgs: (u: string[]) => { imgs = u.slice(0, 30); }, on: () => !!el?.classList.contains("on") };
 }
