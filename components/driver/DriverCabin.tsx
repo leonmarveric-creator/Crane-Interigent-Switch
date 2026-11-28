@@ -23,6 +23,7 @@ import { HOLO_Q_KEY, isHoloQ, type HoloQ } from "@/lib/cabinHolo";
 import { VOICE_MODES, isVoiceMode, voiceClear, type VoiceMode } from "@/lib/cabinVoice";
 import { onVoiceCache, syncVoiceCache, voiceCacheState, type VoiceCacheState } from "@/lib/driverVoiceCache";
 import { startRemoteVoice, unlockRemoteVoice } from "@/lib/remoteVoice";
+import { playbackSession } from "@/lib/iosAudio";
 import { rtJoin, rtJoinMsg, rtKick, rtSend, CABIN_CH } from "@/lib/rtKick";
 import type { Music } from "@/components/driver/DriverMusic";
 import { CAPTAIN, matchCaptain, type CaptainCmdId } from "@/lib/cabinAiTalk";
@@ -45,6 +46,9 @@ let cabVoiceOn = false;
 export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: string) => void, t: T, voiceMode?: string) {
   useEffect(() => { if (isVoiceMode(voiceMode)) voiceModeNow = voiceMode; }, [voiceMode]);
   const [trip, setTrip] = useState<CabinTrip | null>(initial);
+  /* 🔊 音が止まっている: 送迎の途中でページが開き直された (iPhone が画面を落として再起動した・開き直した) ときや、iPhone が音を止めたとき。
+     iPhone は指で押さないと音を出せないので、大きな「タップで音を出す」ボタンを出す (スマホだけのときは車内画面の上に) */
+  const [soundOff, setSoundOff] = useState<boolean>(!!initial);
   const [sending, setSending] = useState<"" | "ok" | "ng">("");
   const mRef = useRef(music); mRef.current = music;
   /* ---------- ボタンひとつの送迎 (自動の部屋オフ・自動乗車・アストレアの確認) ---------- */
@@ -125,7 +129,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
       },
       onStart: () => { cabVoiceOn = true; mRef.current.duck(true); }, onEnd: () => { cabVoiceOn = false; mRef.current.duck(false); }, onSetup: () => toast(t("声をスマホから流すには、Supabase の SQL（migration_cabin_voice.sql）を実行してください")),
       // iPhone が音を止めていた (電話・Siri・画面オフのあとなど)。この声は iPad が代わりに鳴らす。画面に触れれば戻る
-      onBlocked: () => { if (Date.now() - blockedAt > 30000) { blockedAt = Date.now(); toast(t("🔇 スマホの音が止まっています。画面をタップすると ASTRAEA の声が戻ります（今は iPad が話します）")); } } });
+      onBlocked: () => { setSoundOff(true); if (Date.now() - blockedAt > 30000) { blockedAt = Date.now(); toast(t("🔇 スマホの音が止まっています。画面をタップすると ASTRAEA の声が戻ります（今は iPad が話します）")); } } });
     let blockedAt = 0;
     // 画面のどこかに触れたら音を戻す (iPhone は指で触れたときしか音を再開できない)
     const reUnlock = () => { unlockRemoteVoice(); try { mRef.current.prime(); } catch { /* */ } };
@@ -220,7 +224,15 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   boardRef.current = board;
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
-  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide, mode, setMode, mus: () => mRef.current };
+  const restoreSound = useCallback(() => {
+    playbackSession(); unlockRemoteVoice();
+    const m = mRef.current; try { m.prime(); } catch { /* */ }
+    const tr = tripRef2.current;
+    // 音楽が止まっていれば、その送迎の曲をもう一度 (曲の場所は最初から)
+    try { if (tr && !m.playing && !m.inBoost()) { const l = (["zh", "en", "ja", "ko"].includes(tr.lang) ? tr.lang : "en") as "zh" | "en" | "ja" | "ko"; m.startWith(tr.dir, l); } } catch { /* */ }
+    setSoundOff(false);
+  }, []);
+  return { trip, sending, start, end, duck, board, prep, stopPrep, closePrep: () => setPrep(null), ipadOn, phoneEng, phoneHide, setPhoneHide, mode, setMode, mus: () => mRef.current, soundOff: soundOff && !!trip, restoreSound };
 }
 export type Cabin = ReturnType<typeof useCabin>;
 
@@ -469,6 +481,7 @@ function CabinBarIn({ tr, dev, pn, cab, t, ui, humor0 }: { tr: CabinTrip; dev: s
       <button onClick={() => { if (confirm(t("送迎を終わりにしますか？（iPad は待機画面に戻ります）"))) void cab.end(); }}>■ {t("終了")}</button>
       {air && <AirportCard tr={tr} t={t} toast={toastQ} onClose={() => setAir(false)} />}
       {cab.phoneEng && <PhoneCabin hidden={cab.phoneHide} cab={cab} t={t} />}
+      {cab.soundOff && <SoundBtn cab={cab} t={t} />}
       {PP_KEYS.includes(tr.placeKey) && <button className="qbtn" title={t("ここを到着地点にする")} onClick={() => void setHere(tr.placeKey)}>📍<small>{t("ここ")}</small></button>}
       {cab.prep && <PrepNote p={cab.prep} cab={cab} t={t} />}
       {qMsg ? <em className="qmsg" onClick={() => toastQ("")}>{qMsg}</em> : null}
@@ -819,6 +832,13 @@ export function useCabinSheet() {
 /* ================= 📱 スマホの車内画面 (iPad がつながっていないとき) =================
    iPad と同じ車内画面 (/cabin?phone=1) を、この画面の中で動かす。声・効果音は今までどおりこのスマホの音楽と同じ道 (CarPlay) で流れる。
    隠しても動き続ける (観光案内・BOOST・ホログラムの判断はこちらが続ける) */
+/** 🔊 タップで音を出す (画面のいちばん上。スマホだけのときは車内画面の上にも出る) */
+function SoundBtn({ cab, t }: { cab: Cabin; t: T }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHost(document.body); }, []);
+  if (!host) return null;
+  return createPortal(<button className="sndOn" onClick={() => { sfx.tick(); cab.restoreSound(); }}><i>🔊</i><span>{t("タップで音を出す")}<small>{t("音楽・ASTRAEA の声が止まっています")}</small></span></button>, host);
+}
 function PhoneCabin({ hidden, cab, t }: { hidden: boolean; cab: Cabin; t: T }) {
   // 画面いっぱい (iPhone の縦・横)。親の枠 (cabbar) の中だと小さくなるので、body の直下に出す
   const [host, setHost] = useState<HTMLElement | null>(null);

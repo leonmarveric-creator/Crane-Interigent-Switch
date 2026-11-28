@@ -12,6 +12,7 @@ import { parseLrc, toLrc, lyricIndex, decodeLrcBytes, type LrcLine } from "@/lib
 import { sfx, vib } from "@/lib/driverSfx";
 import { driverAddTrack, driverDeleteTrack, driverReorderTracks, driverTrackUploadUrl, driverUpdateTrack, driverCoverUploadUrl, driverSetCover } from "@/app/driver/actions";
 import { compressCover, mp3Cover } from "@/lib/driverCover";
+import { playbackSession } from "@/lib/iosAudio";
 
 export type MLang = "ja" | "en" | "zh" | "ko";
 export const MLANGS: Record<MLang, string> = { ja: "日本語", en: "English", zh: "中文", ko: "한국어" };
@@ -96,6 +97,7 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
   };
   /** タップの中で呼ぶ: Web Audio をつなぎ (1 回だけ)、2 つの audio 要素を後から鳴らせるようにしておく (iPhone 用) */
   const prime = () => {
+    playbackSession();
     try {
       if (!graph.current) {
         const C = window.AudioContext || (window as any).webkitAudioContext;
@@ -241,7 +243,13 @@ export function useDriverMusic(initial: DriverTrack[], t: T, toast: (s: string) 
       if (boost.current) { dropBoost(); const tr = list[i] ?? null; lastId.current = tr?.id ?? null; setCur((c) => ({ ...c, i })); void load(tr, true); return; }
       setCur((c) => ({ ...c, i })); if (!playing) setTimeout(() => api.play(), 50); },
     setPlaylist(p: "in" | "out", l: MLang, play = false) { if (play) prime(); dropBoost(); setQueue([]); lastId.current = null; setCur({ p, l, i: 0 }); if (play) setTimeout(() => { route(); el().play().catch(() => {}); }, 120); },
-    startWith(p: "in" | "out", l: MLang) { dropBoost(); setQueue([]); lastId.current = null; const L = tracks.filter((x) => x.purpose === p && x.lang === l); setCur({ p, l, i: 0 }); if (L.length) { const tr = L.sort((a, b) => a.sort - b.sort)[0]; lastId.current = tr.id; void load(tr, true); } },
+    startWith(p: "in" | "out", l: MLang) {
+      playbackSession();
+      // その言語の曲が無ければ: 英語 → ほかの言語の同じ用途の曲。無音で出発しないように
+      const has = (pp: string, ll?: string) => tracks.some((x) => x.purpose === pp && (!ll || x.lang === ll));
+      if (!has(p, l)) { const alt = has(p, "en") ? "en" : (tracks.find((x) => x.purpose === p)?.lang as MLang | undefined); if (alt) l = alt; }
+      dropBoost(); setQueue([]); lastId.current = null; const L = tracks.filter((x) => x.purpose === p && x.lang === l);
+      setCur({ p, l, i: 0 }); if (L.length) { const tr = L.sort((a, b) => a.sort - b.sort)[0]; lastId.current = tr.id; void load(tr, true); } },
     /** アンドロイドの声の間は音楽を 20% に (声が終わったらゆっくり戻す) */
     /** タップの中で呼ぶ (あとで自動で流すときのため) */
     prime,

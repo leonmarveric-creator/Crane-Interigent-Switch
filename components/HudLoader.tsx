@@ -5,6 +5,10 @@
  *   高精細アークリアクター + 充電ゲージ (%) + 起動ログのタイピング +
  *   六角形グリッド / レーダースイープ / グリッチ帯 / HUD コーナーの数値。
  *   重い処理はなく、SVG と CSS アニメが中心。
+ *   ローディングの演出が重いと、その裏で読み込んでいるページの準備 (スマホの処理) が遅れるので:
+ *   - % の更新は 1 秒に 8 回まで (前は毎コマ = 1 秒 60 回、画面全体を描き直していた)
+ *   - ぼかし (blur 120px) の光は、ぼかしを使わない丸いグラデーションに (見た目は同じ・とても軽い)
+ *   - 古いスマホ・「動きを減らす」の設定では、回る・流れる動きを止めて文字も一度に出す
  */
 import { useEffect, useState } from "react";
 import ArcReactorX from "@/components/tech/ArcReactorX";
@@ -26,40 +30,39 @@ export default function HudLoader({ label = "LOADING SYSTEMS" }: { label?: strin
   const [p, setP] = useState(0);
   const [lines, setLines] = useState(0);
   const [typed, setTyped] = useState("");
+  const [lite, setLite] = useState(false);
   useEffect(() => {
+    const n: any = typeof navigator !== "undefined" ? navigator : {};
+    const low = (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || (n.deviceMemory && n.deviceMemory <= 2) || matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    setLite(!!low);
     const t0 = performance.now();
-    let raf = 0;
-    const loop = (now: number) => {
-      const s = (now - t0) / 1000;
-      setP(1 - Math.exp(-s * 1.1));
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const id = setInterval(() => setP(1 - Math.exp(-((performance.now() - t0) / 1000) * 1.1)), low ? 250 : 125);
+    return () => clearInterval(id);
   }, []);
   // 起動ログ: 1 行ずつタイピング
   useEffect(() => {
+    if (lite) { setLines(LOG.length); return; } // 古いスマホ: 一度に出す
     if (lines >= LOG.length) return;
     const full = LOG[lines];
     if (typed.length < full.length) {
-      const id = setTimeout(() => setTyped(full.slice(0, typed.length + 2)), 18);
+      const id = setTimeout(() => setTyped(full.slice(0, typed.length + 3)), 40);
       return () => clearTimeout(id);
     }
     const id = setTimeout(() => { setLines((n) => n + 1); setTyped(""); }, 160);
     return () => clearTimeout(id);
-  }, [lines, typed]);
+  }, [lines, typed, lite]);
 
   const pct = Math.min(99, Math.floor(p * 100));
 
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#03050b] text-white">
+    <main className={`relative flex${lite ? " hud-lite" : ""} min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#03050b] text-white`}>
       {/* 背景: 六角形グリッド + オーロラ + 走査線 */}
       <div className="pointer-events-none absolute inset-0">
         <div className="anim-hexdrift absolute inset-0 opacity-[0.10]" style={{ backgroundImage: HEX_BG }} />
-        <div className="anim-drift absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/20 blur-[120px]" />
-        <div className="anim-drift2 absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-fuchsia-500/15 blur-[120px]" />
+        <div className="anim-drift absolute -top-48 left-1/2 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full" style={{ background: "radial-gradient(circle, rgba(6,182,212,.22) 0%, rgba(6,182,212,.08) 35%, transparent 65%)" }} />
+        <div className="anim-drift2 absolute bottom-[-12rem] right-[-10rem] h-[32rem] w-[32rem] rounded-full" style={{ background: "radial-gradient(circle, rgba(217,70,239,.16) 0%, rgba(217,70,239,.05) 35%, transparent 65%)" }} />
         <div className="anim-scan absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-cyan-300/15 to-transparent" />
-        <div className="anim-glitchband absolute inset-x-0 top-0 h-1.5 bg-cyan-200/60 mix-blend-screen" />
+        <div className="anim-glitchband absolute inset-x-0 top-0 h-1.5 bg-cyan-200/40" />
         <div className="absolute inset-0 [background:radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.75)_100%)]" />
       </div>
 

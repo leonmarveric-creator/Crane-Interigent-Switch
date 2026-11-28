@@ -24,6 +24,7 @@ import type { WakeState } from "@/lib/wakeAutoLogic";
 import type { WakeLightMode } from "@/lib/wakePrewake";
 import { navTick, setMuted as sfxSetMuted, speak } from "@/lib/sfx";
 import AddToHomePrompt from "@/components/AddToHomePrompt";
+import GuestExtras, { type GuestWc } from "@/components/GuestExtras";
 import { wafuSound, wafuDone } from "@/lib/wafuSfx";
 
 export interface LiteProps {
@@ -39,6 +40,9 @@ export interface LiteProps {
   onSwitchMode?: () => void; // ハイテクUIへ
   guestName?: string | null;
   entranceHref?: string | null;
+  myLink?: string | null;
+  welcome?: GuestWc | null;
+  season?: string | null;
   wake?: WakeState | null;
 }
 
@@ -281,7 +285,7 @@ function WakeLite({ roomSlug, admin, t, hasWafu }: { roomSlug: string; admin?: b
 
 export default function LiteControlPanel({
   roomSlug, roomName, checkOut, initialLang, admin, wake = null,
-  posterUrl, hasGalaxy, hasNest, hasWafu, onSwitchMode, guestName, entranceHref,
+  posterUrl, hasGalaxy, hasNest, hasWafu, onSwitchMode, guestName, entranceHref, myLink, welcome, season,
 }: LiteProps) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = T[lang];
@@ -381,6 +385,7 @@ export default function LiteControlPanel({
             <EntranceKeyButton href={entranceHref} lang={lang} variant="wafu" />
           </div>
         )}
+        <GuestExtras variant="wafu" lang={lang} link={myLink} wc={welcome} season={season} admin={admin} className="mb-3" />
         {!admin && (
           <div className="mb-4">
             <AddToHomePrompt lang={lang} roomName={roomName} variant="wafu" />

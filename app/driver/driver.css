@@ -800,3 +800,7 @@ body.pcab-on .drv{visibility:hidden}
 .drv .hqp{display:flex;flex-direction:column;gap:6px;font-size:13px}.drv .hqp>div{display:flex;gap:6px}
 .drv .hqp button{flex:1;min-height:42px;border-radius:10px;border:1px solid #2a3a58;background:#13223a;color:#cfe3ff;font-size:14px}.drv .hqp button.on{background:#8fe6c8;color:#032;font-weight:700;border-color:#8fe6c8}
 .drv .hqp small{font-size:11px;color:#8aa3c0}
+/* 🔊 タップで音を出す (送迎の途中でページが開き直されたとき・iPhone が音を止めたとき)。車内画面 (pcabF) の上 */
+.sndOn{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);z-index:2147483001;display:flex;align-items:center;gap:12px;padding:14px 22px;border:0;border-radius:18px;background:linear-gradient(135deg,#ffcf6b,#ff8a3d);color:#1a0d00;font:800 18px/1.2 -apple-system,"Hiragino Sans",sans-serif;box-shadow:0 10px 40px rgba(255,140,60,.55),0 0 0 3px rgba(255,255,255,.25);animation:sndOn 1.6s ease-in-out infinite}
+.sndOn i{font-style:normal;font-size:28px}.sndOn span{display:flex;flex-direction:column;text-align:left}.sndOn small{font-weight:600;font-size:12px;opacity:.8;margin-top:3px}
+@keyframes sndOn{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.04)}}

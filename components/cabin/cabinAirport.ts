@@ -85,5 +85,17 @@ export function createAirport(c: AirportCtx) {
     clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
     clearTimeout(maxT); maxT = window.setTimeout(close, 90 * 1000);
   }
-  return { open, arrive, starlink, close, setImgs: (u: string[]) => { imgs = u.slice(0, 30); }, on: () => !!el?.classList.contains("on") };
+  /** 🌏 WELCOME, ○○ FAMILY (お迎え: 車の中でパスポート登録が済んだら)。public/cabin/air/welcome.html */
+  function welcome(o: { name: string | null; cc: string | null; pax: number }) {
+    mount(); if (!el || !fr) return;
+    const w = window as any; w.__cabAC = c.ac(); try { w.__cabAC?.resume?.(); } catch { /* ignore */ }
+    const hq = (window as any).__CAB_HQ as string | undefined;
+    const q = new URLSearchParams({ l: c.lang() }); if (o.name) q.set("nm", o.name); if (o.cc) q.set("cc", o.cc); if (o.pax) q.set("np", String(o.pax)); if (hq) q.set("q", hq);
+    w.__cabAirDone = () => { clearTimeout(closeT); closeT = window.setTimeout(close, 1200); };
+    fr.onload = null;
+    fr.src = `/cabin/air/welcome.html?${q}`; el.classList.add("on");
+    clearInterval(duckT); c.duck(30); duckT = window.setInterval(() => c.duck(30), 25000);
+    clearTimeout(maxT); maxT = window.setTimeout(close, 90 * 1000);
+  }
+  return { open, arrive, starlink, welcome, close, setImgs: (u: string[]) => { imgs = u.slice(0, 30); }, on: () => !!el?.classList.contains("on") };
 }

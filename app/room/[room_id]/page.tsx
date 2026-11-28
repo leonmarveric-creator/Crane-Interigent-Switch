@@ -13,6 +13,11 @@ import { getWakeState } from "@/lib/wakeAuto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBootVoice } from "@/lib/bootVoice";
 import { passportNameFor } from "@/lib/passportName";
+import { guideKeyFor } from "@/lib/nfcGate";
+import { loadCraneNestDrops } from "@/lib/craneNest";
+import { toCountryCode } from "@/lib/countryCode";
+import { toCabinRoom } from "@/lib/cabinData";
+import { seasonOf } from "@/lib/roomSeason";
 
 export const dynamic = "force-dynamic"; // 常に現在時刻で再検証
 
@@ -92,6 +97,17 @@ export default async function RoomPage({
   // 早朝便の自動光目覚まし (チェックアウトが近い予約だけ送迎予約を見る)
   const wake = await getWakeState(matched.id, stays.room).catch(() => null);
 
+  // あなた専用のコンシェルジュのリンク (チェックアウト + 2 日まで 4 桁なしで開ける) と、ウェルカム映像の名前・国 (パスポート登録から)
+  const coAt = (matched as any).late_checkout_at || matched.check_out;
+  const myLink = `/g/${encodeURIComponent(params.room_id)}?k=${encodeURIComponent(guideKeyFor({ rid: matched.id, roomSlug: params.room_id, checkOut: coAt }))}`;
+  let welcome: { nm: string; cc: string | null; np: number } | null = null;
+  try {
+    const drops = await loadCraneNestDrops([{ id: matched.id, roomKanji: toCabinRoom(stays.room as any).kanji, checkOut: coAt, token: (nameRow as any)?.guest_token ?? null }]);
+    const d = drops[matched.id];
+    if (d?.names?.length) welcome = { nm: String(d.names[0]).slice(0, 60), cc: toCountryCode(d.nationality ?? null), np: Math.max(Number(d.pax) || 0, d.names.length) };
+  } catch { /* Crane Nest のシステムに繋がらなくても画面は出す */ }
+  if (!welcome && guestName) welcome = { nm: String(guestName).slice(0, 60), cc: null, np: 1 };
+
   return (
     <>
     <RoomModeSwitch
@@ -111,6 +127,9 @@ export default async function RoomPage({
       hasNest={!!stays.room.switchbot_nest_device_id}
       hasWafu={!!stays.room.switchbot_wafu_device_id}
       bootVoice={bootVoice}
+      myLink={myLink}
+      welcome={welcome}
+      season={seasonOf(stays.room.display_name)}
     />
     <ConciergeLink room={params.room_id} lang={lang} />
     </>

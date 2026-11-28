@@ -37,6 +37,7 @@ import WakeAutoBanner from "@/components/WakeAutoBanner";
 import type { WakeState } from "@/lib/wakeAutoLogic";
 import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
 import type { VoiceAction } from "@/lib/voiceCommand";
+import GuestExtras, { type GuestWc } from "@/components/GuestExtras";
 
 export interface MagicalProps {
   roomSlug: string;
@@ -52,6 +53,9 @@ export interface MagicalProps {
   onSwitchWafu?: () => void;
   guestName?: string | null;
   entranceHref?: string | null;
+  myLink?: string | null;
+  welcome?: GuestWc | null;
+  season?: string | null;
   lat?: number | null;
   lng?: number | null;
   wake?: WakeState | null;
@@ -929,6 +933,9 @@ export default function MagicalControlPanel({
   onSwitchWafu,
   guestName,
   entranceHref,
+  myLink,
+  welcome,
+  season,
   lat,
   lng,
 }: MagicalProps) {
@@ -1221,6 +1228,7 @@ export default function MagicalControlPanel({
             <EntranceKeyButton href={entranceHref} lang={lang} variant="magic" />
           </div>
         )}
+        <GuestExtras variant="magic" lang={lang} link={myLink} wc={welcome} season={season} admin={admin} className="mb-2 text-left" />
 
         <SectionLabel>{copy.circles}</SectionLabel>
         <div className="magic-primary-grid grid grid-cols-2 gap-1.5">

@@ -12,6 +12,7 @@
  *   - 届くのが遅れた古い声 (STALE_MS より前) は鳴らさない (もう iPad が鳴らしている)。
  */
 import { rtJoinMsg, rtSend, rtOn, CABIN_CH } from "@/lib/rtKick";
+import { playbackSession } from "@/lib/iosAudio";
 export interface RemoteVoice { stop(): void; busy(): boolean; /** iPad の声を受け取れている (最近の問い合わせが成功) */ ok(): boolean; /** iPad と直接つながっている (回線がつながり、iPad の印が最近届いた) */ direct(): boolean }
 /** 効果音の印 (声の順番待ちに入れず、すぐ重ねて鳴らす・音楽も下げない) */
 export const SFX_MARK = "#sfx";
@@ -20,6 +21,7 @@ const STALE_MS = 4300;
 let AC: AudioContext | null = null;
 const cache = new Map<string, Promise<AudioBuffer | null>>();
 export function unlockRemoteVoice() {
+  playbackSession();
   try {
     AC = AC || new ((window as any).AudioContext || (window as any).webkitAudioContext)();
     void AC!.resume(); const b = AC!.createBuffer(1, 1, 22050), s = AC!.createBufferSource(); s.buffer = b; s.connect(AC!.destination); s.start(0);

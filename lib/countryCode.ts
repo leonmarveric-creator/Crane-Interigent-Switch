@@ -3,6 +3,7 @@
  *   "IT" / "ITA" / "Italy" / "Italian" / "イタリア" / "意大利" / "이탈리아" などを受け付ける。わからなければ null。
  */
 import { CHEER_COUNTRIES } from "@/lib/cheerText";
+import { ISO3, ALL_A2 } from "@/lib/iso3";
 
 /** 3 文字コード → 2 文字 (よく来る国と、パスポートでよく使われるもの) */
 const A3: Record<string, string> = {
@@ -32,7 +33,7 @@ let NAMES: Map<string, string> | null = null;
 function names(): Map<string, string> {
   if (NAMES) return NAMES;
   const m = new Map<string, string>();
-  const codes = new Set<string>([...CHEER_COUNTRIES.map((c) => c[0]), ...Object.values(A3)]);
+  const codes = new Set<string>([...CHEER_COUNTRIES.map((c) => c[0]), ...Object.values(A3), ...ALL_A2]);
   // 英語・日本語・中文・韓国語と、それぞれの国の言葉 (Italia / Deutschland / España …)
   for (const loc of ["en", "ja", "zh-CN", "zh-TW", "ko", "es", "fr", "de", "it", "pt", "th", "vi", "id", "ru", "ar", "tr", "nl", "pl", "sv", "da", "nb", "fi", "cs", "hu", "el", "ro", "uk", "he", "ms", "fil"]) {
     let dn: Intl.DisplayNames | null = null;
@@ -49,7 +50,7 @@ function exact(seg: string): string | null {
   const s = norm(seg);
   if (!s) return null;
   const up = s.toUpperCase();
-  if (/^[A-Z]{3}$/.test(up) && A3[up]) return A3[up];
+  if (/^[A-Z]{3}$/.test(up) && (A3[up] || ISO3[up])) return A3[up] || ISO3[up];
   return DEMONYM[s] ?? names().get(s) ?? null;
 }
 
@@ -77,7 +78,7 @@ export function toCountryCode(raw: string | null | undefined): string | null {
   if (!s) return null;
   const up = s.toUpperCase();
   if (/^[A-Z]{2}$/.test(up)) return up === "UK" ? "GB" : up;
-  if (/^[A-Z]{3}$/.test(up) && A3[up]) return A3[up];
+  if (/^[A-Z]{3}$/.test(up) && (A3[up] || ISO3[up])) return A3[up] || ISO3[up];
   if (DEMONYM[s]) return DEMONYM[s];
   const byName = names().get(s);
   if (byName) return byName;

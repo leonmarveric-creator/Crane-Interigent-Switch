@@ -18,6 +18,7 @@ import { getWakeState } from "@/lib/wakeAuto";
 import { WAKE_T, type WakeState } from "@/lib/wakeAutoLogic";
 import type { GuideCheckout } from "@/lib/nfcGate";
 import { lightState, type LightPref } from "@/lib/arrivalLight";
+import { toCountryCode } from "@/lib/countryCode";
 
 export interface NfcData {
   room: { kanji: string; en: string } | null; /** 部屋のイラスト (無ければ漢字を出す) */ icon: string | null; slug: string | null; knob: boolean; natsu: boolean; roomKey: string | null; entKey: string | null; trip: string; ck: string;
@@ -31,6 +32,8 @@ export interface NfcData {
   light: { api: string; pref: LightPref | null; arrived: boolean } | null;
   /** 宿泊中・到着前のゲスト: 「到着までに」カード (明かり → チェックイン手続き) を出す */
   arrive: { arrived: boolean } | null;
+  /** 🌏 WELCOME 地球儀 (パスポート登録が済んだ宿泊中のゲスト): 代表者の名前・国 (ISO 2 文字)・人数 */
+  wc: { nm: string; cc: string | null; np: number; /** 車内 (iPad・お父さんのスマホ) でもう流れた */ car: boolean } | null;
   G: { LOCK_T: typeof LOCK_T; TOILET_T: typeof TOILET_T };
   /** ホーム画面のアイコン (春・夏・秋・冬の部屋はその季節、ほかは今の季節) と名前 */
   home: { icon: string; title: string };
@@ -47,7 +50,7 @@ export const homeIconFor = (kanji: string | null | undefined, ms = Date.now()) =
   `/nfc/home/${(kanji && ROOM_SEASON[kanji]) || seasonNow(ms)}`;
 
 export async function nfcData(key: string, codes: { ent: string | null; room: string | null } | null = null, co: GuideCheckout | null = null, rid: string | null = null): Promise<NfcData> {
-  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, wake: null, light: null, arrive: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
+  const out: NfcData = { room: null, icon: null, slug: null, knob: false, natsu: false, roomKey: null, entKey: null, trip: "none", ck: CHECKIN_DEFAULT_URL, codes, co: null, wake: null, light: null, arrive: null, wc: null, G: { LOCK_T, TOILET_T }, home: { icon: homeIconFor(null), title: "Crane Nest" } };
   const k = decodeURIComponent(key || "").trim().toLowerCase();
   try {
     const [{ data }, entQ] = await Promise.all([
@@ -87,6 +90,17 @@ export async function nfcData(key: string, codes: { ent: string | null; room: st
     // 今いる予約 → その予約のチェックインページ
     const cur = mine.find((r) => Date.parse(r.checkIn) - 12 * 3600e3 <= now && Date.parse(r.checkOut) >= now) ?? null;
     if (cur && tokens[cur.id]) out.ck = checkinLinkFor(tokens[cur.id]);
+    // 本人確認済みのゲスト (rid) で、パスポート登録が済んでいる → WELCOME 地球儀 (車内 iPad が無い送迎・車内で登録できなかったときも、自分のスマホで見られる)
+    if (rid && cur && cur.id === rid && !co?.done) {
+      const dr = await loadCraneNestDrops([{ id: cur.id, roomKanji: hit.c.kanji, checkOut: cur.checkOut, token: tokens[cur.id] ?? null }]).catch(() => ({} as Record<string, any>));
+      const d = (dr as any)[cur.id];
+      if (d?.names?.length) {
+        // 車内でもう流れたか (送迎の記録 cabin_trips.done.wc)。流れていなければ、コンシェルジュを開いたときにここで流す
+        const { data: trs } = await supabaseAdmin.from("cabin_trips").select("done").eq("reservation_id", cur.id).then((r) => r, () => ({ data: null } as any));
+        const car = ((trs ?? []) as any[]).some((t) => !!t?.done?.wc);
+        out.wc = { nm: String(d.names[0]).slice(0, 60), cc: toCountryCode(d.nationality ?? null), np: Math.max(Number(d.pax) || 0, d.names.length), car };
+      }
+    }
     // 出発の日 (今日・明日チェックアウト) → 送迎予約の行き先で空港の案内
     const leave = mine.find((r) => jstDay(r.checkOut) === today || jstDay(r.checkOut) === tomorrow);
     if (leave) {

@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import RoomModeSwitch from "@/components/RoomModeSwitch";
 import AccessDenied from "@/components/AccessDenied";
 import { isLang, type Lang } from "@/lib/i18n";
+import { seasonOf } from "@/lib/roomSeason";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,9 @@ export default async function AdminTestRoomPage({
       hasGalaxy={!!room.switchbot_galaxy_device_id}
       hasNest={!!room.switchbot_nest_device_id}
       hasWafu={!!room.switchbot_wafu_device_id}
+      myLink={`/g/${encodeURIComponent(room.slug)}?k=SAMPLE`}
+      welcome={{ nm: "SAMPLE GUEST", cc: "TW", np: 2 }}
+      season={seasonOf(room.display_name)}
     />
   );
 }

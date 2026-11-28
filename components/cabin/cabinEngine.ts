@@ -96,6 +96,8 @@ export interface Engine {
   airOn(): boolean;
   /** お父さんが登録した到着地点 (りんくうのガラスのエレベーターの前など) */
   setPlacePoints(pp: Record<string, [number, number]> | null): void;
+  /** お迎え: ゲストが車の中でパスポート登録を済ませた → 「WELCOME, ○○ FAMILY」の地球儀 (声・演出・BOOST が無いときに 1 回) */
+  welcome(g: { name: string | null; cc: string | null; pax: number }): void;
   pickArrive(g: { name: string | null; flight: string | null; room: string | null; t2?: boolean; hineno?: boolean; place?: string; tripId?: string }): void;
 }
 
@@ -391,8 +393,8 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function arrive() {
     if (!trip) return;
     // 部屋紹介ホログラム・Starlink の途中なら、最後まで見せてから到着の画面にする (演出は途中で切らない。最大 70 秒)
-    if (holo.on() || (air.on() && slNext)) {
-      if (!arrWait) { arrWait = true; const t0 = Date.now(), iv = setInterval(() => { if (!arrWait) { clearInterval(iv); return; } if ((!holo.on() && !(air.on() && slNext)) || Date.now() - t0 > 70000) { clearInterval(iv); arrWait = false; holo.stop(); arrive(); } }, 500); }
+    if (holo.on() || (air.on() && (slNext || wcOn))) {
+      if (!arrWait) { arrWait = true; const t0 = Date.now(), iv = setInterval(() => { if (!arrWait) { clearInterval(iv); return; } if ((!holo.on() && !(air.on() && (slNext || wcOn))) || Date.now() - t0 > 70000) { clearInterval(iv); arrWait = false; holo.stop(); arrive(); } }, 500); }
       return;
     }
     arrWait = false; arrived = true; const id = trip.id; cqOff(); holo.stop(); // 着いたら QR は到着画面のボタンへ
@@ -678,7 +680,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
       wa: !!room && /[春夏秋冬]/.test(room.kanji),
     }),
   });
-  setInterval(() => { slTick(); if (!guide.on() && !toilet.on() && !lock.on() && !holo.on() && !air.on() && !holoHush) ai.tick(); holoTick(); }, 1000);
+  setInterval(() => { wcTick(); slTick(); if (!guide.on() && !toilet.on() && !lock.on() && !holo.on() && !air.on() && !holoHush) ai.tick(); holoTick(); }, 1000);
 
   /* ---------- ホログラム (お迎えのとき・地図の枠の上に約 46 秒)。lib/cabinHolo.ts ----------
      声・効果音はほかの声と同じ道 (iPhone。来ていなければ iPad)。右側の天気・お部屋・QR はそのまま見える */
@@ -694,6 +696,17 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
      着くまでに終わらないとき・BOOST (橋) が近いときは出さずに、すぐ QR */
   const SL_LEN_S = 48;
   let slDone = false, slPending = false, slNext: (() => void) | null = null;
+  /* ---------- 🌏 WELCOME, ○○ FAMILY (パスポート登録が済んだら)。ほかの声・演出・BOOST が無いときに出す。1 回の送迎で 1 回 ---------- */
+  let lastWc: { name: string | null; cc: string | null; pax: number } | null = null;
+  let wcWant: { name: string | null; cc: string | null; pax: number } | null = null, wcDone = false, wcOn = false;
+  function wcTick() {
+    if (!wcWant) return;
+    if (!trip || arrived || wcDone || trip.dir !== "in") { wcWant = null; return; }
+    if (voiceN > 0 || ai.busy() || ai.waiting() || holo.on() || air.on() || holoOverlay()) return;
+    if (holoRemainS(Math.max(0, remNow - 200), vAvg) < 40) { wcWant = null; return; } // もう着く
+    if (!bridgeClear(45)) return; // BOOST のあとで
+    const g = wcWant; lastWc = g; wcWant = null; wcDone = true; wcOn = true; markDone({ wc: true }); air.welcome(g);
+  }
   function slOk() {
     if (!trip || trip.dir !== "in" || arrived || slDone || air.on() || holo.on() || bs.phase === "on" || warpOn || prepSt > 0) return false;
     if (holoRemainS(Math.max(0, remNow - 200), vAvg) < SL_LEN_S * 0.6) return false; // もう着く (着いたら最後まで見せてから到着の画面)
@@ -716,6 +729,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   function yieldToBoost() {
     if (holo.on()) { const q = holoQr; holoQr = false; holo.stop(); holoDone = false; if (q) { cqShow(); if (!slDone) slPending = true; } } // holoTick が BOOST のあと (15 秒あけて) にもう一度。QR は先に出しておき、Starlink は部屋紹介のあと
     if (air.on() && slNext) { slNext = null; air.close(); slDone = false; slPending = true; } // slTick が BOOST のあとに
+    if (air.on() && wcOn) { const g = lastWc; air.close(); wcDone = false; wcWant = g; } // WELCOME も BOOST のあとで最初から
   }
   /** 後回しにした Starlink を、声・演出・BOOST が無いときに出す (1 秒ごと) */
   function slTick() {
@@ -728,6 +742,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
   /** 空港案内・出発/到着の演出・Starlink の枠を閉じたとき */
   function airClosed() {
+    wcOn = false;
     const f = slNext; slNext = null;
     if (f) setTimeout(f, 1500);
     if (!holo.on()) setTimeout(flushPoi, 2000);
@@ -903,7 +918,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     if (done0.go) $("sweep").classList.add("on");
     else if (depS) { linkS(); $("sweep").classList.add("on"); markDone({ go: true }); void depart(t.id, depS); } // お見送り: 忘れ物チェック → 出発のホログラム (出発のセリフはその中で)
     else { linkS(); void say(goKey); $("sweep").classList.add("on"); markDone({ go: true }); }
-    slDone = !!done0.sl; slNext = null; slPending = false;
+    slDone = !!done0.sl; slNext = null; slPending = false; wcDone = !!done0.wc; wcWant = null; wcOn = false;
     cqOff(); holoQr = t.dir === "in" && !done0.holo && !!holoRoomOf(r); if (t.dir === "in" && !holoQr) T_(20000, () => cqShow()); // 🛎 コンシェルジュの QR (乗車のあいさつのあと。部屋紹介があるときは、その終わったあと)
     T_(3000, rcarOn);
     holoDone = !!done0.holo; airEarly = !!done0.air; if (t.dir === "in" && holoRoomOf(r)) void fetch(HOLO_JS).catch(() => {}); // ホログラムを先に読み込んでおく (保存済みなら通信なし)
@@ -1036,6 +1051,7 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     setPlacePoints: (pp) => { PP = pp ?? {}; },
     setArriveImgs: (u) => { air.setImgs(u); },
     airOn: () => air.on(),
+    welcome: (g) => { if (!trip || trip.dir !== "in" || arrived || wcDone) return; wcWant = g; },
     pickArrive: (g) => { if (!arriveNew()) return; airTrip = g.tripId ?? null; air.arrive({ s: g.place === "rinku" ? "pickr1" : g.place === "r833" ? "pickr2" : g.hineno ? "pickh" : g.t2 ? "pick2" : "pick", name: g.name, flight: g.flight, room: g.room, lang: "ja" }); },
     setCheckin: (u) => { ckSet = u; checkinUrl = u || ckDefault; const b = root.querySelector<HTMLElement>('#aq [data-q="ck"]'); if (b) b.style.display = checkinUrl ? "" : "none"; } };
 }

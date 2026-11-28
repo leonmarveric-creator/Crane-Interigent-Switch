@@ -15,6 +15,7 @@ import LiteControlPanel from "@/components/LiteControlPanel";
 import MagicalControlPanel from "@/components/MagicalControlPanel";
 import { type Lang } from "@/lib/i18n";
 import type { WakeState } from "@/lib/wakeAutoLogic";
+import type { GuestWc } from "@/components/GuestExtras";
 
 type Mode = "select" | "normal" | "lite" | "magic";
 const STORE_KEY = "craneUiMode";
@@ -41,6 +42,10 @@ export interface RoomModeSwitchProps {
   bootVoice?: "astralis" | "jarvis";
   /** 早朝便の自動光目覚まし (前の晩 20:00 〜 点灯まで。対象外なら null) */
   wake?: WakeState | null;
+  /** あなた専用のコンシェルジュのリンク (/g/部屋?k=…) と、ウェルカム映像の名前・国 */
+  myLink?: string | null;
+  welcome?: GuestWc | null;
+  season?: string | null;
 }
 
 const SEL: Record<Lang, {
@@ -202,6 +207,9 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasWafu={props.hasWafu}
         guestName={props.guestName}
         entranceHref={props.entranceHref}
+        myLink={props.myLink}
+        welcome={props.welcome}
+        season={props.season}
         onSwitchMode={() => choose("normal")}
       />
     );
@@ -223,6 +231,9 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasWafu={props.hasWafu}
         guestName={props.guestName}
         entranceHref={props.entranceHref}
+        myLink={props.myLink}
+        welcome={props.welcome}
+        season={props.season}
         onSwitchTech={() => choose("normal")}
         lat={props.lat}
         lng={props.lng}
@@ -249,6 +260,9 @@ export default function RoomModeSwitch(props: RoomModeSwitchProps) {
         hasWafu={props.hasWafu}
         guestName={props.guestName}
         entranceHref={props.entranceHref}
+        myLink={props.myLink}
+        welcome={props.welcome}
+        season={props.season}
         bootVoice={props.bootVoice}
         wake={props.wake}
       />

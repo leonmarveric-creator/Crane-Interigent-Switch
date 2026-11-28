@@ -420,3 +420,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 @keyframes co-pulse { 50% { filter: brightness(1.18); } }
 .anim-co-pulse { animation: co-pulse 2.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .anim-co-pulse { animation: none; } }
+/* ローディング: 古いスマホ・「動きを減らす」では回る・流れる動きを止める (components/HudLoader.tsx) */
+.hud-lite .anim-hexdrift,.hud-lite .anim-drift,.hud-lite .anim-drift2,.hud-lite .anim-scan,.hud-lite .anim-glitchband,.hud-lite .anim-radar,.hud-lite .anim-flicker{animation:none!important}
+.hud-lite *{transition:none!important}

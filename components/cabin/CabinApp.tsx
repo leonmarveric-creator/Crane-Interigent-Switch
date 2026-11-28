@@ -22,6 +22,7 @@ import type { CabinTrack } from "@/lib/cabinMusic";
 import { acModeFor, type LL, type GLang } from "@/lib/cabinGeo";
 import { SFX_MARK } from "@/lib/remoteVoice";
 import { rtJoinMsg, rtKick, rtSend, rtOn, CABIN_CH } from "@/lib/rtKick";
+import { playbackSession } from "@/lib/iosAudio";
 
 const WX = { lat: 34.4066, lng: 135.3269 };
 const POLL_MS = 3000;
@@ -343,7 +344,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3", e.boostSfxUrl(),
       "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css",
       // ホログラム (部屋紹介・到着・比較) のページと 3D の部品も保存 → 走行中は通信なしで出る
-      "/cabin/holo/index.html", "/cabin/air/arrive.html", "/cabin/air/starlink.html", ...THREE_URLS, "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
+      "/cabin/holo/index.html", "/cabin/air/arrive.html", "/cabin/air/starlink.html", "/cabin/air/welcome.html", ...THREE_URLS, "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });
     const reg = await navigator.serviceWorker?.ready.catch(() => null);
@@ -389,13 +390,26 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
     await e.start(t, room); setTimeout(() => e.demo(), 2500);
   }
 
+  // 🌏 お迎えの送迎中、ゲストが車の中でパスポート登録を済ませたら「WELCOME, ○○ FAMILY」(20 秒ごとに確認。済んだらその送迎ではもう聞かない)
+  useEffect(() => {
+    const asked = new Set<string>();
+    const iv = setInterval(() => {
+      const t = tripRef.current, e = eng.current;
+      if (!t || !e || t.dir !== "in" || t.phase === "dead" || t.id.startsWith("demo") || asked.has(t.id) || e.arrived()) return;
+      void fetch(`/api/cabin/guest?t=${t.id}`, { cache: "no-store" }).then((r) => r.json()).then((j) => {
+        if (!j?.ok || !j.done || tripRef.current?.id !== t.id) return;
+        asked.add(t.id); e.welcome({ name: j.name ?? null, cc: j.cc ?? null, pax: Number(j.pax) || 1 });
+      }).catch(() => {});
+    }, 20000);
+    return () => clearInterval(iv);
+  }, []);
   // 画面に触れるたびに、回送モードの効果音の AudioContext を動かしておく (iPad はスリープ明けなどで音を止めることがある)
   useEffect(() => {
     const wake = () => { try { const w = window as any; w.__dhAc = w.__dhAc || new (w.AudioContext || w.webkitAudioContext)(); if (w.__dhAc.state !== "running") void w.__dhAc.resume(); } catch { /* 鳴らせない端末 */ } };
     document.addEventListener("pointerdown", wake, true); document.addEventListener("touchend", wake, true);
     return () => { document.removeEventListener("pointerdown", wake, true); document.removeEventListener("touchend", wake, true); };
   }, []);
-  const tap = () => { if (tapped) return; setTapped(true); eng.current?.unlock(); dhRef.current?.unlock(); try { (document.documentElement as any).webkitRequestFullscreen?.(); } catch { /* ignore */ } };
+  const tap = () => { playbackSession(); if (tapped) return; setTapped(true); eng.current?.unlock(); dhRef.current?.unlock(); try { (document.documentElement as any).webkitRequestFullscreen?.(); } catch { /* ignore */ } };
 
   return (
     <div className="cab" ref={root} onClick={tap}>

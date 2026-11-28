@@ -22,11 +22,15 @@ import TechButton from "@/components/tech/TechButton";
 import VoiceMic, { useVoiceAction } from "@/components/tech/VoiceMic";
 import type { VoiceAction } from "@/lib/voiceCommand";
 import RoomHolo from "@/components/tech/RoomHolo";
+import GuestExtras, { type GuestWc } from "@/components/GuestExtras";
 import { TouchReticle, GalaxyLaunch, LockShield, NetworkField, PerspectiveFloor, LightStreaks, TelemetryHud } from "@/components/tech/TechFX";
 
 interface Props {
   guestName?: string | null;
   entranceHref?: string | null;
+  myLink?: string | null;
+  welcome?: GuestWc | null;
+  season?: string | null;
   roomSlug: string;
   roomName: string;
   checkOut: string;
@@ -137,7 +141,7 @@ function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 
 export default function ControlPanel({
-  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref, bootVoice = "astralis", wake = null,
+  roomSlug, roomName, checkOut, initialLang, admin, imageUrl, lat, lng, radiusM, hasGalaxy, hasNest, hasWafu, guestName, entranceHref, myLink, welcome, season, bootVoice = "astralis", wake = null,
 }: Props) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [muted, setMuted] = useState(false);
@@ -417,6 +421,7 @@ export default function ControlPanel({
             <EntranceKeyButton href={entranceHref} lang={lang} variant="tech" />
           </motion.div>
         )}
+        <GuestExtras variant="tech" lang={lang} link={myLink} wc={welcome} season={season} admin={admin} className="mb-4" />
 
         {/* モード (ノーマル / 快適 / ギャラクシー / ネスト / 和み): スクロールしなくても目に入る位置 */}
         <motion.div className="mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.115 }}>

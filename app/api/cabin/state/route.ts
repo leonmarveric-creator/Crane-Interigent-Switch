@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     if (!t || (t as any).status !== "active") return J({ ok: false, error: "NO_TRIP" });
     const cur: any = (t as any).done && typeof (t as any).done === "object" ? (t as any).done : {}, p: any = b.p && typeof b.p === "object" ? b.p : {};
     const next: any = { ...cur };
-    for (const k of ["holo", "air", "boost", "go", "sl"]) if (p[k] === true) next[k] = true;
+    for (const k of ["holo", "air", "boost", "go", "sl", "wc"]) if (p[k] === true) next[k] = true;
     if (Array.isArray(p.poi)) next.poi = [...new Set([...(Array.isArray(cur.poi) ? cur.poi : []), ...p.poi.filter((x: unknown) => typeof x === "string").slice(0, 30)])];
     const { error } = await supabaseAdmin.from("cabin_trips").update({ done: next }).eq("id", b.trip);
     return J(error ? { ok: false, error: error.message } : { ok: true });
