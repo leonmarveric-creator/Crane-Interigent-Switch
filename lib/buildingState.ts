@@ -15,6 +15,8 @@ export interface RoomLive {
   /** その部屋にある機器 (無いものは画面に出さない) */
   has: Part[];
   alert: boolean;
+  /** 泊まっている (到着予定の) ゲスト: パスポート登録から。写真は /api/kaku/passport?drop= をボタンで */
+  guest?: { drop: string; names: string[]; pax: number; cc: string | null } | null;
 }
 
 /** ① 操作 → それぞれの機器がどうなるか (lib/deviceControl.ts の場面と同じ。null = 変えない) */

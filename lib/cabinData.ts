@@ -46,6 +46,7 @@ export interface CabinTrip {
   /** もう済んだこと (iPad とスマホで引き継ぐとき、同じ演出・案内を繰り返さない)。migration_cabin_done.sql */
   done?: CabinDone | null;
 }
+/** true = 済んだ。false は「途中で止めたので、まだ」(記録から消す) */
 export interface CabinDone { poi?: string[]; holo?: boolean; air?: boolean; boost?: boolean; go?: boolean; sl?: boolean; wc?: boolean }
 
 const SEASON: [RegExp, string, string, CabinRoom["fx"]][] = [

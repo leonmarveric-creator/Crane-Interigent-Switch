@@ -12,6 +12,7 @@ import { TOILET_T } from "@/lib/cabinToilet";
 import { CHECKIN_DEFAULT_URL, roomGuideOf } from "@/lib/cabinAiTalk";
 import { jstDay } from "@/lib/driverLogic";
 import { NFC_HTML } from "@/lib/nfcPage";
+import { WELCOME_AV } from "@/lib/welcomeAssets";
 import { roomIcon } from "@/lib/roomIcon";
 import { CO_T, checkoutWindow, coTime } from "@/lib/checkoutText";
 import { getWakeState } from "@/lib/wakeAuto";
@@ -119,5 +120,5 @@ export function nfcHtml(d: NfcData): string {
   const head = `<link rel="apple-touch-icon" href="${esc(d.home.icon)}-180.png"><link rel="icon" type="image/png" sizes="192x192" href="${esc(d.home.icon)}-192.png">`
     + `<meta name="apple-mobile-web-app-title" content="${esc(d.home.title)}"><meta name="application-name" content="${esc(d.home.title)}">`
     + `<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`;
-  return NFC_HTML.replace("<!--HOME-->", head).replace("__DATA__", JSON.stringify(d).replace(/</g, "\\u003c"));
+  return NFC_HTML.replace("<!--HOME-->", head).replace("__WAV__", WELCOME_AV).replace("__DATA__", JSON.stringify(d).replace(/</g, "\\u003c"));
 }

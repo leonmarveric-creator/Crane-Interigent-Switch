@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminLang } from "@/lib/adminI18n";
 import type { Part, RoomLive } from "@/lib/buildingState";
+import GuestFaces from "@/components/admin/GuestFaces";
 
 /** public/holo/building.html の版 (building.js を作り直したら合わせる) */
 export const BUILDING_V = "418ef50b8e";
@@ -102,6 +103,7 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
           <div key={r.id} className={`flex flex-wrap items-center gap-1.5 rounded px-1.5 py-1 ${r.alert ? "bg-rose-500/10 ring-1 ring-rose-400/50" : ""}`}>
             <b className="min-w-[2.2em] text-sm text-white">{r.name}</b>
             <span className={`text-[10.5px] ${r.occ === "stay" ? "text-emerald-300" : r.occ === "soon" ? "text-amber-300" : "text-white/40"}`}>{x[r.occ]}</span>
+            {r.guest && r.occ !== "vacant" && <GuestFaces g={r.guest} room={r.name} />}
             {(["ceil", "wa", "ac", "galaxy", "nest"] as Part[]).map((p) => part(r, p))}
             {r.alert && <span className="text-[10.5px] font-semibold text-rose-300">⚠ {x.alert}</span>}
           </div>

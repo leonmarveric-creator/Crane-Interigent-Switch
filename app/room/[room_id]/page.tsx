@@ -100,13 +100,18 @@ export default async function RoomPage({
   // あなた専用のコンシェルジュのリンク (チェックアウト + 2 日まで 4 桁なしで開ける) と、ウェルカム映像の名前・国 (パスポート登録から)
   const coAt = (matched as any).late_checkout_at || matched.check_out;
   const myLink = `/g/${encodeURIComponent(params.room_id)}?k=${encodeURIComponent(guideKeyFor({ rid: matched.id, roomSlug: params.room_id, checkOut: coAt }))}`;
-  let welcome: { nm: string; cc: string | null; np: number } | null = null;
+  let welcome: { nm: string; cc: string | null; np: number; car?: boolean } | null = null;
   try {
     const drops = await loadCraneNestDrops([{ id: matched.id, roomKanji: toCabinRoom(stays.room as any).kanji, checkOut: coAt, token: (nameRow as any)?.guest_token ?? null }]);
     const d = drops[matched.id];
     if (d?.names?.length) welcome = { nm: String(d.names[0]).slice(0, 60), cc: toCountryCode(d.nationality ?? null), np: Math.max(Number(d.pax) || 0, d.names.length) };
   } catch { /* Crane Nest のシステムに繋がらなくても画面は出す */ }
   if (!welcome && guestName) welcome = { nm: String(guestName).slice(0, 60), cc: null, np: 1 };
+  // 車内でもう地球儀が流れていたら、ここでは自動で出さない (ボタンからは見られる)
+  if (welcome) {
+    const { data: trs } = await supabaseAdmin.from("cabin_trips").select("done").eq("reservation_id", matched.id).then((x) => x, () => ({ data: null } as any));
+    (welcome as any).car = ((trs ?? []) as any[]).some((t) => !!t?.done?.wc);
+  }
 
   return (
     <>

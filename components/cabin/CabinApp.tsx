@@ -1,4 +1,5 @@
 "use client";
+import { welcomeAssets, type WelcomeQ } from "@/lib/welcomeAssets";
 
 /**
  * 車内 iPad (お客さん用の画面)。お父さんのスマホで「出発」を押すと、3 秒以内にこの画面が送迎に切り替わる。
@@ -344,7 +345,7 @@ export default function CabinApp({ rooms }: { rooms: CabinRoom[] }) {
       ...Object.keys(DH_LINES).map(dhAudio), "/cabin/audio/boost-sfx.mp3", e.boostSfxUrl(),
       "/cabin/leaflet/leaflet.js", "/cabin/leaflet/leaflet.css",
       // ホログラム (部屋紹介・到着・比較) のページと 3D の部品も保存 → 走行中は通信なしで出る
-      "/cabin/holo/index.html", "/cabin/air/arrive.html", "/cabin/air/starlink.html", "/cabin/air/welcome.html", ...THREE_URLS, "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
+      "/cabin/holo/index.html", "/cabin/air/arrive.html", "/cabin/air/starlink.html", "/cabin/air/welcome.html", ...welcomeAssets((((window as any).__CAB_HQ as WelcomeQ | undefined) ?? "std")).slice(1), ...THREE_URLS, "/cabin/routes.json", "/cabin/bay.webp", "/cabin/rooms/r1.webp", "/cabin/rooms/r2.webp", "/cabin/rooms/r3.webp", "/cabin/rooms/r4.webp",
       ...rooms.map((r) => r.photo).filter((x): x is string => !!x && x.startsWith("http"))].map((u) => new URL(u, location.href).href);
     setProg({ label: "声・効果音・写真", p: 0 });
     const reg = await navigator.serviceWorker?.ready.catch(() => null);

@@ -4,25 +4,29 @@
 // お部屋の操作画面 (ハイテク・和風・マジカル) に出す 2 つ:
 //  ① あなた専用のコンシェルジュのリンク (表示・コピー・自分に送る)。チェックアウトまで 4 桁なしで開ける
 //  ② ウェルカム映像 (画面の雰囲気に合わせて: ハイテク = 地球儀 / 和風 = 墨と円相 / マジカル = 魔法陣と巻物)
-//     和風・マジカルは、はじめて開いたときに 1 回だけ自動で出す (ハイテクは起動の演出があるのでボタンだけ)
+//     どれか 1 回だけ自動で出す (コンシェルジュ・お部屋のどの画面でも、先に見た 1 回。車内で流れていれば出さない)
+//     重い地球儀は、裏で読み込み終わってから出す (待たせない)。2 回目からはキャッシュで一瞬
 // =========================================================
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { welcomeAssets, type WelcomeQ } from "@/lib/welcomeAssets";
 
-export type GuestWc = { nm: string; cc: string | null; np: number };
+export type GuestWc = { nm: string; cc: string | null; np: number; /** 車内でもう流れた */ car?: boolean };
 type Variant = "tech" | "wafu" | "magic";
 
-const T: Record<string, { h: string; s: string; c: string; cd: string; sh: string; n: string; wc: Record<Variant, string> }> = {
-  ja: { h: "あなた専用のコンシェルジュ", s: "鍵・お部屋・地図・送迎がここから開けます", c: "リンクをコピー", cd: "コピーしました", sh: "自分に送る", n: "メモ・LINE・WhatsApp などに貼って保存してください。チェックアウトまで番号なしで開けます。同行者以外には送らないでください。", wc: { tech: "WELCOME 映像を見る", wafu: "歓迎の映像を見る", magic: "魔法の歓迎を見る" } },
-  en: { h: "Your personal concierge link", s: "Keys, room, map and transfers — all in one place", c: "Copy link", cd: "Copied", sh: "Send to myself", n: "Paste it into Notes, WhatsApp, LINE etc. It opens without a code until checkout — share only with your travel group.", wc: { tech: "Watch your WELCOME", wafu: "Watch your welcome", magic: "Watch your magical welcome" } },
-  zh: { h: "您的专属礼宾链接", s: "钥匙、房间、地图、接送都在这里", c: "复制链接", cd: "已复制", sh: "发给自己", n: "请粘贴到备忘录、微信、WhatsApp 等保存。退房前无需密码即可打开，请只发给同行的人。", wc: { tech: "观看欢迎影像", wafu: "观看欢迎影像", magic: "观看魔法欢迎" } },
-  ko: { h: "나만의 컨시어지 링크", s: "열쇠·객실·지도·송영을 여기서 열 수 있어요", c: "링크 복사", cd: "복사됨", sh: "나에게 보내기", n: "메모·카카오톡·WhatsApp 등에 붙여 넣어 저장하세요. 체크아웃까지 번호 없이 열립니다. 일행 외에는 보내지 마세요.", wc: { tech: "WELCOME 영상 보기", wafu: "환영 영상 보기", magic: "마법의 환영 보기" } },
+const T: Record<string, { h: string; s: string; c: string; cd: string; sh: string; n: string; wc: Record<Variant, string>; my: string }> = {
+  ja: { h: "あなた専用のコンシェルジュ", s: "鍵・お部屋・地図・送迎がここから開けます", c: "リンクをコピー", cd: "コピーしました", sh: "自分に送る", n: "メモ・LINE・WhatsApp などに貼って保存してください。チェックアウトまで番号なしで開けます。同行者以外には送らないでください。", wc: { tech: "WELCOME 映像を見る", wafu: "歓迎の映像を見る", magic: "魔法の歓迎を見る" }, my: "マイリンク（保存用）" },
+  en: { h: "Your personal concierge link", s: "Keys, room, map and transfers — all in one place", c: "Copy link", cd: "Copied", sh: "Send to myself", n: "Paste it into Notes, WhatsApp, LINE etc. It opens without a code until checkout — share only with your travel group.", wc: { tech: "Watch your WELCOME", wafu: "Watch your welcome", magic: "Watch your magical welcome" }, my: "My link (save it)" },
+  zh: { h: "您的专属礼宾链接", s: "钥匙、房间、地图、接送都在这里", c: "复制链接", cd: "已复制", sh: "发给自己", n: "请粘贴到备忘录、微信、WhatsApp 等保存。退房前无需密码即可打开，请只发给同行的人。", wc: { tech: "观看欢迎影像", wafu: "观看欢迎影像", magic: "观看魔法欢迎" }, my: "我的链接（请保存）" },
+  ko: { h: "나만의 컨시어지 링크", s: "열쇠·객실·지도·송영을 여기서 열 수 있어요", c: "링크 복사", cd: "복사됨", sh: "나에게 보내기", n: "메모·카카오톡·WhatsApp 등에 붙여 넣어 저장하세요. 체크아웃까지 번호 없이 열립니다. 일행 외에는 보내지 마세요.", wc: { tech: "WELCOME 영상 보기", wafu: "환영 영상 보기", magic: "마법의 환영 보기" }, my: "내 링크 (저장용)" },
 };
 const PAGE: Record<Variant, string> = { tech: "welcome", wafu: "welcome-wafu", magic: "welcome-magic" };
 const ICON: Record<Variant, string> = { tech: "🌏", wafu: "🏮", magic: "✨" };
 
 /* 画質は端末で自動: iPad・パソコン = 標準 / スマホ = 軽量 / 古い・メモリの少ないスマホ = 超軽量 */
-function hq(): string {
+function hq(): WelcomeQ {
+  // 省データモード・遅い回線 → 超軽量
+  try { const c = (navigator as any).connection; if (c && (c.saveData || /(^|-)2g|3g/.test(String(c.effectiveType || "")))) return "ul"; } catch { /* */ }
   const ua = navigator.userAgent, pad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), phone = /iPhone|Android.+Mobile/.test(ua);
   if (!phone) return pad || !/Android/.test(ua) ? "std" : "lite";
   const mem = (navigator as any).deviceMemory || 0, cpu = navigator.hardwareConcurrency || 0;
@@ -55,6 +59,16 @@ export default function GuestExtras({ variant, lang, link, wc, season, admin, cl
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [open, setOpen] = useState(false);
+  /** 一度コピー・送信・保存したら小さく (1 行) する。押すと広がる */
+  const [small, setSmall] = useState(false);
+  const [expand, setExpand] = useState(false);
+  useEffect(() => {
+    try {
+      const app = (navigator as any).standalone === true || matchMedia("(display-mode: standalone)").matches;
+      setSmall(app || localStorage.getItem("cn.linkSaved") === "1" || localStorage.getItem("cn.saved") === "1");
+    } catch { /* */ }
+  }, []);
+  const saved = () => { try { localStorage.setItem("cn.linkSaved", "1"); } catch { /* */ } setTimeout(() => { setSmall(true); setExpand(false); }, 3000); };
   const [src, setSrc] = useState("");
 
   useEffect(() => {
@@ -67,41 +81,58 @@ export default function GuestExtras({ variant, lang, link, wc, season, admin, cl
     const q = new URLSearchParams({ nm: wc.nm, np: String(wc.np || 1), l: lang === "zh-TW" ? "zh" : lang, tap: "1", q: hq() });
     if (wc.cc) q.set("cc", wc.cc);
     if (season) q.set("s", season);
-    setSrc(`/cabin/air/${PAGE[variant]}.html?${q}`);
+    setSrc(`/cabin/air/${PAGE[variant]}.html#${q}`); // # で渡す → ページの URL が先読みと同じになりキャッシュが効く
     setOpen(true);
   };
-  // 和風・マジカル: はじめて開いたときに 1 回だけ自動で
+  // 先に読んでおく (ハイテク = ページ + 画質に合った地球の写真 / 和風・マジカル = ページだけ。どちらも軽い順に)
+  const prefetch = () => Promise.all((variant === "tech" ? welcomeAssets(hq()) : [`/cabin/air/${PAGE[variant]}.html`]).map((u) => fetch(u).then((r) => r.blob()).catch(() => null)));
+  // 1 回だけ自動で: 読み込みが終わってから (ハイテクは起動の演出のあと)
   useEffect(() => {
-    if (!wc || variant === "tech") return;
-    const auto = admin ? new URLSearchParams(location.search).get("wc") === "1" : true;
-    if (!auto) return;
-    const k = `cnwc-${variant}-${wc.nm}`;
-    try { if (!admin && localStorage.getItem(k)) return; } catch { /* 保存できない端末でも一度は出す */ }
-    const id = setTimeout(() => { try { localStorage.setItem(k, "1"); } catch { /* */ } play(); }, 900);
-    return () => clearTimeout(id);
+    if (!wc) return;
+    const auto = admin ? new URLSearchParams(location.search).get("wc") === "1" : !wc.car;
+    let alive = true;
+    const t0 = Date.now(), k = `cnwc-${wc.nm}`;
+    const idle = setTimeout(() => {
+      void prefetch().then(() => {
+        if (!alive || !auto) return;
+        try { if (!admin && localStorage.getItem(k)) return; } catch { /* 保存できない端末でも一度は出す */ }
+        const rest = Math.max(0, (variant === "tech" ? 9000 : 900) - (Date.now() - t0));
+        setTimeout(() => { if (!alive) return; try { if (!admin && localStorage.getItem(k)) return; localStorage.setItem(k, "1"); } catch { /* */ } play(); }, rest);
+      });
+    }, 1500); // 画面が出そろってから裏で
+    return () => { alive = false; clearTimeout(idle); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wc?.nm, variant]);
 
   const copy = async () => {
-    const ok = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
+    const ok = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); saved(); };
     try { await navigator.clipboard.writeText(url); ok(); }
     catch {
-      const i = document.getElementById(`gx-url-${variant}`) as HTMLInputElement | null;
-      if (i) { i.focus(); i.select(); try { i.setSelectionRange(0, 9999); document.execCommand("copy"); ok(); } catch { /* 長押しでコピーしてもらう */ } }
+      // 古い iPhone: 見えない入力欄に入れてコピー (小さく畳んでいるときも使える)
+      const i = document.createElement("textarea"); i.value = url; i.readOnly = true; i.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+      document.body.appendChild(i); i.focus(); i.select();
+      try { i.setSelectionRange(0, 9999); if (document.execCommand("copy")) ok(); else setExpand(true); } catch { setExpand(true); /* 広げて長押しでコピーしてもらう */ }
+      i.remove();
     }
   };
-  const share = () => { (navigator as any).share?.({ title: "Crane Nest", url }).catch(() => {}); };
+  const share = () => { (navigator as any).share?.({ title: "Crane Nest", url }).then(saved).catch(() => {}); };
 
   if (!link && !wc) return null;
   return (
     <div className={className}>
       {wc && (
         <button type="button" onClick={play}
-          className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold active:scale-[.99] ${s.wcb}`}>
+          className={`mb-2 flex w-full items-center justify-center gap-2 rounded-xl border px-4 font-semibold active:scale-[.99] ${small ? "py-2 text-xs" : "py-3 text-sm"} ${s.wcb}`}>
           <span className="text-lg">{ICON[variant]}</span>{t.wc[variant]}
         </button>
       )}
-      {link && (
+      {link && small && !expand && (
+        <div className={`${s.box} !p-0 flex items-center`}>
+          <button type="button" onClick={() => setExpand(true)} className={`min-w-0 flex-1 truncate px-3 py-2.5 text-left text-[13px] font-semibold ${s.title}`}>🔗 {t.my} <span className="opacity-60">›</span></button>
+          <button type="button" onClick={copy} className={`mr-1.5 shrink-0 rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${s.btn}`}>{copied ? `✅ ${t.cd}` : `📋 ${t.c}`}</button>
+        </div>
+      )}
+      {link && (!small || expand) && (
         <div className={s.box}>
           <p className={s.title}>🔗 {t.h}</p>
           <p className={`mt-0.5 ${s.sub}`}>{t.s}</p>

@@ -727,9 +727,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
   }
   /** BOOST が優先。部屋紹介・Starlink の途中なら閉じて、BOOST が終わってから最初から流し直す (演出は省かない) */
   function yieldToBoost() {
-    if (holo.on()) { const q = holoQr; holoQr = false; holo.stop(); holoDone = false; if (q) { cqShow(); if (!slDone) slPending = true; } } // holoTick が BOOST のあと (15 秒あけて) にもう一度。QR は先に出しておき、Starlink は部屋紹介のあと
-    if (air.on() && slNext) { slNext = null; air.close(); slDone = false; slPending = true; } // slTick が BOOST のあとに
-    if (air.on() && wcOn) { const g = lastWc; air.close(); wcDone = false; wcWant = g; } // WELCOME も BOOST のあとで最初から
+    // 途中で止めたものは「まだ」に戻して記録も消す (この間にアプリが落ちて開き直しても、ちゃんと流し直す)
+    if (holo.on()) { const q = holoQr; holoQr = false; holo.stop(); holoDone = false; markDone({ holo: false }); if (q) { cqShow(); if (!slDone) slPending = true; } } // holoTick が BOOST のあと (15 秒あけて) にもう一度。QR は先に出しておき、Starlink は部屋紹介のあと
+    if (air.on() && slNext) { slNext = null; air.close(); slDone = false; slPending = true; markDone({ sl: false }); } // slTick が BOOST のあとに
+    if (air.on() && wcOn) { const g = lastWc; air.close(); wcDone = false; wcWant = g; markDone({ wc: false }); } // WELCOME も BOOST のあとで最初から
   }
   /** 後回しにした Starlink を、声・演出・BOOST が無いときに出す (1 秒ごと) */
   function slTick() {
