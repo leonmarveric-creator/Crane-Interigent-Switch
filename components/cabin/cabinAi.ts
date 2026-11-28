@@ -43,6 +43,7 @@ export interface AiCtx {
   guide: () => void;               // 入り方ガイドを流す
   roomLights: () => void;          // お部屋の照明をつける (ゲストの質問から)
   roomLit: () => void;             // 部屋の写真に灯り (見た目だけ)
+  roomFx?: () => void;             // 「SYSTEMS ONLINE」の演出 (お部屋の準備を話すのと一緒に)
   conQr: () => void;               // 右下の枠にコンシェルジュの QR を出す (お父さんのスマホのボタン)
   holo: () => void;                // 地図の枠にホログラム (お父さんのスマホのボタン)
   airport: (c: string) => void;    // ✈ 空港案内 (比較 / 降りたあとの道順) を iPad に重ねる
@@ -300,7 +301,7 @@ export function createAi(c: AiCtx): Ai {
     // 話している途中なら、終わってから
     // ほかの声 (道案内・あいさつ)・部屋紹介ホログラムの途中なら、それが終わってから (声を重ねない。最大 2 分待つ)
     const t0 = Date.now(); cmdWait++; let counted = true;
-    const go = () => { if (speaking || (c.voiceBusy() && Date.now() - t0 < 120000)) { setTimeout(go, 500); return; } if (counted) { counted = false; cmdWait = Math.max(0, cmdWait - 1); } void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
+    const go = () => { if (speaking || (c.voiceBusy() && Date.now() - t0 < 120000)) { setTimeout(go, 500); return; } if (counted) { counted = false; cmdWait = Math.max(0, cmdWait - 1); } if (k.id === "room") c.roomFx?.(); void speak(captainAudio(k.id, i), k.v[i], { st: "TO: CAPTAIN" }); };
     if (wait) setTimeout(go, wait); else go();
   }
 

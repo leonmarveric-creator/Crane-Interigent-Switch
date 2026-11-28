@@ -1,3 +1,5 @@
+import { recipientsFor, type NotifyTopic } from "@/lib/notifyRecipients";
+
 // =========================================================
 // WxPusher push notification helper (server only)
 //   Uses standard appToken + UID list, or simple SPT for one-person alerts.
@@ -7,6 +9,10 @@
 export interface WxPusherSendOptions {
   title: string;
   content: string;
+  /** 通知を押したときに開くページ (任意) */
+  url?: string;
+  /** どのお知らせか。管理画面で登録した送り先のうち、これを受け取る人に送る (誰も登録していなければ環境変数の送り先) */
+  topic?: NotifyTopic;
   appToken?: string;
   uids?: string;
   spt?: string;
@@ -41,7 +47,11 @@ function splitCsv(value: string | undefined): string[] {
 
 export async function sendWxPusher(options: WxPusherSendOptions): Promise<WxPusherSendResult> {
   const appToken = options.appToken || process.env.WXPUSHER_APP_TOKEN;
-  const uids = splitCsv(options.uids || process.env.WXPUSHER_UIDS);
+  let uids = splitCsv(options.uids || process.env.WXPUSHER_UIDS);
+  if (!options.uids && options.topic) {
+    const rs = await recipientsFor(options.topic).catch(() => null);
+    if (rs) { if (!rs.length) return { ok: false, skipped: true, error: "このお知らせを受け取る人がいません" }; uids = rs.map((r) => r.uid); }
+  }
   const spts = splitCsv(options.spt || process.env.WXPUSHER_SPT);
   const useStandardPush = !!appToken && uids.length > 0;
   const useSimplePush = !useStandardPush && spts.length > 0;
@@ -71,11 +81,13 @@ export async function sendWxPusher(options: WxPusherSendOptions): Promise<WxPush
                 contentType: 1,
                 uids,
                 verifyPayType: 0,
+                ...(options.url ? { url: options.url } : {}),
               }
             : {
                 content: options.content,
                 summary: options.title.slice(0, 100),
                 contentType: 1,
+                ...(options.url ? { url: options.url } : {}),
                 ...(spts.length === 1 ? { spt: spts[0] } : { sptList: spts }),
               }
         ),

@@ -267,3 +267,30 @@ export async function setDriverDesign(design: string): Promise<{ ok: boolean; er
   revalidatePath("/driver");
   return { ok: true };
 }
+
+/* ---------------- スマホへのお知らせ (WxPusher) ---------------- */
+/** 送り先の一覧と、WxPusher のアプリのトークンが入っているか (トークンそのものは返さない) */
+export async function getNotifyConfig() {
+  requireAdmin();
+  const { getNotifySettings } = await import("@/lib/notifyRecipients");
+  const s = await getNotifySettings(true);
+  return { ...s, tokenSet: !!process.env.WXPUSHER_APP_TOKEN, envUids: !!process.env.WXPUSHER_UIDS, siteSet: !!process.env.VERCEL_PROJECT_PRODUCTION_URL };
+}
+export async function saveNotifyConfig(recipients: import("@/lib/notifyRecipients").Recipient[], tripMin: number) {
+  requireAdmin();
+  const { saveNotifySettings } = await import("@/lib/notifyRecipients");
+  return saveNotifySettings(recipients, tripMin);
+}
+/** 1 人にテスト送信 (kind: trip = 送迎の見本 / plain = ふつうのテスト) */
+export async function testNotify(uid: string, kind: "trip" | "plain", lang: "ja" | "zh"): Promise<{ ok: boolean; error?: string }> {
+  requireAdmin();
+  if (!/^UID_[A-Za-z0-9]+$/.test(uid)) return { ok: false, error: "UID の形がちがいます（UID_ で始まります）" };
+  const { sendWxPusher } = await import("@/lib/wxpusher");
+  const h = process.env.VERCEL_PROJECT_PRODUCTION_URL, url = kind === "trip" && h ? `https://${h.replace(/^https?:\/\//, "")}/driver/go` : undefined;
+  const zh = lang === "zh";
+  const title = kind === "trip" ? (zh ? "🚗 接机/接站 15:30 · 夏 · りんくうタウン駅 5番出口（测试）" : "🚗 お迎え 15:30 · 夏 · りんくうタウン駅 5番出口（テスト）") : (zh ? "✅ Crane Nest 通知测试" : "✅ Crane Nest お知らせのテスト");
+  const body = kind === "trip"
+    ? (zh ? ["时间：15:30", "地点：りんくうタウン駅 5番出口", "房间：夏", "客人：WANG XIAOMING", "", "点开即可打开接送页面"] : ["時刻：15:30", "場所：りんくうタウン駅 5番出口", "部屋：夏", "ゲスト：WANG XIAOMING", "", "押すと送迎画面が開きます"])
+    : [zh ? "收到这条消息，就说明通知设置成功了。" : "これが届いていれば、お知らせの設定はできています。"];
+  return sendWxPusher({ title, content: [title, "", ...body].join("\n"), uids: uid, url });
+}

@@ -6,10 +6,12 @@
  *   - 空室なのについている部屋は赤く点滅 (「つけっぱなし」)
  *   - ホログラム本体は public/holo/building.html (音なし)。閉じておくこともできる
  */
+import { roomHudFx2 } from "@/lib/roomHudFx2";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminLang } from "@/lib/adminI18n";
 import type { Part, RoomLive } from "@/lib/buildingState";
-import GuestFaces from "@/components/admin/GuestFaces";
+import GuestBadge from "@/components/admin/GuestBadge";
+import { roomPowerFx } from "@/lib/roomPowerFx";
 
 /** public/holo/building.html の版 (building.js を作り直したら合わせる) */
 export const BUILDING_V = "418ef50b8e";
@@ -38,10 +40,27 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
     k: r.holo, occ: r.occ, alert: r.alert, unknown: !Object.keys(r.parts).length,
     ceil: !!r.parts.ceil?.on, wa: !!r.parts.wa?.on, ac: !!r.parts.ac?.on, acMode: r.parts.ac?.mode === "heat" ? "heat" : "cool", galaxy: !!r.parts.galaxy?.on, nest: !!r.parts.nest?.on,
   }));
+  /* 演出: 季節の部屋 (春夏秋冬) はその部屋の 3D ホログラム、ほかの部屋は輪の演出。ASTRAEA の声つき */
+  const fx = (o: { kind: "on" | "off"; room: string; holo: string | null; parts: string[]; was?: Record<string, boolean>; acMode?: "cool" | "heat" | null; note: string }) => {
+    const voice = o.kind === "on" ? "/cabin/audio/fx/online.mp3" : "/cabin/audio/fx/offline.mp3";
+    // スマホで開いているときは軽量版 (動く線のホログラム)。パソコン・iPad は 3D のホログラム
+    const lite = typeof matchMedia !== "undefined" && matchMedia("(max-width: 820px)").matches;
+    if (o.holo) void roomHudFx2({ kind: o.kind, holo: o.holo, room: o.room, lang, parts: o.parts, was: o.was, acMode: o.acMode, note: o.note, voice, lite });
+    else void roomPowerFx({ kind: o.kind, room: o.room, lang, parts: o.parts, note: o.note, voice });
+  };
+  /* 自動 ON / 自動 OFF の演出 (まだ見ていないもの。3 分より前のものは演出せず「見た」にする) */
+  const fxEvents = (ev: { id: string; at: number; kind: "on" | "off"; room: string; holo?: string | null; parts: string[]; was?: Record<string, boolean>; acMode?: "cool" | "heat" | null; why: string }[]) => {
+    let seen: string[] = []; try { seen = JSON.parse(localStorage.getItem("cnFxSeen") || "[]"); } catch { /* */ }
+    const fresh = ev.filter((e) => !seen.includes(e.id));
+    if (!fresh.length) return;
+    try { localStorage.setItem("cnFxSeen", JSON.stringify([...seen, ...fresh.map((e) => e.id)].slice(-80))); } catch { /* */ }
+    for (const e of fresh) if (Date.now() - e.at < 180e3)
+      fx({ kind: e.kind, room: e.room, holo: e.holo ?? null, parts: e.parts, was: e.was, acMode: e.acMode ?? null, note: e.why });
+  };
   const load = useCallback(async () => {
     if (!vis.current || document.hidden) return;
     const j = await fetch("/api/admin/live", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-    if (j?.ok) { setData({ rooms: j.rooms, hooks: j.hooks }); if (ready.current) post({ rooms: toHolo(j.rooms) }); }
+    if (j?.ok) { setData({ rooms: j.rooms, hooks: j.hooks }); if (ready.current) post({ rooms: toHolo(j.rooms) }); fxEvents(j.events ?? []); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // 地下の便槽 (便槽モニタリングと同じ計算: /api/admin/tank)
   const loadTank = useCallback(async () => {
@@ -65,6 +84,13 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); io?.disconnect(); window.removeEventListener("message", onMsg); };
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!open) ready.current = false; }, [open]);
+  // 見本: 管理画面の URL に ?fx=on / ?fx=off をつけて開くと、演出を 1 回 (音は画面を一度触ってから)
+  const demo = useRef(false);
+  useEffect(() => {
+    if (demo.current || !data?.rooms.length) return; const f = new URLSearchParams(location.search).get("fx"); if (f !== "on" && f !== "off") return; demo.current = true;
+    const r = data.rooms.find((x) => x.holo) ?? data.rooms[0];
+    fx({ kind: f, room: r.name, holo: r.holo, parts: f === "on" ? r.has.filter((p) => p === "ac" || p === "ceil") : r.has, was: Object.fromEntries(r.has.map((p) => [p, p === "ac" || p === "ceil" || !!r.parts[p]?.on])), acMode: r.parts.ac?.mode === "heat" ? "heat" : "cool", note: "DEMO" });
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (data && ready.current) post({ rooms: toHolo(data.rooms) }); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hook = async () => {
@@ -103,7 +129,7 @@ export default function LiveBuilding({ lang }: { lang: AdminLang }) {
           <div key={r.id} className={`flex flex-wrap items-center gap-1.5 rounded px-1.5 py-1 ${r.alert ? "bg-rose-500/10 ring-1 ring-rose-400/50" : ""}`}>
             <b className="min-w-[2.2em] text-sm text-white">{r.name}</b>
             <span className={`text-[10.5px] ${r.occ === "stay" ? "text-emerald-300" : r.occ === "soon" ? "text-amber-300" : "text-white/40"}`}>{x[r.occ]}</span>
-            {r.guest && r.occ !== "vacant" && <GuestFaces g={r.guest} room={r.name} />}
+            {r.guest && r.occ !== "vacant" && <GuestBadge g={r.guest} stay={r.stay} room={r.name} occ={r.occ} />}
             {(["ceil", "wa", "ac", "galaxy", "nest"] as Part[]).map((p) => part(r, p))}
             {r.alert && <span className="text-[10.5px] font-semibold text-rose-300">⚠ {x.alert}</span>}
           </div>

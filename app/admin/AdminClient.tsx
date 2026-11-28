@@ -19,8 +19,11 @@ import { navTick, blip, confirm as sfxConfirm } from "@/lib/sfx";
 import SmartKeyTab, { SmartKeyPreview, type SmartKeyProps } from "./SmartKeyTab";
 import BootVoiceCard from "./BootVoiceCard";
 import DriverDesignCard from "./DriverDesignCard";
+import NotifyCard from "./NotifyCard";
 import PendingCheers, { type PendingCheer } from "./PendingCheers";
 import LiveBuilding from "@/components/admin/LiveBuilding";
+import GuestBadge from "@/components/admin/GuestBadge";
+import type { RoomLive } from "@/lib/buildingState";
 import { RoomLockForm, type AdminSesameLock } from "./SesameLocks";
 
 export interface Room {
@@ -217,6 +220,7 @@ export default function AdminClient({
               <div className="space-y-10">
                 <BootVoiceCard initial={bootVoice} lang={lang} />
                 <DriverDesignCard initial={driverDesign} lang={lang} />
+                <NotifyCard lang={lang} />
                 <DeviceTestSection rooms={rooms} t={t} />
                 <SmartKeyPreview entrances={smartkey.entrances} settings={smartkey.settings} rooms={rooms} lang={lang} />
               </div>
@@ -952,6 +956,13 @@ function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
   const [armed, setArmed] = useState<string | null>(null); // 誤操作防止: 1度目で武装→2度目で実行
   const [roomBusy, setRoomBusy] = useState<string | null>(null); // 部屋単位OFFの実行中(room.id)
   const [roomDone, setRoomDone] = useState<string | null>(null); // 部屋単位OFFの完了表示(room.id)
+  // 泊まっているゲスト (LIVE と同じデータ: パスポート登録の名前・国籍・送迎。写真は使わない)
+  const [stay, setStay] = useState<Record<string, RoomLive>>({});
+  useEffect(() => {
+    let on = true;
+    void fetch("/api/admin/live", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (on && j?.ok) setStay(Object.fromEntries((j.rooms as RoomLive[]).map((x) => [x.id, x]))); }).catch(() => {});
+    return () => { on = false; };
+  }, []);
 
   const roomOff = async (room: Room) => {
     if (roomBusy) return;
@@ -1027,8 +1038,12 @@ function DeviceTestSection({ rooms, t }: { rooms: Room[]; t: T }) {
                     <a href={`/admin/test/${room.slug}`} target="_blank" rel="noopener noreferrer"
                       className="flex min-w-0 flex-1 items-center gap-2 text-sm text-violet-100">
                       <RoomThumb room={room} size={32} />
-                      <span className="truncate">{room.display_name}</span>
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-violet-300/70" />
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5"><span className="truncate">{room.display_name}</span><ExternalLink className="h-3.5 w-3.5 shrink-0 text-violet-300/70" /></span>
+                        {stay[room.id]?.guest && stay[room.id].occ !== "vacant"
+                          ? <span className="mt-1 flex" onClick={(e) => e.preventDefault()}><GuestBadge g={stay[room.id].guest!} stay={stay[room.id].stay} room={stay[room.id].name} occ={stay[room.id].occ} /></span>
+                          : stay[room.id] ? <span className="mt-0.5 block text-[11px] text-white/35">{stay[room.id].occ === "stay" ? "宿泊中" : stay[room.id].occ === "soon" ? "到着予定" : "空室"}</span> : null}
+                      </span>
                     </a>
                     {/* この部屋だけOFF（エアコン/照明/機器） */}
                     <button

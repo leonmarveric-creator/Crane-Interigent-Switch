@@ -7,6 +7,8 @@
  *   ・スカイゲートブリッジでは、スマホの音楽を「⚡ BOOST 用」の曲に切り替え、渡り切ったら元の曲の続きへ
  *   ・設定: iPad の一覧 / 部屋の写真 (iPad 用) と エアコン・照明・Wi-Fi の位置
  */
+import { roomHudFx2, type RoomHudFx2 } from "@/lib/roomHudFx2";
+import { loadHoloGeo } from "@/lib/holoLite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DriverData } from "@/lib/driverData";
@@ -60,17 +62,33 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     // 車内画面の声 (ASTRAEA・あいさつ) が流れている間は待ってから (声を重ねない。最大 20 秒)
     void (async () => { for (let i = 0; i < 80 && cabVoiceOn; i++) await new Promise((r) => setTimeout(r, 250)); try { void mRef.current.voiceOver(`/cabin/audio/room/${key}-${room}.mp3`, () => {}); } catch { /* 音が出せない */ } })();
   }, [toast]);
+  /* ---------- 自動 ON / OFF の演出 (お父さんのスマホ: 軽量の動くホログラム) ----------
+     走っていてもすぐ出す (自動で動いたことが見えるように)。ほかのアプリを見ている間だけ取っておき、
+     この画面に戻ったときに出す。15 分たっても戻らなければ出さない (声と字幕でもう伝えてある) */
+  const fxQ = useRef<{ o: RoomHudFx2; at: number } | null>(null);
+  const fxTry = useCallback(() => {
+    const q = fxQ.current; if (!q) return;
+    if (Date.now() - q.at > 15 * 60e3) { fxQ.current = null; return; }
+    if (document.hidden) return;
+    fxQ.current = null; void roomHudFx2(q.o);
+  }, []);
+  const roomFx = useCallback((kind: "on" | "off", roomKey: string, name: string, parts: string[]) => {
+    const holo = /^(haru|natsu|aki|fuyu)$/.test(roomKey) ? roomKey : "room";
+    fxQ.current = { at: Date.now(), o: { kind, holo, room: name, lang: tRef.current("ユーモア") === "ユーモア" ? "ja" : "zh", parts, lite: true } };
+    fxTry();
+  }, [fxTry]);
+  useEffect(() => { const v = () => fxTry(); document.addEventListener("visibilitychange", v); return () => document.removeEventListener("visibilitychange", v); }, [fxTry]);
   const autoOff = useCallback(async (a: AutoPlan) => {
     if (!a.off) return; const { roomId, resId, room, name } = a.off;
     for (let i = 0; i < 3; i++) {
       const r = await driverAllOff(roomId, resId, true).catch(() => ({ ok: false }));
-      if (r.ok) { sfx.chord(); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
+      if (r.ok) { sfx.chord(); roomFx("off", a.roomKey, name, ["ac", "ceil", "wa"]); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
       if (i === 0) { sfx.error(); confirmSay("offFail", room, t("{r} が応答しません。もう一度送ります", { r: name })); }
       await new Promise((ok) => setTimeout(ok, 6000));
     }
     sfx.error(); vib([80, 60, 80]); confirmSay("failFinal", room, t("⚠ {r} のオフを確認できませんでした（お知らせに残しました）", { r: name }));
     void cabinAutoAlert(roomId, "auto_off");
-  }, [confirmSay, t]);
+  }, [confirmSay, t, roomFx]);
   useEffect(() => { setTrip(initial); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   /* ---------- 📱 iPad を使うか / スマホだけか (出発の前に選ぶ。送迎中に iPad を探すことはしない) ----------
      スマホだけ: このスマホの中で車内画面 (/cabin?phone=1) を動かす。iPad: 今までどおり iPad が動かす */
@@ -183,11 +201,14 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const tripRef2 = useRef(trip); tripRef2.current = trip;
   /** 🏮 乗車時のお部屋の自動準備 (和風ライト + エアコン) の通知 */
   const [prep, setPrep] = useState<RoomPrep | null>(null);
+  const tRef = useRef(t); tRef.current = t;
   const seenPrep = useRef(0);
   const showPrep = useCallback((p: RoomPrep) => {
     if (p.n <= seenPrep.current) return; seenPrep.current = p.n;
     setPrep(p); sfx.chord(); vib([40, 60, 40]);
-  }, []);
+    // 画面いっぱいの自動 ON の演出
+    if (p.ok) roomFx("on", auto.current?.roomKey ?? "room", p.room, ["ac"]);
+  }, [roomFx]);
   const stopPrep = useCallback(async () => {
     const tr = tripRef2.current; if (!tr) return; sfx.down();
     const r = await cabinRoomPrepStop(tr.id); setPrep(null);
@@ -200,6 +221,8 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));
     auto.current = plan ? { ...plan, tripId: r.trip.id } : null;
+    // 演出に使う建物の形を先に読んでおく (部屋ごと約 60KB。2 回目からはキャッシュ)
+    if (plan && /^(haru|natsu|aki|fuyu)$/.test(plan.roomKey)) void loadHoloGeo(plan.roomKey);
     return true;
   }, [toast, t]);
   const end = useCallback(async () => {

@@ -16,7 +16,13 @@ export interface RoomLive {
   has: Part[];
   alert: boolean;
   /** 泊まっている (到着予定の) ゲスト: パスポート登録から。写真は /api/kaku/passport?drop= をボタンで */
-  guest?: { drop: string; names: string[]; pax: number; cc: string | null } | null;
+  guest?: {
+    drop: string; names: string[]; pax: number; cc: string | null;
+    /** お見送りの送迎 (Crane Nest のシステムに登録したもの) */
+    tr?: { date: string | null; dest: string | null; terminal: string | null; flightAt: string | null; departAt: string | null } | null;
+  } | null;
+  /** 今の予約 (宿泊中 / 到着予定) のチェックイン・チェックアウト */
+  stay?: { in: string; out: string; name: string | null } | null;
 }
 
 /** ① 操作 → それぞれの機器がどうなるか (lib/deviceControl.ts の場面と同じ。null = 変えない) */

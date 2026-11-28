@@ -12,14 +12,21 @@ import { fetchFlight, flightConfigured } from "@/lib/flight";
 import { loadReservations, getDriverSettings, toDRoom } from "@/lib/driverData";
 import { prepDue, pickupBase, batteryTargets, batteryLow, jstDay } from "@/lib/driverLogic";
 import { sendWxPusher } from "@/lib/wxpusher";
+import { runTripNotify } from "@/lib/tripNotify";
+import { toCabinRoom } from "@/lib/cabinData";
 
 export async function runDriverAuto(nowMs = Date.now()) {
-  const out = { prepared: 0, flights: 0, battery: 0 };
-  const { res, missing } = await loadReservations(nowMs - 2 * 86400e3, nowMs + 5 * 86400e3);
+  const out = { prepared: 0, flights: 0, battery: 0, notified: 0 };
+  const { res, missing, tokens } = await loadReservations(nowMs - 2 * 86400e3, nowMs + 5 * 86400e3);
   if (missing) return out;
   const settings = await getDriverSettings();
   const { data: roomRows } = await supabaseAdmin.from("rooms").select("*").eq("is_active", true);
   const byId = new Map((roomRows ?? []).map((r: any) => [r.id, r]));
+  // 0. 送迎のお知らせ (WxPusher アプリ。登録した人にだけ。失敗しても下の処理は続ける)
+  try {
+    const rooms = new Map((roomRows ?? []).map((r: any) => { const c = toCabinRoom(r, nowMs); return [r.id, { name: String(r.display_name || r.slug || ""), kanji: c.kanji }]; }));
+    out.notified = await runTripNotify(res, rooms, tokens, nowMs);
+  } catch (e) { console.error("tripNotify", e); }
 
   // 1. 自動準備
   if (settings.autoPrep) {
@@ -76,6 +83,7 @@ export async function runDriverAuto(nowMs = Date.now()) {
         await sendWxPusher({
           title: `【鍵の電池】${name} 残り ${s.battery}%`,
           content: [`【鍵の電池】${name} の電池が残り ${s.battery}% です。`, "電池を交換してください。", next ? `次のチェックイン: ${jstDay(next.checkIn)}` : "", "交換したら、お父さんの画面の「已更换」を押してください。"].filter(Boolean).join("\n"),
+          topic: "key",
         }).catch(() => null);
       }
     }

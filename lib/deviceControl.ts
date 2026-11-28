@@ -1,4 +1,6 @@
 import { sendSesameCommand, SESAME_CMD } from "./sesame";
+import { autoKind, AUTO_LABEL } from "@/lib/autoPower";
+import { sendWxPusher } from "@/lib/wxpusher";
 import {
   acTurnOn, acTurnOff, acSetAll, lightTurnOn, lightTurnOff, deviceTurnOn, deviceTurnOff,
   bulbSetBrightness, bulbSetColorTemperature, bulbSetColor, irCustomButton, deviceStatus, isIrDevice, type SwitchBotCreds,
@@ -111,6 +113,19 @@ export async function logDevice(entry: {
   action: string; source: "guest" | "admin" | "cron"; success: boolean;
 }) {
   try { await supabaseAdmin.from("device_logs").insert(entry); } catch { /* ignore */ }
+  // 自動 ON / 自動 OFF はスマホに知らせる (WxPusher。設定が無ければ何もしない。3 秒で諦める)
+  const kind = entry.success ? autoKind(entry.action, entry.source, entry.reservation_id) : null;
+  if (kind) {
+    try {
+      const { data: room } = await supabaseAdmin.from("rooms").select("display_name, slug").eq("id", entry.room_id).maybeSingle();
+      const name = String((room as any)?.display_name || (room as any)?.slug || "");
+      const at = new Date().toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+      await Promise.race([
+        sendWxPusher({ title: `${kind === "on" ? "🟢" : "⚫"} ${name} ${kind === "on" ? "自動ON" : "自動OFF"}（${AUTO_LABEL[entry.action] ?? entry.action}）`, content: `${at} ${name}：${AUTO_LABEL[entry.action] ?? entry.action}${kind === "on" ? "。お部屋の準備を始めました。" : "。お部屋をすべてオフにしました。"}`, topic: "auto" }),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch { /* 知らせられなくても止めない */ }
+  }
 }
 
 export type DeviceAction =

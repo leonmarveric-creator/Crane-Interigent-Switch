@@ -4,6 +4,8 @@
  *   Leaflet は /cabin/leaflet/leaflet.js を先に読み込んでおくこと (window.L)。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { roomHudFx2 } from "@/lib/roomHudFx2";
+import { roomPowerFx, type FxLang } from "@/lib/roomPowerFx";
 import { boostSfxFile } from "@/lib/boostSfx";
 import {
   BASE_MIN, BRIDGE, BOOST_INIT, CRANE_NEST, PLACES, POIS, boostPrepDue, boostStep, bridgePos, bufferMin, decodePolyline, dist, etaMin,
@@ -669,6 +671,10 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     hasCheckin: () => !!checkinUrl, checkin: () => showCheckin(), guide: () => guide.start(),
     roomLights: () => { if (trip && !trip.id.startsWith("demo")) hooks.onLights?.(trip.id); setTimeout(roomLit, 2500); },
     roomLit: () => roomLit(),
+    // お部屋の準備の演出 (映像だけ。声は ASTRAEA のひと言)。季節の部屋はその部屋の 3D ホログラム
+    roomFx: () => { if (!room) return; const L = (["ja", "en", "zh", "ko"].includes(lang) ? lang : "en") as FxLang, hk = holoRoomOf(room);
+      if (hk) void roomHudFx2({ kind: "on", holo: hk, room: room.kanji || room.en, lang: L, parts: ["ac"], sound: false });
+      else void roomPowerFx({ kind: "on", room: room.kanji || room.en, lang: L, parts: ["ac"], sound: false }); },
     conQr: () => cqShow(),
     holo: () => { holoStart(true); },
     airport: (c) => { holo.stop(); air.open(c); },

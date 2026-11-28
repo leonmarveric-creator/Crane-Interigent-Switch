@@ -63,6 +63,7 @@ async function sendTankWxPusher(p: AlertPayload): Promise<AlertResult["wxpusher"
   return sendWxPusher({
     title: buildTitle(p),
     content: [buildTitle(p), "", ...buildLines(p)].join("\n"),
+    topic: "tank",
   });
 }
 
