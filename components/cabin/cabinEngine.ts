@@ -673,7 +673,9 @@ export function createEngine(root: HTMLElement, routes: Record<string, [number, 
     roomLit: () => roomLit(),
     // お部屋の準備の演出 (映像だけ。声は ASTRAEA のひと言)。季節の部屋はその部屋の 3D ホログラム
     roomFx: () => { if (!room) return; const L = (["ja", "en", "zh", "ko"].includes(lang) ? lang : "en") as FxLang, hk = holoRoomOf(room);
-      if (hk) void roomHudFx2({ kind: "on", holo: hk, room: room.kanji || room.en, lang: L, parts: ["ac"], sound: false });
+      // お父さんのスマホで車内画面を動かしているとき (/cabin?phone=1) は軽量版 (動く線のホログラム)。iPad は 3D
+      const lite = typeof location !== "undefined" && /[?&]phone=1/.test(location.search);
+      if (hk) void roomHudFx2({ kind: "on", holo: hk, room: room.kanji || room.en, lang: L, parts: ["ac"], sound: false, lite });
       else void roomPowerFx({ kind: "on", room: room.kanji || room.en, lang: L, parts: ["ac"], sound: false }); },
     conQr: () => cqShow(),
     holo: () => { holoStart(true); },

@@ -7,7 +7,7 @@
  *   ・スカイゲートブリッジでは、スマホの音楽を「⚡ BOOST 用」の曲に切り替え、渡り切ったら元の曲の続きへ
  *   ・設定: iPad の一覧 / 部屋の写真 (iPad 用) と エアコン・照明・Wi-Fi の位置
  */
-import { roomHudFx2, type RoomHudFx2 } from "@/lib/roomHudFx2";
+import { roomHudFx2, primeHudAudio, type RoomHudFx2 } from "@/lib/roomHudFx2";
 import { loadHoloGeo } from "@/lib/holoLite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -64,25 +64,28 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   }, [toast]);
   /* ---------- 自動 ON / OFF の演出 (お父さんのスマホ: 軽量の動くホログラム) ----------
      走っていてもすぐ出す (自動で動いたことが見えるように)。ほかのアプリを見ている間だけ取っておき、
-     この画面に戻ったときに出す。15 分たっても戻らなければ出さない (声と字幕でもう伝えてある) */
+     この画面に戻ったときに出す。15 分たっても戻らなければ出さない (声と字幕でもう伝えてある)
+     声と重ねない: 確認の声 (confirmSay) は演出が終わってから。車内画面の声が流れている間は、演出の効果音を鳴らさない */
   const fxQ = useRef<{ o: RoomHudFx2; at: number } | null>(null);
   const fxTry = useCallback(() => {
     const q = fxQ.current; if (!q) return;
     if (Date.now() - q.at > 15 * 60e3) { fxQ.current = null; return; }
     if (document.hidden) return;
-    fxQ.current = null; void roomHudFx2(q.o);
+    fxQ.current = null; return roomHudFx2({ ...q.o, sound: !cabVoiceOn });
   }, []);
-  const roomFx = useCallback((kind: "on" | "off", roomKey: string, name: string, parts: string[]) => {
+  /** 演出を出す。終わったら (取っておいたときはすぐ) 解決する。最大 9 秒で先へ (声が遅れすぎないように) */
+  const roomFx = useCallback((kind: "on" | "off", roomKey: string, name: string, parts: string[]): Promise<void> => {
     const holo = /^(haru|natsu|aki|fuyu)$/.test(roomKey) ? roomKey : "room";
     fxQ.current = { at: Date.now(), o: { kind, holo, room: name, lang: tRef.current("ユーモア") === "ユーモア" ? "ja" : "zh", parts, lite: true } };
-    fxTry();
+    const p = fxTry();
+    return p ? Promise.race([p, new Promise<void>((r) => setTimeout(r, 9000))]) : Promise.resolve();
   }, [fxTry]);
   useEffect(() => { const v = () => fxTry(); document.addEventListener("visibilitychange", v); return () => document.removeEventListener("visibilitychange", v); }, [fxTry]);
   const autoOff = useCallback(async (a: AutoPlan) => {
     if (!a.off) return; const { roomId, resId, room, name } = a.off;
     for (let i = 0; i < 3; i++) {
       const r = await driverAllOff(roomId, resId, true).catch(() => ({ ok: false }));
-      if (r.ok) { sfx.chord(); roomFx("off", a.roomKey, name, ["ac", "ceil", "wa"]); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
+      if (r.ok) { sfx.chord(); await roomFx("off", a.roomKey, name, ["ac", "ceil", "wa"]); confirmSay(i ? "retryOk" : "offOk", room, i ? t("✓ 2 回目でオフにできました：{r}", { r: name }) : t("✓ {r} をすべてオフにしました", { r: name })); return; }
       if (i === 0) { sfx.error(); confirmSay("offFail", room, t("{r} が応答しません。もう一度送ります", { r: name })); }
       await new Promise((ok) => setTimeout(ok, 6000));
     }
@@ -204,10 +207,10 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   const tRef = useRef(t); tRef.current = t;
   const seenPrep = useRef(0);
   const showPrep = useCallback((p: RoomPrep) => {
-    if (p.n <= seenPrep.current) return; seenPrep.current = p.n;
+    if (p.n <= seenPrep.current) return Promise.resolve(); seenPrep.current = p.n;
     setPrep(p); sfx.chord(); vib([40, 60, 40]);
     // 画面いっぱいの自動 ON の演出
-    if (p.ok) roomFx("on", auto.current?.roomKey ?? "room", p.room, ["ac"]);
+    return p.ok ? roomFx("on", auto.current?.roomKey ?? "room", p.room, ["ac"]) : Promise.resolve();
   }, [roomFx]);
   const stopPrep = useCallback(async () => {
     const tr = tripRef2.current; if (!tr) return; sfx.down();
@@ -216,7 +219,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   }, [toast, t]);
 
   const start = useCallback(async (v: Parameters<typeof cabinStart>[0], plan?: Omit<AutoPlan, "tripId">) => {
-    unlockRemoteVoice(); try { mRef.current.prime(); } catch { /* */ } // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
+    unlockRemoteVoice(); primeHudAudio(); try { mRef.current.prime(); } catch { /* */ } // 出発ボタンを押したときに (iPhone は指で押したときでないと音を準備できない)
     const r = await cabinStart(v); rtKick(CABIN_CH);
     if (!r.ok) { sfx.error(); toast(r.error === "SETUP" ? t("先に Supabase の SQL（migration_cabin.sql）を実行してください") : t("iPad に出せませんでした") + "：" + r.error.slice(0, 60)); return false; }
     sfx.chord(); vib(30); setTrip(r.trip); toast(t("🚗 iPad に表示しました。気をつけて！"));
@@ -238,9 +241,9 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
     if (isAuto) toast(t("🚗 迎え先を離れたので、自動で乗車にしました"));
     if (a?.lang) setTimeout(() => { try { const m = mRef.current; if (!(m.playing && m.cur.p === "in" && m.cur.l === a.lang)) m.startWith("in", a.lang); } catch { /* */ } }, 6000); // 乗ったらゲストの言語のお迎え用の音楽へ
     if (r.prep) {
-      showPrep(r.prep);
+      const fxDone = showPrep(r.prep);
       const rk = a?.roomKey ?? "room", nm = a?.roomName ?? "";
-      if (r.prep.ok) setTimeout(() => confirmSay("onOk", rk, t("✓ {r} のエアコンをつけました", { r: nm })), 2500);
+      if (r.prep.ok) void (fxDone ?? Promise.resolve()).then(() => confirmSay("onOk", rk, t("✓ {r} のエアコンをつけました", { r: nm })));
       else { setTimeout(() => confirmSay("onFail", rk, t("⚠ {r} のエアコンが応答しません（お知らせに残しました）", { r: nm })), 2500); if (a?.roomId) void cabinAutoAlert(a.roomId, "auto_on"); }
     } else if (!isAuto) toast(t("🧳 ゲスト乗車。iPad をゲスト用の画面にしました"));
   }, [toast, t, showPrep, confirmSay]);
@@ -248,7 +251,7 @@ export function useCabin(initial: CabinTrip | null, music: Music, toast: (s: str
   /** ASTRAEA に話しかける間、音楽を小さく */
   const duck = useCallback((on: boolean) => { try { mRef.current.duck(on); } catch { /* ignore */ } }, []);
   const restoreSound = useCallback(() => {
-    playbackSession(); unlockRemoteVoice();
+    playbackSession(); unlockRemoteVoice(); primeHudAudio();
     const m = mRef.current; try { m.prime(); } catch { /* */ }
     const tr = tripRef2.current;
     // 音楽が止まっていれば、その送迎の曲をもう一度 (曲の場所は最初から)

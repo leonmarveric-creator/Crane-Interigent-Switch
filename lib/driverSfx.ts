@@ -2,6 +2,7 @@
  * お父さんの送迎画面の効果音 (Web Audio で合成・ファイルなし) と、アンドロイドの声 (/audio/driver/*.mp3)。
  *   声は 1 つの audio 要素を使い回す (iPhone で後から鳴らせるように)。複数のセリフは順番に流す。
  */
+import { playbackSession } from "@/lib/iosAudio";
 let ctx: AudioContext | null = null;
 let muted = false, voiceOff = false;
 export function setDriverMute(sfx: boolean, voice: boolean) { muted = sfx; voiceOff = voice; }
@@ -9,7 +10,7 @@ export function setDriverMute(sfx: boolean, voice: boolean) { muted = sfx; voice
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
   try {
-    if (!ctx) { const C = window.AudioContext || (window as any).webkitAudioContext; if (!C) return null; ctx = new C(); }
+    if (!ctx) { const C = window.AudioContext || (window as any).webkitAudioContext; if (!C) return null; playbackSession(); ctx = new C(); } // 消音スイッチでも鳴らす
     if (ctx.state === "suspended") void ctx.resume();
     return ctx;
   } catch { return null; }

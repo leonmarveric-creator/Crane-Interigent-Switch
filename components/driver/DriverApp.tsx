@@ -7,6 +7,7 @@
  *   ページ: ホーム / 送迎 (お迎え・お見送り) / 案内 (部屋を選んで QR と説明) / 設定。中央の START でお出迎え準備。
  */
 import { syncVoiceCache } from "@/lib/driverVoiceCache";
+import { primeHudAudio } from "@/lib/roomHudFx2";
 import { boostSfxFile } from "@/lib/boostSfx";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
@@ -265,7 +266,7 @@ export default function DriverApp({ data: initial, now: serverNow, simple }: { d
   };
   const roomKeyOf = (slug?: string | null) => { const s = String(slug || "").toLowerCase(); return /haru|spring/.test(s) ? "haru" : /natsu|natu|summer/.test(s) ? "natsu" : /aki|autumn/.test(s) ? "aki" : /fuyu|winter/.test(s) ? "fuyu" : "room"; };
   const quick = async (r: DRes, dir: "in" | "out") => {
-    sfx.prime(); music.prime();
+    sfx.prime(); music.prime(); primeHudAudio(); // 演出の効果音も、指で押したこのときに準備 (マナーモードでも鳴る)
     const pk = quickPlace(r, dir); if (!pk) { cabS.open(r, dir); return; } // 行き先がわからないときは、今までの画面で選ぶ
     let dev: string | null = null; try { dev = localStorage.getItem("drvCabDev"); } catch { /* ignore */ }
     if (!data.cabin.devices.some((d) => d.id === dev)) dev = data.cabin.devices[0]?.id ?? null;

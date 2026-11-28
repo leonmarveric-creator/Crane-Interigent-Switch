@@ -8,6 +8,7 @@
  */
 import type { FxLang } from "@/lib/roomPowerFx";
 import { holoLite, loadHoloGeo, type HoloLite } from "@/lib/holoLite";
+import { playbackSession } from "@/lib/iosAudio";
 
 export interface RoomHudFx2 {
   kind: "on" | "off";
@@ -208,7 +209,13 @@ const CSS = `
 `;
 
 let AC: AudioContext | null = null;
-const ac = () => { try { AC ??= new (window.AudioContext || (window as any).webkitAudioContext)(); if (AC.state === "suspended") void AC.resume(); return AC; } catch { return null; } };
+/* iPhone: 消音 (マナーモード) でも鳴らす (playback)。音は指で押したときに準備した AudioContext でないと鳴らないので、
+   「出発」を押したときに primeHudAudio() で準備しておく (GPS で自動に始まる演出は、指で押した流れの外のため) */
+const ac = () => { try { if (!AC) { playbackSession(); AC = new (window.AudioContext || (window as any).webkitAudioContext)(); } if (AC.state !== "running") void AC.resume(); return AC; } catch { return null; } };
+/** 指で押したときに呼ぶ (出発・音を出すボタン)。無音を 1 回鳴らして、あとから自動で鳴らせるようにする */
+export function primeHudAudio() {
+  try { playbackSession(); const a = ac(); if (!a) return; const b = a.createBuffer(1, 1, 22050), s = a.createBufferSource(); s.buffer = b; s.connect(a.destination); s.start(0); } catch { /* */ }
+}
 function tone(f0: number, f1: number, at: number, dur: number, v: number, type: OscillatorType = "sine") {
   const a = ac(); if (!a) return; const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain(); o.type = type;
   o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
